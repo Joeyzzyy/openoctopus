@@ -66,7 +66,8 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#f3f2ed] text-[#111111]">
-      <div className="mx-auto flex max-w-[1600px] gap-6 px-4 py-4 md:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-[1600px] gap-6 px-3 py-4 sm:px-4 md:px-6 lg:px-8">
+        {/* Sidebar - desktop only */}
         <aside className="hidden w-[248px] shrink-0 xl:block">
           <div className="sticky top-4 rounded-[24px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)]">
             <div className="border-b border-black/8 pb-4">
@@ -119,102 +120,105 @@ export default async function DashboardPage() {
           </div>
         </aside>
 
-        <div className="min-w-0 flex-1 space-y-6">
-          <section className="rounded-[28px] border border-black/8 bg-white p-5 shadow-[0_24px_60px_rgba(0,0,0,0.06)] md:p-6">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        {/* Main content */}
+        <div className="min-w-0 flex-1 space-y-4 sm:space-y-6">
+          {/* Hero header */}
+          <section className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-5 md:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-[#f5f4ef] px-3 py-1 font-mono text-[10px] uppercase tracking-[1px] text-black/50">
                   <ShieldCheck className="h-3.5 w-3.5" />
                   Billing Control Center
                 </div>
-                <h1 className="mt-3 font-mono text-[34px] leading-[0.95] font-bold tracking-[-0.05em] text-[#111111] md:text-[48px]">
-                  Model budgets, keys, and spend oversight in one white-pane dashboard.
+                <h1 className="mt-3 font-mono text-[22px] leading-[1] font-bold tracking-[-0.04em] text-[#111111] sm:text-[30px] md:text-[38px] lg:text-[48px] lg:leading-[0.95]">
+                  Model budgets, keys, and spend oversight.
                 </h1>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-black/56 md:text-[15px]">
+                <p className="mt-2 max-w-3xl text-[13px] leading-6 text-black/56 sm:mt-3 sm:text-sm md:text-[15px]">
                   Track wallet balance, enforce monthly limits, see which key is
-                  burning budget, and audit every model request across production,
-                  batch jobs, and partner traffic.
+                  burning budget, and audit every model request.
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                <button className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-black/8 bg-white px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#111111]">
+                <button className="inline-flex h-9 items-center gap-2 rounded-[14px] border border-black/8 bg-white px-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#111111] sm:h-10 sm:px-4">
                   <Bell className="h-4 w-4" />
-                  Alerts
+                  <span className="hidden sm:inline">Alerts</span>
                 </button>
-                <button className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-black/8 bg-white px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#111111]">
+                <button className="inline-flex h-9 items-center gap-2 rounded-[14px] border border-black/8 bg-white px-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#111111] sm:h-10 sm:px-4">
                   <Settings2 className="h-4 w-4" />
-                  Budget Rules
+                  <span className="hidden sm:inline">Budget Rules</span>
                 </button>
-                <button className="inline-flex h-10 items-center gap-2 rounded-[14px] bg-[#111111] px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white">
+                <button className="inline-flex h-9 items-center gap-2 rounded-[14px] bg-[#111111] px-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white sm:h-10 sm:px-4">
                   <Plus className="h-4 w-4" />
-                  Create Key
+                  <span className="hidden min-[480px]:inline">Create Key</span>
                 </button>
                 <form action="/auth/sign-out" method="post">
                   <button
                     type="submit"
-                    className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-black/8 bg-white px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#111111]"
+                    className="inline-flex h-9 items-center gap-2 rounded-[14px] border border-black/8 bg-white px-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#111111] sm:h-10 sm:px-4"
                   >
                     <LogOut className="h-4 w-4" />
-                    Sign Out
+                    <span className="hidden sm:inline">Sign Out</span>
                   </button>
                 </form>
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center gap-2">
-              <div className="inline-flex h-9 items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3">
-                <span className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+            <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-6">
+              <div className="inline-flex h-8 items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-2.5 sm:h-9 sm:px-3">
+                <span className="font-mono text-[9px] uppercase tracking-[1px] text-black/45 sm:text-[10px]">
                   Workspace
                 </span>
-                <span className="font-mono text-xs font-semibold text-[#111111]">
+                <span className="max-w-[120px] truncate font-mono text-[11px] font-semibold text-[#111111] sm:max-w-none sm:text-xs">
                   {workspace?.name ?? "OpenOctopus Production"}
                 </span>
-                <ChevronDown className="h-4 w-4 text-black/35" />
+                <ChevronDown className="h-3.5 w-3.5 text-black/35 sm:h-4 sm:w-4" />
               </div>
-              <div className="inline-flex h-9 items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3">
-                <span className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+              <div className="inline-flex h-8 items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-2.5 sm:h-9 sm:px-3">
+                <span className="font-mono text-[9px] uppercase tracking-[1px] text-black/45 sm:text-[10px]">
                   User
                 </span>
-                <span className="font-mono text-xs font-semibold text-[#111111]">
+                <span className="max-w-[100px] truncate font-mono text-[11px] font-semibold text-[#111111] sm:max-w-none sm:text-xs">
                   {user.name}
                 </span>
-                <ChevronDown className="h-4 w-4 text-black/35" />
+                <ChevronDown className="h-3.5 w-3.5 text-black/35 sm:h-4 sm:w-4" />
               </div>
             </div>
           </section>
 
-          <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+          {/* Metrics */}
+          <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {metrics.map((metric) => (
               <article
                 key={metric.label}
-                className="rounded-[24px] border border-black/8 bg-white p-5 shadow-[0_20px_50px_rgba(0,0,0,0.05)]"
+                className="rounded-[18px] border border-black/8 bg-white p-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.05)] sm:rounded-[24px] sm:p-5"
               >
-                <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                <p className="font-mono text-[9px] uppercase tracking-[1px] text-black/45 sm:text-[10px]">
                   {metric.label}
                 </p>
-                <p className="mt-4 font-mono text-[30px] leading-none font-bold tracking-[-0.05em] text-[#111111]">
+                <p className="mt-2 font-mono text-[20px] leading-none font-bold tracking-[-0.05em] text-[#111111] sm:mt-4 sm:text-[30px]">
                   {metric.value}
                 </p>
-                <p className={cn("mt-3 font-mono text-[11px] uppercase tracking-[0.9px]", toneStyles[metric.tone])}>
+                <p className={cn("mt-2 font-mono text-[10px] uppercase tracking-[0.9px] sm:mt-3 sm:text-[11px]", toneStyles[metric.tone])}>
                   {metric.change}
                 </p>
               </article>
             ))}
           </section>
 
-          <section className="grid gap-6 2xl:grid-cols-[1.3fr_0.85fr]">
-            <article className="rounded-[28px] border border-black/8 bg-white p-5 shadow-[0_24px_60px_rgba(0,0,0,0.06)] md:p-6">
-              <div className="flex items-start justify-between gap-4">
+          {/* Spend Trend + Model Mix */}
+          <section className="grid gap-4 sm:gap-6 lg:grid-cols-[1.3fr_0.85fr]">
+            <article className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-5 md:p-6">
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
                     Spend Trend
                   </p>
-                  <h2 className="mt-2 font-mono text-xl font-semibold text-[#111111]">
+                  <h2 className="mt-1 font-mono text-base font-semibold text-[#111111] sm:mt-2 sm:text-xl">
                     Daily spend and budget velocity
                   </h2>
                 </div>
-                <div className="inline-flex h-9 items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3">
+                <div className="hidden items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 sm:inline-flex sm:h-9">
                   <ChartNoAxesCombined className="h-4 w-4 text-black/45" />
                   <span className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
                     synced hourly
@@ -222,20 +226,20 @@ export default async function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-8 grid grid-cols-7 items-end gap-3">
+              <div className="mt-5 grid grid-cols-7 items-end gap-1.5 sm:mt-8 sm:gap-3">
                 {spendTrend.map((point) => (
-                  <div key={point.day} className="flex flex-col items-center gap-3">
-                    <div className="flex h-44 w-full items-end rounded-[18px] bg-[#f3f2ed] p-2">
+                  <div key={point.day} className="flex flex-col items-center gap-2 sm:gap-3">
+                    <div className="flex h-24 w-full items-end rounded-[12px] bg-[#f3f2ed] p-1.5 sm:h-44 sm:rounded-[18px] sm:p-2">
                       <div
-                        className="w-full rounded-[12px] bg-[linear-gradient(180deg,#111111,#3e3e3e)]"
+                        className="w-full rounded-[8px] bg-[linear-gradient(180deg,#111111,#3e3e3e)] sm:rounded-[12px]"
                         style={{ height: `${(point.spend / maxSpend) * 100}%` }}
                       />
                     </div>
                     <div className="text-center">
-                      <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/40">
+                      <p className="font-mono text-[8px] uppercase tracking-[0.5px] text-black/40 sm:text-[10px] sm:tracking-[1px]">
                         {point.day}
                       </p>
-                      <p className="mt-1 font-mono text-xs font-semibold text-[#111111]">
+                      <p className="mt-0.5 font-mono text-[10px] font-semibold text-[#111111] sm:mt-1 sm:text-xs">
                         ${point.spend}
                       </p>
                     </div>
@@ -244,32 +248,32 @@ export default async function DashboardPage() {
               </div>
             </article>
 
-            <article className="rounded-[28px] border border-black/8 bg-white p-5 shadow-[0_24px_60px_rgba(0,0,0,0.06)] md:p-6">
+            <article className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-5 md:p-6">
               <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
                 Model Mix
               </p>
-              <h2 className="mt-2 font-mono text-xl font-semibold text-[#111111]">
+              <h2 className="mt-1 font-mono text-base font-semibold text-[#111111] sm:mt-2 sm:text-xl">
                 Where the budget goes
               </h2>
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
                 {modelSpend.length > 0 ? (
                   modelSpend.map((item) => (
-                    <div key={item.model} className="rounded-[18px] border border-black/8 bg-[#faf9f6] p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="font-mono text-sm font-semibold text-[#111111]">
+                    <div key={item.model} className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-3 sm:rounded-[18px] sm:p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-mono text-[13px] font-semibold text-[#111111] sm:text-sm">
                             {item.model}
                           </p>
-                          <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-black/40">
+                          <p className="mt-1 font-mono text-[9px] uppercase tracking-[1px] text-black/40 sm:text-[10px]">
                             {item.provider} · {item.requests}
                           </p>
                         </div>
-                        <p className="font-mono text-sm font-semibold text-[#111111]">
+                        <p className="shrink-0 font-mono text-[13px] font-semibold text-[#111111] sm:text-sm">
                           {item.spend}
                         </p>
                       </div>
-                      <div className="mt-3 h-2 rounded-full bg-black/6">
+                      <div className="mt-2.5 h-1.5 rounded-full bg-black/6 sm:mt-3 sm:h-2">
                         <div
                           className="h-full rounded-full bg-[#111111]"
                           style={{ width: `${item.share}%` }}
@@ -278,7 +282,7 @@ export default async function DashboardPage() {
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-[18px] border border-dashed border-black/10 bg-[#faf9f6] p-6 text-sm text-black/50">
+                  <div className="rounded-[14px] border border-dashed border-black/10 bg-[#faf9f6] p-5 text-sm text-black/50 sm:rounded-[18px] sm:p-6">
                     No model usage has been recorded yet.
                   </div>
                 )}
@@ -286,99 +290,139 @@ export default async function DashboardPage() {
             </article>
           </section>
 
-          <section className="grid gap-6 2xl:grid-cols-[1.3fr_0.85fr]">
-            <article className="rounded-[28px] border border-black/8 bg-white p-5 shadow-[0_24px_60px_rgba(0,0,0,0.06)] md:p-6">
-              <div className="flex items-start justify-between gap-4">
+          {/* API Keys + Budget Policies */}
+          <section className="grid gap-4 sm:gap-6 lg:grid-cols-[1.3fr_0.85fr]">
+            <article className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-5 md:p-6">
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
                     API Keys
                   </p>
-                  <h2 className="mt-2 font-mono text-xl font-semibold text-[#111111]">
+                  <h2 className="mt-1 font-mono text-base font-semibold text-[#111111] sm:mt-2 sm:text-xl">
                     Per-key cost, quota, and activity
                   </h2>
                 </div>
-                <button className="inline-flex h-9 items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111]">
+                <button className="hidden items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111] sm:inline-flex sm:h-9">
                   <KeyRound className="h-4 w-4" />
                   Rotate selected
                 </button>
               </div>
 
-              <div className="mt-6 overflow-x-auto">
-                <table className="min-w-full border-separate border-spacing-y-2">
-                  <thead>
-                    <tr className="text-left">
-                      {["Key", "Environment", "Monthly Budget", "Spent", "Requests", "Last Used", "State"].map((heading) => (
-                        <th
-                          key={heading}
-                          className="px-3 py-2 font-mono text-[10px] uppercase tracking-[1px] text-black/40"
-                        >
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {apiKeys.length > 0 ? (
-                      apiKeys.map((key) => (
-                        <tr key={key.prefix} className="rounded-[18px] bg-[#faf9f6]">
-                          <td className="rounded-l-[16px] px-3 py-3">
-                            <p className="font-mono text-sm font-semibold text-[#111111]">
-                              {key.name}
-                            </p>
-                            <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-black/40">
-                              {key.prefix}
-                            </p>
-                          </td>
-                          <td className="px-3 py-3 text-sm text-black/60">{key.environment}</td>
-                          <td className="px-3 py-3 font-mono text-sm text-[#111111]">{key.budget}</td>
-                          <td className="px-3 py-3 font-mono text-sm text-[#111111]">{key.spent}</td>
-                          <td className="px-3 py-3 text-sm text-black/60">{key.requests}</td>
-                          <td className="px-3 py-3 text-sm text-black/60">{key.lastUsed}</td>
-                          <td className="rounded-r-[16px] px-3 py-3">
-                            <span className={cn("inline-flex rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]", keyToneStyles[key.status])}>
+              {/* Table for md+, cards for mobile */}
+              <div className="mt-4 sm:mt-6">
+                {apiKeys.length > 0 ? (
+                  <>
+                    {/* Mobile: card layout */}
+                    <div className="space-y-3 md:hidden">
+                      {apiKeys.map((key) => (
+                        <div key={key.prefix} className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-3.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate font-mono text-[13px] font-semibold text-[#111111]">
+                                {key.name}
+                              </p>
+                              <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[1px] text-black/40">
+                                {key.prefix} · {key.environment}
+                              </p>
+                            </div>
+                            <span className={cn("shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]", keyToneStyles[key.status])}>
                               {key.status}
                             </span>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={7} className="rounded-[16px] bg-[#faf9f6] px-3 py-6 text-center text-sm text-black/50">
-                          No API keys have been created yet.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                          </div>
+                          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                            <div>
+                              <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-black/40">Budget</p>
+                              <p className="mt-0.5 font-mono text-[12px] font-semibold text-[#111111]">{key.budget}</p>
+                            </div>
+                            <div>
+                              <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-black/40">Spent</p>
+                              <p className="mt-0.5 font-mono text-[12px] font-semibold text-[#111111]">{key.spent}</p>
+                            </div>
+                            <div>
+                              <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-black/40">Requests</p>
+                              <p className="mt-0.5 font-mono text-[12px] font-semibold text-[#111111]">{key.requests}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Desktop: table layout */}
+                    <div className="hidden overflow-x-auto md:block">
+                      <table className="min-w-full border-separate border-spacing-y-2">
+                        <thead>
+                          <tr className="text-left">
+                            {["Key", "Environment", "Monthly Budget", "Spent", "Requests", "Last Used", "State"].map((heading) => (
+                              <th
+                                key={heading}
+                                className="px-3 py-2 font-mono text-[10px] uppercase tracking-[1px] text-black/40"
+                              >
+                                {heading}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {apiKeys.map((key) => (
+                            <tr key={key.prefix} className="rounded-[18px] bg-[#faf9f6]">
+                              <td className="rounded-l-[16px] px-3 py-3">
+                                <p className="font-mono text-sm font-semibold text-[#111111]">
+                                  {key.name}
+                                </p>
+                                <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-black/40">
+                                  {key.prefix}
+                                </p>
+                              </td>
+                              <td className="px-3 py-3 text-sm text-black/60">{key.environment}</td>
+                              <td className="px-3 py-3 font-mono text-sm text-[#111111]">{key.budget}</td>
+                              <td className="px-3 py-3 font-mono text-sm text-[#111111]">{key.spent}</td>
+                              <td className="px-3 py-3 text-sm text-black/60">{key.requests}</td>
+                              <td className="px-3 py-3 text-sm text-black/60">{key.lastUsed}</td>
+                              <td className="rounded-r-[16px] px-3 py-3">
+                                <span className={cn("inline-flex rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]", keyToneStyles[key.status])}>
+                                  {key.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-[14px] bg-[#faf9f6] px-3 py-6 text-center text-sm text-black/50 sm:rounded-[16px]">
+                    No API keys have been created yet.
+                  </div>
+                )}
               </div>
             </article>
 
-            <article className="rounded-[28px] border border-black/8 bg-white p-5 shadow-[0_24px_60px_rgba(0,0,0,0.06)] md:p-6">
+            <article className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-5 md:p-6">
               <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
                 Budget Policies
               </p>
-              <h2 className="mt-2 font-mono text-xl font-semibold text-[#111111]">
+              <h2 className="mt-1 font-mono text-base font-semibold text-[#111111] sm:mt-2 sm:text-xl">
                 Hard caps and alert thresholds
               </h2>
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
                 {budgetRules.length > 0 ? (
                   budgetRules.map((rule) => (
-                    <div key={rule.scope} className="rounded-[18px] border border-black/8 bg-[#faf9f6] p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="font-mono text-sm font-semibold text-[#111111]">
+                    <div key={rule.scope} className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-3 sm:rounded-[18px] sm:p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-mono text-[13px] font-semibold text-[#111111] sm:text-sm">
                             {rule.scope}
                           </p>
-                          <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-black/40">
+                          <p className="mt-1 font-mono text-[9px] uppercase tracking-[1px] text-black/40 sm:text-[10px]">
                             {rule.used} of {rule.limit}
                           </p>
                         </div>
-                        <span className={cn("inline-flex rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]", budgetToneStyles[rule.state])}>
+                        <span className={cn("shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]", budgetToneStyles[rule.state])}>
                           {rule.state}
                         </span>
                       </div>
-                      <div className="mt-4 h-2 rounded-full bg-black/6">
+                      <div className="mt-3 h-1.5 rounded-full bg-black/6 sm:mt-4 sm:h-2">
                         <div
                           className={cn(
                             "h-full rounded-full",
@@ -394,17 +438,17 @@ export default async function DashboardPage() {
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-[18px] border border-dashed border-black/10 bg-[#faf9f6] p-6 text-sm text-black/50">
+                  <div className="rounded-[14px] border border-dashed border-black/10 bg-[#faf9f6] p-5 text-sm text-black/50 sm:rounded-[18px] sm:p-6">
                     No budget rules exist yet.
                   </div>
                 )}
               </div>
 
-              <div className="mt-6 rounded-[18px] border border-black/8 bg-[#111111] p-4 text-white">
+              <div className="mt-4 rounded-[14px] border border-black/8 bg-[#111111] p-3.5 text-white sm:mt-6 sm:rounded-[18px] sm:p-4">
                 <p className="font-mono text-[10px] uppercase tracking-[1px] text-white/45">
                   Suggested next step
                 </p>
-                <p className="mt-2 text-sm leading-6 text-white/78">
+                <p className="mt-2 text-[13px] leading-6 text-white/78 sm:text-sm">
                   Split high-volume usage into separate keys so each workload gets
                   its own budget cap and alert stream.
                 </p>
@@ -412,116 +456,146 @@ export default async function DashboardPage() {
             </article>
           </section>
 
-          <section className="grid gap-6 2xl:grid-cols-[1.35fr_0.8fr]">
-            <article className="rounded-[28px] border border-black/8 bg-white p-5 shadow-[0_24px_60px_rgba(0,0,0,0.06)] md:p-6">
-              <div className="flex items-start justify-between gap-4">
+          {/* Usage Details + Wallet Ledger */}
+          <section className="grid gap-4 sm:gap-6 lg:grid-cols-[1.35fr_0.8fr]">
+            <article className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-5 md:p-6">
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
                     Usage Details
                   </p>
-                  <h2 className="mt-2 font-mono text-xl font-semibold text-[#111111]">
+                  <h2 className="mt-1 font-mono text-base font-semibold text-[#111111] sm:mt-2 sm:text-xl">
                     Request-level cost audit
                   </h2>
                 </div>
-                <button className="inline-flex h-9 items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111]">
+                <button className="hidden items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111] sm:inline-flex sm:h-9">
                   <Clock3 className="h-4 w-4" />
                   Export CSV
                 </button>
               </div>
 
-              <div className="mt-6 overflow-x-auto">
-                <table className="min-w-full border-separate border-spacing-y-2">
-                  <thead>
-                    <tr className="text-left">
-                      {["Timestamp", "API Key", "Model", "Endpoint", "Units", "Cost", "Status"].map((heading) => (
-                        <th
-                          key={heading}
-                          className="px-3 py-2 font-mono text-[10px] uppercase tracking-[1px] text-black/40"
-                        >
-                          {heading}
-                        </th>
+              <div className="mt-4 sm:mt-6">
+                {usageRows.length > 0 ? (
+                  <>
+                    {/* Mobile: card layout */}
+                    <div className="space-y-3 md:hidden">
+                      {usageRows.map((row) => (
+                        <div key={`${row.time}-${row.apiKey}`} className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-3.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate font-mono text-[13px] font-semibold text-[#111111]">
+                                {row.model}
+                              </p>
+                              <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[1px] text-black/40">
+                                {row.apiKey} · {row.status}
+                              </p>
+                            </div>
+                            <p className="shrink-0 font-mono text-[13px] font-semibold text-[#111111]">
+                              {row.cost}
+                            </p>
+                          </div>
+                          <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-black/40">
+                            <span>{row.endpoint}</span>
+                            <span>{row.units}</span>
+                          </div>
+                          <p className="mt-1 font-mono text-[10px] text-black/35">{row.time}</p>
+                        </div>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {usageRows.length > 0 ? (
-                      usageRows.map((row) => (
-                        <tr key={`${row.time}-${row.apiKey}`} className="bg-[#faf9f6]">
-                          <td className="rounded-l-[16px] px-3 py-3 text-sm text-black/60">{row.time}</td>
-                          <td className="px-3 py-3 font-mono text-sm font-semibold text-[#111111]">{row.apiKey}</td>
-                          <td className="px-3 py-3 text-sm text-black/60">{row.model}</td>
-                          <td className="px-3 py-3 font-mono text-[11px] text-black/55">{row.endpoint}</td>
-                          <td className="px-3 py-3 text-sm text-black/60">{row.units}</td>
-                          <td className="px-3 py-3 font-mono text-sm text-[#111111]">{row.cost}</td>
-                          <td className="rounded-r-[16px] px-3 py-3">
-                            <span className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                              {row.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={7} className="rounded-[16px] bg-[#faf9f6] px-3 py-6 text-center text-sm text-black/50">
-                          No usage events have been recorded yet.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </div>
+
+                    {/* Desktop: table layout */}
+                    <div className="hidden overflow-x-auto md:block">
+                      <table className="min-w-full border-separate border-spacing-y-2">
+                        <thead>
+                          <tr className="text-left">
+                            {["Timestamp", "API Key", "Model", "Endpoint", "Units", "Cost", "Status"].map((heading) => (
+                              <th
+                                key={heading}
+                                className="px-3 py-2 font-mono text-[10px] uppercase tracking-[1px] text-black/40"
+                              >
+                                {heading}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {usageRows.map((row) => (
+                            <tr key={`${row.time}-${row.apiKey}`} className="bg-[#faf9f6]">
+                              <td className="rounded-l-[16px] px-3 py-3 text-sm text-black/60">{row.time}</td>
+                              <td className="px-3 py-3 font-mono text-sm font-semibold text-[#111111]">{row.apiKey}</td>
+                              <td className="px-3 py-3 text-sm text-black/60">{row.model}</td>
+                              <td className="px-3 py-3 font-mono text-[11px] text-black/55">{row.endpoint}</td>
+                              <td className="px-3 py-3 text-sm text-black/60">{row.units}</td>
+                              <td className="px-3 py-3 font-mono text-sm text-[#111111]">{row.cost}</td>
+                              <td className="rounded-r-[16px] px-3 py-3">
+                                <span className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                                  {row.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-[14px] bg-[#faf9f6] px-3 py-6 text-center text-sm text-black/50 sm:rounded-[16px]">
+                    No usage events have been recorded yet.
+                  </div>
+                )}
               </div>
             </article>
 
-            <article className="rounded-[28px] border border-black/8 bg-white p-5 shadow-[0_24px_60px_rgba(0,0,0,0.06)] md:p-6">
+            <article className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-5 md:p-6">
               <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
                 Wallet Ledger
               </p>
-              <h2 className="mt-2 font-mono text-xl font-semibold text-[#111111]">
+              <h2 className="mt-1 font-mono text-base font-semibold text-[#111111] sm:mt-2 sm:text-xl">
                 Recharge and settlement trail
               </h2>
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
                 {ledgerRows.length > 0 ? (
                   ledgerRows.map((row) => (
-                    <div key={`${row.title}-${row.detail}`} className="rounded-[18px] border border-black/8 bg-[#faf9f6] p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="font-mono text-sm font-semibold text-[#111111]">
+                    <div key={`${row.title}-${row.detail}`} className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-3 sm:rounded-[18px] sm:p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-mono text-[13px] font-semibold text-[#111111] sm:text-sm">
                             {row.title}
                           </p>
-                          <p className="mt-1 text-sm leading-6 text-black/55">
+                          <p className="mt-1 text-[13px] leading-6 text-black/55 sm:text-sm">
                             {row.detail}
                           </p>
                         </div>
-                        <span className={cn("font-mono text-sm font-semibold", ledgerToneStyles[row.tone])}>
+                        <span className={cn("shrink-0 font-mono text-[13px] font-semibold sm:text-sm", ledgerToneStyles[row.tone])}>
                           {row.amount}
                         </span>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-[18px] border border-dashed border-black/10 bg-[#faf9f6] p-6 text-sm text-black/50">
+                  <div className="rounded-[14px] border border-dashed border-black/10 bg-[#faf9f6] p-5 text-sm text-black/50 sm:rounded-[18px] sm:p-6">
                     No wallet transactions have been recorded yet.
                   </div>
                 )}
               </div>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[18px] border border-black/8 bg-[#f7f5ef] p-4">
+              <div className="mt-4 grid gap-3 sm:mt-6 sm:grid-cols-2">
+                <div className="rounded-[14px] border border-black/8 bg-[#f7f5ef] p-3.5 sm:rounded-[18px] sm:p-4">
                   <CircleDollarSign className="h-5 w-5 text-black/45" />
-                  <p className="mt-3 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                  <p className="mt-2.5 font-mono text-[10px] uppercase tracking-[1px] text-black/45 sm:mt-3">
                     Auto Recharge
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-black/55">
+                  <p className="mt-1.5 text-[13px] leading-6 text-black/55 sm:mt-2 sm:text-sm">
                     Disabled until workspace balance drops below your configured threshold.
                   </p>
                 </div>
-                <div className="rounded-[18px] border border-black/8 bg-[#f7f5ef] p-4">
+                <div className="rounded-[14px] border border-black/8 bg-[#f7f5ef] p-3.5 sm:rounded-[18px] sm:p-4">
                   <CreditCard className="h-5 w-5 text-black/45" />
-                  <p className="mt-3 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                  <p className="mt-2.5 font-mono text-[10px] uppercase tracking-[1px] text-black/45 sm:mt-3">
                     Payment Method
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-black/55">
+                  <p className="mt-1.5 text-[13px] leading-6 text-black/55 sm:mt-2 sm:text-sm">
                     No payment method attached yet. Once recharge goes live, this card area will populate.
                   </p>
                 </div>
@@ -529,10 +603,10 @@ export default async function DashboardPage() {
             </article>
           </section>
 
-          <div className="pb-6">
+          <div className="pb-4 sm:pb-6">
             <Link
               href="/"
-              className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-black/8 bg-white px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#111111]"
+              className="inline-flex h-9 items-center gap-2 rounded-[14px] border border-black/8 bg-white px-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#111111] sm:h-10 sm:px-4"
             >
               Back To Landing
               <ArrowRight className="h-4 w-4" />
