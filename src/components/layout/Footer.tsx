@@ -16,24 +16,6 @@ const FOOTER_SECTIONS = [
     ],
   },
   {
-    title: "Resources",
-    links: [
-      { label: "Image Generator", href: "/image-generator" },
-      { label: "Video Generator", href: "/video-generator" },
-      { label: "Avatar Generator", href: "/avatar-generator" },
-      { label: "Audio Generator", href: "/audio-generator" },
-      { label: "3D Generator", href: "/3d-generator" },
-      { label: "Desktop App", href: "/landing/desktop" },
-      { label: "Studio", href: "/studio" },
-      { label: "Doc", href: "/docs" },
-      { label: "Inspiration", href: "/inspiration" },
-      { label: "Blog", href: "/blog" },
-      { label: "Contact Sales", href: "/enterprise#contact-us" },
-      { label: "Support", href: "/user/support" },
-      { label: "Affiliate", href: "/static/affiliate" },
-    ],
-  },
-  {
     title: "Models",
     links: [
       { label: "Wan 2.7", href: "/collections/wan-2.7" },
@@ -51,27 +33,10 @@ const FOOTER_SECTIONS = [
     ],
   },
   {
-    title: "Tools",
-    links: [
-      { label: "Object Detection and Segmentation", href: "/collections/object-detection-and-segmentation" },
-      { label: "Content Detection Models", href: "/collections/content-detection-models" },
-      { label: "Motion Control Models", href: "/collections/motion-control-models" },
-      { label: "Best Video Models", href: "/collections/best-video-models" },
-      { label: "Best Image Models", href: "/collections/best-image-models" },
-      { label: "Audio for Video", href: "/collections/audio-for-video" },
-      { label: "Video Edit", href: "/collections/video-edit" },
-      { label: "Swap Anything", href: "/collections/swap-anything" },
-      { label: "Ultra Selection", href: "/collections/ultra-selection" },
-      { label: "Generate Music", href: "/collections/generate-music" },
-      { label: "LoRA Generation", href: "/collections/lora-generation" },
-      { label: "First and Last Frame Video", href: "/collections/first-and-last-frame-video" },
-    ],
-  },
-  {
     title: "Legal",
     links: [
-      { label: "Terms of Service", href: "/static/terms" },
-      { label: "Privacy Policy", href: "/static/privacy" },
+      { label: "Terms of Service", href: "/about" },
+      { label: "Privacy Policy", href: "/about" },
     ],
   },
 ];
@@ -96,7 +61,7 @@ export function Footer() {
             </Link>
           </div>
 
-          <div className="mb-10 mt-8 grid grid-cols-2 gap-x-8 gap-y-9 md:grid-cols-3 lg:grid-cols-[0.88fr_1fr_0.9fr_1.24fr_0.66fr]">
+          <div className="mb-10 mt-8 grid grid-cols-2 gap-x-8 gap-y-9 md:grid-cols-3">
             {FOOTER_SECTIONS.map((section) => (
               <div key={section.title} className="flex w-auto flex-col gap-3">
                 <h4 className="font-mono text-[11px] uppercase tracking-[1.1px] text-white/45">

@@ -3,21 +3,28 @@ import { redirect } from "next/navigation";
 import {
   ArrowRight,
   Bell,
+  Blocks,
   ChartNoAxesCombined,
   ChevronDown,
   CircleDollarSign,
   Clock3,
   CreditCard,
+  GitBranchPlus,
   KeyRound,
+  Router,
   LogOut,
-  Plus,
+  Send,
   Settings2,
   ShieldCheck,
   Wallet,
 } from "lucide-react";
+import { Toaster } from "sonner";
 import { dashboardNav } from "@/lib/dashboard-data";
 import { getDashboardData } from "@/lib/dashboard-server";
 import { cn } from "@/lib/utils";
+import { CreateKeyButton } from "./dashboard-actions";
+import { ApiKeysTable } from "./api-keys-table";
+import { UsageTable } from "./usage-filters";
 
 const toneStyles = {
   neutral: "text-black/55",
@@ -31,16 +38,24 @@ const budgetToneStyles = {
   critical: "bg-[#ffe0db] text-[#b43828]",
 };
 
-const keyToneStyles = {
-  active: "bg-[#dff6e6] text-[#167a3d]",
-  warning: "bg-[#fff2d9] text-[#9b6a00]",
-  paused: "bg-[#ececec] text-[#666666]",
-};
 
 const ledgerToneStyles = {
   positive: "text-[#168a42]",
   negative: "text-[#b43828]",
   neutral: "text-black/50",
+};
+
+const providerToneStyles = {
+  healthy: "bg-[#dff6e6] text-[#167a3d]",
+  degraded: "bg-[#fff2d9] text-[#9b6a00]",
+  offline: "bg-[#ffe0db] text-[#b43828]",
+};
+
+const requestStatusStyles = {
+  queued: "bg-[#f2eee4] text-[#6d5b2e]",
+  processing: "bg-[#e6f0ff] text-[#2f5fb8]",
+  succeeded: "bg-[#dff6e6] text-[#167a3d]",
+  failed: "bg-[#ffe0db] text-[#b43828]",
 };
 
 export default async function DashboardPage() {
@@ -60,6 +75,9 @@ export default async function DashboardPage() {
     usageRows,
     user,
     workspace,
+    providerSummaries,
+    requestQueueRows,
+    routingRules,
   } = data;
 
   const maxSpend = Math.max(...spendTrend.map((item) => item.spend), 1);
@@ -148,10 +166,7 @@ export default async function DashboardPage() {
                   <Settings2 className="h-4 w-4" />
                   <span className="hidden sm:inline">Budget Rules</span>
                 </button>
-                <button className="inline-flex h-9 items-center gap-2 rounded-[14px] bg-[#111111] px-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white sm:h-10 sm:px-4">
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden min-[480px]:inline">Create Key</span>
-                </button>
+                <CreateKeyButton />
                 <form action="/auth/sign-out" method="post">
                   <button
                     type="submit"
@@ -302,98 +317,14 @@ export default async function DashboardPage() {
                     Per-key cost, quota, and activity
                   </h2>
                 </div>
-                <button className="hidden items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111] sm:inline-flex sm:h-9">
+                <div className="hidden items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111] sm:inline-flex sm:h-9">
                   <KeyRound className="h-4 w-4" />
-                  Rotate selected
-                </button>
+                  {apiKeys.length} key(s)
+                </div>
               </div>
 
-              {/* Table for md+, cards for mobile */}
               <div className="mt-4 sm:mt-6">
-                {apiKeys.length > 0 ? (
-                  <>
-                    {/* Mobile: card layout */}
-                    <div className="space-y-3 md:hidden">
-                      {apiKeys.map((key) => (
-                        <div key={key.prefix} className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-3.5">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate font-mono text-[13px] font-semibold text-[#111111]">
-                                {key.name}
-                              </p>
-                              <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[1px] text-black/40">
-                                {key.prefix} · {key.environment}
-                              </p>
-                            </div>
-                            <span className={cn("shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]", keyToneStyles[key.status])}>
-                              {key.status}
-                            </span>
-                          </div>
-                          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                            <div>
-                              <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-black/40">Budget</p>
-                              <p className="mt-0.5 font-mono text-[12px] font-semibold text-[#111111]">{key.budget}</p>
-                            </div>
-                            <div>
-                              <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-black/40">Spent</p>
-                              <p className="mt-0.5 font-mono text-[12px] font-semibold text-[#111111]">{key.spent}</p>
-                            </div>
-                            <div>
-                              <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-black/40">Requests</p>
-                              <p className="mt-0.5 font-mono text-[12px] font-semibold text-[#111111]">{key.requests}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Desktop: table layout */}
-                    <div className="hidden overflow-x-auto md:block">
-                      <table className="min-w-full border-separate border-spacing-y-2">
-                        <thead>
-                          <tr className="text-left">
-                            {["Key", "Environment", "Monthly Budget", "Spent", "Requests", "Last Used", "State"].map((heading) => (
-                              <th
-                                key={heading}
-                                className="px-3 py-2 font-mono text-[10px] uppercase tracking-[1px] text-black/40"
-                              >
-                                {heading}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {apiKeys.map((key) => (
-                            <tr key={key.prefix} className="rounded-[18px] bg-[#faf9f6]">
-                              <td className="rounded-l-[16px] px-3 py-3">
-                                <p className="font-mono text-sm font-semibold text-[#111111]">
-                                  {key.name}
-                                </p>
-                                <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-black/40">
-                                  {key.prefix}
-                                </p>
-                              </td>
-                              <td className="px-3 py-3 text-sm text-black/60">{key.environment}</td>
-                              <td className="px-3 py-3 font-mono text-sm text-[#111111]">{key.budget}</td>
-                              <td className="px-3 py-3 font-mono text-sm text-[#111111]">{key.spent}</td>
-                              <td className="px-3 py-3 text-sm text-black/60">{key.requests}</td>
-                              <td className="px-3 py-3 text-sm text-black/60">{key.lastUsed}</td>
-                              <td className="rounded-r-[16px] px-3 py-3">
-                                <span className={cn("inline-flex rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]", keyToneStyles[key.status])}>
-                                  {key.status}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                ) : (
-                  <div className="rounded-[14px] bg-[#faf9f6] px-3 py-6 text-center text-sm text-black/50 sm:rounded-[16px]">
-                    No API keys have been created yet.
-                  </div>
-                )}
+                <ApiKeysTable apiKeys={apiKeys} />
               </div>
             </article>
 
@@ -468,81 +399,14 @@ export default async function DashboardPage() {
                     Request-level cost audit
                   </h2>
                 </div>
-                <button className="hidden items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111] sm:inline-flex sm:h-9">
+                <div className="hidden items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111] sm:inline-flex sm:h-9">
                   <Clock3 className="h-4 w-4" />
-                  Export CSV
-                </button>
+                  {usageRows.length} event(s)
+                </div>
               </div>
 
               <div className="mt-4 sm:mt-6">
-                {usageRows.length > 0 ? (
-                  <>
-                    {/* Mobile: card layout */}
-                    <div className="space-y-3 md:hidden">
-                      {usageRows.map((row) => (
-                        <div key={`${row.time}-${row.apiKey}`} className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-3.5">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate font-mono text-[13px] font-semibold text-[#111111]">
-                                {row.model}
-                              </p>
-                              <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[1px] text-black/40">
-                                {row.apiKey} · {row.status}
-                              </p>
-                            </div>
-                            <p className="shrink-0 font-mono text-[13px] font-semibold text-[#111111]">
-                              {row.cost}
-                            </p>
-                          </div>
-                          <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-black/40">
-                            <span>{row.endpoint}</span>
-                            <span>{row.units}</span>
-                          </div>
-                          <p className="mt-1 font-mono text-[10px] text-black/35">{row.time}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Desktop: table layout */}
-                    <div className="hidden overflow-x-auto md:block">
-                      <table className="min-w-full border-separate border-spacing-y-2">
-                        <thead>
-                          <tr className="text-left">
-                            {["Timestamp", "API Key", "Model", "Endpoint", "Units", "Cost", "Status"].map((heading) => (
-                              <th
-                                key={heading}
-                                className="px-3 py-2 font-mono text-[10px] uppercase tracking-[1px] text-black/40"
-                              >
-                                {heading}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {usageRows.map((row) => (
-                            <tr key={`${row.time}-${row.apiKey}`} className="bg-[#faf9f6]">
-                              <td className="rounded-l-[16px] px-3 py-3 text-sm text-black/60">{row.time}</td>
-                              <td className="px-3 py-3 font-mono text-sm font-semibold text-[#111111]">{row.apiKey}</td>
-                              <td className="px-3 py-3 text-sm text-black/60">{row.model}</td>
-                              <td className="px-3 py-3 font-mono text-[11px] text-black/55">{row.endpoint}</td>
-                              <td className="px-3 py-3 text-sm text-black/60">{row.units}</td>
-                              <td className="px-3 py-3 font-mono text-sm text-[#111111]">{row.cost}</td>
-                              <td className="rounded-r-[16px] px-3 py-3">
-                                <span className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                                  {row.status}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                ) : (
-                  <div className="rounded-[14px] bg-[#faf9f6] px-3 py-6 text-center text-sm text-black/50 sm:rounded-[16px]">
-                    No usage events have been recorded yet.
-                  </div>
-                )}
+                <UsageTable usageRows={usageRows} />
               </div>
             </article>
 
@@ -603,6 +467,211 @@ export default async function DashboardPage() {
             </article>
           </section>
 
+          {/* Orchestration Control Plane */}
+          <section className="grid gap-4 sm:gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+            <article className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-5 md:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                    Provider Control
+                  </p>
+                  <h2 className="mt-1 font-mono text-base font-semibold text-[#111111] sm:mt-2 sm:text-xl">
+                    Upstream health and queue posture
+                  </h2>
+                </div>
+                <div className="hidden items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111] sm:inline-flex sm:h-9">
+                  <Blocks className="h-4 w-4" />
+                  {providerSummaries.length} upstreams
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
+                {providerSummaries.length > 0 ? (
+                  providerSummaries.map((provider) => (
+                    <div
+                      key={provider.name}
+                      className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-3 sm:rounded-[18px] sm:p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-mono text-[13px] font-semibold text-[#111111] sm:text-sm">
+                            {provider.name}
+                          </p>
+                          <p className="mt-1 font-mono text-[9px] uppercase tracking-[1px] text-black/40 sm:text-[10px]">
+                            {provider.kind} · {provider.regions}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]",
+                            providerToneStyles[provider.status]
+                          )}
+                        >
+                          {provider.status}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-3 sm:mt-4">
+                        <div className="rounded-[12px] border border-black/8 bg-white px-3 py-2.5">
+                          <p className="font-mono text-[9px] uppercase tracking-[1px] text-black/40">
+                            Bound models
+                          </p>
+                          <p className="mt-1 font-mono text-sm font-semibold text-[#111111]">
+                            {provider.models}
+                          </p>
+                        </div>
+                        <div className="rounded-[12px] border border-black/8 bg-white px-3 py-2.5">
+                          <p className="font-mono text-[9px] uppercase tracking-[1px] text-black/40">
+                            Queue
+                          </p>
+                          <p className="mt-1 font-mono text-sm font-semibold text-[#111111]">
+                            {provider.queue}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-[14px] border border-dashed border-black/10 bg-[#faf9f6] p-5 text-sm text-black/50 sm:rounded-[18px] sm:p-6">
+                    No providers have been configured yet.
+                  </div>
+                )}
+              </div>
+            </article>
+
+            <article className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-5 md:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                    Routing Rules
+                  </p>
+                  <h2 className="mt-1 font-mono text-base font-semibold text-[#111111] sm:mt-2 sm:text-xl">
+                    Public models mapped to upstream adapters
+                  </h2>
+                </div>
+                <div className="hidden items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111] sm:inline-flex sm:h-9">
+                  <GitBranchPlus className="h-4 w-4" />
+                  unified routing
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
+                {routingRules.length > 0 ? (
+                  routingRules.map((rule) => (
+                    <div
+                      key={rule.publicModel}
+                      className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-3 sm:rounded-[18px] sm:p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-mono text-[13px] font-semibold text-[#111111] sm:text-sm">
+                            {rule.publicModel}
+                          </p>
+                          <p className="mt-1 font-mono text-[9px] uppercase tracking-[1px] text-black/40 sm:text-[10px]">
+                            {rule.capability}
+                          </p>
+                        </div>
+                        <Router className="h-4 w-4 shrink-0 text-black/35" />
+                      </div>
+
+                      <div className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-2">
+                        <div className="rounded-[12px] border border-black/8 bg-white px-3 py-2.5">
+                          <p className="font-mono text-[9px] uppercase tracking-[1px] text-black/40">
+                            Primary
+                          </p>
+                          <p className="mt-1 text-[13px] leading-5 text-[#111111]">
+                            {rule.primary}
+                          </p>
+                        </div>
+                        <div className="rounded-[12px] border border-black/8 bg-white px-3 py-2.5">
+                          <p className="font-mono text-[9px] uppercase tracking-[1px] text-black/40">
+                            Fallback
+                          </p>
+                          <p className="mt-1 text-[13px] leading-5 text-[#111111]">
+                            {rule.fallback}
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="mt-3 text-[13px] leading-6 text-black/55 sm:mt-4">
+                        {rule.strategy}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-[14px] border border-dashed border-black/10 bg-[#faf9f6] p-5 text-sm text-black/50 sm:rounded-[18px] sm:p-6">
+                    No routing rules exist yet.
+                  </div>
+                )}
+              </div>
+            </article>
+          </section>
+
+          <section className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-5 md:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                  Request Queue
+                </p>
+                <h2 className="mt-1 font-mono text-base font-semibold text-[#111111] sm:mt-2 sm:text-xl">
+                  Unified task ledger for the gateway worker
+                </h2>
+              </div>
+              <div className="hidden items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111] sm:inline-flex sm:h-9">
+                <Send className="h-4 w-4" />
+                orchestration events
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-hidden rounded-[18px] border border-black/8 sm:mt-6">
+              <div className="hidden grid-cols-[1.35fr_0.8fr_0.9fr_0.8fr_0.65fr_0.55fr] gap-3 border-b border-black/8 bg-[#f7f5ef] px-4 py-3 font-mono text-[10px] uppercase tracking-[1px] text-black/45 md:grid">
+                <span>Request</span>
+                <span>Model</span>
+                <span>Provider</span>
+                <span>Status</span>
+                <span>Latency</span>
+                <span>Cost</span>
+              </div>
+
+              <div className="divide-y divide-black/8">
+                {requestQueueRows.length > 0 ? (
+                  requestQueueRows.map((row) => (
+                    <div
+                      key={row.requestId}
+                      className="grid gap-3 px-4 py-4 md:grid-cols-[1.35fr_0.8fr_0.9fr_0.8fr_0.65fr_0.55fr] md:items-center"
+                    >
+                      <div>
+                        <p className="font-mono text-[12px] font-semibold text-[#111111]">
+                          {row.requestId}
+                        </p>
+                        <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-black/40">
+                          {row.capability}
+                        </p>
+                      </div>
+                      <p className="text-[13px] leading-5 text-[#111111]">{row.model}</p>
+                      <p className="text-[13px] leading-5 text-[#111111]">{row.provider}</p>
+                      <div>
+                        <span
+                          className={cn(
+                            "inline-flex rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]",
+                            requestStatusStyles[row.status]
+                          )}
+                        >
+                          {row.status}
+                        </span>
+                      </div>
+                      <p className="font-mono text-[12px] text-[#111111]">{row.latency}</p>
+                      <p className="font-mono text-[12px] text-[#111111]">{row.cost}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-4 py-5 text-sm text-black/50">
+                    No orchestration requests have been recorded yet.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
           <div className="pb-4 sm:pb-6">
             <Link
               href="/"
@@ -614,6 +683,7 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
+      <Toaster position="top-right" richColors />
     </main>
   );
 }

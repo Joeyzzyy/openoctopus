@@ -6,6 +6,8 @@ type MetricTone = "neutral" | "positive" | "warning";
 type BudgetState = "healthy" | "watch" | "critical";
 type KeyState = "active" | "warning" | "paused";
 type LedgerTone = "positive" | "negative" | "neutral";
+type ProviderState = "healthy" | "degraded" | "offline";
+type RequestState = "queued" | "processing" | "succeeded" | "failed";
 
 export type DashboardData = {
   user: {
@@ -44,7 +46,9 @@ export type DashboardData = {
     progress: number;
     state: BudgetState;
   }>;
+  workspaceId: string | null;
   apiKeys: Array<{
+    id: string;
     name: string;
     prefix: string;
     environment: string;
@@ -53,6 +57,8 @@ export type DashboardData = {
     requests: string;
     lastUsed: string;
     status: KeyState;
+    rawStatus: string;
+    monthlyBudget: number;
   }>;
   usageRows: Array<{
     time: string;
@@ -68,6 +74,30 @@ export type DashboardData = {
     detail: string;
     amount: string;
     tone: LedgerTone;
+  }>;
+  providerSummaries: Array<{
+    name: string;
+    kind: string;
+    regions: string;
+    models: number;
+    queue: string;
+    status: ProviderState;
+  }>;
+  routingRules: Array<{
+    capability: string;
+    publicModel: string;
+    primary: string;
+    fallback: string;
+    strategy: string;
+  }>;
+  requestQueueRows: Array<{
+    requestId: string;
+    capability: string;
+    model: string;
+    provider: string;
+    status: RequestState;
+    latency: string;
+    cost: string;
   }>;
 };
 
@@ -91,6 +121,7 @@ function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardDa
   return {
     user,
     workspace,
+    workspaceId: workspace?.id ?? null,
     metrics: [
       { label: "Available Credit", value: "$0.00", change: "No wallet top-ups yet", tone: "neutral" },
       { label: "Month Spend", value: "$0.00", change: "No usage recorded", tone: "neutral" },
@@ -126,6 +157,9 @@ function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardDa
     apiKeys: [],
     usageRows: [],
     ledgerRows: [],
+    providerSummaries: [],
+    routingRules: [],
+    requestQueueRows: [],
   };
 }
 
@@ -187,6 +221,10 @@ export async function getDashboardData(): Promise<DashboardData | null> {
       { data: keyRows },
       { data: usageEvents },
       { data: walletRows },
+      providerResponse,
+      providerModelResponse,
+      routingRuleResponse,
+      requestResponse,
     ] = await Promise.all([
       supabase.from("v_api_key_spend_summary").select("*").eq("workspace_id", workspace.id),
       supabase.from("v_model_spend_summary").select("*").eq("workspace_id", workspace.id).order("total_spend", { ascending: false }),
@@ -195,6 +233,10 @@ export async function getDashboardData(): Promise<DashboardData | null> {
       supabase.from("api_keys").select("id, name, key_prefix, environment, status, monthly_budget, last_used_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }),
       supabase.from("usage_events").select("id, endpoint, request_count, total_cost, status_code, created_at, api_key_id, model_id").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
       supabase.from("wallet_transactions").select("id, entry_type, amount_delta, description, created_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
+      supabase.from("providers").select("id, name, kind, regions, status"),
+      supabase.from("provider_models").select("id, provider_id"),
+      supabase.from("routing_rules").select("id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy").or(`workspace_id.eq.${workspace.id},workspace_id.is.null`).eq("active", true).order("created_at", { ascending: true }),
+      supabase.from("inference_requests").select("id, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, created_at, queued_at, started_at, completed_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
     ]);
 
     const currentMonthSpend = (keySummary ?? []).reduce((sum, row) => sum + Number(row.current_month_spend ?? 0), 0);
@@ -207,6 +249,25 @@ export async function getDashboardData(): Promise<DashboardData | null> {
     const modelRows = modelSummary ?? [];
     const modelNameById = new Map(modelRows.map((row) => [row.model_id, row.display_name]));
     const totalModelSpend = modelRows.reduce((sum, row) => sum + Number(row.total_spend ?? 0), 0);
+    const providers = providerResponse.error ? [] : providerResponse.data ?? [];
+    const providerModels = providerModelResponse.error ? [] : providerModelResponse.data ?? [];
+    const routingRuleRows = routingRuleResponse.error ? [] : routingRuleResponse.data ?? [];
+    const requestRows = requestResponse.error ? [] : requestResponse.data ?? [];
+    const providerNameById = new Map(providers.map((row) => [row.id, row.name]));
+    const providerById = new Map(providers.map((row) => [row.id, row]));
+    const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
+    const modelsPerProvider = providerModels.reduce((acc, row) => {
+      acc.set(row.provider_id, (acc.get(row.provider_id) ?? 0) + 1);
+      return acc;
+    }, new Map<string, number>());
+    const queuePerProvider = requestRows.reduce((acc, row) => {
+      if (!row.provider_id || (row.status !== "queued" && row.status !== "processing")) {
+        return acc;
+      }
+
+      acc.set(row.provider_id, (acc.get(row.provider_id) ?? 0) + 1);
+      return acc;
+    }, new Map<string, number>());
 
     const spendTrend = Array.from({ length: 7 }).map((_, index) => {
       const date = new Date();
@@ -222,9 +283,77 @@ export async function getDashboardData(): Promise<DashboardData | null> {
       };
     });
 
+    const providerSummaries = providers.map((provider) => ({
+      name: provider.name,
+      kind:
+        provider.kind === "wavespeed"
+          ? "Primary upstream"
+          : provider.kind === "partner"
+            ? "Fallback upstream"
+            : "Custom upstream",
+      regions: Array.isArray(provider.regions) && provider.regions.length > 0 ? provider.regions.join(" · ") : "unassigned",
+      models: modelsPerProvider.get(provider.id) ?? 0,
+      queue: `${queuePerProvider.get(provider.id) ?? 0} queued`,
+      status: provider.status as ProviderState,
+    }));
+
+    const routingRules = routingRuleRows.map((row) => {
+      const primaryProviderModel = row.primary_provider_model_id
+        ? providerModelById.get(row.primary_provider_model_id)
+        : null;
+      const fallbackProviderModel = row.fallback_provider_model_id
+        ? providerModelById.get(row.fallback_provider_model_id)
+        : null;
+
+      return {
+        capability: row.capability.replaceAll("_", " "),
+        publicModel: row.public_model_slug,
+        primary: primaryProviderModel
+          ? `${providerNameById.get(primaryProviderModel.provider_id) ?? "Unknown provider"} / ${row.public_model_slug}`
+          : "unassigned",
+        fallback: fallbackProviderModel
+          ? `${providerNameById.get(fallbackProviderModel.provider_id) ?? "Unknown provider"} / ${row.public_model_slug}`
+          : "manual failover only",
+        strategy: row.route_strategy.replaceAll("_", " "),
+      };
+    });
+
+    const requestQueueRows = requestRows.map((row) => {
+      const startedAt = row.started_at ? new Date(row.started_at).getTime() : null;
+      const completedAt = row.completed_at ? new Date(row.completed_at).getTime() : null;
+      const queuedAt = row.queued_at ? new Date(row.queued_at).getTime() : new Date(row.created_at).getTime();
+
+      let latency = "pending";
+      if (startedAt && completedAt && completedAt >= startedAt) {
+        latency = `${Math.round((completedAt - startedAt) / 1000)}s`;
+      } else if (startedAt) {
+        latency = `${Math.max(1, Math.round((Date.now() - startedAt) / 1000))}s`;
+      } else if (queuedAt) {
+        latency = "queueing";
+      }
+
+      const costValue = Number(row.actual_cost ?? row.estimated_cost ?? 0);
+
+      return {
+        requestId: row.id,
+        capability: row.capability,
+        model: row.public_model_slug,
+        provider: row.provider_id ? providerNameById.get(row.provider_id) ?? "Unknown provider" : "Unrouted",
+        status:
+          row.status === "queued" || row.status === "processing" || row.status === "succeeded" || row.status === "failed"
+            ? (row.status as RequestState)
+            : row.status === "submitted"
+              ? "processing"
+              : "failed",
+        latency,
+        cost: costValue > 0 ? formatCurrency(costValue) : "pending",
+      };
+    });
+
     return {
       user: userView,
       workspace,
+      workspaceId: workspace.id,
       metrics: [
         {
           label: "Available Credit",
@@ -290,6 +419,7 @@ export async function getDashboardData(): Promise<DashboardData | null> {
         const usagePct = budget > 0 ? (spent / budget) * 100 : 0;
 
         return {
+          id: row.id,
           name: row.name,
           prefix: row.key_prefix,
           environment: row.environment,
@@ -310,6 +440,8 @@ export async function getDashboardData(): Promise<DashboardData | null> {
               : usagePct >= 80
                 ? "warning"
                 : "active",
+          rawStatus: row.status as string,
+          monthlyBudget: budget,
         };
       }),
       usageRows: (usageEvents ?? []).map((row) => ({
@@ -345,6 +477,9 @@ export async function getDashboardData(): Promise<DashboardData | null> {
               ? "negative"
               : "neutral",
       })),
+      providerSummaries,
+      routingRules,
+      requestQueueRows,
     };
   } catch {
     return buildEmptyDashboard(userView, null);

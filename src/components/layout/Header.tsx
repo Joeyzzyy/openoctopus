@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X, ChevronDown, Search, Globe } from "lucide-react";
+import { Menu, X, Search, Globe } from "lucide-react";
 import { useScrollPosition } from "@/hooks/useScrollPosition";
 import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
@@ -11,18 +11,24 @@ const NAV_ITEMS = [
   { label: "Explore", href: "/models" },
   { label: "Pricing", href: "/pricing" },
   { label: "Enterprise", href: "/enterprise" },
-  { label: "Resources", href: "/docs" },
 ];
 
-export function Header({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
+export function Header({
+  isLoggedIn = false,
+  variant = "overlay",
+}: {
+  isLoggedIn?: boolean;
+  variant?: "overlay" | "solid";
+}) {
   const { isScrolled } = useScrollPosition();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const shouldUseSolidHeader = variant === "solid";
 
   return (
     <header
       className={cn(
         "fixed top-0 z-50 w-full transition-all duration-300",
-        isScrolled
+        isScrolled || shouldUseSolidHeader
           ? "border-b border-white/10 bg-[#09070B]/92 backdrop-blur-xl"
           : "bg-transparent"
       )}
@@ -43,10 +49,6 @@ export function Header({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
               {item.label}
             </Link>
           ))}
-          <button className="flex items-center gap-1.5 font-mono text-[12px] text-white transition-colors hover:text-white/60 xl:text-[13px]">
-            More
-            <ChevronDown className="h-4 w-4" />
-          </button>
         </nav>
 
         <div className="flex flex-1 items-center justify-end gap-1.5 md:gap-2">
@@ -79,7 +81,7 @@ export function Header({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
-        {!isScrolled ? (
+        {!isScrolled && !shouldUseSolidHeader ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
         ) : null}
       </div>

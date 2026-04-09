@@ -1,209 +1,199 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { ProviderCard, Provider } from "./ProviderCard";
-import { FadeIn } from "@/components/animations/FadeIn";
+import Image from "next/image";
 
-const FEATURED_IMAGES = [
-  "https://static.wavespeed.ai/media/images/1773982486991777301_pAKnxHQ0.webp",
-  "https://static.wavespeed.ai/media/images/1773982485921091987_9RfY7gqA.webp",
-  "https://static.wavespeed.ai/media/images/1773982487527428587_7V5eoxHR.webp",
-  "https://static.wavespeed.ai/media/images/1773982485462820141_SWBsOay0.webp",
-  "https://static.wavespeed.ai/media/images/1773982488096109393_g2UoRiPf.webp",
-  "https://static.wavespeed.ai/media/images/1773982488033922443_4GhqzJT3.webp",
-  "https://static.wavespeed.ai/media/images/1773982488103867536_m9YmHYnM.webp",
-  "https://static.wavespeed.ai/media/images/1773982488677021111_Z5wmwFPZ.webp",
-  "https://static.wavespeed.ai/media/images/1773982486529320898_2EA1uWkK.webp",
-  "https://static.wavespeed.ai/media/images/1773982487109684599_qpWYmG5z.webp",
-  "https://static.wavespeed.ai/media/images/1773982486219725120_geW0oOkK.webp",
-  "https://static.wavespeed.ai/media/images/1773982487225168510_bW7gpyIR.webp",
-  "https://static.wavespeed.ai/media/images/1773982488807980452_SkV5eoxG.webp",
-  "https://static.wavespeed.ai/media/images/1773982486480192004_ShKT2clu.webp",
-  "https://static.wavespeed.ai/media/images/1773982487369289135_VsisBLU3.webp",
-  "https://static.wavespeed.ai/media/images/1773982488389173191_Oq1bluEO.webp",
-  "https://static.wavespeed.ai/media/images/1773982485839899969_Xn1blvFP.webp",
-  "https://static.wavespeed.ai/media/images/1773982485686510099_qTuEOX6e.webp",
-  "https://static.wavespeed.ai/media/images/1773982485742876269_w2fpyIS1.webp",
-  "https://static.wavespeed.ai/media/images/1773982485879640021_aRPY8hqz.webp",
-  "https://static.wavespeed.ai/media/images/1773982488243677073_vjIRuEOX.webp",
-  "https://static.wavespeed.ai/media/images/1773982488676921146_ZzrAKT2b.webp",
-  "https://static.wavespeed.ai/media/images/1773982488751485730_npzXI3dn.webp",
-  "https://static.wavespeed.ai/media/images/1773982488525553248_TwoyGQ09.webp",
-  "https://static.wavespeed.ai/media/images/1773982486833266645_bI82pJ8z.webp",
-  "https://static.wavespeed.ai/media/images/1773982486509051721_ZD9jsCKU.webp",
-  "https://static.wavespeed.ai/media/images/1773982486882648964_w1O3iwM0.webp",
-  "https://static.wavespeed.ai/media/images/1773982488396898892_b5vELW5h.webp",
-  "https://static.wavespeed.ai/media/images/1773982489037596683_QmZ7irAK.webp",
-  "https://static.wavespeed.ai/media/images/1773982486341819820_t6IS2clu.webp",
-  "https://static.wavespeed.ai/media/images/1773982488941937311_1wajtCMV.webp",
-  "https://static.wavespeed.ai/media/images/1773982488986532231_fBNjtCLU.webp",
-  "https://static.wavespeed.ai/media/images/1773983575543521741_L9jIS1cl.webp",
-  "https://static.wavespeed.ai/media/images/1773983575549817055_cayHQ3dm.webp",
-  "https://static.wavespeed.ai/media/images/1773983575443653992_rdCMZ8hr.webp",
-  "https://static.wavespeed.ai/media/images/1773983575227260340_BNIR3cmw.webp",
+const IMG = "https://static.wavespeed.ai/media/images/";
+
+const LEFT_IMAGES = [
+  "1773982486991777301_pAKnxHQ0.webp",
+  "1773982485921091987_9RfY7gqA.webp",
+  "1773982487527428587_7V5eoxHR.webp",
+  "1773982485462820141_SWBsOay0.webp",
+  "1773982488096109393_g2UoRiPf.webp",
+  "1773982488033922443_4GhqzJT3.webp",
+  "1773982488103867536_m9YmHYnM.webp",
+  "1773982488677021111_Z5wmwFPZ.webp",
+  "1773982486529320898_2EA1uWkK.webp",
+  "1773982487109684599_qpWYmG5z.webp",
+  "1773982486219725120_geW0oOkK.webp",
+  "1773982487225168510_bW7gpyIR.webp",
+  "1773982488807980452_SkV5eoxG.webp",
+  "1773982486480192004_ShKT2clu.webp",
+  "1773982487369289135_VsisBLU3.webp",
+  "1773982488389173191_Oq1bluEO.webp",
 ];
 
-const PROVIDER_NAMES = [
-  "Wan 2.1",
-  "Kling 2.1",
-  "Nano Banana 2",
-  "Seedream 4.0",
-  "Flux Kontext",
-  "InfiniteTalk",
-  "Runway",
-  "Hailuo",
-  "PixVerse",
-  "Midjourney",
-  "OpenAI",
-  "Recraft",
-  "Ideogram",
-  "Gemini",
-  "Pika",
-  "Luma",
-  "MiniMax",
-  "Qwen",
-  "Veo",
-  "Fal",
-  "Replicate",
-  "Together",
-  "Mistral",
-  "Anthropic",
-  "Fireworks",
-  "SambaNova",
-  "Cohere",
-  "Groq",
-  "Cerebras",
-  "AI21",
-  "Haiper",
-  "Morph",
-  "Gen-3",
-  "CogView",
-  "DALL-E",
-  "Sora",
+const RIGHT_IMAGES = [
+  "1773982485839899969_Xn1blvFP.webp",
+  "1773982485686510099_qTuEOX6e.webp",
+  "1773982485742876269_w2fpyIS1.webp",
+  "1773982485879640021_aRPY8hqz.webp",
+  "1773982488243677073_vjIRuEOX.webp",
+  "1773982488676921146_ZzrAKT2b.webp",
+  "1773982488751485730_npzXI3dn.webp",
+  "1773982488525553248_TwoyGQ09.webp",
+  "1773982486833266645_bI82pJ8z.webp",
+  "1773982486509051721_ZD9jsCKU.webp",
+  "1773982486882648964_w1O3iwM0.webp",
+  "1773982488396898892_b5vELW5h.webp",
+  "1773982489037596683_QmZ7irAK.webp",
+  "1773982486341819820_t6IS2clu.webp",
+  "1773982488941937311_1wajtCMV.webp",
+  "1773982488986532231_fBNjtCLU.webp",
 ];
 
-const PROVIDERS: Provider[] = FEATURED_IMAGES.map((icon, index) => ({
-  id: String(index + 1),
-  name: PROVIDER_NAMES[index] ?? `Model ${index + 1}`,
-  icon,
-  status: "online",
-}));
+interface ModelRow {
+  path: string;
+  href: string;
+  provider: string;
+  type: string;
+  price: string;
+  discount?: { percent: number; original: string };
+  image: string;
+}
 
-const LEFT_PROVIDERS = PROVIDERS.slice(0, 18);
-const RIGHT_PROVIDERS = PROVIDERS.slice(18, 36);
+const MODELS: ModelRow[] = [
+  { path: "wan-2.7/text-to-video", href: "/models", provider: "alibaba", type: "text-to-video", price: "$0.5", image: "1773982486991777301_pAKnxHQ0.webp" },
+  { path: "wan-2.7/image-to-video", href: "/models", provider: "alibaba", type: "image-to-video", price: "$0.5", image: "1773982485921091987_9RfY7gqA.webp" },
+  { path: "wan-2.7/reference-to-video", href: "/models", provider: "alibaba", type: "image-to-video", price: "$0.5", image: "1773982487527428587_7V5eoxHR.webp" },
+  { path: "wan-2.7/video-edit", href: "/models", provider: "alibaba", type: "video-to-video", price: "$0.5", image: "1773982485462820141_SWBsOay0.webp" },
+  { path: "nano-banana-pro/edit", href: "/models", provider: "google", type: "image-to-image", price: "$0.119", discount: { percent: 15, original: "$0.14" }, image: "1773982488096109393_g2UoRiPf.webp" },
+  { path: "nano-banana-2/edit", href: "/models", provider: "google", type: "image-to-image", price: "$0.0595", discount: { percent: 15, original: "$0.07" }, image: "1773982488033922443_4GhqzJT3.webp" },
+  { path: "nano-banana-2/text-to-image", href: "/models", provider: "google", type: "text-to-image", price: "$0.0595", discount: { percent: 15, original: "$0.07" }, image: "1773982488103867536_m9YmHYnM.webp" },
+  { path: "nano-banana-pro/text-to-image", href: "/models", provider: "google", type: "text-to-image", price: "$0.119", discount: { percent: 15, original: "$0.14" }, image: "1773982488677021111_Z5wmwFPZ.webp" },
+  { path: "seedream-v4.5/edit", href: "/models", provider: "bytedance", type: "image-to-image", price: "$0.04", image: "1773982486529320898_2EA1uWkK.webp" },
+  { path: "infinitetalk", href: "/models", provider: "openoctopus", type: "digital-human", price: "$0.15", image: "1773982487109684599_qpWYmG5z.webp" },
+  { path: "wan-2.7/image-edit", href: "/models", provider: "alibaba", type: "image-to-image", price: "$0.03", image: "1773982486219725120_geW0oOkK.webp" },
+  { path: "wan-2.7/image-edit-pro", href: "/models", provider: "alibaba", type: "image-to-image", price: "$0.075", image: "1773982487225168510_bW7gpyIR.webp" },
+  { path: "wan-2.2/animate", href: "/models", provider: "openoctopus", type: "motion-control", price: "$0.2", image: "1773982488807980452_SkV5eoxG.webp" },
+  { path: "kling-v2.6-pro/motion-control", href: "/models", provider: "kwaivgi", type: "motion-control", price: "$0.336", image: "1773982486480192004_ShKT2clu.webp" },
+  { path: "wan-2.6/image-to-video-spicy", href: "/models", provider: "alibaba", type: "image-to-video", price: "$0.5", image: "1773982487369289135_VsisBLU3.webp" },
+  { path: "wan-2.6/image-to-video", href: "/models", provider: "alibaba", type: "image-to-video", price: "$0.5", image: "1773982488389173191_Oq1bluEO.webp" },
+];
+
+function StatusDots() {
+  return (
+    <div className="flex items-center gap-px">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div key={i} className="bg-green h-3 w-1" />
+      ))}
+    </div>
+  );
+}
 
 export function FeaturedModels() {
   return (
-    <section className="relative overflow-hidden border-b border-black/8 bg-white py-16 md:py-20">
-      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/[0.03] to-transparent" />
-      <div className="mx-auto flex max-w-[1240px] flex-col items-center gap-8 px-4 sm:px-6">
-        <FadeIn className="flex max-w-[876px] flex-col items-center gap-3 text-center">
-          <h2 className="font-display text-3xl font-bold leading-none tracking-tight text-[#111111] sm:text-4xl md:text-[46px]">
+    <section className="py-20">
+      {/* Title */}
+      <div className="mx-auto flex max-w-[1160px] flex-col items-center gap-10">
+        <div className="flex max-w-[876px] flex-col items-center gap-4 text-center">
+          <h2 className="text-[32px] font-bold leading-none tracking-[-1px] text-balance text-[#111] md:text-[48px] font-display">
             Featured Models
           </h2>
-        </FadeIn>
+        </div>
+      </div>
 
-        <div className="relative mt-8 w-full xl:min-h-[720px]">
-          <div className="pointer-events-none absolute left-0 top-0 hidden flex-col items-start gap-3 xl:flex">
-            {Array.from({ length: 9 }).map((_, rowIndex) => (
-              <div
-                key={`left-row-${rowIndex}`}
-                className="flex gap-3"
-                style={{ marginLeft: rowIndex % 2 === 0 ? "0px" : "46px" }}
-              >
-                {LEFT_PROVIDERS.slice(rowIndex * 2, rowIndex * 2 + 2).map((provider, i) => (
-                  <div
-                    key={provider.id}
-                    className="relative overflow-hidden transition-all duration-300"
-                    style={{
-                      height: "80px",
-                      width: "80px",
-                      opacity: 0.58,
-                      animationDelay: `${(rowIndex * 2 + i) * 50}ms`,
-                    }}
-                  >
-                    <ProviderCard provider={provider} size="md" />
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-
-          <div className="pointer-events-none absolute right-0 top-0 hidden flex-col items-end gap-3 xl:flex">
-            {Array.from({ length: 9 }).map((_, rowIndex) => (
-              <div
-                key={`right-row-${rowIndex}`}
-                className="flex gap-3"
-                style={{ marginRight: rowIndex % 2 === 0 ? "0px" : "46px" }}
-              >
-                {RIGHT_PROVIDERS.slice(rowIndex * 2, rowIndex * 2 + 2).map((provider, i) => (
-                  <div
-                    key={provider.id}
-                    className="relative overflow-hidden transition-all duration-300"
-                    style={{
-                      height: "80px",
-                      width: "80px",
-                      opacity: 0.58,
-                      animationDelay: `${(rowIndex * 2 + i) * 50}ms`,
-                    }}
-                  >
-                    <ProviderCard provider={provider} size="md" />
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-
-          <FadeIn
-            delay={0.2}
-            className="mx-auto flex max-w-[500px] flex-col items-center gap-5 rounded-[4px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,17,17,0.96),rgba(0,0,0,0.9))] px-6 py-8 text-center shadow-[0_30px_100px_rgba(0,0,0,0.45)] backdrop-blur-[2px] xl:absolute xl:left-1/2 xl:top-1/2 xl:w-[470px] xl:-translate-x-1/2 xl:-translate-y-1/2 xl:px-10 xl:py-10"
-          >
-            <h3 className="font-display text-[29px] font-bold leading-[0.94] tracking-[-0.035em] text-white sm:text-[34px]">
-              One Platform, <br className="sm:hidden" />
-              <span className="text-white/80">Infinite Possibilities</span>
-            </h3>
-
-            <p className="max-w-[390px] font-mono text-[12px] leading-5 text-white/52 sm:text-[13px] sm:leading-6">
-              Access flagship image, video, speech, and multimodal models
-              through one unified platform.
-            </p>
-
-            <div className="flex flex-col gap-2.5 sm:flex-row sm:gap-3">
-              <Link
-                href="/models"
-                className="group inline-flex h-10 items-center justify-center gap-2 rounded-[2px] bg-white px-4 text-black shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] transition-colors duration-150 hover:bg-white/90 sm:h-11 sm:px-5"
-              >
-                <span className="font-mono text-[11px] font-bold uppercase tracking-[1.25px] sm:text-xs">
-                  Explore
-                </span>
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
-              <Link
-                href="/docs"
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-[2px] border border-white/20 bg-white/[0.02] px-4 text-white transition-colors duration-150 hover:bg-white/10 sm:h-11 sm:px-5"
-              >
-                <span className="font-mono text-[11px] font-bold uppercase tracking-[1.25px] sm:text-xs">
-                  Documentation
-                </span>
-              </Link>
+      {/* Decorative images + model list */}
+      <div className="relative mt-10">
+        {/* Left decorative column */}
+        <div className="pointer-events-none absolute left-0 top-0 hidden flex-col items-start xl:flex">
+          {LEFT_IMAGES.map((img) => (
+            <div
+              key={img}
+              className="relative overflow-hidden transition-all duration-300 ease-out"
+              style={{ height: 80, width: 80, opacity: 0.6 }}
+            >
+              <Image alt="" src={`${IMG}${img}`} fill className="object-cover" sizes="100vw" unoptimized />
             </div>
-          </FadeIn>
+          ))}
         </div>
 
-        <FadeIn
-          delay={0.3}
-          className="grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-9 xl:hidden"
-        >
-          {LEFT_PROVIDERS.slice(0, 9).map((provider) => (
-            <ProviderCard
-              key={provider.id}
-              provider={provider}
-              size="sm"
-              className="h-auto w-auto p-2"
-            />
+        {/* Right decorative column */}
+        <div className="pointer-events-none absolute right-0 top-0 hidden flex-col items-end xl:flex">
+          {RIGHT_IMAGES.map((img) => (
+            <div
+              key={img}
+              className="relative overflow-hidden transition-all duration-300 ease-out"
+              style={{ height: 80, width: 80, opacity: 0.6 }}
+            >
+              <Image alt="" src={`${IMG}${img}`} fill className="object-cover" sizes="100vw" unoptimized />
+            </div>
           ))}
-        </FadeIn>
+        </div>
+
+        {/* Model list */}
+        <div className="mx-auto max-w-[1160px]">
+          <div className="flex flex-col">
+            {MODELS.map((model) => (
+              <Link
+                key={model.href}
+                href={model.href}
+                className="grid grid-cols-[40px_1fr_auto] items-center gap-3 border-b border-black/5 px-4 py-3 transition-colors duration-150 md:h-20 md:grid-cols-12 md:gap-4 md:px-8 md:py-6 xl:grid-cols-12"
+              >
+                {/* Thumbnail - below xl */}
+                <div className="relative size-10 shrink-0 overflow-hidden rounded-xs xl:hidden">
+                  <Image alt="" src={`${IMG}${model.image}`} fill className="object-cover" sizes="100vw" unoptimized />
+                </div>
+
+                {/* Model path + mobile discount */}
+                <div className="col-span-1 flex items-center justify-between gap-2 md:col-span-4">
+                  <span className="font-mono text-sm leading-5 text-[#111]">{model.path}</span>
+                  {model.discount && (
+                    <span className="block whitespace-nowrap rounded-full bg-orange-500 px-2 font-mono text-xs uppercase leading-4 text-white md:hidden">
+                      {model.discount.percent}% off
+                    </span>
+                  )}
+                </div>
+
+                {/* Provider */}
+                <div className="col-span-2 hidden md:block">
+                  <span className="font-mono text-sm leading-5 text-[#111]">{model.provider}</span>
+                </div>
+
+                {/* Type */}
+                <div className="col-span-2 hidden md:block">
+                  <span className="font-mono text-sm leading-5 text-[#111]">{model.type}</span>
+                </div>
+
+                {/* Price */}
+                <div className="col-span-1 hidden items-center md:flex">
+                  <span className="font-mono text-sm uppercase leading-4 text-[#111]">
+                    {model.discount ? (
+                      <><del>{model.discount.original}</del> {model.price}</>
+                    ) : (
+                      model.price
+                    )}
+                  </span>
+                </div>
+
+                {/* Desktop discount badge */}
+                <div className="col-span-1 hidden items-center md:flex">
+                  {model.discount && (
+                    <span className="ml-2 whitespace-nowrap rounded-full bg-orange-500 px-2 font-mono text-xs uppercase leading-4 text-white">
+                      {model.discount.percent}% off
+                    </span>
+                  )}
+                </div>
+
+                {/* Status dots */}
+                <div className="col-span-1 hidden items-center justify-end md:flex">
+                  <StatusDots />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Explore all button */}
+      <div className="mx-auto mt-10 flex max-w-[1160px] justify-center">
+        <Link
+          href="/models"
+          className="rounded-xs bg-[#111] px-4 py-3 font-mono text-sm font-medium tracking-[1.2px] text-white transition-colors duration-150 hover:bg-[#111]/80"
+        >
+          Explore <span className="font-bold">All 1000+</span> models
+        </Link>
       </div>
     </section>
   );

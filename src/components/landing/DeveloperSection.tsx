@@ -1,8 +1,8 @@
 export function DeveloperSection() {
-  const codeExample = `import WaveSpeed from '@wavespeed/sdk';
+  const codeExample = `import OpenOctopus from '@openoctopus/sdk';
 
-const client = new WaveSpeed({
-  apiKey: process.env.WAVESPEED_API_KEY
+const client = new OpenOctopus({
+  apiKey: process.env.OPENOCTOPUS_API_KEY
 });
 
 const result = await client.generate({

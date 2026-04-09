@@ -4,8 +4,11 @@ import { Footer } from "@/components/layout/Footer";
 import { HeroSlideshow } from "@/components/hero/HeroSlideshow";
 import { FeaturedModels } from "@/components/models/FeaturedModels";
 import { FeaturesSection } from "@/components/features/FeaturesSection";
+import { ToolsShowcase } from "@/components/landing/ToolsShowcase";
 import { ForCreators } from "@/components/creators/ForCreators";
+import { TechFeatures } from "@/components/landing/TechFeatures";
 import { UserVoices } from "@/components/voices/UserVoices";
+import { CTASection } from "@/components/landing/CTASection";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Home() {
@@ -22,9 +25,12 @@ export default async function Home() {
       <main className="flex-1">
         <HeroSlideshow />
         <FeaturedModels />
+        <ToolsShowcase />
         <FeaturesSection />
         <ForCreators />
+        <TechFeatures />
         <UserVoices />
+        <CTASection />
       </main>
 
       <Footer />

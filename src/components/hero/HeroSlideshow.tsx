@@ -28,7 +28,7 @@ const SLIDES: Slide[] = [
     description:
       "The fastest way to run image, video, audio, and multimodal generation through one unified inference platform.",
     cta: { text: "Start Building", href: "/sign-in" },
-    docsHref: "/docs",
+    docsHref: "/about",
   },
   {
     id: 2,
@@ -37,8 +37,8 @@ const SLIDES: Slide[] = [
     title: "Nano Banana 2",
     description:
       "Fast, low-cost image generation with polished prompt following and production-ready quality.",
-    cta: { text: "Try Model", href: "/models/google/nano-banana-2/edit" },
-    docsHref: "/docs/docs-api/google/google-nano-banana-2",
+    cta: { text: "Try Model", href: "/models" },
+    docsHref: "/models",
   },
   {
     id: 3,
@@ -47,8 +47,8 @@ const SLIDES: Slide[] = [
     title: "Seedream 4.5",
     description:
       "Designed for typography and posters, with precise layouts and strong prompt control.",
-    cta: { text: "Try Model", href: "/models/bytedance/seedream-v4.5/edit" },
-    docsHref: "/docs/docs-api/bytedance/bytedance-seedream-v4.5-edit",
+    cta: { text: "Try Model", href: "/models" },
+    docsHref: "/models",
   },
   {
     id: 4,
@@ -56,8 +56,8 @@ const SLIDES: Slide[] = [
     title: "InfiniteTalk",
     description:
       "Create expressive talking characters with high fidelity lip sync and stable identity across scenes.",
-    cta: { text: "Try Model", href: "/models/wavespeed-ai/infinitetalk/edit" },
-    docsHref: "/docs/docs-api/wavespeed-ai/wavespeed-ai-infinitetalk",
+    cta: { text: "Try Model", href: "/models" },
+    docsHref: "/models",
   },
   {
     id: 5,
@@ -65,8 +65,8 @@ const SLIDES: Slide[] = [
     title: "Kling V3 Motion Control",
     description:
       "Guide camera movement and subject motion with stronger control for cinematic video generation.",
-    cta: { text: "Try Model", href: "/models/kwaivgi/kling-v3-motion-control/edit" },
-    docsHref: "/docs/docs-api/kwaivgi/kwaivgi-kling-v3-motion-control",
+    cta: { text: "Try Model", href: "/models" },
+    docsHref: "/models",
   },
 ];
 
@@ -178,7 +178,7 @@ export function HeroSlideshow() {
 
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 <Link
-                  href="/image-generator"
+                  href="/models"
                   className="relative flex h-8 items-center gap-1.5 rounded-[2px] border border-white/20 bg-black/15 px-3 text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
                 >
                   <ImageIcon className="size-3" />
@@ -188,7 +188,7 @@ export function HeroSlideshow() {
                   <span className="absolute -right-2 -top-2 text-[10px]">🔥</span>
                 </Link>
                 <Link
-                  href="/video-generator"
+                  href="/models"
                   className="relative flex h-8 items-center gap-1.5 rounded-[2px] border border-white/20 bg-black/15 px-3 text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
                 >
                   <VideoIcon className="size-3" />

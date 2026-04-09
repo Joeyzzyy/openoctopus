@@ -60,6 +60,35 @@ export type LedgerRow = {
   tone: "positive" | "negative" | "neutral";
 };
 
+export type ProviderStatus = "healthy" | "degraded" | "offline";
+
+export type ProviderSummary = {
+  name: string;
+  kind: string;
+  regions: string;
+  models: number;
+  queue: string;
+  status: ProviderStatus;
+};
+
+export type RoutingRule = {
+  capability: string;
+  publicModel: string;
+  primary: string;
+  fallback: string;
+  strategy: string;
+};
+
+export type RequestQueueRow = {
+  requestId: string;
+  capability: string;
+  model: string;
+  provider: string;
+  status: "queued" | "processing" | "succeeded" | "failed";
+  latency: string;
+  cost: string;
+};
+
 export const dashboardNav: DashboardNavItem[] = [
   { label: "Overview", value: "overview", active: true },
   { label: "Wallet", value: "wallet" },
@@ -196,4 +225,85 @@ export const ledgerRows: LedgerRow[] = [
   { title: "Usage settlement", detail: "Seedream 4.5 generation charges", amount: "-$18.24", tone: "negative" },
   { title: "Usage settlement", detail: "Kling V3 Motion generation charges", amount: "-$26.11", tone: "negative" },
   { title: "Budget alert", detail: "studio-batch crossed 80% monthly cap", amount: "Watch", tone: "neutral" },
+];
+
+export const providerSummaries: ProviderSummary[] = [
+  {
+    name: "WaveSpeed Images",
+    kind: "Primary upstream",
+    regions: "sgp1 · us-west",
+    models: 1,
+    queue: "11 queued",
+    status: "healthy",
+  },
+  {
+    name: "WaveSpeed Video",
+    kind: "Primary upstream",
+    regions: "sgp1",
+    models: 1,
+    queue: "4 queued",
+    status: "healthy",
+  },
+  {
+    name: "Partner Provider A",
+    kind: "Fallback upstream",
+    regions: "us-east",
+    models: 1,
+    queue: "0 queued",
+    status: "degraded",
+  },
+];
+
+export const routingRules: RoutingRule[] = [
+  {
+    capability: "Image generation",
+    publicModel: "openoctopus/seedream-4.5",
+    primary: "WaveSpeed Images / seedream-v4.5",
+    fallback: "Partner Provider A / flux-kontext",
+    strategy: "Primary, then fallback on 5xx or timeout",
+  },
+  {
+    capability: "Video generation",
+    publicModel: "openoctopus/kling-v3-motion",
+    primary: "WaveSpeed Video / kling-v3-motion",
+    fallback: "manual failover only",
+    strategy: "Primary only for MVP",
+  },
+  {
+    capability: "Image editing",
+    publicModel: "openoctopus/flux-kontext-edit",
+    primary: "Partner Provider A / flux-edit",
+    fallback: "WaveSpeed Images / seedream-edit",
+    strategy: "Route by capability tag",
+  },
+];
+
+export const requestQueueRows: RequestQueueRow[] = [
+  {
+    requestId: "req_01JQ9W0M33J4",
+    capability: "image",
+    model: "openoctopus/seedream-4.5",
+    provider: "WaveSpeed Images",
+    status: "processing",
+    latency: "12s",
+    cost: "$0.38",
+  },
+  {
+    requestId: "req_01JQ9VY5P9AM",
+    capability: "video",
+    model: "openoctopus/kling-v3-motion",
+    provider: "WaveSpeed Video",
+    status: "queued",
+    latency: "queueing",
+    cost: "pending",
+  },
+  {
+    requestId: "req_01JQ9VX0M2CY",
+    capability: "image-edit",
+    model: "openoctopus/flux-kontext-edit",
+    provider: "Partner Provider A",
+    status: "succeeded",
+    latency: "8s",
+    cost: "$0.09",
+  },
 ];

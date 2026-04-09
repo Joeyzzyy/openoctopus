@@ -4,7 +4,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* WaveSpeed Exact Design Tokens from source */
+/* OpenOctopus Exact Design Tokens from source */
 :root {
   --banner-h: 36px;
 
@@ -103,4 +103,20 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
+}
+
+/* Marquee animations */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes marquee-reverse {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+/* Hide scrollbar for drag rows */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

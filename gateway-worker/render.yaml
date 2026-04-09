@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: openoctopus-gateway-worker
+    runtime: docker
+    plan: starter
+    autoDeploy: true

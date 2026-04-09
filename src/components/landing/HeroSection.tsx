@@ -27,7 +27,7 @@ export function HeroSection() {
 
         {/* Subtext */}
         <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-500 leading-relaxed">
-          With 1000+ top-tier models, WaveSpeedAI is the most powerful platform for AI image and video generation — built to help you create faster and scale without limits.
+          With 1000+ top-tier models, OpenOctopus is the most powerful platform for AI image and video generation — built to help you create faster and scale without limits.
         </p>
 
         {/* Primary CTAs */}

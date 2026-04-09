@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   title: "OpenOctopus",
   description:
     "OpenOctopus — AI media generation platform with model budgets, API keys, and spend oversight.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

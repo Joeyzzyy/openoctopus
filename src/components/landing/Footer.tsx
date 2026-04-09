@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/layout/Logo";
 
 const footerSections = [
   {
@@ -70,14 +71,9 @@ export function Footer() {
 
         {/* Bottom */}
         <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-200/60 pt-8 gap-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-xs">
-              W
-            </div>
-            <span className="text-sm font-semibold text-slate-900">WaveSpeed</span>
-          </div>
+          <Logo className="text-slate-900" />
           <p className="text-xs text-slate-400">
-            © 2024 WaveSpeed AI. All rights reserved.
+            © 2024 OpenOctopus. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             {/* Social icons as text for now */}
