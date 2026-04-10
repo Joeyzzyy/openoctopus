@@ -15,6 +15,34 @@ import { CreateKeyButton } from "./dashboard-actions";
 import { ApiKeysTable } from "./api-keys-table";
 import { ApiQuickstartCard } from "./api-quickstart-card";
 
+const sectionLinks = [
+  { label: "Overview", href: "#overview" },
+  { label: "Quickstart", href: "#quickstart" },
+  { label: "API Keys", href: "#keys" },
+  { label: "Requests", href: "#requests" },
+];
+
+const gettingStartedSteps = [
+  {
+    title: "Create an API key",
+    detail: "Generate a workspace key and copy the secret once.",
+    href: "#keys",
+    cta: "Go to keys",
+  },
+  {
+    title: "Send your first request",
+    detail: "Use the quickstart example with one model slug and one prompt.",
+    href: "#quickstart",
+    cta: "Open quickstart",
+  },
+  {
+    title: "Check task status",
+    detail: "Track recent jobs and verify the response format you will build against.",
+    href: "#requests",
+    cta: "View requests",
+  },
+];
+
 const toneStyles = {
   neutral: "text-black/55",
   positive: "text-[#168a42]",
@@ -42,7 +70,10 @@ export default async function DashboardPage() {
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,241,214,0.9),_transparent_30%),linear-gradient(180deg,#fffdf8_0%,#f6f7f1_48%,#eef3ef_100%)] text-[#111111]">
       <div className="mx-auto max-w-[1180px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
         <div className="space-y-4 sm:space-y-6">
-          <section className="overflow-hidden rounded-[24px] border border-[#d9dfd2] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(245,249,241,0.96))] p-5 shadow-[0_24px_80px_rgba(68,85,56,0.08)] sm:rounded-[32px] sm:p-7">
+          <section
+            id="overview"
+            className="overflow-hidden rounded-[24px] border border-[#d9dfd2] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(245,249,241,0.96))] p-5 shadow-[0_24px_80px_rgba(68,85,56,0.08)] sm:rounded-[32px] sm:p-7"
+          >
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-[#d9dfd2] bg-white/90 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[1px] text-[#5d6857]">
@@ -82,33 +113,104 @@ export default async function DashboardPage() {
             </div>
           </section>
 
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-            {coreMetrics.map((metric) => (
-              <article
-                key={metric.label}
-                className="rounded-[20px] border border-[#dde5d8] bg-white/92 p-4 shadow-[0_18px_50px_rgba(68,85,56,0.06)] sm:rounded-[24px] sm:p-5"
-              >
-                <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
-                  {metric.label}
-                </p>
-                <p className="mt-3 font-mono text-[24px] leading-none font-bold tracking-[-0.05em] text-[#162319] sm:text-[30px]">
-                  {metric.value}
-                </p>
-                <p
+          <nav className="sticky top-3 z-20 overflow-x-auto rounded-[18px] border border-[#dde5d8] bg-white/90 p-2 shadow-[0_14px_40px_rgba(68,85,56,0.08)] backdrop-blur">
+            <div className="flex min-w-max items-center gap-2">
+              {sectionLinks.map((item, index) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
                   className={cn(
-                    "mt-3 font-mono text-[10px] uppercase tracking-[0.9px]",
-                    toneStyles[metric.tone]
+                    "inline-flex h-9 items-center rounded-[12px] px-3.5 font-mono text-[11px] font-semibold uppercase tracking-[0.9px] transition-colors",
+                    index === 0
+                      ? "bg-[#1f5f39] text-white"
+                      : "text-[#556153] hover:bg-[#f4f8f1] hover:text-[#1f5f39]"
                   )}
                 >
-                  {metric.change}
-                </p>
-              </article>
-            ))}
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </nav>
+
+          <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+            <article className="rounded-[24px] border border-[#dde5d8] bg-white/95 p-5 shadow-[0_20px_60px_rgba(68,85,56,0.06)] sm:p-6">
+              <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
+                Getting Started
+              </p>
+              <h2 className="mt-2 font-mono text-xl font-semibold text-[#162319]">
+                Three things every new user should do
+              </h2>
+              <div className="mt-5 space-y-3">
+                {gettingStartedSteps.map((step, index) => (
+                  <div
+                    key={step.title}
+                    className="flex items-start justify-between gap-3 rounded-[18px] border border-[#e3e8de] bg-[#f9fcf7] px-4 py-4"
+                  >
+                    <div className="flex min-w-0 gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white font-mono text-[11px] font-semibold text-[#1f5f39] shadow-[0_8px_20px_rgba(39,65,46,0.08)]">
+                        {index + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-mono text-[12px] font-semibold uppercase tracking-[0.8px] text-[#162319]">
+                          {step.title}
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-[#4f5d50]">
+                          {step.detail}
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href={step.href}
+                      className="shrink-0 font-mono text-[11px] font-semibold uppercase tracking-[0.8px] text-[#1f5f39]"
+                    >
+                      {step.cta}
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="rounded-[24px] border border-[#dde5d8] bg-white/95 p-5 shadow-[0_20px_60px_rgba(68,85,56,0.06)] sm:p-6">
+              <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
+                Workspace Snapshot
+              </p>
+              <h2 className="mt-2 font-mono text-xl font-semibold text-[#162319]">
+                Core numbers, nothing extra
+              </h2>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                {coreMetrics.map((metric) => (
+                  <article
+                    key={metric.label}
+                    className="rounded-[20px] border border-[#e3e8de] bg-[#f9fcf7] p-4"
+                  >
+                    <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
+                      {metric.label}
+                    </p>
+                    <p className="mt-3 font-mono text-[24px] leading-none font-bold tracking-[-0.05em] text-[#162319] sm:text-[28px]">
+                      {metric.value}
+                    </p>
+                    <p
+                      className={cn(
+                        "mt-3 font-mono text-[10px] uppercase tracking-[0.9px]",
+                        toneStyles[metric.tone]
+                      )}
+                    >
+                      {metric.change}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </article>
           </section>
 
-          <ApiQuickstartCard />
+          <div id="quickstart">
+            <ApiQuickstartCard />
+          </div>
 
-          <section className="rounded-[24px] border border-[#dde5d8] bg-white/95 p-4 shadow-[0_24px_70px_rgba(68,85,56,0.06)] sm:rounded-[30px] sm:p-6">
+          <section
+            id="keys"
+            className="rounded-[24px] border border-[#dde5d8] bg-white/95 p-4 shadow-[0_24px_70px_rgba(68,85,56,0.06)] sm:rounded-[30px] sm:p-6"
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
@@ -129,7 +231,10 @@ export default async function DashboardPage() {
             </div>
           </section>
 
-          <section className="rounded-[24px] border border-[#dde5d8] bg-white/95 p-4 shadow-[0_24px_70px_rgba(68,85,56,0.06)] sm:rounded-[30px] sm:p-6">
+          <section
+            id="requests"
+            className="rounded-[24px] border border-[#dde5d8] bg-white/95 p-4 shadow-[0_24px_70px_rgba(68,85,56,0.06)] sm:rounded-[30px] sm:p-6"
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
