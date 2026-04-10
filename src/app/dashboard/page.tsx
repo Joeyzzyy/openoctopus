@@ -2,58 +2,44 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ArrowRight,
-  ArrowUpRight,
+  ChevronDown,
+  CircleAlert,
+  Download,
+  Grid2x2,
+  ImageIcon,
   KeyRound,
   LogOut,
-  Send,
-  ShieldCheck,
+  Search,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Toaster } from "sonner";
 import { getDashboardData } from "@/lib/dashboard-server";
 import { cn } from "@/lib/utils";
 import { CreateKeyButton } from "./dashboard-actions";
 import { ApiKeysTable } from "./api-keys-table";
-import { ApiQuickstartCard } from "./api-quickstart-card";
 
-const sectionLinks = [
-  { label: "Overview", href: "#overview" },
-  { label: "Quickstart", href: "#quickstart" },
+const topNav = [
+  { label: "Dashboard", href: "/dashboard", active: true },
+  { label: "Explore", href: "#latest-models" },
+  { label: "History", href: "#requests" },
+  { label: "AI Generator", href: "#latest-models", badge: "hot" },
   { label: "API Keys", href: "#keys" },
-  { label: "Requests", href: "#requests" },
+  { label: "Billing", href: "#overview" },
+  { label: "Settings", href: "#overview", dropdown: true },
 ];
 
-const gettingStartedSteps = [
-  {
-    title: "Create an API key",
-    detail: "Generate a workspace key and copy the secret once.",
-    href: "#keys",
-    cta: "Go to keys",
-  },
-  {
-    title: "Send your first request",
-    detail: "Use the quickstart example with one model slug and one prompt.",
-    href: "#quickstart",
-    cta: "Open quickstart",
-  },
-  {
-    title: "Check task status",
-    detail: "Track recent jobs and verify the response format you will build against.",
-    href: "#requests",
-    cta: "View requests",
-  },
+const buildApiSteps = [
+  { index: "01", label: "Get an API key", href: "#keys", cta: "Get" },
+  { index: "02", label: "Quickstart guide", href: "#quickstart", cta: "Check" },
+  { index: "03", label: "First image request", href: "#quickstart", cta: "Try" },
+  { index: "04", label: "Task polling", href: "#requests", cta: "View" },
 ];
-
-const toneStyles = {
-  neutral: "text-black/55",
-  positive: "text-[#168a42]",
-  warning: "text-[#b66a00]",
-};
 
 const requestStatusStyles = {
-  queued: "bg-[#f2eee4] text-[#6d5b2e]",
-  processing: "bg-[#e6f0ff] text-[#2f5fb8]",
-  succeeded: "bg-[#dff6e6] text-[#167a3d]",
-  failed: "bg-[#ffe0db] text-[#b43828]",
+  queued: "bg-[#f4efe3] text-[#7b6226]",
+  processing: "bg-[#e8f0ff] text-[#355fb4]",
+  succeeded: "bg-[#e4f7e8] text-[#1b7a41]",
+  failed: "bg-[#ffe7e3] text-[#b54432]",
 };
 
 export default async function DashboardPage() {
@@ -63,332 +49,568 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const { apiKeys, metrics, requestQueueRows, user, workspace } = data;
-  const coreMetrics = metrics.slice(0, 4);
+  const {
+    apiKeys,
+    metrics,
+    modelSpend,
+    requestQueueRows,
+    routingRules,
+    usageRows,
+    user,
+    workspace,
+  } = data;
+
+  const walletMetric = metrics.find((metric) => metric.label === "Wallet Balance");
+  const spendMetric = metrics.find((metric) => metric.label === "Month Spend");
+  const requestsLast7Days = usageRows.length;
+  const modelsUsed = new Set(
+    [...requestQueueRows.map((row) => row.model), ...usageRows.map((row) => row.model)].filter(Boolean)
+  ).size;
+  const latestModels = routingRules.slice(0, 8).map((rule, index) => ({
+    id: rule.publicModel,
+    name: rule.publicModel.split("/").at(-1) ?? rule.publicModel,
+    slug: rule.publicModel,
+    capability: rule.capability,
+    tone: index % 4,
+  }));
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,241,214,0.9),_transparent_30%),linear-gradient(180deg,#fffdf8_0%,#f6f7f1_48%,#eef3ef_100%)] text-[#111111]">
-      <div className="mx-auto max-w-[1180px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
-        <div className="space-y-4 sm:space-y-6">
-          <section
-            id="overview"
-            className="overflow-hidden rounded-[24px] border border-[#d9dfd2] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(245,249,241,0.96))] p-5 shadow-[0_24px_80px_rgba(68,85,56,0.08)] sm:rounded-[32px] sm:p-7"
-          >
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#d9dfd2] bg-white/90 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[1px] text-[#5d6857]">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  OpenOctopus API
-                </div>
-                <h1 className="mt-4 max-w-3xl font-mono text-[28px] leading-[0.95] font-bold tracking-[-0.05em] text-[#142018] sm:text-[38px] lg:text-[48px]">
-                  Clean, minimal access to your API.
-                </h1>
-                <p className="mt-4 max-w-2xl text-[14px] leading-7 text-[#4f5d50] sm:text-[15px]">
-                  Create a key, copy the example request, and monitor recent
-                  tasks. Everything else stays out of the way until the MVP
-                  actually needs it.
-                </p>
-                <div className="mt-5 flex flex-wrap items-center gap-2.5">
-                  <div className="rounded-[14px] border border-[#dde5d8] bg-white/90 px-3.5 py-2.5 font-mono text-[11px] text-[#233125]">
-                    Workspace: {workspace?.name ?? "OpenOctopus Production"}
-                  </div>
-                  <div className="rounded-[14px] border border-[#dde5d8] bg-white/90 px-3.5 py-2.5 font-mono text-[11px] text-[#233125]">
-                    User: {user.name}
-                  </div>
-                </div>
-              </div>
+    <main className="min-h-screen bg-[#fafaf8] text-[#111111]">
+      <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top_left,rgba(202,232,207,0.35),transparent_38%),radial-gradient(circle_at_top_right,rgba(255,224,194,0.28),transparent_28%)]" />
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
-                <CreateKeyButton />
-                <form action="/auth/sign-out" method="post">
-                  <button
-                    type="submit"
-                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-[#dde5d8] bg-white/95 px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#233125] sm:w-auto"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Sign Out
-                  </button>
-                </form>
-              </div>
-            </div>
-          </section>
-
-          <nav className="sticky top-3 z-20 overflow-x-auto rounded-[18px] border border-[#dde5d8] bg-white/90 p-2 shadow-[0_14px_40px_rgba(68,85,56,0.08)] backdrop-blur">
-            <div className="flex min-w-max items-center gap-2">
-              {sectionLinks.map((item, index) => (
+      <div className="relative mx-auto max-w-7xl px-4 pb-10 xl:px-0">
+        <div className="sticky top-[96px] z-30 w-full overflow-x-auto border-b border-black/10 bg-white/95 backdrop-blur">
+          <div className="flex min-w-max items-center gap-4 px-4 xl:px-0">
+            <div className="flex items-center gap-8">
+              {topNav.map((item) => (
                 <Link
-                  key={item.href}
+                  key={item.label}
                   href={item.href}
                   className={cn(
-                    "inline-flex h-9 items-center rounded-[12px] px-3.5 font-mono text-[11px] font-semibold uppercase tracking-[0.9px] transition-colors",
-                    index === 0
-                      ? "bg-[#1f5f39] text-white"
-                      : "text-[#556153] hover:bg-[#f4f8f1] hover:text-[#1f5f39]"
+                    "flex items-center gap-1.5 whitespace-nowrap border-b-2 py-3 text-sm transition-colors",
+                    item.active
+                      ? "border-black font-semibold text-black"
+                      : "border-transparent text-black/55 hover:text-black"
                   )}
                 >
-                  {item.label}
+                  <span className="relative">
+                    {item.label}
+                    {item.badge ? (
+                      <span className="absolute -right-4 -top-2 text-[10px]">🔥</span>
+                    ) : null}
+                  </span>
+                  {item.dropdown ? <ChevronDown className="h-4 w-4" /> : null}
                 </Link>
               ))}
             </div>
-          </nav>
 
-          <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-            <article className="rounded-[24px] border border-[#dde5d8] bg-white/95 p-5 shadow-[0_20px_60px_rgba(68,85,56,0.06)] sm:p-6">
-              <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
-                Getting Started
+            <button className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 rounded-sm border border-transparent bg-[#f4f4f1] px-2.5 text-sm text-black/80">
+              {user.name}
+              <span className="rounded-sm bg-black/8 px-1.5 py-0.5 text-xs font-medium">
+                personal
+              </span>
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <section className="mt-[108px] min-h-[calc(100vh-108px)] px-0">
+          <div className="mb-3 mt-4 flex flex-col gap-3 md:mb-6 md:mt-8 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold leading-none text-[#111111]">
+                Dashboard
+              </h1>
+              <p className="mt-2 text-sm text-black/55">
+                {workspace?.name ?? "OpenOctopus Production"} workspace
               </p>
-              <h2 className="mt-2 font-mono text-xl font-semibold text-[#162319]">
-                Three things every new user should do
-              </h2>
-              <div className="mt-5 space-y-3">
-                {gettingStartedSteps.map((step, index) => (
-                  <div
-                    key={step.title}
-                    className="flex items-start justify-between gap-3 rounded-[18px] border border-[#e3e8de] bg-[#f9fcf7] px-4 py-4"
-                  >
-                    <div className="flex min-w-0 gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white font-mono text-[11px] font-semibold text-[#1f5f39] shadow-[0_8px_20px_rgba(39,65,46,0.08)]">
-                        {index + 1}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-mono text-[12px] font-semibold uppercase tracking-[0.8px] text-[#162319]">
-                          {step.title}
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-[#4f5d50]">
-                          {step.detail}
-                        </p>
-                      </div>
-                    </div>
-                    <Link
-                      href={step.href}
-                      className="shrink-0 font-mono text-[11px] font-semibold uppercase tracking-[0.8px] text-[#1f5f39]"
-                    >
-                      {step.cta}
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            </article>
+            </div>
 
-            <article className="rounded-[24px] border border-[#dde5d8] bg-white/95 p-5 shadow-[0_20px_60px_rgba(68,85,56,0.06)] sm:p-6">
-              <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
-                Workspace Snapshot
-              </p>
-              <h2 className="mt-2 font-mono text-xl font-semibold text-[#162319]">
-                Core numbers, nothing extra
-              </h2>
-              <div className="mt-5 grid grid-cols-2 gap-3">
-                {coreMetrics.map((metric) => (
-                  <article
-                    key={metric.label}
-                    className="rounded-[20px] border border-[#e3e8de] bg-[#f9fcf7] p-4"
-                  >
-                    <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
-                      {metric.label}
-                    </p>
-                    <p className="mt-3 font-mono text-[24px] leading-none font-bold tracking-[-0.05em] text-[#162319] sm:text-[28px]">
-                      {metric.value}
-                    </p>
-                    <p
-                      className={cn(
-                        "mt-3 font-mono text-[10px] uppercase tracking-[0.9px]",
-                        toneStyles[metric.tone]
-                      )}
-                    >
-                      {metric.change}
-                    </p>
-                  </article>
-                ))}
-              </div>
-            </article>
-          </section>
-
-          <div id="quickstart">
-            <ApiQuickstartCard />
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="inline-flex h-9 items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80">
+                Build app with API
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              </button>
+              <button className="inline-flex h-9 items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80">
+                Hide Getting Started
+              </button>
+              <CreateKeyButton />
+              <form action="/auth/sign-out" method="post">
+                <button
+                  type="submit"
+                  className="inline-flex h-9 items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </form>
+            </div>
           </div>
 
-          <section
-            id="keys"
-            className="rounded-[24px] border border-[#dde5d8] bg-white/95 p-4 shadow-[0_24px_70px_rgba(68,85,56,0.06)] sm:rounded-[30px] sm:p-6"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
-                  API Keys
-                </p>
-                <h2 className="mt-1 font-mono text-lg font-semibold text-[#162319] sm:text-xl">
-                  Create and manage the keys your apps actually use
-                </h2>
+          <div className="mb-4 rounded-sm border border-black/10 bg-white shadow-none">
+            <div className="grid divide-y divide-black/10 md:grid-cols-3 md:divide-x md:divide-y-0">
+              <section className="flex min-h-[260px] flex-col justify-between px-4 py-4 md:px-5 md:py-5">
+                <div>
+                  <h3 className="mb-3 text-lg font-bold text-[#111111]">
+                    Welcome to OpenOctopus
+                  </h3>
+                  <p className="mb-6 text-sm text-black/55">
+                    Follow these steps to get productive quickly. If anything
+                    blocks you, we can keep the path focused on key creation,
+                    first request, and task verification.
+                  </p>
+                </div>
+                <ul className="mt-auto divide-y divide-black/10">
+                  <li className="flex h-11 items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="flex size-4 items-center justify-center rounded-full bg-[#16a34a] text-white">
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="size-3"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                      </span>
+                      <span className="text-sm text-black/50">Create an account</span>
+                    </div>
+                  </li>
+                  <li className="flex h-11 items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="flex size-4 items-center justify-center rounded-full border border-black/20 bg-black/10 text-transparent" />
+                      <span className="text-sm text-black">Add credits</span>
+                    </div>
+                    <button className="inline-flex h-8 items-center rounded-sm bg-black px-3 text-xs font-medium text-white">
+                      Add credits
+                    </button>
+                  </li>
+                  <li className="flex h-11 items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="flex size-4 items-center justify-center rounded-full border border-black/20 bg-black/10 text-transparent" />
+                      <span className="text-sm text-black">Generate your first media</span>
+                    </div>
+                    <Link
+                      href="#latest-models"
+                      className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium"
+                    >
+                      Explore
+                    </Link>
+                  </li>
+                </ul>
+              </section>
+
+              <section
+                id="quickstart"
+                className="flex min-h-[260px] flex-col justify-between px-4 py-4 md:px-5 md:py-5"
+              >
+                <div>
+                  <h3 className="mb-3 text-lg font-bold text-[#111111]">
+                    Create something with API
+                  </h3>
+                  <p className="text-sm text-black/55">
+                    Follow these steps to ship the first request with the least
+                    amount of setup friction.
+                  </p>
+                </div>
+                <ul className="mt-6 divide-y divide-black/5">
+                  {buildApiSteps.map((step) => (
+                    <li
+                      key={step.index}
+                      className="group flex h-11 items-center justify-between gap-2 rounded-sm px-1 transition-colors hover:bg-black/[0.04]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="w-5 shrink-0 text-[10px] tracking-[1px] text-black/45">
+                          {step.index}
+                        </span>
+                        <span className="text-sm text-black">{step.label}</span>
+                      </div>
+                      <Link
+                        href={step.href}
+                        className="inline-flex shrink-0 items-center gap-1 text-xs text-black/60 group-hover:text-black"
+                      >
+                        {step.cta} →
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <section
+                id="latest-models"
+                className="flex min-h-[260px] flex-col justify-between px-4 py-4 md:px-5 md:py-5"
+              >
+                <div>
+                  <h3 className="mb-3 text-lg font-bold text-[#111111]">
+                    Explore models
+                  </h3>
+                  <p className="text-sm text-black/55">
+                    Browse your public model surface and use one slug as the
+                    input contract for your client apps.
+                  </p>
+                </div>
+                <ul className="mt-6 divide-y divide-black/5">
+                  {latestModels.slice(0, 5).map((model) => (
+                    <li key={model.id}>
+                      <Link
+                        href="#quickstart"
+                        className="group -mx-2 flex min-h-11 items-center justify-between gap-2 rounded-sm px-2 py-1.5 transition-colors hover:bg-black/[0.04]"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <div
+                            className={cn(
+                              "flex size-9 shrink-0 items-center justify-center rounded-sm text-[11px] font-semibold text-white",
+                              model.tone === 0 && "bg-[#1f5f39]",
+                              model.tone === 1 && "bg-[#355fb4]",
+                              model.tone === 2 && "bg-[#8d5cf6]",
+                              model.tone === 3 && "bg-[#d07a1d]"
+                            )}
+                          >
+                            {model.name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="line-clamp-1 text-sm text-black">
+                              {model.slug}
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-black/50">
+                              {model.capability}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                  <li>
+                    <button
+                      type="button"
+                      className="group -mx-2 flex h-11 w-[calc(100%+1rem)] items-center justify-between rounded-sm px-2 transition-colors hover:bg-black/[0.04]"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="inline-flex size-8 items-center justify-center rounded-sm bg-[#f4f5f0] text-black/60">
+                          <Grid2x2 className="size-3.5" />
+                        </span>
+                        <span className="text-sm text-black">View all models</span>
+                      </div>
+                      <ArrowRight className="size-3.5 text-black/50 group-hover:text-black" />
+                    </button>
+                  </li>
+                </ul>
+              </section>
+            </div>
+          </div>
+
+          <article className="mb-6 space-y-3 md:mb-8">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-sm bg-[#f7f7f4] px-4 py-4">
+                <div className="flex min-h-[144px] flex-col">
+                  <div>
+                    <p className="text-xs tracking-[0.3px] text-black/60">
+                      Current credit balance
+                    </p>
+                    <p className="mt-2 text-2xl font-medium tracking-tight text-black">
+                      {walletMetric?.value ?? "$0.00"}
+                    </p>
+                  </div>
+                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
+                    <button className="inline-flex h-8 items-center rounded-sm bg-black px-3 text-xs font-medium text-white">
+                      Manage credits
+                    </button>
+                    <button className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs">
+                      Billing
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="hidden items-center gap-2 rounded-[12px] border border-[#dde5d8] bg-[#f7faf3] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#233125] sm:inline-flex sm:h-9">
-                <KeyRound className="h-4 w-4" />
-                {apiKeys.length} key(s)
+
+              <div className="rounded-sm bg-[#f7f7f4] px-4 py-4">
+                <div className="flex min-h-[144px] flex-col">
+                  <div>
+                    <p className="text-xs tracking-[0.3px] text-black/60">
+                      Requests in last 7 days
+                    </p>
+                    <p className="mt-2 text-2xl font-medium tracking-tight text-black">
+                      {requestsLast7Days}
+                    </p>
+                  </div>
+                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
+                    <Link
+                      href="#requests"
+                      className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs"
+                    >
+                      Check history
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-sm bg-[#f7f7f4] px-4 py-4">
+                <div className="flex min-h-[144px] flex-col">
+                  <div>
+                    <p className="text-xs tracking-[0.3px] text-black/60">
+                      Models used
+                    </p>
+                    <p className="mt-2 text-2xl font-medium tracking-tight text-black">
+                      {modelsUsed}
+                    </p>
+                  </div>
+                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
+                    <Link
+                      href="#latest-models"
+                      className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs"
+                    >
+                      Check usage
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <div className="rounded-sm border border-black/10 bg-white">
+            <div className="flex items-center justify-between gap-3 px-4 pt-4">
+              <div className="inline-flex items-center gap-6">
+                <button className="border-b-2 border-black py-1 text-sm font-semibold text-black">
+                  Latest Models
+                </button>
+                <button className="py-1 text-sm text-black/55">Favourite</button>
+              </div>
+              <button className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs">
+                View all models
+              </button>
+            </div>
+
+            <div className="mt-2 grid grid-cols-1 gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4">
+              {latestModels.map((model) => (
+                <Link
+                  key={model.id}
+                  href="#quickstart"
+                  className="flex gap-2.5 rounded-sm border border-black/10 p-2 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div
+                    className={cn(
+                      "flex size-14 shrink-0 items-center justify-center rounded-sm text-sm font-semibold text-white",
+                      model.tone === 0 && "bg-[#1f5f39]",
+                      model.tone === 1 && "bg-[#355fb4]",
+                      model.tone === 2 && "bg-[#8d5cf6]",
+                      model.tone === 3 && "bg-[#d07a1d]"
+                    )}
+                  >
+                    {model.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex flex-col justify-center">
+                    <p className="line-clamp-1 text-sm text-black">{model.name}</p>
+                    <p className="mt-0.5 text-xs leading-tight text-black/50">
+                      {model.capability}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <section id="keys" className="mt-6 rounded-sm border border-black/10 bg-white p-4">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-black">API Keys</h2>
+                <p className="mt-1 text-sm text-black/55">
+                  Create keys, control budgets, and manage active environments.
+                </p>
+              </div>
+              <div className="hidden items-center gap-2 md:flex">
+                <KeyRound className="size-4 text-black/45" />
+                <span className="text-xs text-black/55">{apiKeys.length} keys</span>
               </div>
             </div>
 
-            <div className="mt-4 sm:mt-6">
-              <ApiKeysTable apiKeys={apiKeys} />
-            </div>
+            <ApiKeysTable apiKeys={apiKeys} />
           </section>
 
-          <section
-            id="requests"
-            className="rounded-[24px] border border-[#dde5d8] bg-white/95 p-4 shadow-[0_24px_70px_rgba(68,85,56,0.06)] sm:rounded-[30px] sm:p-6"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
-                  Recent Requests
-                </p>
-                <h2 className="mt-1 font-mono text-lg font-semibold text-[#162319] sm:text-xl">
-                  The last tasks submitted through your API gateway
-                </h2>
+          <section id="requests" className="mt-6">
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold text-black">Requests</h2>
               </div>
-              <div className="hidden items-center gap-2 rounded-[12px] border border-[#dde5d8] bg-[#f7faf3] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#233125] sm:inline-flex sm:h-9">
-                <Send className="h-4 w-4" />
-                task ledger
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-3 md:hidden">
-              {requestQueueRows.length > 0 ? (
-                requestQueueRows.map((row) => (
-                  <article
-                    key={row.requestId}
-                    className="rounded-[18px] border border-[#e3e8de] bg-white p-4 shadow-[0_12px_30px_rgba(68,85,56,0.04)]"
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-2 text-xs text-black">
+                  <span>Show API requests</span>
+                  <button
+                    type="button"
+                    className="inline-flex h-5 w-9 items-center rounded-full bg-black p-0.5"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-mono text-[12px] font-semibold text-[#162319]">
-                          {row.requestId}
-                        </p>
-                        <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-[#7b8778]">
-                          {row.capability}
-                        </p>
-                      </div>
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]",
-                          requestStatusStyles[row.status]
-                        )}
-                      >
-                        {row.status}
-                      </span>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <div className="rounded-[14px] border border-[#e3e8de] bg-[#f9fcf7] px-3 py-2.5">
-                        <p className="font-mono text-[9px] uppercase tracking-[0.8px] text-[#7b8778]">
-                          Model
-                        </p>
-                        <p className="mt-1 text-[12px] leading-5 text-[#162319]">
-                          {row.model}
-                        </p>
-                      </div>
-                      <div className="rounded-[14px] border border-[#e3e8de] bg-[#f9fcf7] px-3 py-2.5">
-                        <p className="font-mono text-[9px] uppercase tracking-[0.8px] text-[#7b8778]">
-                          Provider
-                        </p>
-                        <p className="mt-1 text-[12px] leading-5 text-[#162319]">
-                          {row.provider}
-                        </p>
-                      </div>
-                      <div className="rounded-[14px] border border-[#e3e8de] bg-[#f9fcf7] px-3 py-2.5">
-                        <p className="font-mono text-[9px] uppercase tracking-[0.8px] text-[#7b8778]">
-                          Latency
-                        </p>
-                        <p className="mt-1 font-mono text-[12px] text-[#162319]">
-                          {row.latency}
-                        </p>
-                      </div>
-                      <div className="rounded-[14px] border border-[#e3e8de] bg-[#f9fcf7] px-3 py-2.5">
-                        <p className="font-mono text-[9px] uppercase tracking-[0.8px] text-[#7b8778]">
-                          Cost
-                        </p>
-                        <p className="mt-1 font-mono text-[12px] text-[#162319]">
-                          {row.cost}
-                        </p>
-                      </div>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <div className="rounded-[18px] border border-[#e3e8de] bg-white px-4 py-6 text-sm text-[#697567]">
-                  No requests yet. Create a key above and send your first API
-                  call.
-                </div>
-              )}
+                    <span className="block h-4 w-4 translate-x-4 rounded-full bg-white" />
+                  </button>
+                </label>
+                <button className="inline-flex h-8 items-center gap-1 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
+                  All models
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </button>
+                <button className="inline-flex h-8 items-center gap-1 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
+                  All
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </button>
+                <button className="inline-flex h-8 items-center gap-1 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
+                  <SlidersHorizontal className="size-3.5" />
+                  Filters
+                </button>
+                <button className="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-black/10 bg-white text-black/70">
+                  <Search className="size-3.5" />
+                </button>
+              </div>
             </div>
 
-            <div className="mt-4 hidden overflow-hidden rounded-[18px] border border-[#e3e8de] sm:mt-6 md:block">
-              <div className="hidden grid-cols-[1.35fr_0.95fr_1fr_0.8fr_0.7fr_0.6fr] gap-3 border-b border-[#e3e8de] bg-[#f7faf3] px-4 py-3 font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868] md:grid">
-                <span>Request</span>
-                <span>Model</span>
-                <span>Provider</span>
-                <span>Status</span>
-                <span>Latency</span>
-                <span>Cost</span>
+            <div className="rounded-sm border border-black/10 bg-white">
+              <div className="flex items-center gap-1.5 bg-amber-500/10 px-3 py-2.5">
+                <CircleAlert className="size-3.5 shrink-0 text-amber-600" />
+                <p className="text-xs leading-[1.35] text-amber-900/70">
+                  Your outputs are stored for 7 days only. Make sure to download
+                  and save them before they expire.
+                </p>
               </div>
 
-              <div className="divide-y divide-[#e6ebe1]">
+              <div className="space-y-2 p-2 md:hidden">
                 {requestQueueRows.length > 0 ? (
                   requestQueueRows.map((row) => (
-                    <div
+                    <article
                       key={row.requestId}
-                      className="grid gap-3 bg-white px-4 py-4 md:grid-cols-[1.35fr_0.95fr_1fr_0.8fr_0.7fr_0.6fr] md:items-center"
+                      className="rounded-sm border border-black/10 bg-[#fafaf8] p-3"
                     >
-                      <div>
-                        <p className="font-mono text-[12px] font-semibold text-[#162319]">
-                          {row.requestId}
-                        </p>
-                        <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-[#7b8778]">
-                          {row.capability}
-                        </p>
-                      </div>
-                      <p className="text-[13px] leading-5 text-[#162319]">
-                        {row.model}
-                      </p>
-                      <p className="text-[13px] leading-5 text-[#162319]">
-                        {row.provider}
-                      </p>
-                      <div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-black">
+                            {row.model}
+                          </p>
+                          <p className="mt-1 text-xs text-black/50">
+                            {row.requestId}
+                          </p>
+                        </div>
                         <span
                           className={cn(
-                            "inline-flex rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]",
+                            "rounded-full px-2 py-1 text-[10px] font-medium uppercase",
                             requestStatusStyles[row.status]
                           )}
                         >
                           {row.status}
                         </span>
                       </div>
-                      <p className="font-mono text-[12px] text-[#162319]">
-                        {row.latency}
-                      </p>
-                      <p className="font-mono text-[12px] text-[#162319]">
-                        {row.cost}
-                      </p>
-                    </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-black/70">
+                        <div>Provider: {row.provider}</div>
+                        <div>Latency: {row.latency}</div>
+                        <div>Cost: {row.cost}</div>
+                        <div>Type: {row.capability}</div>
+                      </div>
+                    </article>
                   ))
                 ) : (
-                  <div className="bg-white px-4 py-6 text-sm text-[#697567]">
-                    No requests yet. Create a key above and send your first API
-                    call.
+                  <div className="rounded-sm border border-black/10 bg-[#fafaf8] px-4 py-10 text-center text-sm text-black/50">
+                    No predictions found
                   </div>
                 )}
               </div>
+
+              <div className="hidden md:block">
+                <div className="relative w-full overflow-auto">
+                  <table className="min-w-[680px] w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-black/10 text-left">
+                        <th className="h-10 px-2 text-[10px] tracking-[1px] text-black/50">
+                          Output
+                        </th>
+                        <th className="h-10 px-2 text-[10px] tracking-[1px] text-black/50">
+                          ID
+                        </th>
+                        <th className="h-10 px-2 text-[10px] tracking-[1px] text-black/50">
+                          Model
+                        </th>
+                        <th className="h-10 px-2 text-[10px] tracking-[1px] text-black/50">
+                          Status
+                        </th>
+                        <th className="h-10 px-2 text-[10px] tracking-[1px] text-black/50">
+                          Latency
+                        </th>
+                        <th className="h-10 px-2 text-[10px] tracking-[1px] text-black/50">
+                          Action
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {requestQueueRows.length > 0 ? (
+                        requestQueueRows.map((row) => (
+                          <tr
+                            key={row.requestId}
+                            className="border-b border-black/10 transition-colors hover:bg-black/[0.02]"
+                          >
+                            <td className="px-2 py-3 align-middle">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex size-10 items-center justify-center rounded-sm bg-[#f4f5f0] text-black/60">
+                                  <ImageIcon className="size-4" />
+                                </span>
+                                <div>
+                                  <p className="text-sm text-black">{row.model}</p>
+                                  <p className="text-xs text-black/45">{row.capability}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-2 py-3 text-xs text-black/60">
+                              {row.requestId}
+                            </td>
+                            <td className="px-2 py-3 text-sm text-black">
+                              {row.provider}
+                            </td>
+                            <td className="px-2 py-3">
+                              <span
+                                className={cn(
+                                  "rounded-full px-2 py-1 text-[10px] font-medium uppercase",
+                                  requestStatusStyles[row.status]
+                                )}
+                              >
+                                {row.status}
+                              </span>
+                            </td>
+                            <td className="px-2 py-3 text-sm text-black/70">
+                              {row.latency}
+                            </td>
+                            <td className="px-2 py-3">
+                              <button className="inline-flex h-8 items-center gap-1 rounded-sm border border-black/10 bg-white px-3 text-xs">
+                                <Download className="size-3.5" />
+                                Download
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            className="px-2 py-20 text-center text-sm text-black/50"
+                            colSpan={6}
+                          >
+                            No predictions found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button className="inline-flex h-9 items-center gap-1 rounded-md px-4 text-xs text-black/50">
+                  <ArrowRight className="size-4 rotate-180" />
+                  Previous
+                </button>
+                <button className="hidden h-[34px] items-center rounded-sm border border-black/10 bg-white px-3 text-xs sm:inline-flex">
+                  10/page
+                  <ChevronDown className="ml-1 h-4 w-4 opacity-50" />
+                </button>
+              </div>
+              <button className="inline-flex h-9 items-center gap-1 rounded-md px-4 text-xs text-black/50">
+                Next
+                <ArrowRight className="size-4" />
+              </button>
             </div>
           </section>
-
-          <div className="pb-4 sm:pb-6">
-            <Link
-              href="/"
-              className="inline-flex h-11 items-center gap-2 rounded-[14px] border border-[#dde5d8] bg-white/95 px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#233125]"
-            >
-              Back To Landing
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
+        </section>
       </div>
       <Toaster position="top-right" richColors />
     </main>
