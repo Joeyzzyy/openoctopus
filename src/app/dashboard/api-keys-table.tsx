@@ -5,13 +5,13 @@ import { deleteApiKey, updateApiKey, toggleApiKeyStatus } from "./actions";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
-  Pencil,
-  Trash2,
-  Pause,
-  Play,
-  Check,
-  X,
-} from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Pencil, Trash2, Pause, Play, Check, X } from "lucide-react";
 import { toast } from "sonner";
 
 type ApiKey = {
@@ -38,6 +38,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editBudget, setEditBudget] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const startEdit = (key: ApiKey) => {
@@ -66,12 +67,14 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
     });
   };
 
-  const handleDelete = (keyId: string, keyName: string) => {
-    if (!confirm(`Delete key "${keyName}"? This cannot be undone.`)) return;
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+
     startTransition(async () => {
-      const result = await deleteApiKey(keyId);
+      const result = await deleteApiKey(deleteTarget.id);
       if (result.success) {
         toast.success("Key deleted");
+        setDeleteTarget(null);
       } else {
         toast.error(result.error ?? "Failed to delete");
       }
@@ -100,7 +103,6 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
 
   return (
     <>
-      {/* Mobile: card layout */}
       <div className="space-y-3 md:hidden">
         {apiKeys.map((key) => {
           const isEditing = editingId === key.id;
@@ -180,20 +182,19 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                 </div>
               </div>
 
-              {/* Action buttons */}
               <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#e3e8de] pt-4">
                 {isEditing ? (
                   <>
                     <button
                       onClick={() => saveEdit(key.id)}
                       disabled={isPending}
-                      className="inline-flex h-9 items-center gap-1 rounded-[12px] bg-[#1f5f39] px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-white disabled:opacity-50"
+                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[12px] bg-[#1f5f39] px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Check className="h-3 w-3" /> Save
                     </button>
                     <button
                       onClick={cancelEdit}
-                      className="inline-flex h-9 items-center gap-1 rounded-[12px] border border-[#d7ddd4] bg-white px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-[#556153]"
+                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[12px] border border-[#d7ddd4] bg-white px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-[#556153]"
                     >
                       <X className="h-3 w-3" /> Cancel
                     </button>
@@ -202,14 +203,14 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                   <>
                     <button
                       onClick={() => startEdit(key)}
-                      className="inline-flex h-9 items-center gap-1 rounded-[12px] border border-[#d7ddd4] bg-white px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-[#556153] hover:bg-[#f4f8f1]"
+                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[12px] border border-[#d7ddd4] bg-white px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-[#556153] hover:bg-[#f4f8f1]"
                     >
                       <Pencil className="h-3 w-3" /> Edit
                     </button>
                     <button
                       onClick={() => handleToggle(key.id, key.rawStatus)}
                       disabled={isPending}
-                      className="inline-flex h-9 items-center gap-1 rounded-[12px] border border-[#d7ddd4] bg-white px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-[#556153] hover:bg-[#f4f8f1] disabled:opacity-50"
+                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[12px] border border-[#d7ddd4] bg-white px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-[#556153] hover:bg-[#f4f8f1] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {key.rawStatus === "paused" ? (
                         <>
@@ -222,9 +223,9 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                       )}
                     </button>
                     <button
-                      onClick={() => handleDelete(key.id, key.name)}
+                      onClick={() => setDeleteTarget({ id: key.id, name: key.name })}
                       disabled={isPending}
-                      className="inline-flex h-9 items-center gap-1 rounded-[12px] border border-[#f2cdc7] bg-white px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-[#c65342] hover:bg-[#fff5f2] disabled:opacity-50"
+                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[12px] border border-[#f2cdc7] bg-white px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-[#c65342] hover:bg-[#fff5f2] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Trash2 className="h-3 w-3" /> Delete
                     </button>
@@ -236,7 +237,6 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
         })}
       </div>
 
-      {/* Desktop: table layout */}
       <div className="hidden overflow-x-auto md:block">
         <table className="min-w-full border-separate border-spacing-y-2">
           <thead>
@@ -325,14 +325,14 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                           <button
                             onClick={() => saveEdit(key.id)}
                             disabled={isPending}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#1f5f39] text-white disabled:opacity-50"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] bg-[#1f5f39] text-white disabled:cursor-not-allowed disabled:opacity-50"
                             title="Save"
                           >
                             <Check className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={cancelEdit}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[#d7ddd4] bg-white text-[#556153] hover:bg-[#f4f8f1]"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] border border-[#d7ddd4] bg-white text-[#556153] hover:bg-[#f4f8f1]"
                             title="Cancel"
                           >
                             <X className="h-3.5 w-3.5" />
@@ -342,22 +342,16 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                         <>
                           <button
                             onClick={() => startEdit(key)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[#d7ddd4] bg-white text-[#556153] hover:bg-[#f4f8f1]"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] border border-[#d7ddd4] bg-white text-[#556153] hover:bg-[#f4f8f1]"
                             title="Edit name & budget"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() =>
-                              handleToggle(key.id, key.rawStatus)
-                            }
+                            onClick={() => handleToggle(key.id, key.rawStatus)}
                             disabled={isPending}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[#d7ddd4] bg-white text-[#556153] hover:bg-[#f4f8f1] disabled:opacity-50"
-                            title={
-                              key.rawStatus === "paused"
-                                ? "Resume key"
-                                : "Pause key"
-                            }
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] border border-[#d7ddd4] bg-white text-[#556153] hover:bg-[#f4f8f1] disabled:cursor-not-allowed disabled:opacity-50"
+                            title={key.rawStatus === "paused" ? "Resume key" : "Pause key"}
                           >
                             {key.rawStatus === "paused" ? (
                               <Play className="h-3.5 w-3.5" />
@@ -366,9 +360,9 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                             )}
                           </button>
                           <button
-                            onClick={() => handleDelete(key.id, key.name)}
+                            onClick={() => setDeleteTarget({ id: key.id, name: key.name })}
                             disabled={isPending}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[#f2cdc7] bg-white text-[#c65342] hover:bg-[#fff5f2] disabled:opacity-50"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] border border-[#f2cdc7] bg-white text-[#c65342] hover:bg-[#fff5f2] disabled:cursor-not-allowed disabled:opacity-50"
                             title="Delete key"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -383,6 +377,48 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
           </tbody>
         </table>
       </div>
+
+      <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent
+          showCloseButton={false}
+          className="rounded-[24px] border border-[#dde5d8] bg-[linear-gradient(180deg,#fffdf8_0%,#f5f8f0_100%)] p-0 shadow-[0_30px_80px_rgba(34,47,31,0.14)] sm:max-w-md"
+        >
+          <DialogHeader className="border-b border-[#e1e8dd] px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
+            <DialogTitle className="font-mono text-sm uppercase tracking-[1px] text-[#162319]">
+              Delete API Key
+            </DialogTitle>
+            <DialogDescription className="text-[#566254]">
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 px-5 pb-5 pt-5 sm:px-6 sm:pb-6">
+            <div className="rounded-[16px] border border-[#f2cdc7] bg-[#fff5f2] p-4">
+              <p className="text-sm leading-6 text-[#8f3f33]">
+                Delete <span className="font-mono font-semibold">{deleteTarget?.name}</span>? Any apps using this key will stop working immediately.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-[14px] border border-[#dde5d8] bg-white px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#162319] transition-colors hover:bg-[#f4f8f1]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={isPending}
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-[14px] bg-[#b54432] px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#9f3b2c] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isPending ? "Deleting..." : "Delete Key"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

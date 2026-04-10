@@ -1,8 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import { LogIn } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <g fill="none" fillRule="evenodd">
+        <path
+          d="M17.64 9.20455c0-.63818-.05727-1.25182-.16364-1.84091H9v3.48136h4.84364c-.20864 1.125-.84273 2.07818-1.79591 2.71636v2.25818h2.90864c1.70182-1.56682 2.68363-3.87409 2.68363-6.615z"
+          fill="#4285F4"
+        />
+        <path
+          d="M9 18c2.43 0 4.46727-.80591 5.95636-2.18045l-2.90863-2.25818c-.80591.54-1.83682.85909-3.04773.85909-2.34409 0-4.32818-1.58318-5.03591-3.71045H.95727v2.33182C2.43818 15.98318 5.48182 18 9 18z"
+          fill="#34A853"
+        />
+        <path
+          d="M3.96409 10.71c-.18-.54-.28227-1.11682-.28227-1.71 0-.59318.10227-1.17.28227-1.71V4.95818H.95727C.34773 6.17318 0 7.54773 0 9c0 1.45227.34773 2.82682.95727 4.04182L3.96409 10.71z"
+          fill="#FBBC05"
+        />
+        <path
+          d="M9 3.57955c1.32136 0 2.50773.45409 3.44045 1.34591l2.58136-2.58136C13.46318.89182 11.42591 0 9 0 5.48182 0 2.43818 2.01682.95727 4.95818L3.96409 7.29C4.67182 5.16273 6.65591 3.57955 9 3.57955z"
+          fill="#EA4335"
+        />
+      </g>
+    </svg>
+  );
+}
 
 export function GoogleSignInButton() {
   const [loading, setLoading] = useState(false);
@@ -37,13 +61,14 @@ export function GoogleSignInButton() {
         type="button"
         onClick={handleGoogleLogin}
         disabled={loading}
-        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#111111] px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-60"
+        aria-label="Sign in with Google"
+        className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xs border border-black/10 bg-white px-4 font-mono text-sm font-medium text-black/80 shadow-xs transition-colors hover:bg-black/[0.04] hover:text-black disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <LogIn className="h-4 w-4" />
-        {loading ? "Redirecting..." : "Continue With Google"}
+        <GoogleIcon />
+        {loading ? "Redirecting..." : "Sign in with Google"}
       </button>
       {error ? (
-        <p className="font-mono text-[11px] uppercase tracking-[0.8px] text-[#b43828]">
+        <p className="text-center font-mono text-[11px] uppercase tracking-[0.8px] text-[#b43828]">
           {error}
         </p>
       ) : null}

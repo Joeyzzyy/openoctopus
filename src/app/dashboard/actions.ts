@@ -21,7 +21,9 @@ async function getAuthedWorkspace() {
     .limit(1)
     .maybeSingle();
 
-  if (!membership?.workspace_id) throw new Error("No workspace found");
+  if (!membership?.workspace_id) {
+    throw new Error("Unable to create API keys for this account right now.");
+  }
 
   const canWrite = ["owner", "admin", "billing"].includes(membership.role);
   if (!canWrite) throw new Error("Insufficient permissions");

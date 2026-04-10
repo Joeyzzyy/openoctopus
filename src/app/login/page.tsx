@@ -1,36 +1,51 @@
 import Link from "next/link";
-import { ArrowRight, Wallet } from "lucide-react";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f3f2ed] px-4">
-      <div className="w-full max-w-[420px] rounded-[32px] border border-black/8 bg-white p-6 shadow-[0_28px_80px_rgba(0,0,0,0.06)] md:p-8">
-        <div className="flex h-14 w-14 items-center justify-center rounded-[18px] bg-[#111111] text-white">
-          <Wallet className="h-6 w-6" />
-        </div>
-        <p className="mt-5 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-          Sign In
-        </p>
-        <h2 className="mt-2 font-mono text-2xl font-semibold tracking-[-0.04em] text-[#111111]">
-          Access the billing dashboard
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-black/55">
-          Sign in with your Google account to manage wallet balance, API keys,
-          budgets, and model spend.
-        </p>
+    <main className="flex min-h-screen items-center justify-center bg-[#fafaf8] px-4">
+      <div className="mx-auto w-full max-w-lg space-y-5">
+        <div className="rounded-xs border border-black/10 bg-white shadow-none">
+          <div className="min-h-80 p-10 md:p-12">
+            <div className="mb-8 space-y-3 text-center">
+              <h1 className="text-2xl font-semibold tracking-tight text-black">
+                Welcome
+              </h1>
+              <p className="text-sm text-black/60">
+                Sign in to continue to the dashboard
+              </p>
+            </div>
 
-        <div className="mt-6">
-          <GoogleSignInButton />
+            <div className="space-y-4">
+              <GoogleSignInButton />
+            </div>
+
+            <p className="mt-8 text-center text-xs leading-5 text-black/50">
+              By signing in, you agree to our{" "}
+              <Link
+                href="/static/terms"
+                className="text-black/70 underline underline-offset-2 transition-colors hover:text-black"
+              >
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/static/privacy"
+                className="text-black/70 underline underline-offset-2 transition-colors hover:text-black"
+              >
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          </div>
         </div>
 
-        <div className="mt-6">
+        <div className="text-center">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-black/55 transition-colors hover:text-black"
+            className="text-sm text-black/60 transition-colors hover:text-black"
           >
             Back to home
-            <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </div>

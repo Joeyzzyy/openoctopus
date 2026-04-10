@@ -223,6 +223,8 @@ create or replace function public.is_workspace_member(target_workspace_id uuid)
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select exists (
     select 1
@@ -236,6 +238,8 @@ create or replace function public.is_workspace_admin(target_workspace_id uuid)
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select exists (
     select 1
@@ -407,7 +411,7 @@ with check (public.is_workspace_admin(id));
 drop policy if exists "workspace_members_member_read" on public.workspace_members;
 create policy "workspace_members_member_read"
 on public.workspace_members for select
-using (public.is_workspace_member(workspace_id));
+using (user_id = auth.uid());
 
 drop policy if exists "workspace_members_admin_write" on public.workspace_members;
 create policy "workspace_members_admin_write"

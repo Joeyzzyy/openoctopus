@@ -2,9 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ArrowRight,
-  ChevronDown,
   CircleAlert,
-  Grid2x2,
   KeyRound,
   LogOut,
   ReceiptText,
@@ -14,43 +12,18 @@ import { Toaster } from "sonner";
 import { getDashboardData } from "@/lib/dashboard-server";
 import { cn } from "@/lib/utils";
 import { CreateKeyButton } from "./dashboard-actions";
+import { DashboardSidebar } from "./dashboard-sidebar";
 import { ApiKeysTable } from "./api-keys-table";
+import { ApiQuickstartCard } from "./api-quickstart-card";
+import { PlaygroundCard } from "./playground-card";
 
 const topNav = [
   { label: "Dashboard", href: "#overview", active: true },
-  { label: "Quickstart", href: "#quickstart" },
   { label: "Models", href: "#models" },
+  { label: "Playground", href: "#playground" },
   { label: "API Keys", href: "#keys" },
   { label: "Requests", href: "#requests" },
-];
-
-const gettingStartedSteps = [
-  {
-    label: "Create an API key",
-    detail: "Generate one workspace key and copy the secret once.",
-    href: "#keys",
-    cta: "Open",
-  },
-  {
-    label: "Fund your balance",
-    detail: "Make sure you have credits available before sending requests.",
-    href: "#overview",
-    cta: "Review",
-  },
-  {
-    label: "Ship your first request",
-    detail: "Pick one public model slug and test the request/response flow.",
-    href: "#models",
-    cta: "Pick",
-  },
-];
-
-const buildApiSteps = [
-  { index: "01", label: "Get an API key", href: "#keys", cta: "Open" },
-  { index: "02", label: "Choose a public model", href: "#models", cta: "View" },
-  { index: "03", label: "Send your first request", href: "#requests", cta: "Test" },
-  { index: "04", label: "Check task status", href: "#requests", cta: "Track" },
-];
+] as const;
 
 const requestStatusStyles = {
   queued: "bg-[#f4efe3] text-[#7b6226]",
@@ -87,65 +60,47 @@ export default async function DashboardPage() {
     tone: index % 4,
   }));
 
+  const playgroundModels = [
+    ...new Set(
+      routingRules
+        .filter((rule) => rule.capability === "image_generation")
+        .map((rule) => rule.publicModel)
+    ),
+  ];
+
   const overviewCards = [
     {
-      title: "Current credit balance",
+      title: "Wallet balance",
       value: walletMetric?.value ?? "$0.00",
       note: walletMetric?.change ?? "No wallet top-ups yet",
-      action: "Manage credits",
       icon: Wallet,
     },
     {
       title: "Total top-ups",
       value: topupMetric?.value ?? "$0.00",
       note: topupMetric?.change ?? "No recharge recorded",
-      action: "Review funding",
       icon: ReceiptText,
     },
     {
       title: "Month spend",
       value: spendMetric?.value ?? "$0.00",
       note: spendMetric?.change ?? "No usage recorded",
-      action: "Inspect requests",
       icon: KeyRound,
     },
   ];
 
   return (
-    <main className="min-h-screen bg-[#fafaf8] text-[#111111]">
-      <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top_left,rgba(202,232,207,0.35),transparent_38%),radial-gradient(circle_at_top_right,rgba(255,224,194,0.28),transparent_28%)]" />
+    <main className="relative min-h-screen overflow-hidden bg-[#f7f6f1] text-[#111111]">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(202,232,207,0.52),transparent_32%),radial-gradient(circle_at_top_right,rgba(255,224,194,0.4),transparent_26%),linear-gradient(180deg,#fbfaf5_0%,#f4f3ee_46%,#efeee7_100%)]" />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 h-48 bg-[radial-gradient(circle_at_bottom,rgba(221,229,215,0.55),transparent_56%)]" />
 
       <div className="relative mx-auto max-w-7xl px-4 pb-10 xl:px-0">
-        <div className="sticky top-[96px] z-30 w-full overflow-x-auto border-b border-black/10 bg-white/95 backdrop-blur">
-          <div className="flex min-w-max items-center gap-4 px-4 xl:px-0">
-            <div className="flex items-center gap-8">
-              {topNav.map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center whitespace-nowrap border-b-2 py-3 text-sm transition-colors",
-                    item.active
-                      ? "border-black font-semibold text-black"
-                      : "border-transparent text-black/55 hover:text-black"
-                  )}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
+        <div className="mt-8 grid gap-6 xl:grid-cols-[220px_minmax(0,1fr)]">
+          <aside className="hidden xl:block">
+            <DashboardSidebar items={topNav} userName={user.name} />
+          </aside>
 
-            <div className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 rounded-sm bg-[#f4f4f1] px-2.5 text-sm text-black/80">
-              {user.name}
-              <span className="rounded-sm bg-black/8 px-1.5 py-0.5 text-xs font-medium">
-                personal
-              </span>
-              <ChevronDown className="h-4 w-4" />
-            </div>
-          </div>
-        </div>
-
-        <section className="mt-[108px] min-h-[calc(100vh-108px)]">
+          <section className="min-h-[calc(100vh-108px)]">
           <div
             id="overview"
             className="mb-4 mt-4 flex flex-col gap-3 md:mb-6 md:mt-8 md:flex-row md:items-center md:justify-between"
@@ -154,23 +109,15 @@ export default async function DashboardPage() {
               <h1 className="text-3xl font-semibold leading-none text-[#111111]">
                 Dashboard
               </h1>
-              <p className="mt-2 text-sm text-black/55">
-                {workspace?.name ?? "OpenOctopus Production"} workspace
-              </p>
+              <p className="mt-2 text-sm text-black/55">Usage, keys, and recent requests.</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href="#quickstart"
-                className="inline-flex h-9 items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80"
-              >
-                Build app with API
-              </Link>
               <CreateKeyButton />
               <form action="/auth/sign-out" method="post">
                 <button
                   type="submit"
-                  className="inline-flex h-9 items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80"
+                  className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
                 >
                   <LogOut className="h-4 w-4" />
                   Sign out
@@ -179,170 +126,29 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <div className="mb-4 rounded-sm border border-black/10 bg-white shadow-none">
-            <div className="grid divide-y divide-black/10 md:grid-cols-3 md:divide-x md:divide-y-0">
-              <section className="flex min-h-[260px] flex-col justify-between px-4 py-4 md:px-5 md:py-5">
-                <div>
-                  <h3 className="mb-3 text-lg font-bold text-[#111111]">
-                    Welcome to OpenOctopus
-                  </h3>
-                  <p className="mb-6 text-sm text-black/55">
-                    Keep the onboarding path narrow: credits, key, one request,
-                    then verify the task flow.
-                  </p>
-                </div>
-                <ul className="mt-auto divide-y divide-black/10">
-                  {gettingStartedSteps.map((step, index) => (
-                    <li
-                      key={step.label}
-                      className="flex h-11 items-center justify-between gap-2"
-                    >
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span
-                          className={cn(
-                            "flex size-4 items-center justify-center rounded-full text-[10px] font-medium",
-                            index === 0
-                              ? "bg-[#16a34a] text-white"
-                              : "border border-black/20 bg-black/10 text-transparent"
-                          )}
-                        >
-                          {index === 0 ? "✓" : "."}
-                        </span>
-                        <span className={cn("text-sm", index === 0 ? "text-black/50" : "text-black")}>
-                          {step.label}
-                        </span>
-                      </div>
-                      <Link
-                        href={step.href}
-                        className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium"
-                      >
-                        {step.cta}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-
-              <section
-                id="quickstart"
-                className="flex min-h-[260px] flex-col justify-between px-4 py-4 md:px-5 md:py-5"
-              >
-                <div>
-                  <h3 className="mb-3 text-lg font-bold text-[#111111]">
-                    Create something with API
-                  </h3>
-                  <p className="text-sm text-black/55">
-                    Use the shortest possible path to a stable first integration.
-                  </p>
-                </div>
-                <ul className="mt-6 divide-y divide-black/5">
-                  {buildApiSteps.map((step) => (
-                    <li
-                      key={step.index}
-                      className="group flex h-11 items-center justify-between gap-2 rounded-sm px-1 transition-colors hover:bg-black/[0.04]"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="w-5 shrink-0 text-[10px] tracking-[1px] text-black/45">
-                          {step.index}
-                        </span>
-                        <span className="text-sm text-black">{step.label}</span>
-                      </div>
-                      <Link
-                        href={step.href}
-                        className="inline-flex shrink-0 items-center gap-1 text-xs text-black/60 group-hover:text-black"
-                      >
-                        {step.cta} →
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-
-              <section
-                id="models"
-                className="flex min-h-[260px] flex-col justify-between px-4 py-4 md:px-5 md:py-5"
-              >
-                <div>
-                  <h3 className="mb-3 text-lg font-bold text-[#111111]">
-                    Public models
-                  </h3>
-                  <p className="text-sm text-black/55">
-                    These are the model slugs currently available in your public
-                    routing layer.
-                  </p>
-                </div>
-                <ul className="mt-6 divide-y divide-black/5">
-                  {latestModels.slice(0, 5).map((model) => (
-                    <li key={model.id}>
-                      <div className="group -mx-2 flex min-h-11 items-center justify-between gap-2 rounded-sm px-2 py-1.5">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <div
-                            className={cn(
-                              "flex size-9 shrink-0 items-center justify-center rounded-sm text-[11px] font-semibold text-white",
-                              model.tone === 0 && "bg-[#1f5f39]",
-                              model.tone === 1 && "bg-[#355fb4]",
-                              model.tone === 2 && "bg-[#8d5cf6]",
-                              model.tone === 3 && "bg-[#d07a1d]"
-                            )}
-                          >
-                            {model.name.slice(0, 2).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="line-clamp-1 text-sm text-black">
-                              {model.slug}
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-black/50">
-                              {model.capability}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                  <li>
-                    <button
-                      type="button"
-                      className="group -mx-2 flex h-11 w-[calc(100%+1rem)] items-center justify-between rounded-sm px-2 transition-colors hover:bg-black/[0.04]"
-                    >
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="inline-flex size-8 items-center justify-center rounded-sm bg-[#f4f5f0] text-black/60">
-                          <Grid2x2 className="size-3.5" />
-                        </span>
-                        <span className="text-sm text-black">View all models</span>
-                      </div>
-                      <ArrowRight className="size-3.5 text-black/50 group-hover:text-black" />
-                    </button>
-                  </li>
-                </ul>
-              </section>
-            </div>
-          </div>
-
           <article className="mb-6 space-y-3 md:mb-8">
             <div className="grid gap-3 md:grid-cols-3">
               {overviewCards.map((card) => {
                 const Icon = card.icon;
                 return (
-                  <div key={card.title} className="rounded-sm bg-[#f7f7f4] px-4 py-4">
-                    <div className="flex min-h-[144px] flex-col">
-                      <div>
-                        <div className="inline-flex size-8 items-center justify-center rounded-sm bg-white text-black/55">
-                          <Icon className="size-4" />
-                        </div>
-                        <p className="mt-3 text-xs tracking-[0.3px] text-black/60">
+                  <div
+                    key={card.title}
+                    className="rounded-sm border border-black/8 bg-[#f7f7f4] px-4 py-4 shadow-[0_18px_40px_rgba(17,17,17,0.03)]"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="inline-flex size-8 shrink-0 items-center justify-center rounded-sm bg-white text-black/55">
+                        <Icon className="size-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] tracking-[0.35px] text-black/60">
                           {card.title}
                         </p>
-                        <p className="mt-2 text-2xl font-medium tracking-tight text-black">
+                        <p className="mt-1 text-2xl font-medium tracking-tight text-black">
                           {card.value}
                         </p>
                         <p className="mt-2 text-xs leading-5 text-black/50">
                           {card.note}
                         </p>
-                      </div>
-                      <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-                        <button className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs">
-                          {card.action}
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -351,29 +157,27 @@ export default async function DashboardPage() {
             </div>
           </article>
 
-          <div className="rounded-sm border border-black/10 bg-white">
+          <section
+            id="models"
+            className="rounded-sm border border-black/10 bg-white"
+            aria-labelledby="latest-models-heading"
+          >
             <div className="flex items-center justify-between gap-3 px-4 pt-4">
-              <div className="inline-flex items-center gap-6">
-                <button className="border-b-2 border-black py-1 text-sm font-semibold text-black">
-                  Latest models
-                </button>
-                <button className="py-1 text-sm text-black/55">
-                  Active routing
-                </button>
+              <div>
+                <h2 id="latest-models-heading" className="text-xl font-semibold text-black">
+                  Model catalog
+                </h2>
+                <p className="mt-1 text-sm text-black/55">
+                  Live public model slugs available in your current routing layer.
+                </p>
               </div>
-              <Link
-                href="#models"
-                className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs"
-              >
-                View all models
-              </Link>
             </div>
 
             <div className="mt-2 grid grid-cols-1 gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4">
               {latestModels.map((model) => (
                 <div
                   key={model.id}
-                  className="flex gap-2.5 rounded-sm border border-black/10 p-2 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+                  className="flex cursor-pointer gap-2.5 rounded-sm border border-black/10 p-2 transition-all duration-300 hover:-translate-y-0.5 hover:border-black/15 hover:shadow-md"
                 >
                   <div
                     className={cn(
@@ -395,7 +199,15 @@ export default async function DashboardPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </section>
+
+          <section id="quickstart" className="mt-6">
+            <ApiQuickstartCard />
+          </section>
+
+          <section id="playground" className="mt-6">
+            <PlaygroundCard models={playgroundModels.length > 0 ? playgroundModels : latestModels.map((model) => model.slug)} />
+          </section>
 
           <section id="keys" className="mt-6 rounded-sm border border-black/10 bg-white p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
@@ -418,11 +230,11 @@ export default async function DashboardPage() {
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold text-black">Requests</h2>
+                <p className="mt-1 text-sm text-black/55">
+                  Recent routed requests and task states.
+                </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
-                  <span>Latest activity</span>
-                </div>
                 <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
                   <span>{requestsLast7Days} in 7d</span>
                 </div>
@@ -563,25 +375,9 @@ export default async function DashboardPage() {
                 </div>
               </div>
             </div>
-
-            <div className="mt-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button className="inline-flex h-9 items-center gap-1 rounded-md px-4 text-xs text-black/50">
-                  <ArrowRight className="size-4 rotate-180" />
-                  Previous
-                </button>
-                <button className="hidden h-[34px] items-center rounded-sm border border-black/10 bg-white px-3 text-xs sm:inline-flex">
-                  10/page
-                  <ChevronDown className="ml-1 h-4 w-4 opacity-50" />
-                </button>
-              </div>
-              <button className="inline-flex h-9 items-center gap-1 rounded-md px-4 text-xs text-black/50">
-                Next
-                <ArrowRight className="size-4" />
-              </button>
-            </div>
           </section>
-        </section>
+          </section>
+        </div>
       </div>
       <Toaster position="top-right" richColors />
     </main>

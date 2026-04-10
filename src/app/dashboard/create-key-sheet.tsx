@@ -2,13 +2,14 @@
 
 import { useActionState, useState, useEffect, useRef } from "react";
 import { createApiKey } from "./actions";
+import Link from "next/link";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,9 +22,6 @@ import {
 import { Copy, Check, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import {
-  buildImageGenerationCurl,
-  buildTaskStatusCurl,
-  DEFAULT_QUICKSTART_MODEL,
   PUBLIC_API_BASE_URL,
 } from "@/lib/api-docs";
 
@@ -69,35 +67,33 @@ export function CreateKeySheet({
     }
   };
 
-  const copyText = async (value: string, successMessage: string) => {
-    await navigator.clipboard.writeText(value);
-    toast.success(successMessage);
-  };
-
   return (
-    <Sheet open={open} onOpenChange={handleClose}>
-      <SheetContent
-        side="right"
-        className="w-full overflow-y-auto border-l border-[#dde5d8] bg-[linear-gradient(180deg,#fffdf8_0%,#f5f8f0_100%)] sm:max-w-md"
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[28px] border border-[#dde5d8] bg-[linear-gradient(180deg,#fffdf8_0%,#f5f8f0_100%)] p-0 shadow-[0_30px_80px_rgba(34,47,31,0.14)] sm:max-w-xl"
       >
-        <SheetHeader>
-          <SheetTitle className="font-mono text-sm uppercase tracking-[1px] text-[#162319]">
+        <DialogHeader className="border-b border-[#e1e8dd] px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
+          <DialogTitle className="font-mono text-sm uppercase tracking-[1px] text-[#162319]">
             Create API Key
-          </SheetTitle>
-          <SheetDescription className="text-[#566254]">
+          </DialogTitle>
+          <DialogDescription className="text-[#566254]">
             Generate a new key for your workspace. The secret is shown only
             once.
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
 
         {state.success && state.data?.secret ? (
           /* ---------- Success: show secret ---------- */
-          <div className="px-4 pb-4 space-y-4">
+          <div className="space-y-5 px-5 pb-5 pt-5 sm:px-6 sm:pb-6">
             <div className="rounded-[16px] border border-[#cfe7d7] bg-[#eef8f0] p-4">
               <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#167a3d]">
                 Key Created
               </p>
-              <p className="mt-1 font-mono text-xs text-[#167a3d]">
+              <p className="mt-1 text-sm leading-6 text-[#2d4a35]">
+                Copy the secret now. It will not be shown again after you close this window.
+              </p>
+              <p className="mt-2 font-mono text-xs text-[#167a3d]">
                 Prefix: {state.data.keyPrefix as string}
               </p>
             </div>
@@ -113,7 +109,7 @@ export function CreateKeySheet({
                 <button
                   type="button"
                   onClick={copySecret}
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-[#dde5d8] bg-white transition-colors hover:bg-[#f4f8f1]"
+                  className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-[12px] border border-[#dde5d8] bg-white transition-colors hover:bg-[#f4f8f1]"
                 >
                   {copied ? (
                     <Check className="h-4 w-4 text-[#168a42]" />
@@ -124,101 +120,49 @@ export function CreateKeySheet({
               </div>
             </div>
 
-            <div className="rounded-[16px] border border-[#dde5d8] bg-white/90 p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                Base URL
-              </p>
-              <code className="mt-2 block break-all font-mono text-[11px] text-[#111111]">
-                {PUBLIC_API_BASE_URL}
-              </code>
-            </div>
-
-            <div className="rounded-[16px] border border-[#dde5d8] bg-white/90 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                    First Request
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-black/55">
-                    Replace the prompt, keep the auth header, and submit your
-                    first image generation request.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    copyText(
-                      buildImageGenerationCurl(state.data?.secret as string),
-                      "First request copied"
-                    )
-                  }
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-[#dde5d8] bg-white transition-colors hover:bg-[#f4f8f1]"
-                >
-                  <Copy className="h-4 w-4 text-black/50" />
-                </button>
-              </div>
-              <pre className="mt-3 overflow-x-auto rounded-[14px] bg-[#17211b] p-3 font-mono text-[10px] leading-5 text-[#f6fbf4]">
-                <code>{buildImageGenerationCurl(state.data?.secret as string)}</code>
-              </pre>
-            </div>
-
-            <div className="rounded-[16px] border border-[#dde5d8] bg-white/90 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                    Poll Task
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-black/55">
-                    Use the returned task ID from the previous response to check
-                    progress.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    copyText(
-                      buildTaskStatusCurl(
-                        "task_id_from_previous_response",
-                        state.data?.secret as string
-                      ),
-                      "Task status request copied"
-                    )
-                  }
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-[#dde5d8] bg-white transition-colors hover:bg-[#f4f8f1]"
-                >
-                  <Copy className="h-4 w-4 text-black/50" />
-                </button>
-              </div>
-              <pre className="mt-3 overflow-x-auto rounded-[14px] bg-[#17211b] p-3 font-mono text-[10px] leading-5 text-[#f6fbf4]">
-                <code>
-                  {buildTaskStatusCurl(
-                    "task_id_from_previous_response",
-                    state.data?.secret as string
-                  )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[16px] border border-[#dde5d8] bg-white/90 p-4">
+                <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                  Base URL
+                </p>
+                <code className="mt-2 block break-all font-mono text-[11px] text-[#111111]">
+                  {PUBLIC_API_BASE_URL}
                 </code>
-              </pre>
+              </div>
+              <div className="rounded-[16px] border border-[#dde5d8] bg-white/90 p-4">
+                <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                  Next Step
+                </p>
+                <p className="mt-2 text-sm leading-6 text-black/60">
+                  Use the quickstart section on the dashboard to send your first request.
+                </p>
+              </div>
             </div>
 
-            <div className="rounded-[16px] border border-[#dde5d8] bg-white/90 p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                Starter Model
-              </p>
-              <code className="mt-2 block break-all font-mono text-[11px] text-[#111111]">
-                {DEFAULT_QUICKSTART_MODEL}
-              </code>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Link
+                href="#quickstart"
+                onClick={() => handleClose(false)}
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-[14px] border border-[#dde5d8] bg-white px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#162319] transition-colors hover:bg-[#f4f8f1] sm:flex-1"
+              >
+                Open Quickstart
+              </Link>
+              <button
+                type="button"
+                onClick={() => handleClose(false)}
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-[14px] bg-[#1f5f39] px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#1a5130] sm:flex-1"
+              >
+                Done
+              </button>
             </div>
-
-            <button
-              type="button"
-              onClick={() => handleClose(false)}
-              className="w-full rounded-[14px] bg-[#1f5f39] px-4 py-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white"
-            >
-              Done
-            </button>
           </div>
         ) : (
           /* ---------- Form ---------- */
-          <form ref={formRef} action={formAction} className="px-4 pb-4 space-y-5">
+          <form
+            ref={formRef}
+            action={formAction}
+            className="space-y-5 px-5 pb-5 pt-5 sm:px-6 sm:pb-6"
+          >
             <div className="space-y-2">
               <Label
                 htmlFor="key-name"
@@ -231,7 +175,7 @@ export function CreateKeySheet({
                 name="name"
                 placeholder="e.g. production-api"
                 required
-                className="rounded-[14px] border-[#dde5d8] bg-white/90 font-mono text-sm"
+                className="rounded-[14px] border-[#dde5d8] bg-white/90 font-mono text-sm text-[#162319] placeholder:text-[#8a9385]"
               />
             </div>
 
@@ -241,12 +185,16 @@ export function CreateKeySheet({
               </Label>
               <input type="hidden" name="environment" value={env} />
               <Select value={env} onValueChange={(v) => v && setEnv(v)}>
-                <SelectTrigger className="w-full rounded-[14px] border-[#dde5d8] bg-white/90 font-mono text-sm">
+                <SelectTrigger className="w-full rounded-[14px] border-[#dde5d8] bg-white/90 font-mono text-sm text-[#162319]">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border border-[#dde5d8] bg-white text-[#162319]">
                   {environments.map((e) => (
-                    <SelectItem key={e} value={e}>
+                    <SelectItem
+                      key={e}
+                      value={e}
+                      className="cursor-pointer text-[#162319] focus:bg-[#f4f8f1] focus:text-[#162319]"
+                    >
                       {e}
                     </SelectItem>
                   ))}
@@ -268,7 +216,7 @@ export function CreateKeySheet({
                 min={0}
                 step={0.01}
                 defaultValue={0}
-                className="rounded-[14px] border-[#dde5d8] bg-white/90 font-mono text-sm"
+                className="rounded-[14px] border-[#dde5d8] bg-white/90 font-mono text-sm text-[#162319] placeholder:text-[#8a9385]"
               />
             </div>
 
@@ -281,14 +229,14 @@ export function CreateKeySheet({
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#1f5f39] px-4 py-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white disabled:opacity-50"
+              className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-[14px] bg-[#1f5f39] px-4 py-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#1a5130] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <KeyRound className="h-4 w-4" />
               {isPending ? "Creating..." : "Create Key"}
             </button>
           </form>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
