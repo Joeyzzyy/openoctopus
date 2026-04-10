@@ -2,8 +2,8 @@
 
 # dependencies
 /node_modules
-/gateway-worker/node_modules
-/gateway-worker/dist
+/apps/*/node_modules
+/apps/*/dist
 /.pnp
 .pnp.*
 .yarn/*

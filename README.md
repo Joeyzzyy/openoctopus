@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## OpenOctopus Monorepo
 
-## Getting Started
+This repository is a lightweight monorepo for the OpenOctopus MVP.
 
-First, run the development server:
+## Structure
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```text
+.
+├── apps/
+│   └── gateway-worker/      # Fastify worker for orchestration and provider routing
+├── docs/                    # Architecture and implementation notes
+├── src/                     # Next.js marketing site + dashboard control plane
+├── supabase/                # SQL bootstrap files
+└── package.json             # Root workspace and web app scripts
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Apps
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Root app: Next.js web app for the landing site, auth, and dashboard
+- `apps/gateway-worker`: worker service for request intake, queueing, routing, polling, and billing writes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Install
 
-## Learn More
+```bash
+npm install
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Development
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Run the web app:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev:web
+```
 
-## Deploy on Vercel
+Run the worker:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run dev:worker
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Build
+
+Build the web app:
+
+```bash
+npm run build:web
+```
+
+Build the worker:
+
+```bash
+npm run build:worker
+```
+
+Build both:
+
+```bash
+npm run build:all
+```
+
+## Deployment split
+
+- Deploy the root app to Vercel
+- Deploy `apps/gateway-worker` to Railway or Render
+- Use Supabase for Postgres, Auth, Storage, and Queues
+
+## Supabase bootstrap order
+
+Run these SQL files in order:
+
+1. `supabase/dashboard_bootstrap.sql`
+2. `supabase/orchestration_bootstrap.sql`
+3. `supabase/queue_rpc_wrappers.sql`
+
+## Notes
+
+- This repo uses a practical monorepo layout without moving the current Next.js app into `apps/web`.
+- The root app remains the control plane.
+- `apps/gateway-worker` is the data plane.
