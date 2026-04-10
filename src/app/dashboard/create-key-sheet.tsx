@@ -20,6 +20,12 @@ import {
 } from "@/components/ui/select";
 import { Copy, Check, KeyRound } from "lucide-react";
 import { toast } from "sonner";
+import {
+  buildImageGenerationCurl,
+  buildTaskStatusCurl,
+  DEFAULT_QUICKSTART_MODEL,
+  PUBLIC_API_BASE_URL,
+} from "@/lib/api-docs";
 
 const environments = ["Production", "Development", "Server", "Partner"];
 
@@ -61,6 +67,11 @@ export function CreateKeySheet({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const copyText = async (value: string, successMessage: string) => {
+    await navigator.clipboard.writeText(value);
+    toast.success(successMessage);
   };
 
   return (
@@ -111,6 +122,90 @@ export function CreateKeySheet({
                   )}
                 </button>
               </div>
+            </div>
+
+            <div className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-4">
+              <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                Base URL
+              </p>
+              <code className="mt-2 block break-all font-mono text-[11px] text-[#111111]">
+                {PUBLIC_API_BASE_URL}
+              </code>
+            </div>
+
+            <div className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                    First Request
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-black/55">
+                    Replace the prompt, keep the auth header, and submit your
+                    first image generation request.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyText(
+                      buildImageGenerationCurl(state.data?.secret as string),
+                      "First request copied"
+                    )
+                  }
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/8 bg-white transition-colors hover:bg-black/[0.04]"
+                >
+                  <Copy className="h-4 w-4 text-black/50" />
+                </button>
+              </div>
+              <pre className="mt-3 overflow-x-auto rounded-[12px] bg-[#111111] p-3 font-mono text-[10px] leading-5 text-white">
+                <code>{buildImageGenerationCurl(state.data?.secret as string)}</code>
+              </pre>
+            </div>
+
+            <div className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                    Poll Task
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-black/55">
+                    Use the returned task ID from the previous response to check
+                    progress.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyText(
+                      buildTaskStatusCurl(
+                        "task_id_from_previous_response",
+                        state.data?.secret as string
+                      ),
+                      "Task status request copied"
+                    )
+                  }
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/8 bg-white transition-colors hover:bg-black/[0.04]"
+                >
+                  <Copy className="h-4 w-4 text-black/50" />
+                </button>
+              </div>
+              <pre className="mt-3 overflow-x-auto rounded-[12px] bg-[#111111] p-3 font-mono text-[10px] leading-5 text-white">
+                <code>
+                  {buildTaskStatusCurl(
+                    "task_id_from_previous_response",
+                    state.data?.secret as string
+                  )}
+                </code>
+              </pre>
+            </div>
+
+            <div className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-4">
+              <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                Starter Model
+              </p>
+              <code className="mt-2 block break-all font-mono text-[11px] text-[#111111]">
+                {DEFAULT_QUICKSTART_MODEL}
+              </code>
             </div>
 
             <button
