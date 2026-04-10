@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ArrowRight,
+  ArrowUpRight,
   KeyRound,
   LogOut,
   Send,
@@ -35,43 +36,43 @@ export default async function DashboardPage() {
   }
 
   const { apiKeys, metrics, requestQueueRows, user, workspace } = data;
-  const coreMetrics = metrics.slice(0, 3);
+  const coreMetrics = metrics.slice(0, 4);
 
   return (
-    <main className="min-h-screen bg-[#f3f2ed] text-[#111111]">
-      <div className="mx-auto max-w-[1180px] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,241,214,0.9),_transparent_30%),linear-gradient(180deg,#fffdf8_0%,#f6f7f1_48%,#eef3ef_100%)] text-[#111111]">
+      <div className="mx-auto max-w-[1180px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
         <div className="space-y-4 sm:space-y-6">
-          <section className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <section className="overflow-hidden rounded-[24px] border border-[#d9dfd2] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(245,249,241,0.96))] p-5 shadow-[0_24px_80px_rgba(68,85,56,0.08)] sm:rounded-[32px] sm:p-7">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-[#f5f4ef] px-3 py-1 font-mono text-[10px] uppercase tracking-[1px] text-black/50">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#d9dfd2] bg-white/90 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[1px] text-[#5d6857]">
                   <ShieldCheck className="h-3.5 w-3.5" />
                   OpenOctopus API
                 </div>
-                <h1 className="mt-3 font-mono text-[24px] leading-[1] font-bold tracking-[-0.04em] text-[#111111] sm:text-[34px] lg:text-[42px]">
-                  Create a key, send a request, check the task.
+                <h1 className="mt-4 max-w-3xl font-mono text-[28px] leading-[0.95] font-bold tracking-[-0.05em] text-[#142018] sm:text-[38px] lg:text-[48px]">
+                  Clean, minimal access to your API.
                 </h1>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-black/56 sm:text-[15px]">
-                  This dashboard is intentionally minimal for MVP. It only keeps
-                  the information users need to start calling the API and see
-                  recent task status.
+                <p className="mt-4 max-w-2xl text-[14px] leading-7 text-[#4f5d50] sm:text-[15px]">
+                  Create a key, copy the example request, and monitor recent
+                  tasks. Everything else stays out of the way until the MVP
+                  actually needs it.
                 </p>
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <div className="rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 py-2 font-mono text-[11px] text-[#111111]">
+                <div className="mt-5 flex flex-wrap items-center gap-2.5">
+                  <div className="rounded-[14px] border border-[#dde5d8] bg-white/90 px-3.5 py-2.5 font-mono text-[11px] text-[#233125]">
                     Workspace: {workspace?.name ?? "OpenOctopus Production"}
                   </div>
-                  <div className="rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 py-2 font-mono text-[11px] text-[#111111]">
+                  <div className="rounded-[14px] border border-[#dde5d8] bg-white/90 px-3.5 py-2.5 font-mono text-[11px] text-[#233125]">
                     User: {user.name}
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
                 <CreateKeyButton />
                 <form action="/auth/sign-out" method="post">
                   <button
                     type="submit"
-                    className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-black/8 bg-white px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#111111]"
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-[#dde5d8] bg-white/95 px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#233125] sm:w-auto"
                   >
                     <LogOut className="h-4 w-4" />
                     Sign Out
@@ -81,16 +82,16 @@ export default async function DashboardPage() {
             </div>
           </section>
 
-          <section className="grid gap-3 sm:grid-cols-3 sm:gap-4">
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
             {coreMetrics.map((metric) => (
               <article
                 key={metric.label}
-                className="rounded-[18px] border border-black/8 bg-white p-4 shadow-[0_20px_50px_rgba(0,0,0,0.05)] sm:rounded-[24px] sm:p-5"
+                className="rounded-[20px] border border-[#dde5d8] bg-white/92 p-4 shadow-[0_18px_50px_rgba(68,85,56,0.06)] sm:rounded-[24px] sm:p-5"
               >
-                <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
                   {metric.label}
                 </p>
-                <p className="mt-3 font-mono text-[24px] leading-none font-bold tracking-[-0.05em] text-[#111111] sm:text-[30px]">
+                <p className="mt-3 font-mono text-[24px] leading-none font-bold tracking-[-0.05em] text-[#162319] sm:text-[30px]">
                   {metric.value}
                 </p>
                 <p
@@ -107,17 +108,17 @@ export default async function DashboardPage() {
 
           <ApiQuickstartCard />
 
-          <section className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-6">
+          <section className="rounded-[24px] border border-[#dde5d8] bg-white/95 p-4 shadow-[0_24px_70px_rgba(68,85,56,0.06)] sm:rounded-[30px] sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
                   API Keys
                 </p>
-                <h2 className="mt-1 font-mono text-base font-semibold text-[#111111] sm:text-xl">
+                <h2 className="mt-1 font-mono text-lg font-semibold text-[#162319] sm:text-xl">
                   Create and manage the keys your apps actually use
                 </h2>
               </div>
-              <div className="hidden items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111] sm:inline-flex sm:h-9">
+              <div className="hidden items-center gap-2 rounded-[12px] border border-[#dde5d8] bg-[#f7faf3] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#233125] sm:inline-flex sm:h-9">
                 <KeyRound className="h-4 w-4" />
                 {apiKeys.length} key(s)
               </div>
@@ -128,24 +129,94 @@ export default async function DashboardPage() {
             </div>
           </section>
 
-          <section className="rounded-[20px] border border-black/8 bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:rounded-[28px] sm:p-6">
+          <section className="rounded-[24px] border border-[#dde5d8] bg-white/95 p-4 shadow-[0_24px_70px_rgba(68,85,56,0.06)] sm:rounded-[30px] sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]">
                   Recent Requests
                 </p>
-                <h2 className="mt-1 font-mono text-base font-semibold text-[#111111] sm:text-xl">
+                <h2 className="mt-1 font-mono text-lg font-semibold text-[#162319] sm:text-xl">
                   The last tasks submitted through your API gateway
                 </h2>
               </div>
-              <div className="hidden items-center gap-2 rounded-[12px] border border-black/8 bg-[#f7f5ef] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#111111] sm:inline-flex sm:h-9">
+              <div className="hidden items-center gap-2 rounded-[12px] border border-[#dde5d8] bg-[#f7faf3] px-3 font-mono text-[10px] uppercase tracking-[1px] text-[#233125] sm:inline-flex sm:h-9">
                 <Send className="h-4 w-4" />
                 task ledger
               </div>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-[18px] border border-black/8 sm:mt-6">
-              <div className="hidden grid-cols-[1.35fr_0.95fr_1fr_0.8fr_0.7fr_0.6fr] gap-3 border-b border-black/8 bg-[#f7f5ef] px-4 py-3 font-mono text-[10px] uppercase tracking-[1px] text-black/45 md:grid">
+            <div className="mt-4 space-y-3 md:hidden">
+              {requestQueueRows.length > 0 ? (
+                requestQueueRows.map((row) => (
+                  <article
+                    key={row.requestId}
+                    className="rounded-[18px] border border-[#e3e8de] bg-white p-4 shadow-[0_12px_30px_rgba(68,85,56,0.04)]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-mono text-[12px] font-semibold text-[#162319]">
+                          {row.requestId}
+                        </p>
+                        <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-[#7b8778]">
+                          {row.capability}
+                        </p>
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]",
+                          requestStatusStyles[row.status]
+                        )}
+                      >
+                        {row.status}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <div className="rounded-[14px] border border-[#e3e8de] bg-[#f9fcf7] px-3 py-2.5">
+                        <p className="font-mono text-[9px] uppercase tracking-[0.8px] text-[#7b8778]">
+                          Model
+                        </p>
+                        <p className="mt-1 text-[12px] leading-5 text-[#162319]">
+                          {row.model}
+                        </p>
+                      </div>
+                      <div className="rounded-[14px] border border-[#e3e8de] bg-[#f9fcf7] px-3 py-2.5">
+                        <p className="font-mono text-[9px] uppercase tracking-[0.8px] text-[#7b8778]">
+                          Provider
+                        </p>
+                        <p className="mt-1 text-[12px] leading-5 text-[#162319]">
+                          {row.provider}
+                        </p>
+                      </div>
+                      <div className="rounded-[14px] border border-[#e3e8de] bg-[#f9fcf7] px-3 py-2.5">
+                        <p className="font-mono text-[9px] uppercase tracking-[0.8px] text-[#7b8778]">
+                          Latency
+                        </p>
+                        <p className="mt-1 font-mono text-[12px] text-[#162319]">
+                          {row.latency}
+                        </p>
+                      </div>
+                      <div className="rounded-[14px] border border-[#e3e8de] bg-[#f9fcf7] px-3 py-2.5">
+                        <p className="font-mono text-[9px] uppercase tracking-[0.8px] text-[#7b8778]">
+                          Cost
+                        </p>
+                        <p className="mt-1 font-mono text-[12px] text-[#162319]">
+                          {row.cost}
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <div className="rounded-[18px] border border-[#e3e8de] bg-white px-4 py-6 text-sm text-[#697567]">
+                  No requests yet. Create a key above and send your first API
+                  call.
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 hidden overflow-hidden rounded-[18px] border border-[#e3e8de] sm:mt-6 md:block">
+              <div className="hidden grid-cols-[1.35fr_0.95fr_1fr_0.8fr_0.7fr_0.6fr] gap-3 border-b border-[#e3e8de] bg-[#f7faf3] px-4 py-3 font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868] md:grid">
                 <span>Request</span>
                 <span>Model</span>
                 <span>Provider</span>
@@ -154,25 +225,25 @@ export default async function DashboardPage() {
                 <span>Cost</span>
               </div>
 
-              <div className="divide-y divide-black/8">
+              <div className="divide-y divide-[#e6ebe1]">
                 {requestQueueRows.length > 0 ? (
                   requestQueueRows.map((row) => (
                     <div
                       key={row.requestId}
-                      className="grid gap-3 px-4 py-4 md:grid-cols-[1.35fr_0.95fr_1fr_0.8fr_0.7fr_0.6fr] md:items-center"
+                      className="grid gap-3 bg-white px-4 py-4 md:grid-cols-[1.35fr_0.95fr_1fr_0.8fr_0.7fr_0.6fr] md:items-center"
                     >
                       <div>
-                        <p className="font-mono text-[12px] font-semibold text-[#111111]">
+                        <p className="font-mono text-[12px] font-semibold text-[#162319]">
                           {row.requestId}
                         </p>
-                        <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-black/40">
+                        <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-[#7b8778]">
                           {row.capability}
                         </p>
                       </div>
-                      <p className="text-[13px] leading-5 text-[#111111]">
+                      <p className="text-[13px] leading-5 text-[#162319]">
                         {row.model}
                       </p>
-                      <p className="text-[13px] leading-5 text-[#111111]">
+                      <p className="text-[13px] leading-5 text-[#162319]">
                         {row.provider}
                       </p>
                       <div>
@@ -185,16 +256,16 @@ export default async function DashboardPage() {
                           {row.status}
                         </span>
                       </div>
-                      <p className="font-mono text-[12px] text-[#111111]">
+                      <p className="font-mono text-[12px] text-[#162319]">
                         {row.latency}
                       </p>
-                      <p className="font-mono text-[12px] text-[#111111]">
+                      <p className="font-mono text-[12px] text-[#162319]">
                         {row.cost}
                       </p>
                     </div>
                   ))
                 ) : (
-                  <div className="px-4 py-6 text-sm text-black/50">
+                  <div className="bg-white px-4 py-6 text-sm text-[#697567]">
                     No requests yet. Create a key above and send your first API
                     call.
                   </div>
@@ -206,10 +277,10 @@ export default async function DashboardPage() {
           <div className="pb-4 sm:pb-6">
             <Link
               href="/"
-              className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-black/8 bg-white px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#111111]"
+              className="inline-flex h-11 items-center gap-2 rounded-[14px] border border-[#dde5d8] bg-white/95 px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#233125]"
             >
               Back To Landing
-              <ArrowRight className="h-4 w-4" />
+              <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>
         </div>

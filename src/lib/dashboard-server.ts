@@ -123,15 +123,15 @@ function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardDa
     workspace,
     workspaceId: workspace?.id ?? null,
     metrics: [
-      { label: "Available Credit", value: "$0.00", change: "No wallet top-ups yet", tone: "neutral" },
+      {
+        label: "Wallet Balance",
+        value: "$0.00",
+        change: "No wallet top-ups yet",
+        tone: "neutral",
+      },
+      { label: "Total Top-Ups", value: "$0.00", change: "No recharge recorded", tone: "neutral" },
       { label: "Month Spend", value: "$0.00", change: "No usage recorded", tone: "neutral" },
       { label: "Active API Keys", value: "0", change: "Create your first key", tone: "neutral" },
-      {
-        label: "Budget Remaining",
-        value: formatCurrency(workspace?.monthly_budget ?? 0),
-        change: "Workspace budget has not been used",
-        tone: "positive",
-      },
     ],
     spendTrend: [
       { day: "Mon", spend: 0 },
@@ -241,7 +241,10 @@ export async function getDashboardData(): Promise<DashboardData | null> {
 
     const currentMonthSpend = (keySummary ?? []).reduce((sum, row) => sum + Number(row.current_month_spend ?? 0), 0);
     const walletBalance = (walletRows ?? []).reduce((sum, row) => sum + Number(row.amount_delta ?? 0), 0);
-    const remainingBudget = Math.max(workspace.monthly_budget - currentMonthSpend, 0);
+    const totalTopUps = (walletRows ?? []).reduce((sum, row) => {
+      const delta = Number(row.amount_delta ?? 0);
+      return delta > 0 ? sum + delta : sum;
+    }, 0);
     const activeKeys = (keyRows ?? []).filter((row) => row.status === "active").length;
 
     const keySummaryMap = new Map((keySummary ?? []).map((row) => [row.api_key_id, row]));
@@ -356,10 +359,16 @@ export async function getDashboardData(): Promise<DashboardData | null> {
       workspaceId: workspace.id,
       metrics: [
         {
-          label: "Available Credit",
+          label: "Wallet Balance",
           value: formatCurrency(walletBalance),
-          change: walletBalance > 0 ? "Wallet has available balance" : "No wallet top-ups yet",
+          change: walletBalance > 0 ? "Available to spend right now" : "No wallet top-ups yet",
           tone: walletBalance > 0 ? "positive" : "neutral",
+        },
+        {
+          label: "Total Top-Ups",
+          value: formatCurrency(totalTopUps),
+          change: totalTopUps > 0 ? "Total recharge recorded in wallet" : "No recharge recorded",
+          tone: totalTopUps > 0 ? "positive" : "neutral",
         },
         {
           label: "Month Spend",
@@ -372,12 +381,6 @@ export async function getDashboardData(): Promise<DashboardData | null> {
           value: String(activeKeys),
           change: activeKeys > 0 ? `${activeKeys} key(s) currently active` : "Create your first key",
           tone: activeKeys > 0 ? "positive" : "neutral",
-        },
-        {
-          label: "Budget Remaining",
-          value: formatCurrency(remainingBudget),
-          change: `${workspace.currency} workspace monthly cap`,
-          tone: remainingBudget > 0 ? "positive" : "warning",
         },
       ],
       spendTrend,
