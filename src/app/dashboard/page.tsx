@@ -4,13 +4,11 @@ import {
   ArrowRight,
   ChevronDown,
   CircleAlert,
-  Download,
   Grid2x2,
-  ImageIcon,
   KeyRound,
   LogOut,
-  Search,
-  SlidersHorizontal,
+  ReceiptText,
+  Wallet,
 } from "lucide-react";
 import { Toaster } from "sonner";
 import { getDashboardData } from "@/lib/dashboard-server";
@@ -19,20 +17,39 @@ import { CreateKeyButton } from "./dashboard-actions";
 import { ApiKeysTable } from "./api-keys-table";
 
 const topNav = [
-  { label: "Dashboard", href: "/dashboard", active: true },
-  { label: "Explore", href: "#latest-models" },
-  { label: "History", href: "#requests" },
-  { label: "AI Generator", href: "#latest-models", badge: "hot" },
+  { label: "Dashboard", href: "#overview", active: true },
+  { label: "Quickstart", href: "#quickstart" },
+  { label: "Models", href: "#models" },
   { label: "API Keys", href: "#keys" },
-  { label: "Billing", href: "#overview" },
-  { label: "Settings", href: "#overview", dropdown: true },
+  { label: "Requests", href: "#requests" },
+];
+
+const gettingStartedSteps = [
+  {
+    label: "Create an API key",
+    detail: "Generate one workspace key and copy the secret once.",
+    href: "#keys",
+    cta: "Open",
+  },
+  {
+    label: "Fund your balance",
+    detail: "Make sure you have credits available before sending requests.",
+    href: "#overview",
+    cta: "Review",
+  },
+  {
+    label: "Ship your first request",
+    detail: "Pick one public model slug and test the request/response flow.",
+    href: "#models",
+    cta: "Pick",
+  },
 ];
 
 const buildApiSteps = [
-  { index: "01", label: "Get an API key", href: "#keys", cta: "Get" },
-  { index: "02", label: "Quickstart guide", href: "#quickstart", cta: "Check" },
-  { index: "03", label: "First image request", href: "#quickstart", cta: "Try" },
-  { index: "04", label: "Task polling", href: "#requests", cta: "View" },
+  { index: "01", label: "Get an API key", href: "#keys", cta: "Open" },
+  { index: "02", label: "Choose a public model", href: "#models", cta: "View" },
+  { index: "03", label: "Send your first request", href: "#requests", cta: "Test" },
+  { index: "04", label: "Check task status", href: "#requests", cta: "Track" },
 ];
 
 const requestStatusStyles = {
@@ -49,23 +66,19 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const {
-    apiKeys,
-    metrics,
-    modelSpend,
-    requestQueueRows,
-    routingRules,
-    usageRows,
-    user,
-    workspace,
-  } = data;
+  const { apiKeys, metrics, requestQueueRows, routingRules, usageRows, user, workspace } =
+    data;
 
   const walletMetric = metrics.find((metric) => metric.label === "Wallet Balance");
+  const topupMetric = metrics.find((metric) => metric.label === "Total Top-Ups");
   const spendMetric = metrics.find((metric) => metric.label === "Month Spend");
+  const keyMetric = metrics.find((metric) => metric.label === "Active API Keys");
+
   const requestsLast7Days = usageRows.length;
   const modelsUsed = new Set(
     [...requestQueueRows.map((row) => row.model), ...usageRows.map((row) => row.model)].filter(Boolean)
   ).size;
+
   const latestModels = routingRules.slice(0, 8).map((rule, index) => ({
     id: rule.publicModel,
     name: rule.publicModel.split("/").at(-1) ?? rule.publicModel,
@@ -73,6 +86,30 @@ export default async function DashboardPage() {
     capability: rule.capability,
     tone: index % 4,
   }));
+
+  const overviewCards = [
+    {
+      title: "Current credit balance",
+      value: walletMetric?.value ?? "$0.00",
+      note: walletMetric?.change ?? "No wallet top-ups yet",
+      action: "Manage credits",
+      icon: Wallet,
+    },
+    {
+      title: "Total top-ups",
+      value: topupMetric?.value ?? "$0.00",
+      note: topupMetric?.change ?? "No recharge recorded",
+      action: "Review funding",
+      icon: ReceiptText,
+    },
+    {
+      title: "Month spend",
+      value: spendMetric?.value ?? "$0.00",
+      note: spendMetric?.change ?? "No usage recorded",
+      action: "Inspect requests",
+      icon: KeyRound,
+    },
+  ];
 
   return (
     <main className="min-h-screen bg-[#fafaf8] text-[#111111]">
@@ -87,35 +124,32 @@ export default async function DashboardPage() {
                   key={item.label}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-1.5 whitespace-nowrap border-b-2 py-3 text-sm transition-colors",
+                    "flex items-center whitespace-nowrap border-b-2 py-3 text-sm transition-colors",
                     item.active
                       ? "border-black font-semibold text-black"
                       : "border-transparent text-black/55 hover:text-black"
                   )}
                 >
-                  <span className="relative">
-                    {item.label}
-                    {item.badge ? (
-                      <span className="absolute -right-4 -top-2 text-[10px]">🔥</span>
-                    ) : null}
-                  </span>
-                  {item.dropdown ? <ChevronDown className="h-4 w-4" /> : null}
+                  {item.label}
                 </Link>
               ))}
             </div>
 
-            <button className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 rounded-sm border border-transparent bg-[#f4f4f1] px-2.5 text-sm text-black/80">
+            <div className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 rounded-sm bg-[#f4f4f1] px-2.5 text-sm text-black/80">
               {user.name}
               <span className="rounded-sm bg-black/8 px-1.5 py-0.5 text-xs font-medium">
                 personal
               </span>
               <ChevronDown className="h-4 w-4" />
-            </button>
+            </div>
           </div>
         </div>
 
-        <section className="mt-[108px] min-h-[calc(100vh-108px)] px-0">
-          <div className="mb-3 mt-4 flex flex-col gap-3 md:mb-6 md:mt-8 md:flex-row md:items-center md:justify-between">
+        <section className="mt-[108px] min-h-[calc(100vh-108px)]">
+          <div
+            id="overview"
+            className="mb-4 mt-4 flex flex-col gap-3 md:mb-6 md:mt-8 md:flex-row md:items-center md:justify-between"
+          >
             <div>
               <h1 className="text-3xl font-semibold leading-none text-[#111111]">
                 Dashboard
@@ -126,13 +160,12 @@ export default async function DashboardPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <button className="inline-flex h-9 items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80">
+              <Link
+                href="#quickstart"
+                className="inline-flex h-9 items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80"
+              >
                 Build app with API
-                <ChevronDown className="h-4 w-4 opacity-50" />
-              </button>
-              <button className="inline-flex h-9 items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80">
-                Hide Getting Started
-              </button>
+              </Link>
               <CreateKeyButton />
               <form action="/auth/sign-out" method="post">
                 <button
@@ -154,49 +187,39 @@ export default async function DashboardPage() {
                     Welcome to OpenOctopus
                   </h3>
                   <p className="mb-6 text-sm text-black/55">
-                    Follow these steps to get productive quickly. If anything
-                    blocks you, we can keep the path focused on key creation,
-                    first request, and task verification.
+                    Keep the onboarding path narrow: credits, key, one request,
+                    then verify the task flow.
                   </p>
                 </div>
                 <ul className="mt-auto divide-y divide-black/10">
-                  <li className="flex h-11 items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="flex size-4 items-center justify-center rounded-full bg-[#16a34a] text-white">
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="size-3"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
-                      </span>
-                      <span className="text-sm text-black/50">Create an account</span>
-                    </div>
-                  </li>
-                  <li className="flex h-11 items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="flex size-4 items-center justify-center rounded-full border border-black/20 bg-black/10 text-transparent" />
-                      <span className="text-sm text-black">Add credits</span>
-                    </div>
-                    <button className="inline-flex h-8 items-center rounded-sm bg-black px-3 text-xs font-medium text-white">
-                      Add credits
-                    </button>
-                  </li>
-                  <li className="flex h-11 items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="flex size-4 items-center justify-center rounded-full border border-black/20 bg-black/10 text-transparent" />
-                      <span className="text-sm text-black">Generate your first media</span>
-                    </div>
-                    <Link
-                      href="#latest-models"
-                      className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium"
+                  {gettingStartedSteps.map((step, index) => (
+                    <li
+                      key={step.label}
+                      className="flex h-11 items-center justify-between gap-2"
                     >
-                      Explore
-                    </Link>
-                  </li>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span
+                          className={cn(
+                            "flex size-4 items-center justify-center rounded-full text-[10px] font-medium",
+                            index === 0
+                              ? "bg-[#16a34a] text-white"
+                              : "border border-black/20 bg-black/10 text-transparent"
+                          )}
+                        >
+                          {index === 0 ? "✓" : "."}
+                        </span>
+                        <span className={cn("text-sm", index === 0 ? "text-black/50" : "text-black")}>
+                          {step.label}
+                        </span>
+                      </div>
+                      <Link
+                        href={step.href}
+                        className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium"
+                      >
+                        {step.cta}
+                      </Link>
+                    </li>
+                  ))}
                 </ul>
               </section>
 
@@ -209,8 +232,7 @@ export default async function DashboardPage() {
                     Create something with API
                   </h3>
                   <p className="text-sm text-black/55">
-                    Follow these steps to ship the first request with the least
-                    amount of setup friction.
+                    Use the shortest possible path to a stable first integration.
                   </p>
                 </div>
                 <ul className="mt-6 divide-y divide-black/5">
@@ -237,25 +259,22 @@ export default async function DashboardPage() {
               </section>
 
               <section
-                id="latest-models"
+                id="models"
                 className="flex min-h-[260px] flex-col justify-between px-4 py-4 md:px-5 md:py-5"
               >
                 <div>
                   <h3 className="mb-3 text-lg font-bold text-[#111111]">
-                    Explore models
+                    Public models
                   </h3>
                   <p className="text-sm text-black/55">
-                    Browse your public model surface and use one slug as the
-                    input contract for your client apps.
+                    These are the model slugs currently available in your public
+                    routing layer.
                   </p>
                 </div>
                 <ul className="mt-6 divide-y divide-black/5">
                   {latestModels.slice(0, 5).map((model) => (
                     <li key={model.id}>
-                      <Link
-                        href="#quickstart"
-                        className="group -mx-2 flex min-h-11 items-center justify-between gap-2 rounded-sm px-2 py-1.5 transition-colors hover:bg-black/[0.04]"
-                      >
+                      <div className="group -mx-2 flex min-h-11 items-center justify-between gap-2 rounded-sm px-2 py-1.5">
                         <div className="flex min-w-0 items-center gap-2">
                           <div
                             className={cn(
@@ -277,7 +296,7 @@ export default async function DashboardPage() {
                             </p>
                           </div>
                         </div>
-                      </Link>
+                      </div>
                     </li>
                   ))}
                   <li>
@@ -301,68 +320,34 @@ export default async function DashboardPage() {
 
           <article className="mb-6 space-y-3 md:mb-8">
             <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-sm bg-[#f7f7f4] px-4 py-4">
-                <div className="flex min-h-[144px] flex-col">
-                  <div>
-                    <p className="text-xs tracking-[0.3px] text-black/60">
-                      Current credit balance
-                    </p>
-                    <p className="mt-2 text-2xl font-medium tracking-tight text-black">
-                      {walletMetric?.value ?? "$0.00"}
-                    </p>
+              {overviewCards.map((card) => {
+                const Icon = card.icon;
+                return (
+                  <div key={card.title} className="rounded-sm bg-[#f7f7f4] px-4 py-4">
+                    <div className="flex min-h-[144px] flex-col">
+                      <div>
+                        <div className="inline-flex size-8 items-center justify-center rounded-sm bg-white text-black/55">
+                          <Icon className="size-4" />
+                        </div>
+                        <p className="mt-3 text-xs tracking-[0.3px] text-black/60">
+                          {card.title}
+                        </p>
+                        <p className="mt-2 text-2xl font-medium tracking-tight text-black">
+                          {card.value}
+                        </p>
+                        <p className="mt-2 text-xs leading-5 text-black/50">
+                          {card.note}
+                        </p>
+                      </div>
+                      <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
+                        <button className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs">
+                          {card.action}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-                    <button className="inline-flex h-8 items-center rounded-sm bg-black px-3 text-xs font-medium text-white">
-                      Manage credits
-                    </button>
-                    <button className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs">
-                      Billing
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-sm bg-[#f7f7f4] px-4 py-4">
-                <div className="flex min-h-[144px] flex-col">
-                  <div>
-                    <p className="text-xs tracking-[0.3px] text-black/60">
-                      Requests in last 7 days
-                    </p>
-                    <p className="mt-2 text-2xl font-medium tracking-tight text-black">
-                      {requestsLast7Days}
-                    </p>
-                  </div>
-                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-                    <Link
-                      href="#requests"
-                      className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs"
-                    >
-                      Check history
-                    </Link>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-sm bg-[#f7f7f4] px-4 py-4">
-                <div className="flex min-h-[144px] flex-col">
-                  <div>
-                    <p className="text-xs tracking-[0.3px] text-black/60">
-                      Models used
-                    </p>
-                    <p className="mt-2 text-2xl font-medium tracking-tight text-black">
-                      {modelsUsed}
-                    </p>
-                  </div>
-                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-                    <Link
-                      href="#latest-models"
-                      className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs"
-                    >
-                      Check usage
-                    </Link>
-                  </div>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </article>
 
@@ -370,20 +355,24 @@ export default async function DashboardPage() {
             <div className="flex items-center justify-between gap-3 px-4 pt-4">
               <div className="inline-flex items-center gap-6">
                 <button className="border-b-2 border-black py-1 text-sm font-semibold text-black">
-                  Latest Models
+                  Latest models
                 </button>
-                <button className="py-1 text-sm text-black/55">Favourite</button>
+                <button className="py-1 text-sm text-black/55">
+                  Active routing
+                </button>
               </div>
-              <button className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs">
+              <Link
+                href="#models"
+                className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs"
+              >
                 View all models
-              </button>
+              </Link>
             </div>
 
             <div className="mt-2 grid grid-cols-1 gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4">
               {latestModels.map((model) => (
-                <Link
+                <div
                   key={model.id}
-                  href="#quickstart"
                   className="flex gap-2.5 rounded-sm border border-black/10 p-2 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
                 >
                   <div
@@ -403,7 +392,7 @@ export default async function DashboardPage() {
                       {model.capability}
                     </p>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           </div>
@@ -418,7 +407,7 @@ export default async function DashboardPage() {
               </div>
               <div className="hidden items-center gap-2 md:flex">
                 <KeyRound className="size-4 text-black/45" />
-                <span className="text-xs text-black/55">{apiKeys.length} keys</span>
+                <span className="text-xs text-black/55">{keyMetric?.value ?? apiKeys.length} active</span>
               </div>
             </div>
 
@@ -431,30 +420,15 @@ export default async function DashboardPage() {
                 <h2 className="text-xl font-semibold text-black">Requests</h2>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <label className="flex items-center gap-2 text-xs text-black">
-                  <span>Show API requests</span>
-                  <button
-                    type="button"
-                    className="inline-flex h-5 w-9 items-center rounded-full bg-black p-0.5"
-                  >
-                    <span className="block h-4 w-4 translate-x-4 rounded-full bg-white" />
-                  </button>
-                </label>
-                <button className="inline-flex h-8 items-center gap-1 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
-                  All models
-                  <ChevronDown className="h-4 w-4 opacity-50" />
-                </button>
-                <button className="inline-flex h-8 items-center gap-1 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
-                  All
-                  <ChevronDown className="h-4 w-4 opacity-50" />
-                </button>
-                <button className="inline-flex h-8 items-center gap-1 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
-                  <SlidersHorizontal className="size-3.5" />
-                  Filters
-                </button>
-                <button className="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-black/10 bg-white text-black/70">
-                  <Search className="size-3.5" />
-                </button>
+                <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
+                  <span>Latest activity</span>
+                </div>
+                <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
+                  <span>{requestsLast7Days} in 7d</span>
+                </div>
+                <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
+                  <span>{modelsUsed} models used</span>
+                </div>
               </div>
             </div>
 
@@ -462,8 +436,8 @@ export default async function DashboardPage() {
               <div className="flex items-center gap-1.5 bg-amber-500/10 px-3 py-2.5">
                 <CircleAlert className="size-3.5 shrink-0 text-amber-600" />
                 <p className="text-xs leading-[1.35] text-amber-900/70">
-                  Your outputs are stored for 7 days only. Make sure to download
-                  and save them before they expire.
+                  Your outputs are stored for 7 days only. Download anything you
+                  need to keep.
                 </p>
               </div>
 
@@ -509,7 +483,7 @@ export default async function DashboardPage() {
 
               <div className="hidden md:block">
                 <div className="relative w-full overflow-auto">
-                  <table className="min-w-[680px] w-full text-sm">
+                  <table className="w-full min-w-[680px] text-sm">
                     <thead>
                       <tr className="border-b border-black/10 text-left">
                         <th className="h-10 px-2 text-[10px] tracking-[1px] text-black/50">
@@ -519,7 +493,7 @@ export default async function DashboardPage() {
                           ID
                         </th>
                         <th className="h-10 px-2 text-[10px] tracking-[1px] text-black/50">
-                          Model
+                          Provider
                         </th>
                         <th className="h-10 px-2 text-[10px] tracking-[1px] text-black/50">
                           Status
@@ -528,7 +502,7 @@ export default async function DashboardPage() {
                           Latency
                         </th>
                         <th className="h-10 px-2 text-[10px] tracking-[1px] text-black/50">
-                          Action
+                          Cost
                         </th>
                       </tr>
                     </thead>
@@ -542,7 +516,7 @@ export default async function DashboardPage() {
                             <td className="px-2 py-3 align-middle">
                               <div className="flex items-center gap-2">
                                 <span className="inline-flex size-10 items-center justify-center rounded-sm bg-[#f4f5f0] text-black/60">
-                                  <ImageIcon className="size-4" />
+                                  <ReceiptText className="size-4" />
                                 </span>
                                 <div>
                                   <p className="text-sm text-black">{row.model}</p>
@@ -569,11 +543,8 @@ export default async function DashboardPage() {
                             <td className="px-2 py-3 text-sm text-black/70">
                               {row.latency}
                             </td>
-                            <td className="px-2 py-3">
-                              <button className="inline-flex h-8 items-center gap-1 rounded-sm border border-black/10 bg-white px-3 text-xs">
-                                <Download className="size-3.5" />
-                                Download
-                              </button>
+                            <td className="px-2 py-3 text-sm text-black/70">
+                              {row.cost}
                             </td>
                           </tr>
                         ))
