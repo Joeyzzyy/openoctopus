@@ -834,7 +834,7 @@ export default async function InternalPage({
                         help="Operational capability family for this public model. Provider models and routes must match this."
                       />
                       <BillingConfigEditor
-                        initialValue={'{"billingMode":"per_image","currency":"USD","costPerImage":0.04}'}
+                        initialValue={'{"billingMode":"hybrid","currency":"USD","charges":{"perImage":0.039,"inputTextTokensPerMillion":0.30}}'}
                       />
                       <label className="flex items-center gap-3 rounded-sm border border-black/10 bg-white px-3 py-3 text-sm text-black/72">
                         <input type="checkbox" name="active" defaultChecked className="size-4 rounded border-black/20 bg-white accent-black" />

@@ -26,16 +26,14 @@ type ProviderModelOption = {
   capability: "image_generation" | "image_edit" | "video_generation";
 };
 
-type BillingMode =
-  | "per_request"
-  | "per_image"
-  | "per_video"
-  | "per_second"
-  | "per_million_tokens";
-
 type BillingFormState = {
-  billingMode: BillingMode;
   currency: string;
+  chargePerRequest: boolean;
+  chargePerImage: boolean;
+  chargePerVideo: boolean;
+  chargePerSecond: boolean;
+  chargeInputTokens: boolean;
+  chargeOutputTokens: boolean;
   costPerRequest: string;
   costPerImage: string;
   costPerVideo: string;
@@ -44,38 +42,15 @@ type BillingFormState = {
   outputCostPerMillion: string;
 };
 
-const billingModeOptions: Array<{ value: BillingMode; label: string; help: string }> = [
-  {
-    value: "per_image",
-    label: "Per image",
-    help: "Charge once for each generated image asset.",
-  },
-  {
-    value: "per_video",
-    label: "Per video",
-    help: "Charge once for each generated video asset.",
-  },
-  {
-    value: "per_request",
-    label: "Per request",
-    help: "Charge a fixed amount for each successful request.",
-  },
-  {
-    value: "per_second",
-    label: "Per second",
-    help: "Charge by generated duration in seconds.",
-  },
-  {
-    value: "per_million_tokens",
-    label: "Per 1M tokens",
-    help: "Charge text models by input and output token usage.",
-  },
-];
-
 function parseBillingFormState(initialValue?: string): BillingFormState {
   const fallback: BillingFormState = {
-    billingMode: "per_image",
     currency: "USD",
+    chargePerRequest: false,
+    chargePerImage: true,
+    chargePerVideo: false,
+    chargePerSecond: false,
+    chargeInputTokens: false,
+    chargeOutputTokens: false,
     costPerRequest: "0.04",
     costPerImage: "0.04",
     costPerVideo: "0.8",
@@ -90,15 +65,39 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
 
   try {
     const parsed = JSON.parse(initialValue) as Record<string, unknown>;
-    const billingMode = typeof parsed.billingMode === "string" ? parsed.billingMode : fallback.billingMode;
-    if (!billingModeOptions.some((item) => item.value === billingMode)) {
-      return fallback;
+    if (parsed.billingMode === "hybrid" && parsed.charges && typeof parsed.charges === "object") {
+      const charges = parsed.charges as Record<string, unknown>;
+      return {
+        ...fallback,
+        currency: typeof parsed.currency === "string" ? parsed.currency : fallback.currency,
+        chargePerRequest: charges.perRequest !== undefined,
+        chargePerImage: charges.perImage !== undefined,
+        chargePerVideo: charges.perVideo !== undefined,
+        chargePerSecond: charges.perSecond !== undefined,
+        chargeInputTokens: charges.inputTextTokensPerMillion !== undefined,
+        chargeOutputTokens: charges.outputTextTokensPerMillion !== undefined,
+        costPerRequest: String(charges.perRequest ?? fallback.costPerRequest),
+        costPerImage: String(charges.perImage ?? fallback.costPerImage),
+        costPerVideo: String(charges.perVideo ?? fallback.costPerVideo),
+        costPerSecond: String(charges.perSecond ?? fallback.costPerSecond),
+        inputCostPerMillion: String(
+          charges.inputTextTokensPerMillion ?? fallback.inputCostPerMillion
+        ),
+        outputCostPerMillion: String(
+          charges.outputTextTokensPerMillion ?? fallback.outputCostPerMillion
+        ),
+      };
     }
 
     return {
       ...fallback,
-      billingMode: billingMode as BillingMode,
       currency: typeof parsed.currency === "string" ? parsed.currency : fallback.currency,
+      chargePerRequest: parsed.billingMode === "per_request",
+      chargePerImage: parsed.billingMode === "per_image",
+      chargePerVideo: parsed.billingMode === "per_video",
+      chargePerSecond: parsed.billingMode === "per_second",
+      chargeInputTokens: parsed.billingMode === "per_million_tokens",
+      chargeOutputTokens: parsed.billingMode === "per_million_tokens",
       costPerRequest: String(parsed.costPerRequest ?? fallback.costPerRequest),
       costPerImage: String(parsed.costPerImage ?? fallback.costPerImage),
       costPerVideo: String(parsed.costPerVideo ?? fallback.costPerVideo),
@@ -112,27 +111,32 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
 }
 
 function buildBillingConfigValue(state: BillingFormState) {
-  const base = {
-    billingMode: state.billingMode,
-    currency: state.currency.trim() || "USD",
-  };
+  const charges: Record<string, number> = {};
 
-  switch (state.billingMode) {
-    case "per_request":
-      return JSON.stringify({ ...base, costPerRequest: Number(state.costPerRequest) });
-    case "per_image":
-      return JSON.stringify({ ...base, costPerImage: Number(state.costPerImage) });
-    case "per_video":
-      return JSON.stringify({ ...base, costPerVideo: Number(state.costPerVideo) });
-    case "per_second":
-      return JSON.stringify({ ...base, costPerSecond: Number(state.costPerSecond) });
-    case "per_million_tokens":
-      return JSON.stringify({
-        ...base,
-        inputCostPerMillion: Number(state.inputCostPerMillion),
-        outputCostPerMillion: Number(state.outputCostPerMillion),
-      });
+  if (state.chargePerRequest) {
+    charges.perRequest = Number(state.costPerRequest);
   }
+  if (state.chargePerImage) {
+    charges.perImage = Number(state.costPerImage);
+  }
+  if (state.chargePerVideo) {
+    charges.perVideo = Number(state.costPerVideo);
+  }
+  if (state.chargePerSecond) {
+    charges.perSecond = Number(state.costPerSecond);
+  }
+  if (state.chargeInputTokens) {
+    charges.inputTextTokensPerMillion = Number(state.inputCostPerMillion);
+  }
+  if (state.chargeOutputTokens) {
+    charges.outputTextTokensPerMillion = Number(state.outputCostPerMillion);
+  }
+
+  return JSON.stringify({
+    billingMode: "hybrid",
+    currency: state.currency.trim() || "USD",
+    charges,
+  });
 }
 
 function FieldHint({
@@ -197,34 +201,12 @@ export function BillingConfigEditor({
   initialValue?: string;
 }) {
   const [state, setState] = useState(() => parseBillingFormState(initialValue));
-  const selectedMode = billingModeOptions.find((item) => item.value === state.billingMode) ?? billingModeOptions[0];
   const hiddenValue = buildBillingConfigValue(state);
 
   return (
     <div className="rounded-sm border border-black/8 bg-white p-3">
       <input type="hidden" name={name} value={hiddenValue} />
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px]">
-        <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Billing Mode</span>
-          <select
-            value={state.billingMode}
-            onChange={(event) =>
-              setState((current) => ({
-                ...current,
-                billingMode: event.target.value as BillingMode,
-              }))
-            }
-            className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20"
-          >
-            {billingModeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <FieldHint help={selectedMode.help} />
-        </label>
-
+      <div className="grid gap-3 md:grid-cols-[120px_minmax(0,1fr)]">
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Currency</span>
           <input
@@ -239,31 +221,64 @@ export function BillingConfigEditor({
             className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20"
           />
         </label>
+
+        <div className="rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-3">
+          <p className="text-[11px] tracking-[0.35px] text-black/45">Charge Components</p>
+          <div className="mt-2 grid gap-2 md:grid-cols-3">
+            {[
+              ["chargePerRequest", "Per request"],
+              ["chargePerImage", "Per image"],
+              ["chargePerVideo", "Per video"],
+              ["chargePerSecond", "Per second"],
+              ["chargeInputTokens", "Input tokens"],
+              ["chargeOutputTokens", "Output tokens"],
+            ].map(([key, label]) => (
+              <label
+                key={key}
+                className="flex items-center gap-2 rounded-sm border border-black/8 bg-white px-3 py-2 text-sm text-black/72"
+              >
+                <input
+                  type="checkbox"
+                  checked={Boolean(state[key as keyof BillingFormState])}
+                  onChange={(event) =>
+                    setState((current) => ({
+                      ...current,
+                      [key]: event.target.checked,
+                    }))
+                  }
+                  className="size-4 rounded border-black/20 bg-white accent-black"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+          <FieldHint help="Enable one or more charge dimensions. Gemini 2.5 Flash Image should usually charge input tokens plus output images." />
+        </div>
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
-        {state.billingMode === "per_request" ? (
+        {state.chargePerRequest ? (
           <BillingNumberField
             label="Cost Per Request"
             value={state.costPerRequest}
             onChange={(value) => setState((current) => ({ ...current, costPerRequest: value }))}
           />
         ) : null}
-        {state.billingMode === "per_image" ? (
+        {state.chargePerImage ? (
           <BillingNumberField
             label="Cost Per Image"
             value={state.costPerImage}
             onChange={(value) => setState((current) => ({ ...current, costPerImage: value }))}
           />
         ) : null}
-        {state.billingMode === "per_video" ? (
+        {state.chargePerVideo ? (
           <BillingNumberField
             label="Cost Per Video"
             value={state.costPerVideo}
             onChange={(value) => setState((current) => ({ ...current, costPerVideo: value }))}
           />
         ) : null}
-        {state.billingMode === "per_second" ? (
+        {state.chargePerSecond ? (
           <BillingNumberField
             label="Cost Per Second"
             value={state.costPerSecond}
@@ -271,19 +286,21 @@ export function BillingConfigEditor({
             help="Worker reads duration from request input or provider output."
           />
         ) : null}
-        {state.billingMode === "per_million_tokens" ? (
+        {state.chargeInputTokens ? (
           <>
             <BillingNumberField
               label="Input Cost Per 1M Tokens"
               value={state.inputCostPerMillion}
               onChange={(value) => setState((current) => ({ ...current, inputCostPerMillion: value }))}
             />
-            <BillingNumberField
-              label="Output Cost Per 1M Tokens"
-              value={state.outputCostPerMillion}
-              onChange={(value) => setState((current) => ({ ...current, outputCostPerMillion: value }))}
-            />
           </>
+        ) : null}
+        {state.chargeOutputTokens ? (
+          <BillingNumberField
+            label="Output Cost Per 1M Tokens"
+            value={state.outputCostPerMillion}
+            onChange={(value) => setState((current) => ({ ...current, outputCostPerMillion: value }))}
+          />
         ) : null}
       </div>
 
@@ -416,7 +433,7 @@ export function CreateProviderModelForm({
           />
           <FieldHint
             help="Optional internal cost and billing metadata for this provider model."
-            example='{"billingMode":"per_image","costPerUnit":0.04,"currency":"USD"}'
+            example='{"billingMode":"hybrid","currency":"USD","charges":{"perImage":0.039,"inputTextTokensPerMillion":0.30}}'
           />
         </label>
 
