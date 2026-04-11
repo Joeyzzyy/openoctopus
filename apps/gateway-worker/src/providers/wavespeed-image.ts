@@ -2,6 +2,7 @@ import { env } from "../config.js";
 import { getJson, postJson } from "../lib/http.js";
 import { getByPath } from "../lib/object-path.js";
 import type {
+  PollRequestInput,
   PollRequestResult,
   ProviderAdapter,
   SubmitRequestInput,
@@ -11,10 +12,10 @@ import type {
 export class WaveSpeedImageAdapter implements ProviderAdapter {
   slug = "wavespeed-images";
 
-  private buildHeaders() {
+  private buildHeaders(secret: string) {
     const apiKeyValue = env.WAVESPEED_IMAGE_API_KEY_PREFIX
-      ? `${env.WAVESPEED_IMAGE_API_KEY_PREFIX} ${env.WAVESPEED_API_KEY}`
-      : env.WAVESPEED_API_KEY;
+      ? `${env.WAVESPEED_IMAGE_API_KEY_PREFIX} ${secret}`
+      : secret;
 
     return {
       [env.WAVESPEED_IMAGE_API_KEY_HEADER]: apiKeyValue,
@@ -24,13 +25,13 @@ export class WaveSpeedImageAdapter implements ProviderAdapter {
   async submit(input: SubmitRequestInput): Promise<SubmitRequestResult> {
     const submitUrl = new URL(
       env.WAVESPEED_IMAGE_SUBMIT_PATH,
-      env.WAVESPEED_BASE_URL
+      input.provider.baseUrl ?? env.WAVESPEED_BASE_URL
     ).toString();
 
     const { data } = await postJson<Record<string, unknown>>(submitUrl, {
-      headers: this.buildHeaders(),
+      headers: this.buildHeaders(input.provider.secret),
       body: {
-        model: input.publicModelSlug,
+        model: input.upstreamModelSlug,
         prompt: input.prompt,
         ...input.input,
       },
@@ -73,15 +74,18 @@ export class WaveSpeedImageAdapter implements ProviderAdapter {
     };
   }
 
-  async poll(upstreamTaskId: string): Promise<PollRequestResult> {
+  async poll(input: PollRequestInput): Promise<PollRequestResult> {
     const statusPath = env.WAVESPEED_IMAGE_STATUS_PATH.replace(
       "{taskId}",
-      upstreamTaskId
+      input.upstreamTaskId
     );
-    const statusUrl = new URL(statusPath, env.WAVESPEED_BASE_URL).toString();
+    const statusUrl = new URL(
+      statusPath,
+      input.provider.baseUrl ?? env.WAVESPEED_BASE_URL
+    ).toString();
 
     const { data } = await getJson<Record<string, unknown>>(statusUrl, {
-      headers: this.buildHeaders(),
+      headers: this.buildHeaders(input.provider.secret),
     });
 
     const status = String(

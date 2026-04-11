@@ -2,7 +2,10 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { enqueueInferenceJob } from "../queue/runner.js";
-import { createQueuedRequest } from "../services/request-service.js";
+import {
+  createQueuedRequest,
+  RequestValidationError,
+} from "../services/request-service.js";
 
 const imageRequestSchema = z.object({
   model: z.string().min(1),
@@ -17,6 +20,19 @@ const videoRequestSchema = z.object({
 });
 
 export async function registerTaskRoutes(app: FastifyInstance) {
+  const sendRequestError = (reply: { code: (statusCode: number) => { send: (body: unknown) => unknown } }, error: unknown) => {
+    if (error instanceof RequestValidationError) {
+      return reply.code(error.statusCode).send({
+        error: {
+          code: error.code,
+          message: error.message,
+        },
+      });
+    }
+
+    throw error;
+  };
+
   app.get("/v1/models", async () => {
     const { data, error } = await supabaseAdmin
       .from("provider_models")
@@ -68,31 +84,40 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const authHeader = request.headers.authorization;
     const apiKey = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
 
-    const queued = await createQueuedRequest({
-      apiKey,
-      endpoint: "/v1/images/generations",
-      capability: "image_generation",
-      model: parsed.model,
-      prompt: parsed.prompt,
-      input: parsed.input,
-    });
+    try {
+      const queued = await createQueuedRequest({
+        apiKey,
+        endpoint: "/v1/images/generations",
+        capability: "image_generation",
+        model: parsed.model,
+        prompt: parsed.prompt,
+        input: parsed.input,
+      });
 
-    await enqueueInferenceJob({
-      requestId: queued.requestId,
-      workspaceId: queued.workspaceId,
-      apiKeyId: queued.apiKeyId,
-      providerSlug: queued.providerSlug,
-      capability: "image_generation",
-      model: parsed.model,
-      endpoint: queued.endpoint,
-      prompt: parsed.prompt,
-      input: parsed.input,
-    });
+      await enqueueInferenceJob({
+        requestId: queued.requestId,
+        workspaceId: queued.workspaceId,
+        apiKeyId: queued.apiKeyId,
+        providerModelId: queued.providerModelId,
+        credentialId: queued.credentialId,
+        providerSlug: queued.providerSlug,
+        providerBaseUrl: queued.providerBaseUrl,
+        providerConfig: queued.providerConfig,
+        capability: "image_generation",
+        publicModelSlug: parsed.model,
+        upstreamModelSlug: queued.upstreamModelSlug,
+        endpoint: queued.endpoint,
+        prompt: parsed.prompt,
+        input: parsed.input,
+      });
 
-    return reply.code(202).send({
-      id: queued.requestId,
-      status: "queued",
-    });
+      return reply.code(202).send({
+        id: queued.requestId,
+        status: "queued",
+      });
+    } catch (error) {
+      return sendRequestError(reply, error);
+    }
   });
 
   app.post("/v1/videos/generations", async (request, reply) => {
@@ -100,31 +125,40 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const authHeader = request.headers.authorization;
     const apiKey = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
 
-    const queued = await createQueuedRequest({
-      apiKey,
-      endpoint: "/v1/videos/generations",
-      capability: "video_generation",
-      model: parsed.model,
-      prompt: parsed.prompt,
-      input: parsed.input,
-    });
+    try {
+      const queued = await createQueuedRequest({
+        apiKey,
+        endpoint: "/v1/videos/generations",
+        capability: "video_generation",
+        model: parsed.model,
+        prompt: parsed.prompt,
+        input: parsed.input,
+      });
 
-    await enqueueInferenceJob({
-      requestId: queued.requestId,
-      workspaceId: queued.workspaceId,
-      apiKeyId: queued.apiKeyId,
-      providerSlug: queued.providerSlug,
-      capability: "video_generation",
-      model: parsed.model,
-      endpoint: queued.endpoint,
-      prompt: parsed.prompt,
-      input: parsed.input,
-    });
+      await enqueueInferenceJob({
+        requestId: queued.requestId,
+        workspaceId: queued.workspaceId,
+        apiKeyId: queued.apiKeyId,
+        providerModelId: queued.providerModelId,
+        credentialId: queued.credentialId,
+        providerSlug: queued.providerSlug,
+        providerBaseUrl: queued.providerBaseUrl,
+        providerConfig: queued.providerConfig,
+        capability: "video_generation",
+        publicModelSlug: parsed.model,
+        upstreamModelSlug: queued.upstreamModelSlug,
+        endpoint: queued.endpoint,
+        prompt: parsed.prompt,
+        input: parsed.input,
+      });
 
-    return reply.code(202).send({
-      id: queued.requestId,
-      status: "queued",
-    });
+      return reply.code(202).send({
+        id: queued.requestId,
+        status: "queued",
+      });
+    } catch (error) {
+      return sendRequestError(reply, error);
+    }
   });
 
   app.get("/v1/tasks/:id", async (request) => {

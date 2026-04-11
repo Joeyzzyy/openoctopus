@@ -1,44 +1,106 @@
-export async function postJson<TResponse>(
+import http from "node:http";
+import https from "node:https";
+import { ProxyAgent } from "proxy-agent";
+
+const REQUEST_TIMEOUT_MS = 30000;
+const proxyConfigured = Boolean(process.env.HTTPS_PROXY || process.env.HTTP_PROXY);
+const proxyAgent = proxyConfigured ? new ProxyAgent() : null;
+
+function requestJson<TResponse>(
+  url: string,
+  options: {
+    method: "GET" | "POST";
+    headers?: Record<string, string>;
+    body?: Record<string, unknown>;
+  }
+): Promise<{ status: number; data: TResponse }> {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const payload = options.body ? JSON.stringify(options.body) : null;
+    const transport = target.protocol === "https:" ? https : http;
+
+    const req = transport.request(
+      {
+        protocol: target.protocol,
+        hostname: target.hostname,
+        port: target.port || undefined,
+        path: `${target.pathname}${target.search}`,
+        method: options.method,
+        family: 4,
+        timeout: REQUEST_TIMEOUT_MS,
+        agent: proxyAgent ?? undefined,
+        headers: {
+          accept: "application/json",
+          ...(payload ? { "content-type": "application/json" } : {}),
+          ...(payload ? { "content-length": Buffer.byteLength(payload).toString() } : {}),
+          ...(options.headers ?? {}),
+        },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+
+        res.on("data", (chunk) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+
+        res.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf8");
+          const status = res.statusCode ?? 500;
+
+          try {
+            const data = JSON.parse(text) as TResponse;
+
+            if (status < 200 || status >= 300) {
+              reject(new Error(`Upstream ${options.method} failed with ${status}: ${text}`));
+              return;
+            }
+
+            resolve({ status, data });
+          } catch {
+            reject(new Error(`Upstream ${options.method} returned non-JSON response: ${text}`));
+          }
+        });
+      }
+    );
+
+    req.on("timeout", () => {
+      req.destroy(new Error(`Upstream ${options.method} timed out after ${REQUEST_TIMEOUT_MS}ms`));
+    });
+
+    req.on("error", (error) => {
+      reject(error);
+    });
+
+    if (payload) {
+      req.write(payload);
+    }
+
+    req.end();
+  });
+}
+
+export function postJson<TResponse>(
   url: string,
   options: {
     headers?: Record<string, string>;
     body: Record<string, unknown>;
   }
 ): Promise<{ status: number; data: TResponse }> {
-  const response = await fetch(url, {
+  return requestJson<TResponse>(url, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(options.headers ?? {}),
-    },
-    body: JSON.stringify(options.body),
+    headers: options.headers,
+    body: options.body,
   });
-
-  const data = (await response.json()) as TResponse;
-
-  if (!response.ok) {
-    throw new Error(`Upstream POST failed with ${response.status}`);
-  }
-
-  return { status: response.status, data };
 }
 
-export async function getJson<TResponse>(
+export function getJson<TResponse>(
   url: string,
   options?: {
     headers?: Record<string, string>;
   }
 ): Promise<{ status: number; data: TResponse }> {
-  const response = await fetch(url, {
+  return requestJson<TResponse>(url, {
     method: "GET",
     headers: options?.headers,
   });
-
-  const data = (await response.json()) as TResponse;
-
-  if (!response.ok) {
-    throw new Error(`Upstream GET failed with ${response.status}`);
-  }
-
-  return { status: response.status, data };
 }

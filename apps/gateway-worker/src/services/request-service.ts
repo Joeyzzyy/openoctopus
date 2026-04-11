@@ -1,6 +1,13 @@
 import crypto from "node:crypto";
 import { supabaseAdmin } from "../lib/supabase.js";
 
+type ProviderCredentialRow = {
+  id: string;
+  provider_id: string;
+  secret_source: string;
+  environment: string;
+};
+
 export type UnifiedRequestInput = {
   apiKey: string;
   endpoint: "/v1/images/generations" | "/v1/videos/generations";
@@ -9,6 +16,37 @@ export type UnifiedRequestInput = {
   prompt?: string;
   input: Record<string, unknown>;
 };
+
+export class RequestValidationError extends Error {
+  constructor(
+    message: string,
+    readonly statusCode: number,
+    readonly code: string
+  ) {
+    super(message);
+    this.name = "RequestValidationError";
+  }
+}
+
+function pickRuntimeCredential(rows: ProviderCredentialRow[]) {
+  const encryptedProduction = rows.find(
+    (row) => row.secret_source === "internal_encrypted" && row.environment === "production"
+  );
+  if (encryptedProduction) {
+    return encryptedProduction;
+  }
+
+  const encryptedAny = rows.find((row) => row.secret_source === "internal_encrypted");
+  if (encryptedAny) {
+    return encryptedAny;
+  }
+
+  if (rows.length > 0) {
+    throw new Error("Active provider credential is still using a legacy external reference. Rotate it in /internal before live traffic.");
+  }
+
+  throw new Error("No active provider credential found for this provider");
+}
 
 export async function createQueuedRequest(input: UnifiedRequestInput) {
   const secretHash = crypto
@@ -27,7 +65,29 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
   }
 
   if (!apiKeyRow || apiKeyRow.status !== "active") {
-    throw new Error("Invalid or inactive API key");
+    throw new RequestValidationError("Invalid or inactive API key", 401, "invalid_api_key");
+  }
+
+  const { data: walletRows, error: walletError } = await supabaseAdmin
+    .from("wallet_transactions")
+    .select("amount_delta")
+    .eq("workspace_id", apiKeyRow.workspace_id);
+
+  if (walletError) {
+    throw new Error(walletError.message);
+  }
+
+  const walletBalance = (walletRows ?? []).reduce(
+    (sum, row) => sum + Number(row.amount_delta ?? 0),
+    0
+  );
+
+  if (walletBalance <= 0) {
+    throw new RequestValidationError(
+      "Insufficient balance. Please top up your wallet before making API requests.",
+      402,
+      "insufficient_balance"
+    );
   }
 
   const { data: routeRow, error: routeError } = await supabaseAdmin
@@ -44,12 +104,16 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
   }
 
   if (!routeRow) {
-    throw new Error(`No routing rule found for ${input.model}`);
+    throw new RequestValidationError(
+      `No routing rule found for ${input.model}`,
+      404,
+      "model_not_available"
+    );
   }
 
   const { data: providerModelRow, error: providerModelError } = await supabaseAdmin
     .from("provider_models")
-    .select("id, provider_id")
+    .select("id, provider_id, upstream_model_slug")
     .eq("id", routeRow.primary_provider_model_id)
     .maybeSingle();
 
@@ -63,7 +127,7 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
 
   const { data: providerRow, error: providerError } = await supabaseAdmin
     .from("providers")
-    .select("slug")
+    .select("slug, base_url, config")
     .eq("id", providerModelRow.provider_id)
     .maybeSingle();
 
@@ -74,6 +138,19 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
   if (!providerRow) {
     throw new Error("Provider row is missing");
   }
+
+  const { data: credentialRows, error: credentialError } = await supabaseAdmin
+    .from("provider_credentials")
+    .select("id, provider_id, secret_source, environment")
+    .eq("provider_id", providerModelRow.provider_id)
+    .eq("is_active", true)
+    .order("updated_at", { ascending: false });
+
+  if (credentialError) {
+    throw new Error(credentialError.message);
+  }
+
+  const credential = pickRuntimeCredential((credentialRows ?? []) as ProviderCredentialRow[]);
 
   const requestId = crypto.randomUUID();
   const providerSlug = providerRow.slug;
@@ -103,7 +180,14 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     workspaceId: apiKeyRow.workspace_id,
     apiKeyId: apiKeyRow.id,
     providerModelId: routeRow.primary_provider_model_id,
+    credentialId: credential.id,
     providerSlug,
+    providerBaseUrl: providerRow.base_url ?? null,
+    providerConfig:
+      providerRow.config && typeof providerRow.config === "object" && !Array.isArray(providerRow.config)
+        ? (providerRow.config as Record<string, unknown>)
+        : null,
+    upstreamModelSlug: providerModelRow.upstream_model_slug,
     endpoint: input.endpoint,
     publicModelSlug: input.model,
   };

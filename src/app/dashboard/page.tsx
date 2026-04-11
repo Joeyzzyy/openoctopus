@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  ArrowRight,
   CircleAlert,
   KeyRound,
   LogOut,
@@ -15,12 +13,10 @@ import { CreateKeyButton } from "./dashboard-actions";
 import { DashboardSidebar } from "./dashboard-sidebar";
 import { ApiKeysTable } from "./api-keys-table";
 import { ApiQuickstartCard } from "./api-quickstart-card";
-import { PlaygroundCard } from "./playground-card";
 
 const topNav = [
   { label: "Dashboard", href: "#overview", active: true },
   { label: "Models", href: "#models" },
-  { label: "Playground", href: "#playground" },
   { label: "API Keys", href: "#keys" },
   { label: "Requests", href: "#requests" },
 ] as const;
@@ -39,8 +35,7 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const { apiKeys, metrics, requestQueueRows, routingRules, usageRows, user, workspace } =
-    data;
+  const { apiKeys, metrics, requestQueueRows, routingRules, usageRows, user } = data;
 
   const walletMetric = metrics.find((metric) => metric.label === "Wallet Balance");
   const topupMetric = metrics.find((metric) => metric.label === "Total Top-Ups");
@@ -59,14 +54,6 @@ export default async function DashboardPage() {
     capability: rule.capability,
     tone: index % 4,
   }));
-
-  const playgroundModels = [
-    ...new Set(
-      routingRules
-        .filter((rule) => rule.capability === "image_generation")
-        .map((rule) => rule.publicModel)
-    ),
-  ];
 
   const overviewCards = [
     {
@@ -203,10 +190,6 @@ export default async function DashboardPage() {
 
           <section id="quickstart" className="mt-6">
             <ApiQuickstartCard />
-          </section>
-
-          <section id="playground" className="mt-6">
-            <PlaygroundCard models={playgroundModels.length > 0 ? playgroundModels : latestModels.map((model) => model.slug)} />
           </section>
 
           <section id="keys" className="mt-6 rounded-sm border border-black/10 bg-white p-4">

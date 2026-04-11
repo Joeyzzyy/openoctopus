@@ -1,4 +1,10 @@
-import type { PollRequestResult, ProviderAdapter, SubmitRequestInput, SubmitRequestResult } from "./types.js";
+import type {
+  PollRequestInput,
+  PollRequestResult,
+  ProviderAdapter,
+  SubmitRequestInput,
+  SubmitRequestResult,
+} from "./types.js";
 
 export class WaveSpeedVideoAdapter implements ProviderAdapter {
   slug = "wavespeed-video";
@@ -13,11 +19,11 @@ export class WaveSpeedVideoAdapter implements ProviderAdapter {
     };
   }
 
-  async poll(upstreamTaskId: string): Promise<PollRequestResult> {
+  async poll(input: PollRequestInput): Promise<PollRequestResult> {
     return {
       done: false,
       pollAfterSeconds: 8,
-      raw: { upstreamTaskId, status: "processing" },
+      raw: { upstreamTaskId: input.upstreamTaskId, status: "processing" },
     };
   }
 }

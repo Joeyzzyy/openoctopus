@@ -250,6 +250,21 @@ as $$
   );
 $$;
 
+create or replace function public.is_operator()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.workspace_members wm
+    where wm.user_id = auth.uid()
+      and wm.role in ('owner', 'admin')
+  );
+$$;
+
 create or replace view public.v_api_key_spend_summary as
 select
   k.id as api_key_id,
@@ -466,18 +481,11 @@ create policy "supported_models_read_all"
 on public.supported_models for select
 using (true);
 
-insert into public.supported_models (provider, model_slug, display_name, modality, unit_label, default_unit_cost)
-values
-  ('ByteDance', 'seedream-v4-5', 'Seedream 4.5', 'image', 'image', 0.038000),
-  ('Kuaishou', 'kling-v3-motion-control', 'Kling V3 Motion Control', 'video', 'job', 3.730000),
-  ('Google', 'nano-banana-2', 'Nano Banana 2', 'image', 'image', 0.011000),
-  ('OpenOctopus', 'infinitetalk', 'InfiniteTalk', 'video', 'job', 4.200000),
-  ('Black Forest', 'flux-kontext', 'Flux Kontext', 'image', 'image', 0.021000)
-on conflict (model_slug) do update
-set
-  display_name = excluded.display_name,
-  provider = excluded.provider,
-  modality = excluded.modality,
-  unit_label = excluded.unit_label,
-  default_unit_cost = excluded.default_unit_cost,
-  active = true;
+drop policy if exists "supported_models_operator_write" on public.supported_models;
+create policy "supported_models_operator_write"
+on public.supported_models for all
+using (public.is_operator())
+with check (public.is_operator());
+
+-- Intentionally no supported model seed data here.
+-- Internal admins should create real public models in /internal.

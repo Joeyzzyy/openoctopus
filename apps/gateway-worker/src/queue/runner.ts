@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../lib/supabase.js";
+import { decryptProviderSecret } from "../lib/provider-secret-crypto.js";
 import { getProviderAdapter } from "../providers/index.js";
 import { persistGeneratedAssets } from "../services/assets-service.js";
 import {
@@ -10,9 +11,14 @@ type QueueMessage = {
   requestId: string;
   workspaceId: string;
   apiKeyId: string | null;
+  providerModelId: string;
+  credentialId: string;
   providerSlug: string;
+  providerBaseUrl: string | null;
+  providerConfig: Record<string, unknown> | null;
   capability: "image_generation" | "video_generation";
-  model: string;
+  publicModelSlug: string;
+  upstreamModelSlug: string;
   endpoint: string;
   prompt?: string;
   input: Record<string, unknown>;
@@ -22,8 +28,13 @@ type PollingMessage = {
   requestId: string;
   workspaceId: string;
   apiKeyId: string | null;
+  providerModelId: string;
+  credentialId: string;
   providerSlug: string;
-  model: string;
+  providerBaseUrl: string | null;
+  providerConfig: Record<string, unknown> | null;
+  publicModelSlug: string;
+  upstreamModelSlug: string;
   endpoint: string;
   upstreamTaskId: string;
 };
@@ -86,6 +97,25 @@ export async function processNextInferenceJob() {
 
   const message = row.message as QueueMessage;
   const adapter = getProviderAdapter(message.providerSlug);
+  const { data: credentialRow, error: credentialError } = await supabaseAdmin
+    .from("provider_credentials")
+    .select("secret_ciphertext, secret_iv, secret_auth_tag")
+    .eq("id", message.credentialId)
+    .maybeSingle();
+
+  if (credentialError) {
+    throw new Error(credentialError.message);
+  }
+
+  if (!credentialRow?.secret_ciphertext || !credentialRow.secret_iv || !credentialRow.secret_auth_tag) {
+    throw new Error("Provider credential secret is missing or not managed internally");
+  }
+
+  const providerSecret = decryptProviderSecret({
+    ciphertext: credentialRow.secret_ciphertext,
+    iv: credentialRow.secret_iv,
+    authTag: credentialRow.secret_auth_tag,
+  });
   const attemptStartedAt = Date.now();
   const { data: requestRow, error: requestRowError } = await supabaseAdmin
     .from("inference_requests")
@@ -106,7 +136,8 @@ export async function processNextInferenceJob() {
       attempt_no: 1,
       status: "sent",
       request_payload: {
-        model: message.model,
+        publicModelSlug: message.publicModelSlug,
+        upstreamModelSlug: message.upstreamModelSlug,
         prompt: message.prompt,
         input: message.input,
       },
@@ -116,13 +147,63 @@ export async function processNextInferenceJob() {
     throw new Error(attemptInsertError.message);
   }
 
-  const result = await adapter.submit({
-    requestId: message.requestId,
-    capability: message.capability,
-    publicModelSlug: message.model,
-    prompt: message.prompt,
-    input: message.input,
-  });
+  let result;
+  try {
+    result = await adapter.submit({
+      requestId: message.requestId,
+      capability: message.capability,
+      publicModelSlug: message.publicModelSlug,
+      upstreamModelSlug: message.upstreamModelSlug,
+      prompt: message.prompt,
+      input: message.input,
+      provider: {
+        slug: message.providerSlug,
+        baseUrl: message.providerBaseUrl,
+        config: message.providerConfig,
+        secret: providerSecret,
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown provider submit error";
+
+    await supabaseAdmin
+      .from("inference_requests")
+      .update({
+        status: "failed",
+        error_code: "provider_submit_failed",
+        error_message: errorMessage,
+        started_at: new Date(attemptStartedAt).toISOString(),
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", message.requestId);
+
+    await supabaseAdmin
+      .from("provider_attempts")
+      .update({
+        status: "failed",
+        error_message: errorMessage,
+        latency_ms: Date.now() - attemptStartedAt,
+      })
+      .eq("request_id", message.requestId)
+      .eq("attempt_no", 1);
+
+    await recordUsageEvent({
+      requestId: message.requestId,
+      workspaceId: message.workspaceId,
+      apiKeyId: message.apiKeyId,
+      publicModelSlug: message.publicModelSlug,
+      endpoint: message.endpoint,
+      totalCost: 0,
+      statusCode: 500,
+    });
+
+    await supabaseAdmin.rpc("queue_delete", {
+      queue_name: "inference_jobs",
+      message_id: row.msg_id,
+    });
+
+    return true;
+  }
 
   if (result.mode === "sync") {
     const totalCost = Number(result.estimatedCost ?? 0);
@@ -158,7 +239,7 @@ export async function processNextInferenceJob() {
       requestId: message.requestId,
       workspaceId: message.workspaceId,
       apiKeyId: message.apiKeyId,
-      publicModelSlug: message.model,
+      publicModelSlug: message.publicModelSlug,
       endpoint: message.endpoint,
       totalCost,
       statusCode: 200,
@@ -168,7 +249,7 @@ export async function processNextInferenceJob() {
       requestId: message.requestId,
       workspaceId: message.workspaceId,
       amount: totalCost,
-      description: `${message.model} usage settlement`,
+      description: `${message.publicModelSlug} usage settlement`,
     });
   } else {
     await supabaseAdmin
@@ -197,8 +278,13 @@ export async function processNextInferenceJob() {
         requestId: message.requestId,
         workspaceId: message.workspaceId,
         apiKeyId: message.apiKeyId,
+        providerModelId: message.providerModelId,
+        credentialId: message.credentialId,
         providerSlug: message.providerSlug,
-        model: message.model,
+        providerBaseUrl: message.providerBaseUrl,
+        providerConfig: message.providerConfig,
+        publicModelSlug: message.publicModelSlug,
+        upstreamModelSlug: message.upstreamModelSlug,
         endpoint: message.endpoint,
         upstreamTaskId: result.upstreamTaskId,
       },
@@ -231,6 +317,25 @@ export async function processNextPollingJob() {
 
   const message = row.message as PollingMessage;
   const adapter = getProviderAdapter(message.providerSlug);
+  const { data: credentialRow, error: credentialError } = await supabaseAdmin
+    .from("provider_credentials")
+    .select("secret_ciphertext, secret_iv, secret_auth_tag")
+    .eq("id", message.credentialId)
+    .maybeSingle();
+
+  if (credentialError) {
+    throw new Error(credentialError.message);
+  }
+
+  if (!credentialRow?.secret_ciphertext || !credentialRow.secret_iv || !credentialRow.secret_auth_tag) {
+    throw new Error("Provider credential secret is missing or not managed internally");
+  }
+
+  const providerSecret = decryptProviderSecret({
+    ciphertext: credentialRow.secret_ciphertext,
+    iv: credentialRow.secret_iv,
+    authTag: credentialRow.secret_auth_tag,
+  });
 
   if (!adapter.poll) {
     await supabaseAdmin.rpc("queue_delete", {
@@ -240,7 +345,46 @@ export async function processNextPollingJob() {
     return true;
   }
 
-  const result = await adapter.poll(message.upstreamTaskId);
+  let result;
+  try {
+    result = await adapter.poll({
+      upstreamTaskId: message.upstreamTaskId,
+      provider: {
+        slug: message.providerSlug,
+        baseUrl: message.providerBaseUrl,
+        config: message.providerConfig,
+        secret: providerSecret,
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown provider poll error";
+
+    await supabaseAdmin
+      .from("inference_requests")
+      .update({
+        status: "failed",
+        error_code: "provider_poll_failed",
+        error_message: errorMessage,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", message.requestId);
+
+    await supabaseAdmin
+      .from("provider_attempts")
+      .update({
+        status: "failed",
+        error_message: errorMessage,
+      })
+      .eq("request_id", message.requestId)
+      .eq("attempt_no", 1);
+
+    await supabaseAdmin.rpc("queue_delete", {
+      queue_name: "inference_polling",
+      message_id: row.msg_id,
+    });
+
+    return true;
+  }
 
   if (!result.done) {
     await supabaseAdmin.rpc("queue_delete", {
@@ -286,7 +430,7 @@ export async function processNextPollingJob() {
       requestId: message.requestId,
       workspaceId: message.workspaceId,
       apiKeyId: message.apiKeyId,
-      publicModelSlug: message.model,
+      publicModelSlug: message.publicModelSlug,
       endpoint: message.endpoint,
       totalCost: result.actualCost,
       statusCode: 200,
@@ -296,7 +440,7 @@ export async function processNextPollingJob() {
       requestId: message.requestId,
       workspaceId: message.workspaceId,
       amount: result.actualCost,
-      description: `${message.model} usage settlement`,
+      description: `${message.publicModelSlug} usage settlement`,
     });
   } else {
     await supabaseAdmin

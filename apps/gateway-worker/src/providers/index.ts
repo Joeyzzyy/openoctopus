@@ -1,9 +1,11 @@
+import { GeminiDirectImageAdapter } from "./gemini-direct-image.js";
 import type { ProviderAdapter } from "./types.js";
 import { PartnerProviderAAdapter } from "./partner-provider-a.js";
 import { WaveSpeedImageAdapter } from "./wavespeed-image.js";
 import { WaveSpeedVideoAdapter } from "./wavespeed-video.js";
 
 const adapters: ProviderAdapter[] = [
+  new GeminiDirectImageAdapter(),
   new WaveSpeedImageAdapter(),
   new WaveSpeedVideoAdapter(),
   new PartnerProviderAAdapter(),

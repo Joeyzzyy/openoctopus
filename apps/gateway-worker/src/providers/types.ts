@@ -1,11 +1,25 @@
 export type Capability = "image_generation" | "image_edit" | "video_generation";
 
+export type ProviderRuntimeContext = {
+  slug: string;
+  baseUrl: string | null;
+  config: Record<string, unknown> | null;
+  secret: string;
+};
+
 export type SubmitRequestInput = {
   requestId: string;
   capability: Capability;
   publicModelSlug: string;
+  upstreamModelSlug: string;
   prompt?: string;
   input: Record<string, unknown>;
+  provider: ProviderRuntimeContext;
+};
+
+export type PollRequestInput = {
+  upstreamTaskId: string;
+  provider: ProviderRuntimeContext;
 };
 
 export type SubmitRequestResult =
@@ -47,5 +61,5 @@ export type PollRequestResult =
 export interface ProviderAdapter {
   slug: string;
   submit(input: SubmitRequestInput): Promise<SubmitRequestResult>;
-  poll?(upstreamTaskId: string): Promise<PollRequestResult>;
+  poll?(input: PollRequestInput): Promise<PollRequestResult>;
 }

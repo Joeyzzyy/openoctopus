@@ -44,6 +44,17 @@ begin
   end if;
 end $$;
 
+alter table public.supported_models
+add column if not exists capability public.request_capability;
+
+update public.supported_models
+set capability = case
+  when modality = 'image' then 'image_generation'::public.request_capability
+  when modality = 'video' then 'video_generation'::public.request_capability
+  else null
+end
+where capability is null;
+
 create table if not exists public.providers (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
@@ -57,6 +68,58 @@ create table if not exists public.providers (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+create table if not exists public.provider_credentials (
+  id uuid primary key default gen_random_uuid(),
+  provider_id uuid not null references public.providers(id) on delete cascade,
+  label text not null,
+  secret_ref text,
+  secret_ciphertext text,
+  secret_iv text,
+  secret_auth_tag text,
+  secret_mask text,
+  secret_source text not null default 'internal_encrypted',
+  secret_key_version integer not null default 1,
+  secret_last_updated_at timestamptz not null default timezone('utc', now()),
+  environment text not null default 'production',
+  is_active boolean not null default true,
+  notes text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.provider_credentials
+  alter column secret_ref drop not null;
+
+alter table public.provider_credentials
+  add column if not exists secret_ciphertext text,
+  add column if not exists secret_iv text,
+  add column if not exists secret_auth_tag text,
+  add column if not exists secret_mask text,
+  add column if not exists secret_source text not null default 'internal_encrypted',
+  add column if not exists secret_key_version integer not null default 1,
+  add column if not exists secret_last_updated_at timestamptz not null default timezone('utc', now());
+
+update public.provider_credentials
+set
+  secret_source = case
+    when secret_ciphertext is not null then 'internal_encrypted'
+    else 'external_ref'
+  end,
+  secret_mask = case
+    when secret_mask is not null then secret_mask
+    when secret_ref is not null then '[legacy external secret reference]'
+    else secret_mask
+  end,
+  secret_last_updated_at = coalesce(secret_last_updated_at, updated_at, created_at, timezone('utc', now()))
+where
+  secret_source is distinct from case
+    when secret_ciphertext is not null then 'internal_encrypted'
+    else 'external_ref'
+  end
+  or secret_mask is null
+  or secret_last_updated_at is null;
 
 create table if not exists public.provider_models (
   id uuid primary key default gen_random_uuid(),
@@ -162,17 +225,36 @@ create table if not exists public.webhook_deliveries (
   created_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.admin_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  actor_user_id uuid references auth.users(id) on delete set null,
+  workspace_id uuid references public.workspaces(id) on delete set null,
+  action text not null,
+  target_type text not null,
+  target_id text,
+  summary text not null,
+  details jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
 create index if not exists idx_provider_models_public_model on public.provider_models(public_model_slug, capability);
+create index if not exists idx_provider_credentials_provider on public.provider_credentials(provider_id, created_at desc);
 create index if not exists idx_routing_rules_workspace_model on public.routing_rules(workspace_id, public_model_slug, capability);
 create index if not exists idx_inference_requests_workspace_created on public.inference_requests(workspace_id, created_at desc);
 create index if not exists idx_inference_requests_status_created on public.inference_requests(status, created_at desc);
 create index if not exists idx_inference_requests_api_key_created on public.inference_requests(api_key_id, created_at desc);
 create index if not exists idx_provider_attempts_request_created on public.provider_attempts(request_id, created_at asc);
 create index if not exists idx_generated_assets_request on public.generated_assets(request_id);
+create index if not exists idx_admin_audit_logs_workspace_created on public.admin_audit_logs(workspace_id, created_at desc);
 
 drop trigger if exists set_providers_updated_at on public.providers;
 create trigger set_providers_updated_at
 before update on public.providers
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_provider_credentials_updated_at on public.provider_credentials;
+create trigger set_provider_credentials_updated_at
+before update on public.provider_credentials
 for each row execute function public.set_updated_at();
 
 drop trigger if exists set_provider_models_updated_at on public.provider_models;
@@ -209,187 +291,5 @@ exception when others then
   null;
 end $$;
 
-insert into public.providers (name, slug, kind, base_url, regions, status)
-values
-  ('WaveSpeed Images', 'wavespeed-images', 'wavespeed', 'https://api.wavespeed.ai', array['sgp1', 'us-west'], 'healthy'),
-  ('WaveSpeed Video', 'wavespeed-video', 'wavespeed', 'https://api.wavespeed.ai', array['sgp1'], 'healthy'),
-  ('Partner Provider A', 'partner-provider-a', 'partner', 'https://api.partner-a.example', array['us-east'], 'degraded')
-on conflict (slug) do nothing;
-
-insert into public.supported_models (
-  provider,
-  model_slug,
-  display_name,
-  modality,
-  unit_label,
-  default_unit_cost,
-  active
-)
-values
-  ('OpenOctopus', 'openoctopus/seedream-4.5', 'Seedream 4.5', 'image', 'image', 0.010000, true),
-  ('OpenOctopus', 'openoctopus/kling-v3-motion', 'Kling V3 Motion', 'video', 'job', 0.800000, true),
-  ('OpenOctopus', 'openoctopus/flux-kontext-edit', 'Flux Kontext Edit', 'image', 'image', 0.009000, true)
-on conflict (model_slug) do nothing;
-
-insert into public.provider_models (
-  provider_id,
-  supported_model_id,
-  public_model_slug,
-  upstream_model_slug,
-  capability
-)
-select
-  p.id,
-  sm.id,
-  'openoctopus/seedream-4.5',
-  'seedream-v4.5',
-  'image_generation'
-from public.providers p
-join public.supported_models sm on sm.model_slug = 'openoctopus/seedream-4.5'
-where p.slug = 'wavespeed-images'
-on conflict (provider_id, upstream_model_slug) do nothing;
-
-insert into public.provider_models (
-  provider_id,
-  supported_model_id,
-  public_model_slug,
-  upstream_model_slug,
-  capability
-)
-select
-  p.id,
-  sm.id,
-  'openoctopus/kling-v3-motion',
-  'kling-v3-motion',
-  'video_generation'
-from public.providers p
-join public.supported_models sm on sm.model_slug = 'openoctopus/kling-v3-motion'
-where p.slug = 'wavespeed-video'
-on conflict (provider_id, upstream_model_slug) do nothing;
-
-insert into public.provider_models (
-  provider_id,
-  supported_model_id,
-  public_model_slug,
-  upstream_model_slug,
-  capability
-)
-select
-  p.id,
-  sm.id,
-  'openoctopus/flux-kontext-edit',
-  'flux-edit',
-  'image_edit'
-from public.providers p
-join public.supported_models sm on sm.model_slug = 'openoctopus/flux-kontext-edit'
-where p.slug = 'partner-provider-a'
-on conflict (provider_id, upstream_model_slug) do nothing;
-
-insert into public.provider_models (
-  provider_id,
-  supported_model_id,
-  public_model_slug,
-  upstream_model_slug,
-  capability
-)
-select
-  p.id,
-  sm.id,
-  'openoctopus/flux-kontext-edit',
-  'seedream-edit',
-  'image_edit'
-from public.providers p
-join public.supported_models sm on sm.model_slug = 'openoctopus/flux-kontext-edit'
-where p.slug = 'wavespeed-images'
-on conflict (provider_id, upstream_model_slug) do nothing;
-
-insert into public.routing_rules (
-  workspace_id,
-  capability,
-  public_model_slug,
-  primary_provider_model_id,
-  fallback_provider_model_id,
-  route_strategy,
-  active
-)
-select
-  null,
-  'image_generation',
-  'openoctopus/seedream-4.5',
-  primary_model.id,
-  null,
-  'primary_then_fallback',
-  true
-from public.provider_models primary_model
-join public.providers p on p.id = primary_model.provider_id
-where p.slug = 'wavespeed-images'
-  and primary_model.public_model_slug = 'openoctopus/seedream-4.5'
-  and not exists (
-    select 1
-    from public.routing_rules rr
-    where rr.workspace_id is null
-      and rr.capability = 'image_generation'
-      and rr.public_model_slug = 'openoctopus/seedream-4.5'
-  );
-
-insert into public.routing_rules (
-  workspace_id,
-  capability,
-  public_model_slug,
-  primary_provider_model_id,
-  fallback_provider_model_id,
-  route_strategy,
-  active
-)
-select
-  null,
-  'video_generation',
-  'openoctopus/kling-v3-motion',
-  primary_model.id,
-  null,
-  'primary_only',
-  true
-from public.provider_models primary_model
-join public.providers p on p.id = primary_model.provider_id
-where p.slug = 'wavespeed-video'
-  and primary_model.public_model_slug = 'openoctopus/kling-v3-motion'
-  and not exists (
-    select 1
-    from public.routing_rules rr
-    where rr.workspace_id is null
-      and rr.capability = 'video_generation'
-      and rr.public_model_slug = 'openoctopus/kling-v3-motion'
-  );
-
-insert into public.routing_rules (
-  workspace_id,
-  capability,
-  public_model_slug,
-  primary_provider_model_id,
-  fallback_provider_model_id,
-  route_strategy,
-  active
-)
-select
-  null,
-  'image_edit',
-  'openoctopus/flux-kontext-edit',
-  primary_model.id,
-  fallback_model.id,
-  'route_by_capability_tag'
-  ,
-  true
-from public.provider_models primary_model
-join public.providers primary_provider on primary_provider.id = primary_model.provider_id
-left join public.provider_models fallback_model on fallback_model.public_model_slug = 'openoctopus/flux-kontext-edit'
-left join public.providers fallback_provider on fallback_provider.id = fallback_model.provider_id
-where primary_provider.slug = 'partner-provider-a'
-  and primary_model.public_model_slug = 'openoctopus/flux-kontext-edit'
-  and fallback_provider.slug = 'wavespeed-images'
-  and not exists (
-    select 1
-    from public.routing_rules rr
-    where rr.workspace_id is null
-      and rr.capability = 'image_edit'
-      and rr.public_model_slug = 'openoctopus/flux-kontext-edit'
-  );
+-- Intentionally no provider/model/routing seed data here.
+-- The internal admin dashboard is the source of truth for real provider onboarding.

@@ -8,8 +8,8 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8080),
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  INTERNAL_SECRET_ENCRYPTION_KEY: z.string().min(1),
   OPENOCTOPUS_API_KEY_SALT: z.string().min(1),
-  WAVESPEED_API_KEY: z.string().min(1),
   WAVESPEED_BASE_URL: z.string().url().default("https://api.wavespeed.ai"),
   WAVESPEED_IMAGE_SUBMIT_PATH: z.string().min(1).default("/v1/images/generations"),
   WAVESPEED_IMAGE_STATUS_PATH: z.string().min(1).default("/v1/predictions/{taskId}"),
@@ -19,7 +19,6 @@ const envSchema = z.object({
   WAVESPEED_IMAGE_STATUS_FIELD: z.string().default("status"),
   WAVESPEED_IMAGE_TASK_ID_FIELD: z.string().default("id"),
   WAVESPEED_IMAGE_REQUEST_ID_FIELD: z.string().default("id"),
-  PARTNER_PROVIDER_A_API_KEY: z.string().min(1),
 });
 
 export const env = envSchema.parse(process.env);
