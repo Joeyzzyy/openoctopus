@@ -368,27 +368,17 @@ export default async function InternalPage({
 
       <div className="relative mx-auto max-w-7xl px-4 pb-10 xl:px-0">
         <section className="min-h-[calc(100vh-108px)] py-8">
-          <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="mb-6">
             <div>
-              <p className="text-[11px] tracking-[0.35px] text-black/45">Internal Control</p>
               <h1 className="mt-2 text-3xl font-semibold leading-none text-[#111111]">
                 Internal Control Plane
               </h1>
               <p className="mt-2 text-sm text-black/55">
                 Real provider onboarding, routing, credentials, and execution visibility.
               </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex h-9 items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80">
-                <span>{data.workspace.name}</span>
-              </div>
-              <div className="inline-flex h-9 items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80">
-                <span>{data.role}</span>
-              </div>
-              <div className="inline-flex h-9 items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80">
-                <span>{data.user.name}</span>
-              </div>
+              <p className="mt-3 text-xs text-black/42">
+                {data.workspace.name} · {data.role}
+              </p>
             </div>
           </div>
 
@@ -486,6 +476,143 @@ export default async function InternalPage({
                         </div>
                       </div>
                     </div>
+                  </div>
+                </SectionShell>
+              </section>
+
+              <section className="mb-6">
+                <SectionShell
+                  id="customer-economics-panel"
+                  title="Customer Economics"
+                  description="Current workspace revenue, estimated internal cost, and profit by API key."
+                >
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[820px] text-sm">
+                      <thead>
+                        <tr className="border-b border-black/10 text-left">
+                          <th className="py-3 pr-4 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
+                            Customer
+                          </th>
+                          <th className="py-3 pr-4 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
+                            Revenue
+                          </th>
+                          <th className="py-3 pr-4 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
+                            Cost
+                          </th>
+                          <th className="py-3 pr-4 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
+                            Profit
+                          </th>
+                          <th className="py-3 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
+                            Requests
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b border-black/10 bg-[#faf9f6] align-top">
+                          <td className="py-4 pr-4">
+                            <div>
+                              <p className="font-medium text-black">
+                                {data.customerEconomics.customerName}
+                              </p>
+                              <p className="mt-1 text-xs text-black/45">
+                                {data.customerEconomics.workspaceSlug}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="py-4 pr-4 font-mono text-black">
+                            {data.customerEconomics.revenueLabel}
+                          </td>
+                          <td className="py-4 pr-4 font-mono text-black/70">
+                            {data.customerEconomics.costLabel}
+                          </td>
+                          <td className="py-4 pr-4 font-mono text-black">
+                            {data.customerEconomics.profitLabel}
+                          </td>
+                          <td className="py-4 font-mono text-black/70">
+                            {data.customerEconomics.requestCount}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td colSpan={5} className="px-0 py-0">
+                            <div className="border-b border-black/10 bg-white px-4 py-4">
+                              <p className="mb-3 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
+                                API Key Breakdown
+                              </p>
+                              <table className="w-full min-w-[760px] text-sm">
+                                <thead>
+                                  <tr className="border-b border-black/8 text-left">
+                                    <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                                      Key
+                                    </th>
+                                    <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                                      Environment
+                                    </th>
+                                    <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                                      Revenue
+                                    </th>
+                                    <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                                      Cost
+                                    </th>
+                                    <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                                      Profit
+                                    </th>
+                                    <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                                      Requests
+                                    </th>
+                                    <th className="py-2 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                                      Created
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {data.customerEconomics.keys.length > 0 ? (
+                                    data.customerEconomics.keys.map((key) => (
+                                      <tr key={key.id} className="border-b border-black/6">
+                                        <td className="py-3 pr-4">
+                                          <div>
+                                            <p className="font-medium text-black">{key.name}</p>
+                                            <p className="mt-1 font-mono text-[11px] text-black/40">
+                                              {key.keyPrefix}
+                                            </p>
+                                          </div>
+                                        </td>
+                                        <td className="py-3 pr-4 text-black/60">
+                                          {key.environment}
+                                        </td>
+                                        <td className="py-3 pr-4 font-mono text-black">
+                                          {key.revenueLabel}
+                                        </td>
+                                        <td className="py-3 pr-4 font-mono text-black/70">
+                                          {key.costLabel}
+                                        </td>
+                                        <td className="py-3 pr-4 font-mono text-black">
+                                          {key.profitLabel}
+                                        </td>
+                                        <td className="py-3 pr-4 font-mono text-black/60">
+                                          {key.requestCount}
+                                        </td>
+                                        <td className="py-3 font-mono text-black/40">
+                                          {key.createdLabel}
+                                        </td>
+                                      </tr>
+                                    ))
+                                  ) : (
+                                    <tr>
+                                      <td
+                                        colSpan={7}
+                                        className="py-8 text-center text-sm text-black/45"
+                                      >
+                                        No API key economics yet
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </SectionShell>
               </section>

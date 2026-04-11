@@ -60,6 +60,7 @@ type RoutingRuleRow = {
 
 type RequestRow = {
   id: string;
+  api_key_id: string | null;
   capability: string;
   public_model_slug: string;
   provider_id: string | null;
@@ -86,6 +87,28 @@ type AttemptRow = {
   latency_ms: number | null;
   error_message: string | null;
   created_at: string;
+};
+
+type ApiKeyRow = {
+  id: string;
+  name: string;
+  key_prefix: string;
+  environment: string;
+  status: string;
+  created_at: string;
+};
+
+type ApiKeySpendSummaryRow = {
+  api_key_id: string;
+  workspace_id: string;
+  current_month_spend: number | null;
+  current_month_requests: number | null;
+};
+
+type RequestCostRow = {
+  api_key_id: string | null;
+  estimated_cost: number | null;
+  actual_cost: number | null;
 };
 
 type ProviderCredentialRow = {
@@ -153,6 +176,15 @@ function formatRelativeTimestamp(value: string | null) {
   }).format(date);
 }
 
+function formatCurrency(value: number | null | undefined) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value ?? 0);
+}
+
 export async function getInternalAdminData() {
   const supabase = await createClient();
   const {
@@ -193,6 +225,9 @@ export async function getInternalAdminData() {
   const workspaceRelation = Array.isArray(membership.workspaces)
     ? membership.workspaces[0]
     : membership.workspaces;
+  const currentMonthStart = new Date();
+  currentMonthStart.setUTCDate(1);
+  currentMonthStart.setUTCHours(0, 0, 0, 0);
 
   const [
     providersResponse,
@@ -201,6 +236,9 @@ export async function getInternalAdminData() {
     providerModelsResponse,
     routingRulesResponse,
     requestsResponse,
+    apiKeysResponse,
+    apiKeySpendSummaryResponse,
+    requestCostResponse,
     attemptsResponse,
     adminAuditLogsResponse,
   ] =
@@ -239,10 +277,25 @@ export async function getInternalAdminData() {
       supabase
         .from("inference_requests")
         .select(
-          "id, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, error_code, error_message, created_at, started_at, completed_at"
+          "id, api_key_id, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, error_code, error_message, created_at, started_at, completed_at"
         )
+        .eq("workspace_id", membership.workspace_id)
         .order("created_at", { ascending: false })
         .limit(20),
+      supabase
+        .from("api_keys")
+        .select("id, name, key_prefix, environment, status, created_at")
+        .eq("workspace_id", membership.workspace_id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("v_api_key_spend_summary")
+        .select("api_key_id, workspace_id, current_month_spend, current_month_requests")
+        .eq("workspace_id", membership.workspace_id),
+      supabase
+        .from("inference_requests")
+        .select("api_key_id, estimated_cost, actual_cost")
+        .eq("workspace_id", membership.workspace_id)
+        .gte("created_at", currentMonthStart.toISOString()),
       supabase
         .from("provider_attempts")
         .select(
@@ -270,6 +323,13 @@ export async function getInternalAdminData() {
   const providerModels = (providerModelsResponse.error ? [] : providerModelsResponse.data ?? []) as ProviderModelRow[];
   const routingRules = (routingRulesResponse.error ? [] : routingRulesResponse.data ?? []) as RoutingRuleRow[];
   const requests = (requestsResponse.error ? [] : requestsResponse.data ?? []) as RequestRow[];
+  const apiKeys = (apiKeysResponse.error ? [] : apiKeysResponse.data ?? []) as ApiKeyRow[];
+  const apiKeySpendSummaries = (apiKeySpendSummaryResponse.error
+    ? []
+    : apiKeySpendSummaryResponse.data ?? []) as ApiKeySpendSummaryRow[];
+  const requestCosts = (requestCostResponse.error
+    ? []
+    : requestCostResponse.data ?? []) as RequestCostRow[];
   const attempts = (attemptsResponse.error ? [] : attemptsResponse.data ?? []) as AttemptRow[];
   const adminAuditLogs = (adminAuditLogsResponse.error
     ? []
@@ -278,6 +338,7 @@ export async function getInternalAdminData() {
   const providerById = new Map(providers.map((row) => [row.id, row]));
   const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
   const supportedModelById = new Map(supportedModels.map((row) => [row.id, row]));
+  const apiKeySpendById = new Map(apiKeySpendSummaries.map((row) => [row.api_key_id, row]));
 
   const requestAttempts = new Map<string, AttemptRow[]>();
   for (const attempt of attempts) {
@@ -401,6 +462,58 @@ export async function getInternalAdminData() {
     };
   });
 
+  const requestCostByApiKeyId = requestCosts.reduce((map, request) => {
+    if (!request.api_key_id) {
+      return map;
+    }
+
+    map.set(
+      request.api_key_id,
+      (map.get(request.api_key_id) ?? 0) +
+        Number(request.actual_cost ?? request.estimated_cost ?? 0)
+    );
+
+    return map;
+  }, new Map<string, number>());
+
+  const keyEconomics = apiKeys.map((apiKey) => {
+    const spendSummary = apiKeySpendById.get(apiKey.id);
+    const cost = requestCostByApiKeyId.get(apiKey.id) ?? 0;
+    const revenue = Number(spendSummary?.current_month_spend ?? 0);
+    const requestCount = Number(spendSummary?.current_month_requests ?? 0);
+
+    return {
+      id: apiKey.id,
+      name: apiKey.name,
+      keyPrefix: apiKey.key_prefix,
+      environment: apiKey.environment,
+      status: apiKey.status,
+      revenue,
+      cost,
+      profit: revenue - cost,
+      requestCount,
+      createdLabel: formatRelativeTimestamp(apiKey.created_at),
+    };
+  });
+
+  const customerEconomics = {
+    customerName: workspaceRelation?.name ?? "Workspace",
+    workspaceSlug: workspaceRelation?.slug ?? "workspace",
+    revenue: keyEconomics.reduce((sum, key) => sum + key.revenue, 0),
+    cost: keyEconomics.reduce((sum, key) => sum + key.cost, 0),
+    profit: keyEconomics.reduce((sum, key) => sum + key.profit, 0),
+    requestCount: keyEconomics.reduce((sum, key) => sum + key.requestCount, 0),
+    keys: keyEconomics.map((key) => ({
+      ...key,
+      revenueLabel: formatCurrency(key.revenue),
+      costLabel: formatCurrency(key.cost),
+      profitLabel: formatCurrency(key.profit),
+    })),
+    revenueLabel: formatCurrency(keyEconomics.reduce((sum, key) => sum + key.revenue, 0)),
+    costLabel: formatCurrency(keyEconomics.reduce((sum, key) => sum + key.cost, 0)),
+    profitLabel: formatCurrency(keyEconomics.reduce((sum, key) => sum + key.profit, 0)),
+  };
+
   return {
     authorized: true as const,
     user: {
@@ -435,5 +548,6 @@ export async function getInternalAdminData() {
     routingRules: routingRuleSummaries,
     requests: recentRequestSummaries,
     auditLogs: auditLogSummaries,
+    customerEconomics,
   };
 }
