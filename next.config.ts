@@ -22,8 +22,8 @@ const nextConfig: NextConfig = {
           basePath: false,
         },
         {
-          source: "/tools/:slug",
-          destination: "https://openoctopus-tools.vercel.app/tools/:slug",
+          source: "/tools/:path*",
+          destination: "https://openoctopus-tools.vercel.app/tools/:path*",
           basePath: false,
         },
       ],
