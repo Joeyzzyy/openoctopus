@@ -5,6 +5,7 @@ import { persistGeneratedAssets } from "../services/assets-service.js";
 import {
   recordUsageEvent,
   recordWalletSettlement,
+  resolveBillableCost,
 } from "../services/billing-service.js";
 
 type QueueMessage = {
@@ -36,6 +37,7 @@ type PollingMessage = {
   publicModelSlug: string;
   upstreamModelSlug: string;
   endpoint: string;
+  input: Record<string, unknown>;
   upstreamTaskId: string;
 };
 
@@ -206,7 +208,14 @@ export async function processNextInferenceJob() {
   }
 
   if (result.mode === "sync") {
-    const totalCost = Number(result.estimatedCost ?? 0);
+    const totalCost = await resolveBillableCost({
+      publicModelSlug: message.publicModelSlug,
+      requestInput: message.input,
+      output: result.output,
+      providerRaw: typeof result.output.raw === "object" && result.output.raw !== null && !Array.isArray(result.output.raw)
+        ? (result.output.raw as Record<string, unknown>)
+        : null,
+    });
     await supabaseAdmin
       .from("inference_requests")
       .update({
@@ -252,12 +261,16 @@ export async function processNextInferenceJob() {
       description: `${message.publicModelSlug} usage settlement`,
     });
   } else {
+    const estimatedCost = await resolveBillableCost({
+      publicModelSlug: message.publicModelSlug,
+      requestInput: message.input,
+    });
     await supabaseAdmin
       .from("inference_requests")
       .update({
         status: "processing",
         started_at: new Date().toISOString(),
-        estimated_cost: result.estimatedCost,
+        estimated_cost: estimatedCost,
       })
       .eq("id", message.requestId);
 
@@ -286,6 +299,7 @@ export async function processNextInferenceJob() {
         publicModelSlug: message.publicModelSlug,
         upstreamModelSlug: message.upstreamModelSlug,
         endpoint: message.endpoint,
+        input: message.input,
         upstreamTaskId: result.upstreamTaskId,
       },
     });
@@ -401,12 +415,18 @@ export async function processNextPollingJob() {
   }
 
   if (result.success) {
+    const totalCost = await resolveBillableCost({
+      publicModelSlug: message.publicModelSlug,
+      requestInput: message.input,
+      output: result.output,
+      providerRaw: result.raw,
+    });
     await supabaseAdmin
       .from("inference_requests")
       .update({
         status: "succeeded",
         output_payload: result.output,
-        actual_cost: result.actualCost,
+        actual_cost: totalCost,
         completed_at: new Date().toISOString(),
       })
       .eq("id", message.requestId);
@@ -432,14 +452,14 @@ export async function processNextPollingJob() {
       apiKeyId: message.apiKeyId,
       publicModelSlug: message.publicModelSlug,
       endpoint: message.endpoint,
-      totalCost: result.actualCost,
+      totalCost,
       statusCode: 200,
     });
 
     await recordWalletSettlement({
       requestId: message.requestId,
       workspaceId: message.workspaceId,
-      amount: result.actualCost,
+      amount: totalCost,
       description: `${message.publicModelSlug} usage settlement`,
     });
   } else {

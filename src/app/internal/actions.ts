@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod/v4";
+import { deriveLegacyBillingFields, parseBillingConfig } from "@/lib/billing-config";
 import { encryptProviderSecret } from "@/lib/provider-secret-crypto";
 import { createClient } from "@/lib/supabase/server";
 
@@ -51,6 +52,18 @@ function parseJsonField(value: FormDataEntryValue | null, fallback: Record<strin
   }
 
   return parsed as Record<string, unknown>;
+}
+
+function parseBillingConfigField(value: FormDataEntryValue | null) {
+  const config = parseBillingConfig(parseJsonField(value));
+  return {
+    config,
+    legacyFields: deriveLegacyBillingFields(config),
+  };
+}
+
+function assertBillingConfig(value: unknown) {
+  parseBillingConfig(value);
 }
 
 async function getInternalAdminContext() {
@@ -456,8 +469,7 @@ const createSupportedModelSchema = z.object({
   displayName: z.string().min(2).max(120),
   modality: modalitySchema,
   capability: capabilitySchema,
-  unitLabel: z.string().min(1).max(40),
-  defaultUnitCost: z.coerce.number().min(0).max(1000000),
+  billingConfig: z.unknown(),
   active: z.boolean(),
 });
 
@@ -469,10 +481,11 @@ export async function createSupportedModel(formData: FormData) {
     displayName: formData.get("displayName"),
     modality: formData.get("modality"),
     capability: formData.get("capability"),
-    unitLabel: formData.get("unitLabel"),
-    defaultUnitCost: formData.get("defaultUnitCost"),
+    billingConfig: parseBillingConfigField(formData.get("billingConfig")).config,
     active: parseBooleanField(formData.get("active")),
   });
+  const billingConfig = parseBillingConfig(parsed.billingConfig);
+  const legacyBillingFields = deriveLegacyBillingFields(billingConfig);
 
   const invalidCapabilityForModality =
     (parsed.modality === "image" &&
@@ -491,8 +504,9 @@ export async function createSupportedModel(formData: FormData) {
       display_name: parsed.displayName,
       modality: parsed.modality,
       capability: parsed.capability,
-      unit_label: parsed.unitLabel,
-      default_unit_cost: parsed.defaultUnitCost,
+      billing_config: billingConfig,
+      unit_label: legacyBillingFields.unitLabel,
+      default_unit_cost: legacyBillingFields.defaultUnitCost,
       active: parsed.active,
     })
     .select("id")
@@ -510,7 +524,10 @@ export async function createSupportedModel(formData: FormData) {
     targetType: "supported_model",
     targetId: data?.id ?? null,
     summary: `Created public model ${parsed.modelSlug}`,
-    details: parsed,
+    details: {
+      ...parsed,
+      billingConfig,
+    },
   });
 
   revalidatePath("/internal");
@@ -527,6 +544,24 @@ export async function updateSupportedModelState(formData: FormData) {
     supportedModelId: formData.get("supportedModelId"),
     active: parseBooleanField(formData.get("active")),
   });
+
+  if (parsed.active) {
+    const { data: modelRow, error: modelError } = await supabase
+      .from("supported_models")
+      .select("billing_config")
+      .eq("id", parsed.supportedModelId)
+      .maybeSingle();
+
+    if (modelError) {
+      throw new Error(modelError.message);
+    }
+
+    if (!modelRow) {
+      throw new Error("Supported model is missing");
+    }
+
+    assertBillingConfig(modelRow.billing_config);
+  }
 
   const { error } = await supabase
     .from("supported_models")
@@ -546,6 +581,50 @@ export async function updateSupportedModelState(formData: FormData) {
     targetId: parsed.supportedModelId,
     summary: `${parsed.active ? "Activated" : "Deactivated"} public model`,
     details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+const updateSupportedModelPricingSchema = z.object({
+  supportedModelId: z.string().uuid(),
+  billingConfig: z.unknown(),
+});
+
+export async function updateSupportedModelPricing(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = updateSupportedModelPricingSchema.parse({
+    supportedModelId: formData.get("supportedModelId"),
+    billingConfig: parseBillingConfigField(formData.get("billingConfig")).config,
+  });
+  const billingConfig = parseBillingConfig(parsed.billingConfig);
+  const legacyBillingFields = deriveLegacyBillingFields(billingConfig);
+
+  const { error } = await supabase
+    .from("supported_models")
+    .update({
+      billing_config: billingConfig,
+      unit_label: legacyBillingFields.unitLabel,
+      default_unit_cost: legacyBillingFields.defaultUnitCost,
+    })
+    .eq("id", parsed.supportedModelId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "supported_model.pricing.update",
+    targetType: "supported_model",
+    targetId: parsed.supportedModelId,
+    summary: `Updated public model billing config`,
+    details: {
+      ...parsed,
+      billingConfig,
+    },
   });
 
   revalidatePath("/internal");
@@ -577,7 +656,7 @@ export async function createProviderModel(formData: FormData) {
 
   const { data: supportedModelRow, error: supportedModelError } = await supabase
     .from("supported_models")
-    .select("model_slug, capability")
+    .select("model_slug, capability, billing_config")
     .eq("id", parsed.supportedModelId)
     .maybeSingle();
 
@@ -592,6 +671,8 @@ export async function createProviderModel(formData: FormData) {
   if (supportedModelRow.capability !== parsed.capability) {
     throw new Error("Provider model capability must match the selected public model capability");
   }
+
+  assertBillingConfig(supportedModelRow.billing_config);
 
   const { data, error } = await supabase
     .from("provider_models")
@@ -692,7 +773,7 @@ export async function createRoutingRule(formData: FormData) {
 
   const { data: supportedModelRow, error: supportedModelError } = await supabase
     .from("supported_models")
-    .select("model_slug, capability")
+    .select("model_slug, capability, billing_config")
     .eq("id", parsed.supportedModelId)
     .maybeSingle();
 
@@ -707,6 +788,8 @@ export async function createRoutingRule(formData: FormData) {
   if (supportedModelRow.capability !== parsed.capability) {
     throw new Error("Routing capability must match the selected public model capability");
   }
+
+  assertBillingConfig(supportedModelRow.billing_config);
 
   const providerModelIds = [
     parsed.primaryProviderModelId,

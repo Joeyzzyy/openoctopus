@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { parseBillingConfig } from "../lib/billing-config.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 
 type ProviderCredentialRow = {
@@ -111,6 +112,34 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     );
   }
 
+  const { data: supportedModelRow, error: supportedModelError } = await supabaseAdmin
+    .from("supported_models")
+    .select("billing_config, active")
+    .eq("model_slug", input.model)
+    .maybeSingle();
+
+  if (supportedModelError) {
+    throw new Error(supportedModelError.message);
+  }
+
+  if (!supportedModelRow?.active) {
+    throw new RequestValidationError(
+      `Model ${input.model} is not active`,
+      404,
+      "model_not_available"
+    );
+  }
+
+  try {
+    parseBillingConfig(supportedModelRow.billing_config);
+  } catch {
+    throw new RequestValidationError(
+      `Model ${input.model} is missing a valid billing configuration`,
+      409,
+      "model_billing_not_configured"
+    );
+  }
+
   const { data: providerModelRow, error: providerModelError } = await supabaseAdmin
     .from("provider_models")
     .select("id, provider_id, upstream_model_slug")
@@ -173,6 +202,15 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
 
   if (insertError) {
     throw new Error(insertError.message);
+  }
+
+  const { error: lastUsedError } = await supabaseAdmin
+    .from("api_keys")
+    .update({ last_used_at: new Date().toISOString() })
+    .eq("id", apiKeyRow.id);
+
+  if (lastUsedError) {
+    throw new Error(lastUsedError.message);
   }
 
   return {

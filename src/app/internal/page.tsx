@@ -15,13 +15,14 @@ import {
   createSupportedModel,
   deleteProviderCredential,
   rotateProviderCredentialSecret,
+  updateSupportedModelPricing,
   updateProviderCredentialState,
   updateProviderModelState,
   updateProviderStatus,
   updateRoutingRule,
   updateSupportedModelState,
 } from "./actions";
-import { CreateProviderModelForm, CreateRoutingRuleForm } from "./form-panels";
+import { BillingConfigEditor, CreateProviderModelForm, CreateRoutingRuleForm } from "./form-panels";
 import { SubmitButton } from "./submit-button";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -747,7 +748,7 @@ export default async function InternalPage({
                               <p className="mt-3 text-sm font-medium text-black">{model.display_name}</p>
                               <p className="mt-1 text-xs text-black/50">{model.model_slug}</p>
                               <p className="mt-1 text-xs text-black/50">
-                                unit: {model.unit_label} · default cost: {model.defaultUnitCost}
+                                billing: {model.billingSummary}
                               </p>
                             </div>
 
@@ -769,6 +770,16 @@ export default async function InternalPage({
                               Created: {model.createdLabel}
                             </div>
                           </div>
+
+                          <form action={updateSupportedModelPricing} className="mt-4 rounded-sm border border-black/8 bg-white p-3">
+                            <input type="hidden" name="supportedModelId" value={model.id} />
+                            <div className="grid gap-3">
+                              <BillingConfigEditor initialValue={model.billingConfigText} />
+                              <div className="flex justify-end">
+                                <SubmitButton label="Update billing" />
+                              </div>
+                            </div>
+                          </form>
                         </div>
                       ))
                     ) : (
@@ -822,21 +833,8 @@ export default async function InternalPage({
                         defaultValue="image_generation"
                         help="Operational capability family for this public model. Provider models and routes must match this."
                       />
-                      <Field
-                        label="Unit Label"
-                        name="unitLabel"
-                        defaultValue="image"
-                        help="Reporting or billing unit for this capability."
-                        example="image"
-                        required
-                      />
-                      <Field
-                        label="Default Unit Cost"
-                        name="defaultUnitCost"
-                        defaultValue="0"
-                        help="Optional baseline unit cost metadata."
-                        example="0.04"
-                        required
+                      <BillingConfigEditor
+                        initialValue={'{"billingMode":"per_image","currency":"USD","costPerImage":0.04}'}
                       />
                       <label className="flex items-center gap-3 rounded-sm border border-black/10 bg-white px-3 py-3 text-sm text-black/72">
                         <input type="checkbox" name="active" defaultChecked className="size-4 rounded border-black/20 bg-white accent-black" />

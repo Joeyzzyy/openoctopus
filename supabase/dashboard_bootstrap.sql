@@ -128,11 +128,42 @@ create table if not exists public.supported_models (
   model_slug text not null unique,
   display_name text not null,
   modality text not null,
+  billing_config jsonb not null default '{"billingMode":"per_request","currency":"USD","costPerRequest":0}'::jsonb,
   unit_label text not null,
   default_unit_cost numeric(12,6) not null default 0,
   active boolean not null default true,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.supported_models
+  add column if not exists billing_config jsonb not null default '{"billingMode":"per_request","currency":"USD","costPerRequest":0}'::jsonb;
+
+update public.supported_models
+set billing_config = case
+  when unit_label = 'image' then jsonb_build_object(
+    'billingMode', 'per_image',
+    'currency', 'USD',
+    'costPerImage', default_unit_cost
+  )
+  when unit_label = 'video' then jsonb_build_object(
+    'billingMode', 'per_video',
+    'currency', 'USD',
+    'costPerVideo', default_unit_cost
+  )
+  when unit_label = 'second' then jsonb_build_object(
+    'billingMode', 'per_second',
+    'currency', 'USD',
+    'costPerSecond', default_unit_cost
+  )
+  else jsonb_build_object(
+    'billingMode', 'per_request',
+    'currency', 'USD',
+    'costPerRequest', default_unit_cost
+  )
+end
+where billing_config is null
+   or billing_config = '{}'::jsonb
+   or not (billing_config ? 'billingMode');
 
 create table if not exists public.api_keys (
   id uuid primary key default gen_random_uuid(),

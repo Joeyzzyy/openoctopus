@@ -1,5 +1,6 @@
 import "server-only";
 
+import { parseBillingConfig, summarizeBillingConfig } from "@/lib/billing-config";
 import { createClient } from "@/lib/supabase/server";
 
 type AdminRole = "owner" | "admin";
@@ -24,6 +25,7 @@ type SupportedModelRow = {
   display_name: string;
   modality: "image" | "video" | "audio";
   capability: "image_generation" | "image_edit" | "video_generation" | null;
+  billing_config: Record<string, unknown> | null;
   unit_label: string;
   default_unit_cost: number;
   active: boolean;
@@ -121,6 +123,18 @@ function formatJson(value: Record<string, unknown> | null | undefined) {
   return JSON.stringify(value, null, 2);
 }
 
+function summarizeBilling(value: Record<string, unknown> | null | undefined) {
+  if (!value) {
+    return "missing billing config";
+  }
+
+  try {
+    return summarizeBillingConfig(parseBillingConfig(value));
+  } catch {
+    return "invalid billing config";
+  }
+}
+
 function formatRelativeTimestamp(value: string | null) {
   if (!value) {
     return "pending";
@@ -200,7 +214,7 @@ export async function getInternalAdminData() {
       supabase
         .from("supported_models")
         .select(
-          "id, provider, model_slug, display_name, modality, capability, unit_label, default_unit_cost, active, created_at"
+          "id, provider, model_slug, display_name, modality, capability, billing_config, unit_label, default_unit_cost, active, created_at"
         )
         .order("created_at", { ascending: true }),
       supabase
@@ -379,6 +393,8 @@ export async function getInternalAdminData() {
     return {
       ...model,
       defaultUnitCost: Number(model.default_unit_cost ?? 0),
+      billingConfigText: formatJson(model.billing_config),
+      billingSummary: summarizeBilling(model.billing_config),
       providerModelCount: linkedProviderModels.length,
       activeProviderModelCount: linkedProviderModels.filter((item) => item.active).length,
       createdLabel: formatRelativeTimestamp(model.created_at),
