@@ -13,6 +13,7 @@ import {
   createProvider,
   createProviderCredential,
   createSupportedModel,
+  deleteProviderCredential,
   rotateProviderCredentialSecret,
   updateProviderCredentialState,
   updateProviderModelState,
@@ -1139,6 +1140,15 @@ export default async function InternalPage({
                                 <input type="hidden" name="isActive" value={credential.is_active ? "false" : "true"} />
                                 <SubmitButton label={credential.is_active ? "Deactivate" : "Activate"} />
                               </form>
+                              <form action={deleteProviderCredential} className="flex items-center gap-2">
+                                <input type="hidden" name="credentialId" value={credential.id} />
+                                <SubmitButton
+                                  label="Delete"
+                                  pendingLabel="Deleting..."
+                                  disabled={credential.is_active}
+                                  tone="danger"
+                                />
+                              </form>
                             </div>
                           </div>
 
@@ -1147,6 +1157,15 @@ export default async function InternalPage({
                               <CircleAlert className="size-3.5 shrink-0 text-[#b54432]" />
                               <p className="text-xs leading-[1.35] text-[#b54432]">
                                 This is a legacy external reference only. Rotate it below before sending live traffic.
+                              </p>
+                            </div>
+                          ) : null}
+
+                          {credential.is_active ? (
+                            <div className="mt-4 flex items-center gap-1.5 bg-[#fff4df] px-3 py-2.5">
+                              <CircleAlert className="size-3.5 shrink-0 text-[#8a5a00]" />
+                              <p className="text-xs leading-[1.35] text-[#8a5a00]">
+                                Delete is only available after deactivation so queued traffic does not lose its credential.
                               </p>
                             </div>
                           ) : null}

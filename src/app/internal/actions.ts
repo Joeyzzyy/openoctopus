@@ -395,6 +395,61 @@ export async function rotateProviderCredentialSecret(formData: FormData) {
   revalidatePath("/internal");
 }
 
+const deleteProviderCredentialSchema = z.object({
+  credentialId: z.string().uuid(),
+});
+
+export async function deleteProviderCredential(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = deleteProviderCredentialSchema.parse({
+    credentialId: formData.get("credentialId"),
+  });
+
+  const { data: credentialRow, error: credentialError } = await supabase
+    .from("provider_credentials")
+    .select("id, label, provider_id, is_active")
+    .eq("id", parsed.credentialId)
+    .maybeSingle();
+
+  if (credentialError) {
+    throw new Error(credentialError.message);
+  }
+
+  if (!credentialRow) {
+    throw new Error("Provider credential is missing");
+  }
+
+  if (credentialRow.is_active) {
+    throw new Error("Deactivate this credential before deleting it");
+  }
+
+  const { error } = await supabase
+    .from("provider_credentials")
+    .delete()
+    .eq("id", parsed.credentialId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_credential.delete",
+    targetType: "provider_credential",
+    targetId: parsed.credentialId,
+    summary: `Deleted provider credential ${credentialRow.label}`,
+    details: {
+      credentialId: parsed.credentialId,
+      providerId: credentialRow.provider_id,
+      label: credentialRow.label,
+    },
+  });
+
+  revalidatePath("/internal");
+}
+
 const createSupportedModelSchema = z.object({
   provider: z.string().min(2).max(80),
   modelSlug: z.string().min(3).max(160),
