@@ -217,6 +217,65 @@ export async function updateProviderStatus(formData: FormData) {
   revalidatePath("/internal");
 }
 
+const updateProviderSchema = z.object({
+  providerId: z.string().uuid(),
+  name: z.string().min(2).max(80),
+  slug: z.string().min(2).max(80),
+  kind: providerKindSchema,
+  baseUrl: z.string().url().optional().or(z.literal("")),
+  status: providerStatusSchema,
+  regions: z.array(z.string()).default([]),
+  credentialsRef: z.string().max(200).optional().or(z.literal("")),
+  config: z.record(z.string(), z.unknown()).default({}),
+});
+
+export async function updateProvider(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+
+  const parsed = updateProviderSchema.parse({
+    providerId: formData.get("providerId"),
+    name: formData.get("name"),
+    slug: formData.get("slug"),
+    kind: formData.get("kind"),
+    baseUrl: normalizeOptionalText(formData.get("baseUrl")) ?? "",
+    status: formData.get("status"),
+    regions: parseStringArray(formData.get("regions")),
+    credentialsRef: normalizeOptionalText(formData.get("credentialsRef")) ?? "",
+    config: parseJsonField(formData.get("config")),
+  });
+
+  const { error } = await supabase
+    .from("providers")
+    .update({
+      name: parsed.name,
+      slug: parsed.slug,
+      kind: parsed.kind,
+      base_url: parsed.baseUrl || null,
+      status: parsed.status,
+      regions: parsed.regions,
+      credentials_ref: parsed.credentialsRef || null,
+      config: parsed.config,
+    })
+    .eq("id", parsed.providerId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider.update",
+    targetType: "provider",
+    targetId: parsed.providerId,
+    summary: `Updated provider ${parsed.slug}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
 const createProviderCredentialSchema = z.object({
   providerId: z.string().uuid(),
   label: z.string().min(2).max(120),
@@ -463,6 +522,83 @@ export async function deleteProviderCredential(formData: FormData) {
   revalidatePath("/internal");
 }
 
+const updateProviderCredentialDetailsSchema = z.object({
+  credentialId: z.string().uuid(),
+  label: z.string().min(2).max(120),
+  secretRef: z.string().max(240).optional().or(z.literal("")),
+  environment: z.string().min(2).max(40),
+  notes: z.string().max(2000).optional().or(z.literal("")),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+  isActive: z.boolean(),
+});
+
+export async function updateProviderCredentialDetails(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = updateProviderCredentialDetailsSchema.parse({
+    credentialId: formData.get("credentialId"),
+    label: formData.get("label"),
+    secretRef: normalizeOptionalText(formData.get("secretRef")) ?? "",
+    environment: formData.get("environment"),
+    notes: normalizeOptionalText(formData.get("notes")) ?? "",
+    metadata: parseJsonField(formData.get("metadata")),
+    isActive: parseBooleanField(formData.get("isActive")),
+  });
+
+  const { data: credentialRow, error: credentialRowError } = await supabase
+    .from("provider_credentials")
+    .select("provider_id")
+    .eq("id", parsed.credentialId)
+    .maybeSingle();
+
+  if (credentialRowError) {
+    throw new Error(credentialRowError.message);
+  }
+
+  if (!credentialRow) {
+    throw new Error("Provider credential is missing");
+  }
+
+  if (parsed.isActive) {
+    const { error: deactivateError } = await supabase
+      .from("provider_credentials")
+      .update({ is_active: false })
+      .eq("provider_id", credentialRow.provider_id);
+
+    if (deactivateError) {
+      throw new Error(deactivateError.message);
+    }
+  }
+
+  const { error } = await supabase
+    .from("provider_credentials")
+    .update({
+      label: parsed.label,
+      secret_ref: parsed.secretRef || null,
+      environment: parsed.environment,
+      notes: parsed.notes || null,
+      metadata: parsed.metadata,
+      is_active: parsed.isActive,
+    })
+    .eq("id", parsed.credentialId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_credential.update",
+    targetType: "provider_credential",
+    targetId: parsed.credentialId,
+    summary: `Updated provider credential ${parsed.label}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
 const createSupportedModelSchema = z.object({
   provider: z.string().min(2).max(80),
   modelSlug: z.string().min(3).max(160),
@@ -630,6 +766,115 @@ export async function updateSupportedModelPricing(formData: FormData) {
   revalidatePath("/internal");
 }
 
+const updateSupportedModelDetailsSchema = z.object({
+  supportedModelId: z.string().uuid(),
+  provider: z.string().min(2).max(80),
+  modelSlug: z.string().min(3).max(160),
+  displayName: z.string().min(2).max(120),
+  modality: modalitySchema,
+  capability: capabilitySchema,
+  billingConfig: z.unknown(),
+  active: z.boolean(),
+});
+
+export async function updateSupportedModelDetails(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = updateSupportedModelDetailsSchema.parse({
+    supportedModelId: formData.get("supportedModelId"),
+    provider: formData.get("provider"),
+    modelSlug: formData.get("modelSlug"),
+    displayName: formData.get("displayName"),
+    modality: formData.get("modality"),
+    capability: formData.get("capability"),
+    billingConfig: parseBillingConfigField(formData.get("billingConfig")).config,
+    active: parseBooleanField(formData.get("active")),
+  });
+  const billingConfig = parseBillingConfig(parsed.billingConfig);
+  const legacyBillingFields = deriveLegacyBillingFields(billingConfig);
+
+  const invalidCapabilityForModality =
+    (parsed.modality === "image" &&
+      !["image_generation", "image_edit"].includes(parsed.capability)) ||
+    (parsed.modality === "video" && parsed.capability !== "video_generation");
+
+  if (invalidCapabilityForModality) {
+    throw new Error("Public model modality and capability do not match");
+  }
+
+  const { data: currentSupportedModel, error: currentSupportedModelError } = await supabase
+    .from("supported_models")
+    .select("model_slug")
+    .eq("id", parsed.supportedModelId)
+    .maybeSingle();
+
+  if (currentSupportedModelError) {
+    throw new Error(currentSupportedModelError.message);
+  }
+
+  if (!currentSupportedModel) {
+    throw new Error("Supported model is missing");
+  }
+
+  const { error } = await supabase
+    .from("supported_models")
+    .update({
+      provider: parsed.provider,
+      model_slug: parsed.modelSlug,
+      display_name: parsed.displayName,
+      modality: parsed.modality,
+      capability: parsed.capability,
+      billing_config: billingConfig,
+      unit_label: legacyBillingFields.unitLabel,
+      default_unit_cost: legacyBillingFields.defaultUnitCost,
+      active: parsed.active,
+    })
+    .eq("id", parsed.supportedModelId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const { error: providerModelUpdateError } = await supabase
+    .from("provider_models")
+    .update({
+      public_model_slug: parsed.modelSlug,
+      capability: parsed.capability,
+    })
+    .eq("supported_model_id", parsed.supportedModelId);
+
+  if (providerModelUpdateError) {
+    throw new Error(providerModelUpdateError.message);
+  }
+
+  const { error: routingRuleUpdateError } = await supabase
+    .from("routing_rules")
+    .update({
+      public_model_slug: parsed.modelSlug,
+      capability: parsed.capability,
+    })
+    .eq("public_model_slug", currentSupportedModel.model_slug);
+
+  if (routingRuleUpdateError) {
+    throw new Error(routingRuleUpdateError.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "supported_model.update",
+    targetType: "supported_model",
+    targetId: parsed.supportedModelId,
+    summary: `Updated public model ${parsed.modelSlug}`,
+    details: {
+      ...parsed,
+      billingConfig,
+    },
+  });
+
+  revalidatePath("/internal");
+}
+
 const createProviderModelSchema = z.object({
   providerId: z.string().uuid(),
   supportedModelId: z.string().uuid(),
@@ -741,6 +986,88 @@ export async function updateProviderModelState(formData: FormData) {
     targetId: parsed.providerModelId,
     summary: `${parsed.active ? "Activated" : "Deactivated"} provider model`,
     details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+const updateProviderModelDetailsSchema = z.object({
+  providerModelId: z.string().uuid(),
+  providerId: z.string().uuid(),
+  supportedModelId: z.string().uuid(),
+  upstreamModelSlug: z.string().min(1).max(160),
+  capability: capabilitySchema,
+  active: z.boolean(),
+  pricing: z.record(z.string(), z.unknown()).default({}),
+  inputSchema: z.record(z.string(), z.unknown()).default({}),
+  outputSchema: z.record(z.string(), z.unknown()).default({}),
+});
+
+export async function updateProviderModelDetails(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = updateProviderModelDetailsSchema.parse({
+    providerModelId: formData.get("providerModelId"),
+    providerId: formData.get("providerId"),
+    supportedModelId: formData.get("supportedModelId"),
+    upstreamModelSlug: formData.get("upstreamModelSlug"),
+    capability: formData.get("capability"),
+    active: parseBooleanField(formData.get("active")),
+    pricing: parseJsonField(formData.get("pricing")),
+    inputSchema: parseJsonField(formData.get("inputSchema")),
+    outputSchema: parseJsonField(formData.get("outputSchema")),
+  });
+
+  const { data: supportedModelRow, error: supportedModelError } = await supabase
+    .from("supported_models")
+    .select("model_slug, capability, billing_config")
+    .eq("id", parsed.supportedModelId)
+    .maybeSingle();
+
+  if (supportedModelError) {
+    throw new Error(supportedModelError.message);
+  }
+
+  if (!supportedModelRow) {
+    throw new Error("Supported model is missing");
+  }
+
+  if (supportedModelRow.capability !== parsed.capability) {
+    throw new Error("Provider model capability must match the selected public model capability");
+  }
+
+  assertBillingConfig(supportedModelRow.billing_config);
+
+  const { error } = await supabase
+    .from("provider_models")
+    .update({
+      provider_id: parsed.providerId,
+      supported_model_id: parsed.supportedModelId,
+      public_model_slug: supportedModelRow.model_slug,
+      upstream_model_slug: parsed.upstreamModelSlug,
+      capability: parsed.capability,
+      active: parsed.active,
+      pricing: parsed.pricing,
+      input_schema: parsed.inputSchema,
+      output_schema: parsed.outputSchema,
+    })
+    .eq("id", parsed.providerModelId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_model.update",
+    targetType: "provider_model",
+    targetId: parsed.providerModelId,
+    summary: `Updated provider model ${supportedModelRow.model_slug}`,
+    details: {
+      ...parsed,
+      publicModelSlug: supportedModelRow.model_slug,
+    },
   });
 
   revalidatePath("/internal");

@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import {
-  BadgeCheck,
   CircleAlert,
   Fingerprint,
   Network,
@@ -9,22 +8,14 @@ import {
   Waypoints,
 } from "lucide-react";
 import { getInternalAdminData } from "@/lib/internal-admin-server";
-import {
-  createProvider,
-  createProviderCredential,
-  createSupportedModel,
-  deleteProviderCredential,
-  rotateProviderCredentialSecret,
-  updateSupportedModelPricing,
-  updateProviderCredentialState,
-  updateProviderModelState,
-  updateProviderStatus,
-  updateRoutingRule,
-  updateSupportedModelState,
-} from "./actions";
-import { BillingConfigEditor, CreateProviderModelForm, CreateRoutingRuleForm } from "./form-panels";
 import { InternalShell } from "./internal-shell";
-import { SubmitButton } from "./submit-button";
+import {
+  CredentialsPanel,
+  ModelsPanel,
+  ProvidersPanel,
+  PublicModelsPanel,
+  RoutesPanel,
+} from "./internal-management-panels";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -89,13 +80,6 @@ const providerKindOptions = [
   { value: "wavespeed", label: "WaveSpeed" },
   { value: "partner", label: "Partner" },
   { value: "custom", label: "Custom" },
-] as const;
-
-const routeStrategies = [
-  "primary_then_fallback",
-  "primary_only",
-  "manual_failover",
-  "route_by_capability_tag",
 ] as const;
 
 const tabGuidance: Record<
@@ -319,125 +303,6 @@ function EmptyState({
   );
 }
 
-function Field({
-  label,
-  name,
-  placeholder,
-  defaultValue,
-  help,
-  example,
-  required = false,
-  disabled = false,
-  type = "text",
-  autoComplete,
-}: {
-  label: string;
-  name: string;
-  placeholder?: string;
-  defaultValue?: string;
-  help?: string;
-  example?: string;
-  required?: boolean;
-  disabled?: boolean;
-  type?: "text" | "password";
-  autoComplete?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">{label}</span>
-      <input
-        type={type}
-        name={name}
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        required={required}
-        disabled={disabled}
-        autoComplete={autoComplete}
-        className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
-      />
-      {help ? <span className="mt-2 block text-xs leading-5 text-black/50">{help}</span> : null}
-      {example ? (
-        <span className="mt-1 block text-xs leading-5 text-black/40">
-          Example: <code className="rounded bg-black/[0.04] px-1 py-0.5 text-[11px]">{example}</code>
-        </span>
-      ) : null}
-    </label>
-  );
-}
-
-function TextAreaField({
-  label,
-  name,
-  placeholder,
-  defaultValue,
-  help,
-  example,
-  disabled = false,
-}: {
-  label: string;
-  name: string;
-  placeholder?: string;
-  defaultValue?: string;
-  help?: string;
-  example?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">{label}</span>
-      <textarea
-        name={name}
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        rows={4}
-        disabled={disabled}
-        className="w-full rounded-sm border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
-      />
-      {help ? <span className="mt-2 block text-xs leading-5 text-black/50">{help}</span> : null}
-      {example ? (
-        <span className="mt-1 block text-xs leading-5 text-black/40">
-          Example: <code className="rounded bg-black/[0.04] px-1 py-0.5 text-[11px]">{example}</code>
-        </span>
-      ) : null}
-    </label>
-  );
-}
-
-function SelectField({
-  label,
-  name,
-  options,
-  defaultValue,
-  help,
-  disabled = false,
-}: {
-  label: string;
-  name: string;
-  options: ReadonlyArray<{ value: string; label: string }>;
-  defaultValue?: string;
-  help?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">{label}</span>
-      <select
-        name={name}
-        defaultValue={defaultValue}
-        disabled={disabled}
-        className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      {help ? <span className="mt-2 block text-xs leading-5 text-black/50">{help}</span> : null}
-    </label>
-  );
-}
-
 export default async function InternalPage({
   searchParams,
 }: {
@@ -467,10 +332,6 @@ export default async function InternalPage({
     );
   }
 
-  const providerModelOptions = data.providerModels.map((item) => ({
-    value: item.id,
-    label: `${item.supportedModelName} / ${item.providerName} / ${item.upstream_model_slug}`,
-  }));
   const hasProviders = data.providers.length > 0;
   const hasSupportedModels = data.supportedModels.length > 0;
   const hasProviderModels = data.providerModels.length > 0;
@@ -646,121 +507,7 @@ export default async function InternalPage({
                     This is the real clustering layer. If two providers both offer Gemini 2.5 image generation, they should both attach to one public model such as <code className="rounded bg-white px-1 py-0.5">openoctopus/gemini-image</code>.
                   </p>
                 </div>
-
-                <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                  <div className="space-y-3">
-                    {hasSupportedModels ? (
-                      data.supportedModels.map((model) => (
-                        <div key={model.id} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
-                          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
-                                  {model.modality}
-                                </span>
-                                <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
-                                  {model.active ? "active" : "inactive"}
-                                </span>
-                              </div>
-                              <p className="mt-3 text-sm font-medium text-black">{model.display_name}</p>
-                              <p className="mt-1 text-xs text-black/50">{model.model_slug}</p>
-                              <p className="mt-1 text-xs text-black/50">
-                                billing: {model.billingSummary}
-                              </p>
-                            </div>
-
-                            <form action={updateSupportedModelState} className="flex items-center gap-2">
-                              <input type="hidden" name="supportedModelId" value={model.id} />
-                              <input type="hidden" name="active" value={model.active ? "false" : "true"} />
-                              <SubmitButton label={model.active ? "Deactivate" : "Activate"} />
-                            </form>
-                          </div>
-
-                          <div className="mt-4 grid gap-2 text-xs text-black/55 sm:grid-cols-3">
-                            <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                              Provider label: {model.provider}
-                            </div>
-                            <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                              Implementations: {model.activeProviderModelCount}/{model.providerModelCount} active
-                            </div>
-                            <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                              Created: {model.createdLabel}
-                            </div>
-                          </div>
-
-                          <form action={updateSupportedModelPricing} className="mt-4 rounded-sm border border-black/8 bg-white p-3">
-                            <input type="hidden" name="supportedModelId" value={model.id} />
-                            <div className="grid gap-3">
-                              <BillingConfigEditor initialValue={model.billingConfigText} />
-                              <div className="flex justify-end">
-                                <SubmitButton label="Update billing" />
-                              </div>
-                            </div>
-                          </form>
-                        </div>
-                      ))
-                    ) : (
-                      <EmptyState
-                        title="No public models yet"
-                        detail="Create a public capability first, for example openoctopus/gemini-image. Providers and routes should attach to this layer rather than inventing separate user-facing slugs."
-                      />
-                    )}
-                  </div>
-
-                  <form action={createSupportedModel} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
-                    <div className="grid gap-4">
-                      <Field
-                        label="Provider Label"
-                        name="provider"
-                        defaultValue="OpenOctopus"
-                        help="Human-readable owner label for this public model. In most cases keep this as OpenOctopus."
-                        example="OpenOctopus"
-                        required
-                      />
-                      <Field
-                        label="Public Model Slug"
-                        name="modelSlug"
-                        defaultValue="openoctopus/gemini-image"
-                        help="Customer-facing capability slug. This is what users conceptually buy from OpenOctopus."
-                        example="openoctopus/gemini-image"
-                        required
-                      />
-                      <Field
-                        label="Display Name"
-                        name="displayName"
-                        defaultValue="Gemini Image"
-                        help="Readable label for internal and future catalog views."
-                        example="Gemini Image"
-                        required
-                      />
-                      <SelectField
-                        label="Modality"
-                        name="modality"
-                        options={[
-                          { value: "image", label: "Image" },
-                          { value: "video", label: "Video" },
-                          { value: "audio", label: "Audio" },
-                        ]}
-                        help="High-level media type of this public capability."
-                      />
-                      <SelectField
-                        label="Capability"
-                        name="capability"
-                        options={capabilityOptions}
-                        defaultValue="image_generation"
-                        help="Operational capability family for this public model. Provider models and routes must match this."
-                      />
-                      <BillingConfigEditor
-                        initialValue={'{"billingMode":"hybrid","currency":"USD","charges":{"perImage":0.039,"inputTextTokensPerMillion":0.30}}'}
-                      />
-                      <label className="flex items-center gap-3 rounded-sm border border-black/10 bg-white px-3 py-3 text-sm text-black/72">
-                        <input type="checkbox" name="active" defaultChecked className="size-4 rounded border-black/20 bg-white accent-black" />
-                        Active on create
-                      </label>
-                      <SubmitButton label="Add public model" />
-                    </div>
-                  </form>
-                </div>
+                <PublicModelsPanel models={data.supportedModels} capabilityOptions={capabilityOptions} />
                 </SectionShell>
               </section>
             </>
@@ -818,130 +565,12 @@ export default async function InternalPage({
                   A provider is a supply source, not a customer-facing model. Multiple providers can map to one public model such as Gemini Image.
                 </p>
               </div>
-              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                <div className="space-y-3">
-                  {hasProviders ? (
-                    data.providers.map((provider) => (
-                      <div
-                        key={provider.id}
-                        className="rounded-sm border border-black/10 bg-[#faf9f6] p-4"
-                      >
-                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="inline-flex h-6 items-center rounded-sm bg-[#eef3ea] px-2 text-[11px] text-[#335d2d]">
-                                {provider.kind}
-                              </span>
-                              <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
-                                {provider.status}
-                              </span>
-                            </div>
-                            <p className="mt-3 text-sm font-medium text-black">{provider.name}</p>
-                            <p className="mt-1 text-xs text-black/50">{provider.slug}</p>
-                            <p className="mt-1 text-xs text-black/50">
-                              {provider.base_url ?? "No base URL"}
-                            </p>
-                          </div>
-
-                          <form action={updateProviderStatus} className="flex items-center gap-2">
-                            <input type="hidden" name="providerId" value={provider.id} />
-                            <select
-                              name="status"
-                              defaultValue={provider.status}
-                              className="h-9 rounded-sm border border-black/10 bg-white px-3 text-xs text-black"
-                            >
-                              {providerStatusOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                            <SubmitButton label="Save" />
-                          </form>
-                        </div>
-
-                        <div className="mt-4 grid gap-2 text-xs text-black/55 sm:grid-cols-3">
-                          <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                            Regions: {provider.regionsLabel}
-                          </div>
-                          <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                            Models: {provider.activeModelCount}/{provider.modelCount} active
-                          </div>
-                          <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                            Credentials: {provider.credentialCount}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <EmptyState
-                      title="No providers yet"
-                      detail="Start by adding your first real upstream provider, for example your direct Gemini account or any partner API you intend to resell behind the OpenOctopus surface."
-                    />
-                  )}
-                </div>
-
-                <form action={createProvider} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
-                  <div className="grid gap-4">
-                    <Field
-                      label="Name"
-                      name="name"
-                      defaultValue={selectedTemplate?.provider.name}
-                      placeholder="Gemini Direct"
-                      help="Internal display name for this upstream vendor. Operators will see this name in routing and request history."
-                      example="Gemini Direct"
-                      required
-                    />
-                    <Field
-                      label="Slug"
-                      name="slug"
-                      defaultValue={selectedTemplate?.provider.slug}
-                      placeholder="gemini-direct"
-                      help="Stable internal identifier. Use lowercase letters and hyphens. Avoid changing it later."
-                      example="gemini-direct"
-                      required
-                    />
-                    <SelectField
-                      label="Kind"
-                      name="kind"
-                      options={providerKindOptions}
-                      defaultValue={selectedTemplate?.provider.kind}
-                      help="Use custom for direct official APIs, wavespeed for WaveSpeed-backed supply, and partner for other third-party resellers."
-                    />
-                    <Field
-                      label="Base URL"
-                      name="baseUrl"
-                      defaultValue={selectedTemplate?.provider.baseUrl}
-                      placeholder="https://generativelanguage.googleapis.com"
-                      help="Base endpoint for this provider. Leave blank only if the adapter fully hardcodes the upstream endpoint."
-                      example="https://generativelanguage.googleapis.com"
-                    />
-                    <SelectField
-                      label="Status"
-                      name="status"
-                      options={providerStatusOptions}
-                      defaultValue={selectedTemplate?.provider.status ?? "healthy"}
-                      help="Manual operator status. Healthy means ready for routing, degraded means caution, offline means do not send traffic."
-                    />
-                    <Field
-                      label="Regions"
-                      name="regions"
-                      defaultValue={selectedTemplate?.provider.regions}
-                      placeholder="us-east1, asia-southeast1"
-                      help="Optional. Only fill this if this provider has region-specific endpoints, routing, or commercial constraints. Otherwise leave it empty."
-                      example="us-east1, asia-southeast1"
-                    />
-                    <TextAreaField
-                      label="Config JSON"
-                      name="config"
-                      defaultValue={selectedTemplate?.provider.config ?? "{}"}
-                      help="Optional provider-level settings. Use this for adapter behavior such as timeout, API version, polling defaults, or transport mode. If you do not need extra settings yet, keep it as an empty object."
-                      example={'{"timeoutMs":60000,"apiVersion":"v1beta"}'}
-                    />
-                    <SubmitButton label="Add provider" />
-                  </div>
-                </form>
-              </div>
+              <ProvidersPanel
+                providers={data.providers}
+                providerKindOptions={providerKindOptions}
+                providerStatusOptions={providerStatusOptions}
+                selectedTemplate={selectedTemplate}
+              />
               </SectionShell>
             </>
           ) : null}
@@ -961,198 +590,11 @@ export default async function InternalPage({
                     Secrets entered here are encrypted server-side before storage. The worker decrypts them at runtime.
                   </p>
                 </div>
-
-                <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-                  <form action={createProviderCredential} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
-                    <div className="grid gap-4">
-                      <SelectField
-                        label="Provider"
-                        name="providerId"
-                        options={
-                          hasProviders
-                            ? data.providers.map((item) => ({
-                                value: item.id,
-                                label: `${item.name} (${item.slug})`,
-                              }))
-                            : [{ value: "", label: "Add a provider first" }]
-                        }
-                        disabled={!hasProviders}
-                        help="Choose which provider this credential belongs to."
-                      />
-                      <Field
-                        label="Label"
-                        name="label"
-                        defaultValue={selectedTemplate?.credential.label}
-                        placeholder="Primary production key"
-                        help="Human-readable name for this credential set. Use names that help operators distinguish prod, staging, backup, or rotated keys."
-                        example="Primary production key"
-                        required
-                        disabled={!hasProviders}
-                      />
-                      <Field
-                        label="Secret"
-                        name="secret"
-                        type="password"
-                        placeholder="Paste the real upstream API key"
-                        help="The raw provider secret. It is encrypted immediately on the server and cannot be viewed again after save."
-                        required
-                        disabled={!hasProviders}
-                        autoComplete="new-password"
-                      />
-                      <Field
-                        label="Reference (Optional)"
-                        name="secretRef"
-                        defaultValue={selectedTemplate?.credential.secretRef}
-                        placeholder="Google AI Studio production key"
-                        help="Optional operator note for where this secret came from or how to identify it during rotation."
-                        example="Google AI Studio production key"
-                        disabled={!hasProviders}
-                      />
-                      <Field
-                        label="Environment"
-                        name="environment"
-                        defaultValue={selectedTemplate?.credential.environment}
-                        placeholder="production"
-                        help="Execution environment this credential is intended for."
-                        example="production"
-                        required
-                        disabled={!hasProviders}
-                      />
-                      <TextAreaField
-                        label="Notes"
-                        name="notes"
-                        defaultValue={selectedTemplate?.credential.notes}
-                        placeholder="Quota approved Apr 2026"
-                        help="Optional free-form operator notes such as who owns the key, why it was rotated, or where it is approved for use."
-                        example="Primary Gemini image credential for production traffic"
-                        disabled={!hasProviders}
-                      />
-                      <TextAreaField
-                        label="Metadata JSON"
-                        name="metadata"
-                        defaultValue={selectedTemplate?.credential.metadata ?? "{}"}
-                        help="Optional machine-readable annotations for ops workflows. Leave as {} if you do not need extra metadata."
-                        example={'{"owner":"infra","rotationPolicy":"90d"}'}
-                        disabled={!hasProviders}
-                      />
-                      <label className="flex items-center gap-3 rounded-sm border border-black/10 bg-white px-3 py-3 text-sm text-black/72">
-                        <input
-                          type="checkbox"
-                          name="isActive"
-                          defaultChecked
-                          disabled={!hasProviders}
-                          className="size-4 rounded border-black/20 bg-white accent-black"
-                        />
-                        Active on create
-                      </label>
-                      <SubmitButton label="Add credential" disabled={!hasProviders} />
-                    </div>
-                  </form>
-
-                  <div className="space-y-3">
-                    {hasCredentials ? (
-                      data.providerCredentials.map((credential) => (
-                        <div
-                          key={credential.id}
-                          className="rounded-sm border border-black/10 bg-[#faf9f6] p-4"
-                        >
-                          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
-                                  {credential.environment}
-                                </span>
-                                <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
-                                  {credential.secretSourceLabel}
-                                </span>
-                                {credential.is_active ? (
-                                  <span className="inline-flex h-6 items-center gap-1 rounded-sm bg-[#eef3ea] px-2 text-[11px] text-[#335d2d]">
-                                    <BadgeCheck className="size-3" />
-                                    active
-                                  </span>
-                                ) : null}
-                              </div>
-                              <p className="mt-3 text-sm font-medium text-black">{credential.label}</p>
-                              <p className="mt-1 text-xs text-black/50">
-                                {credential.providerName} · {credential.secretMask}
-                              </p>
-                              {credential.secret_ref ? (
-                                <p className="mt-1 text-xs text-black/50">reference: {credential.secret_ref}</p>
-                              ) : null}
-                              <p className="mt-1 text-xs text-black/50">
-                                secret updated: {credential.secretUpdatedLabel}
-                              </p>
-                              {credential.notes ? (
-                                <p className="mt-2 text-xs leading-5 text-black/55">{credential.notes}</p>
-                              ) : null}
-                            </div>
-
-                            <div className="flex flex-col gap-2">
-                              <form action={updateProviderCredentialState} className="flex items-center gap-2">
-                                <input type="hidden" name="credentialId" value={credential.id} />
-                                <input type="hidden" name="isActive" value={credential.is_active ? "false" : "true"} />
-                                <SubmitButton label={credential.is_active ? "Deactivate" : "Activate"} />
-                              </form>
-                              <form action={deleteProviderCredential} className="flex items-center gap-2">
-                                <input type="hidden" name="credentialId" value={credential.id} />
-                                <SubmitButton
-                                  label="Delete"
-                                  pendingLabel="Deleting..."
-                                  disabled={credential.is_active}
-                                  tone="danger"
-                                />
-                              </form>
-                            </div>
-                          </div>
-
-                          {credential.secret_source !== "internal_encrypted" ? (
-                            <div className="mt-4 flex items-center gap-1.5 bg-[#ffe7e3] px-3 py-2.5">
-                              <CircleAlert className="size-3.5 shrink-0 text-[#b54432]" />
-                              <p className="text-xs leading-[1.35] text-[#b54432]">
-                                This is a legacy external reference only. Rotate it below before sending live traffic.
-                              </p>
-                            </div>
-                          ) : null}
-
-                          {credential.is_active ? (
-                            <div className="mt-4 flex items-center gap-1.5 bg-[#fff4df] px-3 py-2.5">
-                              <CircleAlert className="size-3.5 shrink-0 text-[#8a5a00]" />
-                              <p className="text-xs leading-[1.35] text-[#8a5a00]">
-                                Delete is only available after deactivation so queued traffic does not lose its credential.
-                              </p>
-                            </div>
-                          ) : null}
-
-                          <form action={rotateProviderCredentialSecret} className="mt-4 rounded-sm border border-black/8 bg-white p-3">
-                            <input type="hidden" name="credentialId" value={credential.id} />
-                            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
-                              <Field
-                                label="Rotate Secret"
-                                name="secret"
-                                type="password"
-                                placeholder="Paste a replacement secret"
-                                required
-                                autoComplete="new-password"
-                              />
-                              <Field
-                                label="Reference (Optional)"
-                                name="secretRef"
-                                defaultValue={credential.secret_ref ?? ""}
-                                placeholder="Rotation ticket or source note"
-                              />
-                              <SubmitButton label="Rotate secret" />
-                            </div>
-                          </form>
-                        </div>
-                      ))
-                    ) : (
-                      <EmptyState
-                        title="No credentials yet"
-                        detail="Once you add a provider, record the real secret reference here so the team knows which credential is active in each environment."
-                      />
-                    )}
-                  </div>
-                </div>
+                <CredentialsPanel
+                  credentials={data.providerCredentials}
+                  providers={data.providers}
+                  selectedTemplate={selectedTemplate}
+                />
                 </SectionShell>
               </section>
             </>
@@ -1173,82 +615,12 @@ export default async function InternalPage({
                     Provider models now attach to the public model catalog. This keeps all Gemini-capability implementations grouped under one customer-facing capability.
                   </p>
                 </div>
-                <div className="grid gap-4">
-                  <CreateProviderModelForm
-                    supportedModels={data.supportedModels.map((item) => ({
-                      id: item.id,
-                      modelSlug: item.model_slug,
-                      displayName: item.display_name,
-                      capability: item.capability,
-                    }))}
-                    providers={data.providers.map((item) => ({
-                      id: item.id,
-                      name: item.name,
-                      slug: item.slug,
-                    }))}
-                    defaultSupportedModelSlug="openoctopus/gemini-image"
-                    defaultUpstreamModelSlug={selectedTemplate?.providerModel.upstreamModelSlug}
-                    defaultPricing={selectedTemplate?.providerModel.pricing}
-                    defaultInputSchema={selectedTemplate?.providerModel.inputSchema}
-                    defaultOutputSchema={selectedTemplate?.providerModel.outputSchema}
-                    disabled={!hasProviders || !hasSupportedModels}
-                  />
-
-                  <div className="space-y-3">
-                    {hasProviderModels ? (
-                      data.providerModels.map((item) => (
-                        <div
-                          key={item.id}
-                          className="rounded-sm border border-black/10 bg-[#faf9f6] p-4"
-                        >
-                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
-                                  {item.capability}
-                                </span>
-                                <span className="text-sm font-medium text-black">{item.providerName}</span>
-                              </div>
-                              <p className="mt-3 text-sm font-medium text-black">{item.public_model_slug}</p>
-                              <p className="mt-1 text-xs text-black/50">
-                                public model: {item.supportedModelName}
-                              </p>
-                              <p className="mt-1 text-xs text-black/50">
-                                upstream: {item.upstream_model_slug}
-                              </p>
-                            </div>
-
-                            <form action={updateProviderModelState} className="flex items-center gap-2">
-                              <input type="hidden" name="providerModelId" value={item.id} />
-                              <input type="hidden" name="active" value={item.active ? "false" : "true"} />
-                              <SubmitButton label={item.active ? "Deactivate" : "Activate"} />
-                            </form>
-                          </div>
-
-                          <div className="mt-4 grid gap-3 text-xs text-black/55 xl:grid-cols-3">
-                            <div className="rounded-sm border border-black/8 bg-white p-3">
-                              <p className="text-[11px] tracking-[0.35px] text-black/45">Pricing</p>
-                              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{item.pricingText}</pre>
-                            </div>
-                            <div className="rounded-sm border border-black/8 bg-white p-3">
-                              <p className="text-[11px] tracking-[0.35px] text-black/45">Input schema</p>
-                              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{item.inputSchemaText}</pre>
-                            </div>
-                            <div className="rounded-sm border border-black/8 bg-white p-3">
-                              <p className="text-[11px] tracking-[0.35px] text-black/45">Output schema</p>
-                              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{item.outputSchemaText}</pre>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <EmptyState
-                        title="No provider models yet"
-                        detail="After creating a provider, add the real upstream model IDs you plan to expose behind OpenOctopus public model slugs."
-                      />
-                    )}
-                  </div>
-                </div>
+                <ModelsPanel
+                  providerModels={data.providerModels}
+                  providers={data.providers}
+                  supportedModels={data.supportedModels}
+                  selectedTemplate={selectedTemplate}
+                />
                 </SectionShell>
               </section>
             </>
@@ -1269,94 +641,12 @@ export default async function InternalPage({
                     Operators choose which implementation is online for each public model here. Customers still only see the public OpenOctopus capability.
                   </p>
                 </div>
-                <div className="grid gap-4">
-                  <CreateRoutingRuleForm
-                    supportedModels={data.supportedModels.map((item) => ({
-                      id: item.id,
-                      modelSlug: item.model_slug,
-                      displayName: item.display_name,
-                      capability: item.capability,
-                    }))}
-                    providerModels={data.providerModels.map((item) => ({
-                      id: item.id,
-                      supportedModelId: item.supported_model_id,
-                      supportedModelName: item.supportedModelName,
-                      providerName: item.providerName,
-                      upstreamModelSlug: item.upstream_model_slug,
-                      capability: item.capability,
-                    }))}
-                    defaultStrategy={selectedTemplate?.route.routeStrategy}
-                    defaultWorkspaceScope={selectedTemplate?.route.workspaceScope}
-                    disabled={!hasProviderModels || !hasSupportedModels}
-                  />
-
-                  <div className="space-y-3">
-                    {hasRoutes ? (
-                      data.routingRules.map((rule) => (
-                        <form
-                          key={rule.id}
-                          action={updateRoutingRule}
-                          className="rounded-sm border border-black/10 bg-[#faf9f6] p-4"
-                        >
-                          <input type="hidden" name="routingRuleId" value={rule.id} />
-                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-black/45">
-                                <span>{rule.scopeLabel}</span>
-                                <span>•</span>
-                                <span>{rule.capability}</span>
-                              </div>
-                              <p className="mt-3 text-sm font-medium text-black">{rule.public_model_slug}</p>
-                            </div>
-                            <label className="flex items-center gap-2 rounded-sm border border-black/10 bg-white px-3 py-2 text-xs text-black/70">
-                              <input
-                                type="checkbox"
-                                name="active"
-                                defaultChecked={rule.active}
-                                className="size-4 rounded border-black/20 bg-white accent-black"
-                              />
-                              Active
-                            </label>
-                          </div>
-
-                          <div className="mt-4 grid gap-4 md:grid-cols-3">
-                            <SelectField
-                              label="Primary"
-                              name="primaryProviderModelId"
-                              options={providerModelOptions}
-                              defaultValue={rule.primary_provider_model_id}
-                            />
-                            <SelectField
-                              label="Fallback"
-                              name="fallbackProviderModelId"
-                              options={[{ value: "", label: "No fallback" }, ...providerModelOptions]}
-                              defaultValue={rule.fallback_provider_model_id ?? ""}
-                            />
-                            <SelectField
-                              label="Strategy"
-                              name="routeStrategy"
-                              options={routeStrategies.map((item) => ({ value: item, label: item }))}
-                              defaultValue={rule.route_strategy}
-                            />
-                          </div>
-
-                          <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-black/52">
-                              <span>Primary: {rule.primaryLabel}</span>
-                              <span>Fallback: {rule.fallbackLabel}</span>
-                            </div>
-                            <SubmitButton label="Save route" />
-                          </div>
-                        </form>
-                      ))
-                    ) : (
-                      <EmptyState
-                        title="No routes yet"
-                        detail="Create routes only after you have at least one real provider model. Until then, your public API surface should remain unbound."
-                      />
-                    )}
-                  </div>
-                </div>
+                <RoutesPanel
+                  routingRules={data.routingRules}
+                  providerModels={data.providerModels}
+                  supportedModels={data.supportedModels}
+                  selectedTemplate={selectedTemplate}
+                />
                 </SectionShell>
               </section>
             </>

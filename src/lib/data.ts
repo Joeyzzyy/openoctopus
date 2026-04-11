@@ -280,40 +280,6 @@ export const popularModels = [
   { id: "wan-2.6-i2v", name: "Wan 2.6 Image to Video", provider: "Alibaba", task: "image-to-video" },
 ];
 
-/* ─── Pricing page ─── */
-
-export const imageVideoPricing = [
-  { name: "Nano Banana Pro", unit: "per image", price: "$0.14" },
-  { name: "Seedream V4.5", unit: "per image", price: "$0.04" },
-  { name: "Flux Dev Ultra Fast", unit: "per image", price: "$0.005" },
-  { name: "FLUX.2 [Pro]", unit: "per image", price: "$0.055" },
-  { name: "Midjourney", unit: "per image", price: "$0.08" },
-  { name: "Kling O3", unit: "per second", price: "$0.15" },
-  { name: "Veo 3.1", unit: "per second", price: "$0.12" },
-  { name: "Wan 2.6", unit: "per second", price: "$0.08" },
-  { name: "Seedance 2.0", unit: "per second", price: "$0.10" },
-  { name: "Hailuo Minimax", unit: "per second", price: "$0.01" },
-];
-
-export const languageModelPricing = [
-  { name: "Claude Opus 4.6", context: "200K", input: "$0.015", output: "$0.075" },
-  { name: "Claude Sonnet 4.6", context: "200K", input: "$0.003", output: "$0.015" },
-  { name: "GPT-5.4", context: "128K", input: "$0.010", output: "$0.030" },
-  { name: "GPT-5.4 Mini", context: "128K", input: "$0.0004", output: "$0.0016" },
-  { name: "Gemini 3.1 Pro", context: "2M", input: "$0.00125", output: "$0.005" },
-  { name: "Qwen3 Max", context: "128K", input: "$0.0012", output: "$0.0048" },
-  { name: "DeepSeek V4", context: "128K", input: "$0.0007", output: "$0.0028" },
-];
-
-export const serverlessGpuPricing = [
-  { tier: "B2", gpu: "B200", vram: "141 GB", hourly: "$5.98/hr", perSecond: "$0.00166/s" },
-  { tier: "A1", gpu: "A100", vram: "80 GB", hourly: "$1.89/hr", perSecond: "$0.00053/s" },
-  { tier: "A1", gpu: "A100", vram: "48 GB", hourly: "$1.39/hr", perSecond: "$0.00039/s" },
-  { tier: "H1", gpu: "H100", vram: "80 GB", hourly: "$3.49/hr", perSecond: "$0.00097/s" },
-  { tier: "50", gpu: "RTX 5090", vram: "24 GB", hourly: "$0.69/hr", perSecond: "$0.00019/s" },
-  { tier: "40", gpu: "RTX 4090", vram: "24 GB", hourly: "$0.49/hr", perSecond: "$0.00014/s" },
-];
-
 export const pricingFAQ = [
   {
     question: "How does pricing work?",

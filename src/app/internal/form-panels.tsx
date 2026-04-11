@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { createProviderModel, createRoutingRule } from "./actions";
 import { SubmitButton } from "./submit-button";
 
@@ -313,23 +314,37 @@ export function BillingConfigEditor({
 }
 
 export function CreateProviderModelForm({
+  action = createProviderModel,
   supportedModels,
   providers,
   defaultSupportedModelSlug,
+  defaultProviderId,
   defaultUpstreamModelSlug,
   defaultPricing,
   defaultInputSchema,
   defaultOutputSchema,
+  defaultActive = true,
+  providerModelId,
   disabled,
+  onSuccess,
+  submitLabel = "Add provider model",
+  className = "rounded-sm border border-black/10 bg-[#faf9f6] p-4",
 }: {
+  action?: (formData: FormData) => void | Promise<void>;
   supportedModels: SupportedModelOption[];
   providers: ProviderOption[];
   defaultSupportedModelSlug?: string;
+  defaultProviderId?: string;
   defaultUpstreamModelSlug?: string;
   defaultPricing?: string;
   defaultInputSchema?: string;
   defaultOutputSchema?: string;
+  defaultActive?: boolean;
+  providerModelId?: string;
   disabled: boolean;
+  onSuccess?: () => void;
+  submitLabel?: string;
+  className?: string;
 }) {
   const fallbackSupportedModelId = supportedModels[0]?.id ?? "";
   const templateSupportedModelId =
@@ -343,9 +358,20 @@ export function CreateProviderModelForm({
 
   const selectedSupportedModel =
     supportedModels.find((item) => item.id === supportedModelId) ?? null;
+  const [submitted, setSubmitted] = useState(false);
 
   return (
-    <form action={createProviderModel} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+    <form
+      action={action}
+      className={className}
+      onSubmit={() => {
+        setSubmitted(true);
+      }}
+    >
+      <FormAutoClose submitted={submitted} onSuccess={onSuccess} />
+      {providerModelId ? (
+        <input type="hidden" name="providerModelId" value={providerModelId} />
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Public Model</span>
@@ -375,6 +401,7 @@ export function CreateProviderModelForm({
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Provider</span>
           <select
             name="providerId"
+            defaultValue={defaultProviderId}
             disabled={disabled}
             className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
           >
@@ -471,17 +498,17 @@ export function CreateProviderModelForm({
           <input
             type="checkbox"
             name="active"
-            defaultChecked
+            defaultChecked={defaultActive}
             disabled={disabled}
             className="size-4 rounded border-black/20 bg-white accent-black"
           />
-          Active on create
+          Active
         </label>
       </div>
 
       <div className="mt-4">
         <SubmitButton
-          label="Add provider model"
+          label={submitLabel}
           disabled={disabled || !selectedSupportedModel?.capability}
         />
       </div>
@@ -490,20 +517,39 @@ export function CreateProviderModelForm({
 }
 
 export function CreateRoutingRuleForm({
+  action = createRoutingRule,
   supportedModels,
   providerModels,
+  defaultSupportedModelId,
+  defaultPrimaryProviderModelId,
+  defaultFallbackProviderModelId,
   defaultStrategy,
   defaultWorkspaceScope,
+  defaultActive = true,
+  routingRuleId,
   disabled,
+  onSuccess,
+  submitLabel = "Add routing rule",
+  className = "rounded-sm border border-black/10 bg-[#faf9f6] p-4",
 }: {
+  action?: (formData: FormData) => void | Promise<void>;
   supportedModels: SupportedModelOption[];
   providerModels: ProviderModelOption[];
+  defaultSupportedModelId?: string;
+  defaultPrimaryProviderModelId?: string;
+  defaultFallbackProviderModelId?: string;
   defaultStrategy?: string;
   defaultWorkspaceScope?: string;
+  defaultActive?: boolean;
+  routingRuleId?: string;
   disabled: boolean;
+  onSuccess?: () => void;
+  submitLabel?: string;
+  className?: string;
 }) {
-  const initialSupportedModelId = supportedModels[0]?.id ?? "";
+  const initialSupportedModelId = defaultSupportedModelId ?? supportedModels[0]?.id ?? "";
   const [supportedModelId, setSupportedModelId] = useState(initialSupportedModelId);
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     setSupportedModelId(initialSupportedModelId);
@@ -518,7 +564,17 @@ export function CreateRoutingRuleForm({
   );
 
   return (
-    <form action={createRoutingRule} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+    <form
+      action={action}
+      className={className}
+      onSubmit={() => {
+        setSubmitted(true);
+      }}
+    >
+      <FormAutoClose submitted={submitted} onSuccess={onSuccess} />
+      {routingRuleId ? (
+        <input type="hidden" name="routingRuleId" value={routingRuleId} />
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Public Model</span>
@@ -561,6 +617,7 @@ export function CreateRoutingRuleForm({
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Primary Provider Model</span>
           <select
             name="primaryProviderModelId"
+            defaultValue={defaultPrimaryProviderModelId}
             disabled={disabled}
             className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
           >
@@ -581,6 +638,7 @@ export function CreateRoutingRuleForm({
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Fallback Provider Model</span>
           <select
             name="fallbackProviderModelId"
+            defaultValue={defaultFallbackProviderModelId}
             disabled={disabled}
             className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
           >
@@ -628,20 +686,38 @@ export function CreateRoutingRuleForm({
           <input
             type="checkbox"
             name="active"
-            defaultChecked
+            defaultChecked={defaultActive}
             disabled={disabled}
             className="size-4 rounded border-black/20 bg-white accent-black"
           />
-          Active on create
+          Active
         </label>
       </div>
 
       <div className="mt-4">
         <SubmitButton
-          label="Add routing rule"
+          label={submitLabel}
           disabled={disabled || !selectedSupportedModel?.capability || filteredProviderModels.length === 0}
         />
       </div>
     </form>
   );
+}
+
+function FormAutoClose({
+  submitted,
+  onSuccess,
+}: {
+  submitted: boolean;
+  onSuccess?: () => void;
+}) {
+  const { pending } = useFormStatus();
+
+  useEffect(() => {
+    if (submitted && !pending && onSuccess) {
+      onSuccess();
+    }
+  }, [onSuccess, pending, submitted]);
+
+  return null;
 }

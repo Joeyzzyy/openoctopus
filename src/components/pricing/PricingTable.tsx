@@ -1,47 +1,17 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FadeIn } from "@/components/animations/FadeIn";
 
-interface ImageVideoRow {
+type PricingResponse = {
   name: string;
-  unit: string;
-  price: string;
-}
-
-interface LLMRow {
-  name: string;
-  context: string;
-  input: string;
-  output: string;
-}
-
-interface GpuRow {
-  tier: string;
-  gpu: string;
-  vram: string;
-  hourly: string;
-  perSecond: string;
-}
-
-function parsePriceValue(value: string) {
-  const numeric = Number.parseFloat(value.replace(/[^0-9.]/g, ""));
-  return Number.isFinite(numeric) ? numeric : null;
-}
-
-function formatOutputPerDollar(price: string, unit: string) {
-  const numeric = parsePriceValue(price);
-
-  if (!numeric || numeric <= 0) {
-    return "N/A";
-  }
-
-  const amount = 1 / numeric;
-  const rounded =
-    amount >= 100 ? Math.round(amount) : amount >= 10 ? Math.round(amount * 10) / 10 : Math.round(amount * 100) / 100;
-  const normalizedUnit = unit.toLowerCase();
-  const label = rounded === 1 ? normalizedUnit : `${normalizedUnit}s`;
-
-  return `${rounded} ${label}`;
-}
+  billingUnit: string;
+  costUsd: number | null;
+  sellUsd: number;
+  costLabel: string;
+  sellLabel: string;
+};
 
 function PricingSection({
   title,
@@ -87,148 +57,97 @@ function TableCell({
   return <td className={`py-4 pr-4 last:pr-0 ${className}`}>{children}</td>;
 }
 
-export function ImageVideoTable({ rows }: { rows: ImageVideoRow[] }) {
+export function ImageVideoTable() {
+  const [pricing, setPricing] = useState<PricingResponse | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPricing() {
+      try {
+        const response = await fetch("/api/pricing/image-model", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Pricing request failed with ${response.status}`);
+        }
+
+        const nextPricing = (await response.json()) as PricingResponse;
+
+        if (!cancelled) {
+          setPricing(nextPricing);
+        }
+      } catch (fetchError) {
+        console.error(fetchError);
+
+        if (!cancelled) {
+          setError(true);
+        }
+      }
+    }
+
+    void loadPricing();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <PricingSection
       title="Image & Video Models"
-      description="State-of-the-art generation with models from OpenOctopus, ByteDance, Google, and more."
+      description="Temporary pricing preview for the current featured image model."
       className="px-6 pt-12 md:px-12 md:pt-16 lg:px-20"
     >
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[600px] text-sm">
+        <table className="w-full min-w-[560px] text-sm">
           <thead>
             <tr className="border-b border-black/10">
               <TableHeaderCell>Model</TableHeaderCell>
-              <TableHeaderCell>Unit</TableHeaderCell>
-              <TableHeaderCell>Price</TableHeaderCell>
-              <TableHeaderCell>Output per $1</TableHeaderCell>
+              <TableHeaderCell>Cost</TableHeaderCell>
+              <TableHeaderCell>Sell</TableHeaderCell>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr
-                key={row.name}
-                className="border-b border-black/6 transition-colors hover:bg-black/[0.02]"
-              >
+            {pricing ? (
+              <tr className="border-b border-black/6 transition-colors hover:bg-black/[0.02]">
                 <TableCell>
                   <span className="flex items-center gap-2 font-medium text-[#111111]">
-                    {row.name}
+                    {pricing.name}
                   </span>
                 </TableCell>
-                <TableCell className="font-mono text-xs text-black/60">
-                  {row.unit}
+                <TableCell className="font-mono text-[#111111]">
+                  {pricing.costLabel}
                 </TableCell>
                 <TableCell className="font-mono text-[#111111]">
-                  {row.price}
-                </TableCell>
-                <TableCell className="font-mono text-xs text-black/60">
-                  {formatOutputPerDollar(row.price, row.unit)}
+                  {pricing.sellLabel}
                 </TableCell>
               </tr>
-            ))}
+            ) : (
+              <tr className="border-b border-black/6">
+                <TableCell className="font-medium text-[#111111]">
+                  Nano Banana Pro
+                </TableCell>
+                <TableCell className="font-mono text-black/50">
+                  {error ? "Unavailable" : "Loading..."}
+                </TableCell>
+                <TableCell className="font-mono text-[#111111]">
+                  $0.10 / image
+                </TableCell>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
       <p className="mt-4 text-xs text-black/40">
-        Prices may vary based on resolution and generation parameters.{" "}
+        Cost is loaded from the pricing API. Sell price is temporarily shown as a
+        sample at $0.10 per image.{" "}
         <Link href="/docs" className="text-brand hover:underline">
           See full pricing documentation
         </Link>
       </p>
-    </PricingSection>
-  );
-}
-
-export function LanguageModelTable({ rows }: { rows: LLMRow[] }) {
-  return (
-    <PricingSection
-      title="Language Models"
-      description="Access leading LLMs for chat, reasoning, coding, and multimodal workflows."
-    >
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead>
-            <tr className="border-b border-black/10">
-              <TableHeaderCell>Model</TableHeaderCell>
-              <TableHeaderCell>Context</TableHeaderCell>
-              <TableHeaderCell>Input</TableHeaderCell>
-              <TableHeaderCell>Output</TableHeaderCell>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr
-                key={row.name}
-                className="border-b border-black/6 transition-colors hover:bg-black/[0.02]"
-              >
-                <TableCell>
-                  <span className="flex items-center gap-2 font-medium text-[#111111]">
-                    {row.name}
-                  </span>
-                </TableCell>
-                <TableCell className="font-mono text-xs text-black/60">
-                  {row.context}
-                </TableCell>
-                <TableCell className="font-mono text-[#111111]">
-                  {row.input}
-                </TableCell>
-                <TableCell className="font-mono text-xs text-black/60">
-                  {row.output}
-                </TableCell>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </PricingSection>
-  );
-}
-
-export function ServerlessGpuTable({ rows }: { rows: GpuRow[] }) {
-  return (
-    <PricingSection
-      title="Serverless GPU"
-      description="Deploy and scale GPU workloads with pay-per-second billing and enterprise-grade infrastructure."
-    >
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead>
-            <tr className="border-b border-black/10">
-              <TableHeaderCell>Tier</TableHeaderCell>
-              <TableHeaderCell>GPU</TableHeaderCell>
-              <TableHeaderCell>VRAM</TableHeaderCell>
-              <TableHeaderCell>Hourly</TableHeaderCell>
-              <TableHeaderCell>Per Second</TableHeaderCell>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr
-                key={`${row.gpu}-${i}`}
-                className="border-b border-black/6 transition-colors hover:bg-black/[0.02]"
-              >
-                <TableCell className="font-mono text-xs text-black/60">
-                  {row.tier}
-                </TableCell>
-                <TableCell>
-                  <span className="flex items-center gap-2 font-medium text-[#111111]">
-                    {row.gpu}
-                  </span>
-                </TableCell>
-                <TableCell className="font-mono text-xs text-black/60">
-                  {row.vram}
-                </TableCell>
-                <TableCell className="font-mono text-[#111111]">
-                  {row.hourly}
-                </TableCell>
-                <TableCell className="font-mono text-xs text-black/60">
-                  {row.perSecond}
-                </TableCell>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </PricingSection>
   );
 }
