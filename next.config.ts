@@ -13,6 +13,22 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: "/tools",
+          destination: "https://openoctopus-tools.vercel.app/tools",
+          basePath: false,
+        },
+        {
+          source: "/tools/:slug",
+          destination: "https://openoctopus-tools.vercel.app/tools/:slug",
+          basePath: false,
+        },
+      ],
+    };
+  },
 };
 
 export default nextConfig;
