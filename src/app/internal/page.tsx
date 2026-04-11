@@ -23,6 +23,7 @@ import {
   updateSupportedModelState,
 } from "./actions";
 import { BillingConfigEditor, CreateProviderModelForm, CreateRoutingRuleForm } from "./form-panels";
+import { InternalShell } from "./internal-shell";
 import { SubmitButton } from "./submit-button";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -281,45 +282,6 @@ function GuidanceCard({
   );
 }
 
-function TabBar({
-  activeTab,
-  selectedTemplateKey,
-}: {
-  activeTab: InternalTabKey;
-  selectedTemplateKey?: string;
-}) {
-  return (
-    <section className="rounded-sm border border-black/10 bg-white p-4">
-      <div className="flex flex-col gap-4">
-        <div className="overflow-x-auto">
-          <nav className="flex min-w-max gap-2">
-            {tabs.map((tab) => {
-              const active = tab.key === activeTab;
-
-              return (
-                <a
-                  key={tab.key}
-                  href={buildInternalHref(tab.key, selectedTemplateKey)}
-                  className={`inline-flex min-w-[148px] flex-col rounded-sm border px-3 py-3 text-left transition-colors ${
-                    active
-                      ? "border-black bg-black text-white"
-                      : "border-black/10 bg-[#faf9f6] text-black/75 hover:bg-white"
-                  }`}
-                >
-                  <span className="text-sm font-medium">{tab.label}</span>
-                  <span className={`mt-1 text-xs leading-5 ${active ? "text-white/72" : "text-black/45"}`}>
-                    {tab.description}
-                  </span>
-                </a>
-              );
-            })}
-          </nav>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function SectionShell({
   id,
   title,
@@ -522,6 +484,21 @@ export default async function InternalPage({
     selectedTemplateKey && selectedTemplateKey in providerTemplates
       ? providerTemplates[selectedTemplateKey as keyof typeof providerTemplates]
       : null;
+  const sidebarTabs = tabs.map((tab) => ({
+    ...tab,
+    count:
+      tab.key === "public-models"
+        ? data.metrics.publicModels
+        : tab.key === "providers"
+          ? data.metrics.providers
+          : tab.key === "credentials"
+            ? data.metrics.credentials
+            : tab.key === "models"
+              ? data.metrics.providerModels
+              : tab.key === "routes"
+                ? data.metrics.activeRoutes
+                : undefined,
+  }));
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#f7f6f1] text-[#111111]">
@@ -554,67 +531,7 @@ export default async function InternalPage({
             </div>
           </div>
 
-          <section className="mb-6 rounded-sm border border-black/10 bg-white p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-black">Quick Templates</h2>
-                <p className="mt-1 text-sm text-black/55">
-                  Pre-fill common provider onboarding values so operators do not start from a blank form.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <a
-                  href={buildInternalHref("providers", "gemini-direct")}
-                  className="inline-flex h-9 cursor-pointer items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
-                >
-                  Gemini Direct
-                </a>
-                <a
-                  href={buildInternalHref("providers", "wavespeed")}
-                  className="inline-flex h-9 cursor-pointer items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
-                >
-                  WaveSpeed
-                </a>
-                <a
-                  href={buildInternalHref(activeTab)}
-                  className="inline-flex h-9 cursor-pointer items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
-                >
-                  Clear
-                </a>
-              </div>
-            </div>
-            {selectedTemplate ? (
-              <div className="mt-4 flex items-center gap-1.5 bg-[#e8f0ff] px-3 py-2.5">
-                <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
-                <p className="text-xs leading-[1.35] text-[#355fb4]">
-                  Template loaded. Review each field and replace any placeholder values before saving.
-                </p>
-              </div>
-            ) : null}
-          </section>
-
-          <div className="mb-6">
-            <TabBar activeTab={activeTab} selectedTemplateKey={selectedTemplateKey} />
-          </div>
-
-          <div className="mb-6 flex flex-wrap gap-2 text-xs text-black/55">
-            <span className="rounded-sm border border-black/10 bg-white px-3 py-2">
-              Public models: {data.metrics.publicModels}
-            </span>
-            <span className="rounded-sm border border-black/10 bg-white px-3 py-2">
-              Providers: {data.metrics.providers}
-            </span>
-            <span className="rounded-sm border border-black/10 bg-white px-3 py-2">
-              Credentials: {data.metrics.credentials}
-            </span>
-            <span className="rounded-sm border border-black/10 bg-white px-3 py-2">
-              Provider models: {data.metrics.providerModels}
-            </span>
-            <span className="rounded-sm border border-black/10 bg-white px-3 py-2">
-              Active routes: {data.metrics.activeRoutes}
-            </span>
-          </div>
-
+          <InternalShell activeTab={activeTab} selectedTemplateKey={selectedTemplateKey} tabs={sidebarTabs}>
           {activeTab === "overview" ? (
             <>
               <article className="mb-6 space-y-3 md:mb-8">
@@ -852,6 +769,44 @@ export default async function InternalPage({
           {activeTab === "providers" ? (
             <>
               <GuidanceCard tab="providers" />
+              <section className="mb-6 rounded-sm border border-black/10 bg-white p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-black">Quick Templates</h2>
+                    <p className="mt-1 text-sm text-black/55">
+                      Pre-fill common provider onboarding values so operators do not start from a blank form.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={buildInternalHref("providers", "gemini-direct")}
+                      className="inline-flex h-9 cursor-pointer items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
+                    >
+                      Gemini Direct
+                    </a>
+                    <a
+                      href={buildInternalHref("providers", "wavespeed")}
+                      className="inline-flex h-9 cursor-pointer items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
+                    >
+                      WaveSpeed
+                    </a>
+                    <a
+                      href={buildInternalHref("providers")}
+                      className="inline-flex h-9 cursor-pointer items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
+                    >
+                      Clear
+                    </a>
+                  </div>
+                </div>
+                {selectedTemplate ? (
+                  <div className="mt-4 flex items-center gap-1.5 bg-[#e8f0ff] px-3 py-2.5">
+                    <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
+                    <p className="text-xs leading-[1.35] text-[#355fb4]">
+                      Template loaded. Review each field and replace any placeholder values before saving.
+                    </p>
+                  </div>
+                ) : null}
+              </section>
               <SectionShell
                 id="providers-panel"
                 title="Providers"
@@ -1540,6 +1495,7 @@ export default async function InternalPage({
               </div>
             </div>
           </section>
+          </InternalShell>
         </section>
       </div>
     </main>
