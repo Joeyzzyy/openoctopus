@@ -45,6 +45,14 @@ function buildRequestsPageHref(page: number) {
   return `/dashboard?${params.toString()}#requests`;
 }
 
+function buildVisibleRequestPages(currentPage: number, totalPages: number) {
+  const pages = new Set<number>([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+
+  return Array.from(pages)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((a, b) => a - b);
+}
+
 function ProviderLogo({
   name,
   kind,
@@ -137,7 +145,7 @@ export default async function DashboardPage({
       <div className="relative mx-auto max-w-7xl px-4 pb-10 xl:px-0">
         <div className="mt-8 grid gap-6 xl:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="hidden xl:block">
-            <DashboardSidebar items={topNav} userName={user.name} />
+            <DashboardSidebar items={topNav} userLabel={user.email ?? user.name} />
           </aside>
 
           <section className="min-h-[calc(100vh-108px)]">
@@ -260,12 +268,15 @@ export default async function DashboardPage({
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold text-black">Requests</h2>
                 <p className="mt-1 text-sm text-black/55">
-                  Recent routed requests and task states.
+                  All routed requests and task states, 10 per page.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
                   <span>{requestPagination.total} total</span>
+                </div>
+                <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
+                  <span>10 per page</span>
                 </div>
                 <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
                   <span>{modelsUsed} models used</span>
@@ -405,30 +416,52 @@ export default async function DashboardPage({
               </div>
 
               {requestPagination.totalPages > 1 ? (
-                <div className="flex items-center justify-between border-t border-black/10 px-3 py-3">
-                  <Link
-                    href={buildRequestsPageHref(Math.max(1, requestPagination.page - 1))}
-                    aria-disabled={requestPagination.page <= 1}
-                    className={cn(
-                      "inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
-                      requestPagination.page <= 1 && "pointer-events-none opacity-40"
-                    )}
-                  >
-                    Previous
-                  </Link>
+                <div className="flex flex-col gap-3 border-t border-black/10 px-3 py-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={buildRequestsPageHref(Math.max(1, requestPagination.page - 1))}
+                      aria-disabled={requestPagination.page <= 1}
+                      className={cn(
+                        "inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
+                        requestPagination.page <= 1 && "pointer-events-none opacity-40"
+                      )}
+                    >
+                      Previous
+                    </Link>
+                    <div className="flex items-center gap-2">
+                      {buildVisibleRequestPages(requestPagination.page, requestPagination.totalPages).map((page, index, pages) => (
+                        <div key={page} className="flex items-center gap-2">
+                          {index > 0 && page - pages[index - 1] > 1 ? (
+                            <span className="text-xs text-black/35">…</span>
+                          ) : null}
+                          <Link
+                            href={buildRequestsPageHref(page)}
+                            className={cn(
+                              "inline-flex h-8 min-w-8 items-center justify-center rounded-sm border px-2 text-xs font-medium transition-colors",
+                              page === requestPagination.page
+                                ? "border-black bg-black text-white"
+                                : "border-black/10 bg-white text-black/70 hover:bg-black/[0.03]"
+                            )}
+                          >
+                            {page}
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                    <Link
+                      href={buildRequestsPageHref(Math.min(requestPagination.totalPages, requestPagination.page + 1))}
+                      aria-disabled={requestPagination.page >= requestPagination.totalPages}
+                      className={cn(
+                        "inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
+                        requestPagination.page >= requestPagination.totalPages && "pointer-events-none opacity-40"
+                      )}
+                    >
+                      Next
+                    </Link>
+                  </div>
                   <span className="text-xs text-black/50">
                     Page {requestPagination.page} of {requestPagination.totalPages}
                   </span>
-                  <Link
-                    href={buildRequestsPageHref(Math.min(requestPagination.totalPages, requestPagination.page + 1))}
-                    aria-disabled={requestPagination.page >= requestPagination.totalPages}
-                    className={cn(
-                      "inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
-                      requestPagination.page >= requestPagination.totalPages && "pointer-events-none opacity-40"
-                    )}
-                  >
-                    Next
-                  </Link>
                 </div>
               ) : null}
             </div>

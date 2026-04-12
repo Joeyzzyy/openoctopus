@@ -8,10 +8,10 @@ type DashboardSidebarProps = {
     label: string;
     href: `#${string}`;
   }>;
-  userName: string;
+  userLabel: string;
 };
 
-export function DashboardSidebar({ items, userName }: DashboardSidebarProps) {
+export function DashboardSidebar({ items, userLabel }: DashboardSidebarProps) {
   const [activeHref, setActiveHref] = useState(items[0]?.href ?? "#overview");
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export function DashboardSidebar({ items, userName }: DashboardSidebarProps) {
     <div className="fixed left-[max(1rem,calc(50%-40rem))] top-8 z-30 w-[220px] rounded-sm border border-black/10 bg-white/92 p-3 shadow-[0_18px_48px_rgba(17,17,17,0.05)] backdrop-blur-sm">
       <div className="mb-3 border-b border-black/10 px-2 pb-3">
         <div className="inline-flex items-center rounded-sm bg-[#f4f4f1] px-2.5 py-1 text-sm text-black/80">
-          {userName}
+          {userLabel}
         </div>
       </div>
 
