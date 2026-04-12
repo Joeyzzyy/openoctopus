@@ -18,6 +18,7 @@ import {
   PublicModelsPanel,
   RoutesPanel,
 } from "./internal-management-panels";
+import { RequestRecordsClearForm } from "./request-records-clear-form";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -832,41 +833,11 @@ export default async function InternalPage({
                 </div>
 
                 {selectedRequestKeyRecord ? (
-                  <form
+                  <RequestRecordsClearForm
                     action={clearApiKeyRequestRecords}
-                    className="mb-4 rounded-sm border border-[#f0d5d0] bg-[#fff5f3] p-4"
-                  >
-                    <input type="hidden" name="apiKeyId" value={selectedRequestKeyRecord.id} />
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                      <div className="max-w-3xl">
-                        <p className="text-sm font-medium text-[#8d4336]">
-                          清除当前 API Key 的调用记录
-                        </p>
-                        <p className="mt-2 text-xs leading-5 text-[#8d4336]/78">
-                          将删除 API Key「{selectedRequestKeyRecord.name}」关联的 inference_requests、全部 usage_events，以及对应的 usage 扣费流水，包括已找不到请求明细的历史孤儿用量。其余非 usage 钱包流水会保留，并自动重算剩余账本余额。
-                        </p>
-                      </div>
-                      <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[280px]">
-                        <label className="block">
-                          <span className="mb-1 block text-[11px] tracking-[0.35px] text-[#8d4336]/70">
-                            输入“清除”确认
-                          </span>
-                          <input
-                            name="confirmText"
-                            placeholder="清除"
-                            required
-                            className="h-9 w-full rounded-sm border border-[#f0d5d0] bg-white px-3 text-sm text-black outline-none placeholder:text-black/25 focus:border-[#d89b90]"
-                          />
-                        </label>
-                        <button
-                          type="submit"
-                          className="inline-flex h-9 items-center justify-center rounded-sm bg-[#b54432] px-3 text-xs font-medium text-white transition-colors hover:bg-[#9f3a2c]"
-                        >
-                          清除该 Key 的请求与扣费记录
-                        </button>
-                      </div>
-                    </div>
-                  </form>
+                    apiKeyId={selectedRequestKeyRecord.id}
+                    apiKeyName={selectedRequestKeyRecord.name}
+                  />
                 ) : null}
 
                 <div className="mb-4 grid gap-3 md:grid-cols-4">
