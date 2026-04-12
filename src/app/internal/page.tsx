@@ -358,6 +358,52 @@ function EmptyState({
   );
 }
 
+function RequestMetricCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-sm border border-black/8 bg-white px-3 py-2.5">
+      <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">{label}</p>
+      <p className="mt-1 text-sm font-medium text-black">{value}</p>
+    </div>
+  );
+}
+
+function RequestBreakdownSection({
+  title,
+  items,
+  emptyLabel,
+}: {
+  title: string;
+  items: Array<{ label: string; value: string }>;
+  emptyLabel: string;
+}) {
+  return (
+    <section className="rounded-sm border border-black/8 bg-white px-3 py-3">
+      <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">{title}</p>
+      {items.length > 0 ? (
+        <div className="mt-3 grid gap-2">
+          {items.map((item) => (
+            <div
+              key={`${title}-${item.label}`}
+              className="flex items-center justify-between gap-3 rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-2 text-xs"
+            >
+              <span className="text-black/58">{item.label}</span>
+              <span className="font-mono text-black">{item.value}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-black/45">{emptyLabel}</p>
+      )}
+    </section>
+  );
+}
+
 function ReadinessItem({
   label,
   detail,
@@ -873,126 +919,86 @@ export default async function InternalPage({
                         key={request.id}
                         className="rounded-sm border border-black/10 bg-[#faf9f6] p-4"
                       >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
-                            {request.status}
-                          </span>
-                          <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
-                            {request.capability}
-                          </span>
-                        </div>
-
-                        <p className="mt-3 text-sm font-medium text-black">{request.public_model_slug}</p>
-                        <p className="mt-1 text-xs text-black/50">
-                          {request.providerName} / {request.upstreamModelSlug}
-                        </p>
-                        <p className="mt-1 text-xs text-black/45">
-                          {request.customerName} · {request.apiKeyName} · {request.apiKeyPrefix}
-                        </p>
-
-                        <div className="mt-4 grid gap-2 text-xs text-black/55 md:grid-cols-2">
-                          <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                            创建时间：{request.createdLabel}
-                          </div>
-                          <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                            完成时间：{request.completedLabel}
-                          </div>
-                          <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                            尝试次数：{request.attemptCount}
-                          </div>
-                          <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                            客户收费：{request.customerChargeLabel}
-                          </div>
-                          <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                            供应商成本：{request.providerCostLabel}
-                          </div>
-                          <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                            利润：{request.profitLabel}
-                          </div>
-                        </div>
-
-                        {request.lastAttempt ? (
-                          <div className="mt-4 rounded-sm border border-black/8 bg-white px-3 py-3 text-xs text-black/58">
-                            <div className="flex items-center justify-between gap-3">
-                              <span>最后一次尝试 #{request.lastAttempt.attempt_no}</span>
-                              <span>{request.lastAttempt.status}</span>
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
+                                {request.status}
+                              </span>
+                              <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
+                                {request.capability}
+                              </span>
                             </div>
-                            <div className="mt-2 flex items-center justify-between gap-3">
-                              <span>延迟</span>
-                              <span>{request.lastAttempt.latency_ms ?? "等待中"} ms</span>
-                            </div>
-                            {request.error_message || request.lastAttempt.error_message ? (
-                              <p className="mt-3 text-[#b54432]">
-                                {request.error_message ?? request.lastAttempt.error_message}
-                              </p>
-                            ) : null}
-                          </div>
-                        ) : null}
-
-                        {request.usageBreakdown.length > 0 ? (
-                          <div className="mt-4 rounded-sm border border-black/8 bg-white px-3 py-3">
-                            <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                              使用量指标
+                            <p className="mt-3 text-sm font-medium text-black">{request.public_model_slug}</p>
+                            <p className="mt-1 text-xs text-black/50">
+                              {request.providerName} / {request.upstreamModelSlug}
                             </p>
-                            <div className="mt-3 grid gap-2 md:grid-cols-3">
-                              {request.usageBreakdown.map((item) => (
-                                <div
-                                  key={`${request.id}-usage-${item.label}`}
-                                  className="rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-2 text-xs text-black/60"
-                                >
-                                  {item.label}: <span className="font-mono text-black">{item.value}</span>
-                                </div>
-                              ))}
-                            </div>
+                            <p className="mt-1 text-xs text-black/45">
+                              {request.customerName} · {request.apiKeyName} · {request.apiKeyPrefix}
+                            </p>
                           </div>
-                        ) : null}
 
-                        {request.customerComponentBreakdown.length > 0 ||
-                        request.providerComponentBreakdown.length > 0 ? (
-                          <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                            <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
-                              <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                                客户侧计费拆分
-                              </p>
-                              {request.customerComponentBreakdown.length > 0 ? (
-                                <div className="mt-3 grid gap-2">
-                                  {request.customerComponentBreakdown.map((item) => (
-                                    <div
-                                      key={`${request.id}-customer-${item.label}`}
-                                      className="flex items-center justify-between rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-2 text-xs text-black/60"
-                                    >
-                                      <span>{item.label}</span>
-                                      <span className="font-mono text-black">{item.value}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="mt-3 text-xs text-black/45">没有客户侧可计费组件</p>
-                              )}
-                            </div>
-
-                            <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
-                              <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                                供应商成本拆分
-                              </p>
-                              {request.providerComponentBreakdown.length > 0 ? (
-                                <div className="mt-3 grid gap-2">
-                                  {request.providerComponentBreakdown.map((item) => (
-                                    <div
-                                      key={`${request.id}-provider-${item.label}`}
-                                      className="flex items-center justify-between rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-2 text-xs text-black/60"
-                                    >
-                                      <span>{item.label}</span>
-                                      <span className="font-mono text-black">{item.value}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="mt-3 text-xs text-black/45">没有供应商侧可计费组件</p>
-                              )}
-                            </div>
+                          <div className="grid min-w-[280px] gap-2 sm:grid-cols-3 lg:w-[360px]">
+                            <RequestMetricCard label="客户收费" value={request.customerChargeLabel} />
+                            <RequestMetricCard label="供应商成本" value={request.providerCostLabel} />
+                            <RequestMetricCard label="利润" value={request.profitLabel} />
                           </div>
-                        ) : null}
+                        </div>
+
+                        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                          <section className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                            <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">请求摘要</p>
+                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                              <RequestMetricCard label="创建时间" value={request.createdLabel} />
+                              <RequestMetricCard label="完成时间" value={request.completedLabel} />
+                              <RequestMetricCard label="尝试次数" value={String(request.attemptCount)} />
+                              <RequestMetricCard
+                                label="最后延迟"
+                                value={
+                                  request.lastAttempt
+                                    ? `${request.lastAttempt.latency_ms ?? "等待中"} ms`
+                                    : "无尝试"
+                                }
+                              />
+                            </div>
+                            {request.lastAttempt ? (
+                              <div className="mt-3 rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-2.5 text-xs">
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="text-black/58">
+                                    最后一次尝试 #{request.lastAttempt.attempt_no}
+                                  </span>
+                                  <span className="font-medium text-black">
+                                    {request.lastAttempt.status}
+                                  </span>
+                                </div>
+                                {request.error_message || request.lastAttempt.error_message ? (
+                                  <p className="mt-2 leading-5 text-[#b54432]">
+                                    {request.error_message ?? request.lastAttempt.error_message}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </section>
+
+                          <RequestBreakdownSection
+                            title="使用量指标"
+                            items={request.usageBreakdown}
+                            emptyLabel="没有记录到使用量指标"
+                          />
+
+                          <div className="grid gap-3">
+                            <RequestBreakdownSection
+                              title="客户侧计费"
+                              items={request.customerComponentBreakdown}
+                              emptyLabel="没有客户侧可计费组件"
+                            />
+                            <RequestBreakdownSection
+                              title="供应商成本"
+                              items={request.providerComponentBreakdown}
+                              emptyLabel="没有供应商侧成本拆分"
+                            />
+                          </div>
+                        </div>
                       </article>
                     ))}
                   </div>
