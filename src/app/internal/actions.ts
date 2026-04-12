@@ -229,6 +229,63 @@ const updateProviderSchema = z.object({
   config: z.record(z.string(), z.unknown()).default({}),
 });
 
+const clearApiKeyRequestRecordsSchema = z.object({
+  apiKeyId: z.string().uuid(),
+  confirmText: z.literal("清除"),
+});
+
+export async function clearApiKeyRequestRecords(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = clearApiKeyRequestRecordsSchema.parse({
+    apiKeyId: formData.get("apiKeyId"),
+    confirmText: formData.get("confirmText"),
+  });
+
+  const { data: apiKey, error: apiKeyError } = await supabase
+    .from("api_keys")
+    .select("id, name, key_prefix")
+    .eq("id", parsed.apiKeyId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
+  if (apiKeyError) {
+    throw new Error(apiKeyError.message);
+  }
+
+  if (!apiKey) {
+    throw new Error("API Key 不属于当前工作区");
+  }
+
+  const { data: result, error } = await supabase.rpc("clear_request_records_for_api_key", {
+    p_workspace_id: workspaceId,
+    p_api_key_id: parsed.apiKeyId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "request_records.clear_by_api_key",
+    targetType: "api_key",
+    targetId: parsed.apiKeyId,
+    summary: `Cleared request records for API key ${apiKey.name}`,
+    details: {
+      apiKeyId: parsed.apiKeyId,
+      apiKeyName: apiKey.name,
+      keyPrefix: apiKey.key_prefix,
+      result: result ?? {},
+      walletTransactionsPreserved: false,
+    },
+  });
+
+  revalidatePath("/internal");
+  revalidatePath("/dashboard");
+}
+
 export async function updateProvider(formData: FormData) {
   const { supabase, userId, workspaceId } = await getInternalAdminContext();
 
