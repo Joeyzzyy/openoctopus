@@ -244,7 +244,8 @@ export async function getDashboardData({
       { data: budgetRows },
       { data: keyRows },
       { data: usageEvents },
-      { data: walletRows },
+      { data: walletSummaryRows },
+      { data: walletLedgerRows },
       providerResponse,
       providerModelResponse,
       routingRuleResponse,
@@ -256,6 +257,7 @@ export async function getDashboardData({
       supabase.from("budget_rules").select("id, scope, monthly_limit, api_key_id, model_id").eq("workspace_id", workspace.id).order("created_at", { ascending: true }),
       supabase.from("api_keys").select("id, name, key_prefix, environment, status, monthly_budget, last_used_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }),
       supabase.from("usage_events").select("id, endpoint, request_count, total_cost, status_code, created_at, api_key_id, model_id").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
+      supabase.from("wallet_transactions").select("amount_delta").eq("workspace_id", workspace.id),
       supabase.from("wallet_transactions").select("id, entry_type, amount_delta, description, created_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
       supabase.from("providers").select("id, name, kind, regions, status"),
       supabase.from("provider_models").select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id"),
@@ -269,8 +271,8 @@ export async function getDashboardData({
     ]);
 
     const currentMonthSpend = (keySummary ?? []).reduce((sum, row) => sum + Number(row.current_month_spend ?? 0), 0);
-    const walletBalance = (walletRows ?? []).reduce((sum, row) => sum + Number(row.amount_delta ?? 0), 0);
-    const totalTopUps = (walletRows ?? []).reduce((sum, row) => {
+    const walletBalance = (walletSummaryRows ?? []).reduce((sum, row) => sum + Number(row.amount_delta ?? 0), 0);
+    const totalTopUps = (walletSummaryRows ?? []).reduce((sum, row) => {
       const delta = Number(row.amount_delta ?? 0);
       return delta > 0 ? sum + delta : sum;
     }, 0);
@@ -499,7 +501,7 @@ export async function getDashboardData({
         cost: formatCurrency(Number(row.total_cost ?? 0)),
         status: row.status_code ? String(row.status_code) : "n/a",
       })),
-      ledgerRows: (walletRows ?? []).map((row) => ({
+      ledgerRows: (walletLedgerRows ?? []).map((row) => ({
         title:
           row.entry_type === "topup"
             ? "Wallet top-up"
