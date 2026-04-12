@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 
@@ -38,14 +37,18 @@ export function Header() {
 
           {/* Right side */}
           <div className="hidden md:flex items-center gap-3">
-            <Button asChild variant="ghost" className="text-slate-600 hover:text-slate-900 hover:bg-slate-100">
-              <Link href="/login">Sign In</Link>
-            </Button>
-            <Button asChild className="bg-sky-600 hover:bg-sky-700 text-white">
-              <Link href="/login">
+            <Link
+              href="/login"
+              className="inline-flex h-8 items-center justify-center rounded-lg px-2.5 text-sm font-medium text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900"
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex h-8 items-center justify-center rounded-lg bg-sky-600 px-2.5 text-sm font-medium text-white transition-all hover:bg-sky-700"
+            >
               Get Started
-              </Link>
-            </Button>
+            </Link>
           </div>
 
           {/* Mobile toggle */}
@@ -64,8 +67,18 @@ export function Header() {
             <Link href="/pricing" className="block px-3 py-2 text-sm text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100">Pricing</Link>
             <Link href="/enterprise" className="block px-3 py-2 text-sm text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100">Enterprise</Link>
             <div className="pt-2 space-y-2">
-              <Button asChild variant="ghost" className="w-full text-slate-600"><Link href="/login">Sign In</Link></Button>
-              <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 text-white"><Link href="/login">Get Started</Link></Button>
+              <Link
+                href="/login"
+                className="inline-flex h-8 w-full items-center justify-center rounded-lg text-sm font-medium text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/login"
+                className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-blue-600 text-sm font-medium text-white transition-all hover:bg-blue-700"
+              >
+                Get Started
+              </Link>
             </div>
           </div>
         )}
