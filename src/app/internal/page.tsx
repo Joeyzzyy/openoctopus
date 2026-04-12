@@ -3,7 +3,6 @@ import {
   CircleAlert,
   Fingerprint,
   Network,
-  ReceiptText,
   ShieldAlert,
   ShieldCheck,
   Waypoints,
@@ -1051,20 +1050,6 @@ export default async function InternalPage({
               </SectionShell>
             </section>
           ) : null}
-
-          <section className="mt-6 rounded-sm border border-black/10 bg-white p-4">
-            <div className="flex items-start gap-3">
-              <div className="inline-flex size-8 shrink-0 items-center justify-center rounded-sm bg-[#f7f7f4] text-black/55">
-                <ReceiptText className="size-4" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-black">仅使用真实数据的内部工作区</p>
-                <p className="mt-2 text-sm leading-6 text-black/55">
-                  这个控制台默认没有任何上游供应商。请从零录入真实供应商、真实密钥引用、真实供应商模型和真实路由。
-                </p>
-              </div>
-            </div>
-          </section>
           </InternalShell>
         </section>
       </div>
