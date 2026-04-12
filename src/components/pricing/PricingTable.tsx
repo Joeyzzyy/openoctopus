@@ -142,8 +142,8 @@ export function ImageVideoTable() {
         </table>
       </div>
       <p className="mt-4 text-xs text-black/40">
-        Cost is loaded from the pricing API. Sell price is temporarily shown as a
-        sample at $0.10 per image.{" "}
+        Cost and sell price are loaded from the active marketing route and the
+        current public model pricing configured in internal.{" "}
         <Link href="/docs" className="text-brand hover:underline">
           See full pricing documentation
         </Link>

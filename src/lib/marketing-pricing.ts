@@ -1,8 +1,9 @@
 import "server-only";
 
+import { normalizeBillingConfig, parseBillingConfig } from "@/lib/billing-config";
 import { createClient } from "@/lib/supabase/server";
 
-const DEFAULT_SELL_PRICE = 0.1;
+const IMAGE_OUTPUT_TOKENS_PER_IMAGE = 1290;
 
 type ProviderModelPricing = Record<string, unknown> | null;
 type SupportedModelBillingConfig = Record<string, unknown> | null;
@@ -33,16 +34,36 @@ function extractProviderModelCost(pricing: ProviderModelPricing) {
     return null;
   }
 
-  const directPerImage =
-    readNumeric(pricing.costPerImage) ??
-    readNumeric(pricing.costPerUnit);
+  try {
+    const normalized = normalizeBillingConfig(parseBillingConfig(pricing));
+    const charges = normalized.charges;
+    const perImage = readNumeric(charges.perImage);
 
-  if (directPerImage !== null) {
-    return directPerImage;
-  }
+    if (perImage !== null) {
+      return perImage;
+    }
 
-  if (pricing.billingMode === "hybrid" && pricing.charges && typeof pricing.charges === "object") {
-    return readNumeric((pricing.charges as Record<string, unknown>).perImage);
+    const inputTokenCost = readNumeric(charges.inputTextTokensPerMillion) ?? 0;
+    const outputTokenCost = readNumeric(charges.outputTextTokensPerMillion);
+
+    if (outputTokenCost !== null) {
+      return (
+        (IMAGE_OUTPUT_TOKENS_PER_IMAGE / 1_000_000) * outputTokenCost +
+        (24 / 1_000_000) * inputTokenCost
+      );
+    }
+  } catch {
+    const directPerImage =
+      readNumeric(pricing.costPerImage) ??
+      readNumeric(pricing.costPerUnit);
+
+    if (directPerImage !== null) {
+      return directPerImage;
+    }
+
+    if (pricing.billingMode === "hybrid" && pricing.charges && typeof pricing.charges === "object") {
+      return readNumeric((pricing.charges as Record<string, unknown>).perImage);
+    }
   }
 
   return null;
@@ -52,21 +73,43 @@ function extractSupportedModelCost(
   billingConfig: SupportedModelBillingConfig,
   defaultUnitCost: unknown
 ) {
-  if (billingConfig && billingConfig.billingMode === "hybrid" && billingConfig.charges && typeof billingConfig.charges === "object") {
-    const hybridPerImage = readNumeric(
-      (billingConfig.charges as Record<string, unknown>).perImage
-    );
+  if (billingConfig) {
+    try {
+      const normalized = normalizeBillingConfig(parseBillingConfig(billingConfig));
+      const charges = normalized.charges;
+      const perImage = readNumeric(charges.perImage);
 
-    if (hybridPerImage !== null) {
-      return hybridPerImage;
-    }
-  }
+      if (perImage !== null) {
+        return perImage;
+      }
 
-  if (billingConfig && billingConfig.billingMode === "per_image") {
-    const perImage = readNumeric(billingConfig.costPerImage);
+      const outputTokenCost = readNumeric(charges.outputTextTokensPerMillion);
+      const inputTokenCost = readNumeric(charges.inputTextTokensPerMillion) ?? 0;
 
-    if (perImage !== null) {
-      return perImage;
+      if (outputTokenCost !== null) {
+        return (
+          (IMAGE_OUTPUT_TOKENS_PER_IMAGE / 1_000_000) * outputTokenCost +
+          (24 / 1_000_000) * inputTokenCost
+        );
+      }
+    } catch {
+      if (billingConfig.billingMode === "hybrid" && billingConfig.charges && typeof billingConfig.charges === "object") {
+        const hybridPerImage = readNumeric(
+          (billingConfig.charges as Record<string, unknown>).perImage
+        );
+
+        if (hybridPerImage !== null) {
+          return hybridPerImage;
+        }
+      }
+
+      if (billingConfig.billingMode === "per_image") {
+        const perImage = readNumeric(billingConfig.costPerImage);
+
+        if (perImage !== null) {
+          return perImage;
+        }
+      }
     }
   }
 
@@ -115,10 +158,10 @@ export async function getMarketingImagePricing(): Promise<MarketingImagePricing>
   );
 
   return {
-    name: providerModel?.upstream_model_slug ?? supportedModel?.display_name ?? "Unknown image model",
+    name: supportedModel?.display_name ?? providerModel?.upstream_model_slug ?? "Unknown image model",
     billingUnit: "image",
     costUsd: providerModelCost ?? supportedModelCost,
-    sellUsd: DEFAULT_SELL_PRICE,
+    sellUsd: supportedModelCost ?? 0,
     publicModelSlug: route?.public_model_slug ?? supportedModel?.model_slug ?? null,
   };
 }
