@@ -420,6 +420,10 @@ export function PublicModelsPanel({
         </ManagementDialog>
       </div>
 
+      <div className="rounded-sm border border-[#d8e4f8] bg-[#f2f7ff] px-4 py-3 text-sm text-[#274a86]">
+        这里维护的是用户看到的模型入口和用户售价。不要在这里填写供应商成本。
+      </div>
+
       {models.length > 0 ? (
         models.map((model) => (
           <div key={model.id} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
@@ -853,18 +857,18 @@ export function ModelsPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-black/55">已有供应商模型</div>
+        <div className="text-sm text-black/55">已有上游实现</div>
         <ManagementDialog
           trigger={
             <button type="button" disabled={!hasProviders || !hasSupportedModels}>
               <ModalButton>
                 <Plus className="size-3.5" />
-                新建供应商模型
+                新建上游实现
               </ModalButton>
             </button>
           }
-          title="新建供应商模型"
-          description="在独立弹窗中，把公共模型映射到具体的上游实现。"
+          title="新建上游实现"
+          description="在独立弹窗中，把公共模型映射到某个供应商的具体上游实现。"
         >
           {({ close }) => (
             <CreateProviderModelForm
@@ -883,6 +887,10 @@ export function ModelsPanel({
         </ManagementDialog>
       </div>
 
+      <div className="rounded-sm border border-[#f1dfc6] bg-[#fff8ee] px-4 py-3 text-sm text-[#8a5b12]">
+        这里维护的是供应商真实成本和上游实现，不是用户售价。用户售价请去“公共模型”里改。
+      </div>
+
       {providerModels.length > 0 ? (
         providerModels.map((item) => (
           <div key={item.id} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
@@ -897,6 +905,9 @@ export function ModelsPanel({
                 <p className="mt-3 text-sm font-medium text-black">{item.public_model_slug}</p>
                 <p className="mt-1 text-xs text-black/50">公共模型：{item.supportedModelName}</p>
                 <p className="mt-1 text-xs text-black/50">上游模型：{item.upstream_model_slug}</p>
+                <p className="mt-1 text-xs text-[#8a5b12]">
+                  这里的价格 = 供应商成本；用户售价不在这里改。
+                </p>
               </div>
 
               <ManagementDialog
@@ -925,7 +936,7 @@ export function ModelsPanel({
                     defaultOutputSchema={item.outputSchemaText}
                     defaultActive={item.active}
                     disabled={!hasProviders || !hasSupportedModels}
-                    submitLabel="保存供应商模型"
+                    submitLabel="保存上游实现"
                     className="grid gap-4"
                     onSuccess={close}
                   />
@@ -951,7 +962,7 @@ export function ModelsPanel({
         ))
       ) : (
         <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
-          <p className="text-sm font-medium text-black">还没有供应商模型</p>
+          <p className="text-sm font-medium text-black">还没有上游实现</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             创建供应商后，在这里补齐真实上游模型标识和成本配置。
           </p>

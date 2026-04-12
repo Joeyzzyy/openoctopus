@@ -458,7 +458,7 @@ export function CreateProviderModelForm({
           <BillingConfigEditor
             name="pricing"
             initialValue={defaultPricing}
-            componentHint="按供应商真实结算方式填写内部成本。这里决定请求的 provider cost。"
+            componentHint="按供应商真实结算方式填写内部进货成本。这里决定 provider cost，不影响用户售价。"
             generatedLabel="生成的供应商计费配置"
           />
         </div>

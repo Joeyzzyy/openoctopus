@@ -27,29 +27,29 @@ const tabs = [
     description: "控制台健康状态与配置指引。",
   },
   {
-    key: "public-models",
-    label: "公共模型",
-    description: "面向客户的能力目录。",
+    key: "providers",
+    label: "1. 供应商",
+    description: "先登记 Google、WaveSpeed 等上游。",
   },
   {
-    key: "providers",
-    label: "供应商",
-    description: "真实上游供应商记录。",
+    key: "public-models",
+    label: "2. 公共模型",
+    description: "定义用户看到的模型入口和售价。",
   },
   {
     key: "credentials",
-    label: "凭证",
-    description: "绑定到供应商的密钥引用。",
+    label: "3. 凭证",
+    description: "给供应商绑定真实密钥。",
   },
   {
     key: "models",
-    label: "供应商模型",
-    description: "公共模型对应的上游实现。",
+    label: "4. 上游实现",
+    description: "把供应商挂到公共模型，并填写内部成本。",
   },
   {
     key: "routes",
-    label: "路由",
-    description: "不同实现之间的流量切换。",
+    label: "5. 路由",
+    description: "决定当前流量走哪个供应商实现。",
   },
   {
     key: "requests",
@@ -103,34 +103,34 @@ const tabGuidance: Record<
     next: string;
   }
 > = {
-  "public-models": {
-    relation:
-      "定义用户看到的统一能力层。后面的供应商模型和路由都围绕这个公共能力做映射和流量切换。",
-    prerequisite: "这是全链路的起点。首次搭建时先建它；后续维护时主要在这里新增或停用对外能力。",
-    next: "建完后去供应商，录入真实上游供应商。",
-  },
   providers: {
     relation:
-      "定义真实上游供应商，是凭证和供应商模型的归属对象。一个供应商可以挂多组凭证，也可以承载多个上游模型。",
-    prerequisite: "通常在公共模型之后创建。没有供应商，后面的凭证和模型都无法落地。",
-    next: "如果是首次接入新供应商，下一步去凭证；如果凭证已齐全，也可以直接去供应商模型。",
+      "这里记录真实上游供应商，例如 Google、WaveSpeed。它只描述供应商本身的基础信息，不代表用户可见的模型。",
+    prerequisite: "这是第一步。先把供应商录进去，后面的凭证和上游实现都要依附在供应商下面。",
+    next: "供应商创建后，去公共模型定义用户可见的模型入口和售价。",
+  },
+  "public-models": {
+    relation:
+      "这里定义用户看到的模型入口，例如 `openoctopus/gemini-image`。这里的价格是用户售价，不是供应商成本。",
+    prerequisite: "通常是第二步。供应商和公共模型彼此独立，但后面的上游实现需要同时依附这两者。",
+    next: "公共模型定义好后，去凭证给供应商绑定可用密钥。",
   },
   credentials: {
     relation:
-      "给供应商绑定真实可用的密钥引用和环境信息。它不直接暴露给用户，但决定这个供应商是否可运行。",
-    prerequisite: "必须先有供应商。你已经有一套全链路时，这里更多是做密钥轮换、环境切换和启停管理。",
-    next: "凭证准备好后去供应商模型，把这个供应商的真实上游模型挂到公共模型上。",
+      "凭证只属于供应商，用来保存真实可用的密钥引用和环境信息。它不影响用户售价，只决定这个供应商能不能调用。",
+    prerequisite: "必须先有供应商。这通常是第三步。",
+    next: "凭证准备好后，去上游实现，把某个供应商的真实模型挂到公共模型上，并填写内部成本。",
   },
   models: {
     relation:
-      "这是公共模型和供应商之间的映射层。每条供应商模型代表某个供应商对某个公共模型的一个具体实现。",
-    prerequisite: "必须同时先有公共模型和供应商。没有这两边，映射关系无法建立。",
-    next: "映射建好后去路由，决定线上主路由和回退路由走哪条实现。",
+      "这里是连接公共模型和供应商的映射层。每条上游实现代表“某个供应商提供某个公共模型的一种实现”。这里填写的是供应商成本，不是用户售价。",
+    prerequisite: "必须同时先有供应商、公共模型和可用凭证。没有这三者，上游实现就没有意义。",
+    next: "映射建好后去路由，决定线上主路由和回退实现走哪条。",
   },
   routes: {
     relation:
-      "路由决定某个公共模型当前把流量发到哪个供应商模型，是全链路真正生效的切换层。",
-    prerequisite: "必须先有兼容的供应商模型。你已经建好一套链路时，这里就是主要的上线、切流和故障切换面板。",
+      "路由决定某个公共模型当前把流量发到哪个上游实现，是全链路真正生效的切换层。",
+    prerequisite: "必须先有兼容的上游实现。你已经建好一套链路后，这里就是上线、切流和故障切换面板。",
     next: "切流后去请求记录看真实调用表现，去审计看变更记录。",
   },
 };
@@ -289,6 +289,32 @@ function GuidanceCard({
           <p className="text-[11px] tracking-[0.35px] text-black/45">下一步</p>
           <p className="mt-2 text-sm leading-6 text-black/68">{guidance.next}</p>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function SetupOrderCard() {
+  const steps = [
+    "1. 先建供应商：只填 Google / WaveSpeed 这类上游基础信息，例如名称、slug、base URL。",
+    "2. 再建公共模型：定义用户可见的模型入口，例如 `openoctopus/gemini-image`，这里填的是用户售价。",
+    "3. 然后配凭证：把真实密钥绑定到供应商。",
+    "4. 再建上游实现：把“某个供应商的某个真实模型”挂到某个公共模型上，这里填的是供应商成本。",
+    "5. 最后配路由：决定线上默认走哪个上游实现，是否有回退实现。",
+  ];
+
+  return (
+    <section className="mb-6 rounded-sm border border-black/10 bg-white p-4">
+      <h2 className="text-xl font-semibold text-black">推荐操作顺序</h2>
+      <p className="mt-1 text-sm text-black/55">
+        先把供应商、售价、凭证、上游实现、路由这五层分清，再去录数据，整个后台就不会绕。
+      </p>
+      <div className="mt-4 grid gap-3">
+        {steps.map((step) => (
+          <div key={step} className="rounded-sm border border-black/8 bg-[#faf9f6] px-4 py-3 text-sm text-black/72">
+            {step}
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -465,10 +491,11 @@ export default async function InternalPage({
           <InternalShell activeTab={activeTab} selectedTemplateKey={selectedTemplateKey} tabs={sidebarTabs}>
           {activeTab === "overview" ? (
             <>
+              <SetupOrderCard />
               <article className="mb-6 space-y-3 md:mb-8">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <OverviewCard
-                    title="公共模型"
+                    title="公共模型（用户售价）"
                     value={data.metrics.publicModels}
                     note={
                       hasSupportedModels
@@ -488,7 +515,7 @@ export default async function InternalPage({
                     icon={ShieldCheck}
                   />
                   <OverviewCard
-                    title="供应商模型"
+                    title="上游实现（供应商成本）"
                     value={data.metrics.providerModels}
                     note={
                       hasProviderModels
@@ -574,13 +601,13 @@ export default async function InternalPage({
               <section className="mb-6">
                 <SectionShell
                 id="public-models-panel"
-                title="公共模型"
-                description="在这里定义面向客户的 OpenOctopus 能力。多个供应商可以实现同一个公共模型。"
+                title="公共模型（用户售价）"
+                description="这里定义用户看到的模型入口，以及用户侧售价。多个供应商可以共同实现同一个公共模型。"
                 >
                 <div className="mb-4 flex items-center gap-1.5 bg-[#e8f0ff] px-3 py-2.5">
                   <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
                   <p className="text-xs leading-[1.35] text-[#355fb4]">
-                    这是实际的聚合层。如果两个供应商都提供 Gemini 2.5 图片生成能力，它们应该都挂到同一个公共模型，例如 <code className="rounded bg-white px-1 py-0.5">openoctopus/gemini-image</code>。
+                    这里填的是用户看到的模型入口和用户售价，不是供应商成本。如果两个供应商都提供 Gemini 2.5 图片生成能力，它们应该都挂到同一个公共模型，例如 <code className="rounded bg-white px-1 py-0.5">openoctopus/gemini-image</code>。
                   </p>
                 </div>
                 <PublicModelsPanel models={data.supportedModels} capabilityOptions={capabilityOptions} />
@@ -682,13 +709,13 @@ export default async function InternalPage({
               <section className="mt-6">
                 <SectionShell
                 id="models-panel"
-                title="供应商模型"
-                description="把 OpenOctopus 公共模型 slug 映射到真实上游模型标识。"
+                title="上游实现（供应商成本）"
+                description="把公共模型映射到真实上游模型，并填写内部供应商成本。这里不是用户售价。"
                 >
                 <div className="mb-4 flex items-center gap-1.5 bg-[#e8f0ff] px-3 py-2.5">
                   <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
                   <p className="text-xs leading-[1.35] text-[#355fb4]">
-                    供应商模型会挂到公共模型目录下。这样所有 Gemini 能力实现都会被归到同一个客户侧能力入口。
+                    这里填的是供应商真实结算成本，不是用户售价。用户售价在“公共模型”里维护；这里维护的是某个供应商对这个公共模型的一种实现和进货成本。
                   </p>
                 </div>
                 <ModelsPanel
