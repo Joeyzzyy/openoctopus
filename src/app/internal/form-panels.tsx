@@ -381,7 +381,7 @@ export function CreateProviderModelForm({
       <input type="hidden" name="pricingSourceEvidence" value={defaultPricingSourceEvidence} />
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">公共模型</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">可售模型</span>
           <select
             name="supportedModelId"
             value={supportedModelId}
@@ -396,11 +396,11 @@ export function CreateProviderModelForm({
                 </option>
               ))
             ) : (
-              <option value="">请先创建公共模型</option>
+              <option value="">请先创建可售模型</option>
             )}
           </select>
           <FieldHint
-            help="选择这个供应商模型所实现的对外能力。能力类型会跟随所选公共模型自动推断。"
+            help="选择这个供应商模型所实现的对外能力。能力类型会跟随所选可售模型自动推断。"
           />
         </label>
 
@@ -437,7 +437,7 @@ export function CreateProviderModelForm({
             name="capability"
             value={selectedSupportedModel?.capability ?? ""}
           />
-          <FieldHint help="这里跟随公共模型锁定，避免把图片和视频实现混在一起。" />
+          <FieldHint help="这里跟随可售模型锁定，避免把图片和视频实现混在一起。" />
         </label>
 
         <label className="block">
@@ -503,7 +503,7 @@ export function CreateProviderModelForm({
             disabled={disabled}
             className="block w-full rounded-sm border border-black/10 bg-white px-3 py-2 text-sm text-black file:mr-3 file:rounded-sm file:border-0 file:bg-black file:px-3 file:py-2 file:text-xs file:font-medium file:text-white"
           />
-          <FieldHint help="可选，上传官方价格页截图。保存后会把文件路径记录到上游实现里。" />
+          <FieldHint help="可选，上传官方价格页截图。保存后会把文件路径记录到供应商模型里。" />
         </label>
 
         <label className="flex items-center gap-3 rounded-sm border border-black/10 bg-white px-3 py-3 text-sm text-black/72">
@@ -589,7 +589,7 @@ export function CreateRoutingRuleForm({
       ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">公共模型</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">可售模型</span>
           <select
             name="supportedModelId"
             value={supportedModelId}
@@ -604,7 +604,7 @@ export function CreateRoutingRuleForm({
                 </option>
               ))
             ) : (
-              <option value="">请先创建公共模型</option>
+              <option value="">请先创建可售模型</option>
             )}
           </select>
           <FieldHint help="选择要上线的客户侧能力入口。" />
@@ -622,7 +622,7 @@ export function CreateRoutingRuleForm({
             name="capability"
             value={selectedSupportedModel?.capability ?? ""}
           />
-          <FieldHint help="跟随所选公共模型自动锁定。" />
+          <FieldHint help="跟随所选可售模型自动锁定。" />
         </label>
 
         <label className="block">
@@ -643,7 +643,7 @@ export function CreateRoutingRuleForm({
               <option value="">暂无兼容的供应商模型</option>
             )}
           </select>
-          <FieldHint help="这里只展示属于当前公共模型和能力类型的实现。" />
+          <FieldHint help="这里只展示属于当前可售模型和能力类型的实现。" />
         </label>
 
         <label className="block">
@@ -661,7 +661,7 @@ export function CreateRoutingRuleForm({
               </option>
             ))}
           </select>
-          <FieldHint help="可选，必须来自同一个公共模型的备用实现。" />
+          <FieldHint help="可选，必须来自同一个可售模型的备用实现。" />
         </label>
 
         <label className="block">

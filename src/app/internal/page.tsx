@@ -33,24 +33,24 @@ const tabs = [
     description: "先登记 Google、WaveSpeed 等上游。",
   },
   {
-    key: "public-models",
-    label: "2. 公共模型",
-    description: "定义用户看到的模型入口和售价。",
-  },
-  {
     key: "credentials",
-    label: "3. 凭证",
+    label: "2. 凭证",
     description: "给供应商绑定真实密钥。",
   },
   {
+    key: "public-models",
+    label: "3. 可售模型",
+    description: "定义用户看到的模型型号和售价。",
+  },
+  {
     key: "models",
-    label: "4. 上游实现",
-    description: "把供应商挂到公共模型，并填写内部成本。",
+    label: "4. 供应商模型",
+    description: "把供应商挂到可售模型，并填写内部成本。",
   },
   {
     key: "routes",
     label: "5. 路由",
-    description: "决定当前流量走哪个供应商实现。",
+    description: "决定当前流量走哪个供应商模型。",
   },
   {
     key: "requests",
@@ -107,31 +107,31 @@ const tabGuidance: Record<
   providers: {
     relation:
       "这里记录真实上游供应商，例如 Google、WaveSpeed。它只描述供应商本身的基础信息，不代表用户可见的模型。",
-    prerequisite: "这是第一步。先把供应商录进去，后面的凭证和上游实现都要依附在供应商下面。",
-    next: "供应商创建后，去公共模型定义用户可见的模型入口和售价。",
+    prerequisite: "这是第一步。先把供应商录进去，后面的凭证和供应商模型都要依附在供应商下面。",
+    next: "供应商创建后，去可售模型定义用户可见的模型型号和售价。",
   },
   "public-models": {
     relation:
-      "这里定义用户看到的模型入口，例如 `openoctopus/gemini-image`。这里的价格是用户售价，不是供应商成本。",
-    prerequisite: "通常是第二步。供应商和公共模型彼此独立，但后面的上游实现需要同时依附这两者。",
-    next: "公共模型定义好后，去凭证给供应商绑定可用密钥。",
+      "这里定义用户看到的模型型号，例如 `openoctopus/gemini-2.5-flash-image`。这里的价格是用户售价，不是供应商成本。",
+    prerequisite: "通常是第三步。供应商和可售模型彼此独立，但后面的供应商模型需要同时依附这两者。",
+    next: "可售模型定义好后，去供应商模型把真实上游模型挂上来，并填写内部成本。",
   },
   credentials: {
     relation:
       "凭证只属于供应商，用来保存真实可用的密钥引用和环境信息。它不影响用户售价，只决定这个供应商能不能调用。",
-    prerequisite: "必须先有供应商。这通常是第三步。",
-    next: "凭证准备好后，去上游实现，把某个供应商的真实模型挂到公共模型上，并填写内部成本。",
+    prerequisite: "必须先有供应商。这通常是第二步。",
+    next: "凭证准备好后，去可售模型或供应商模型继续完成对外型号和成本配置。",
   },
   models: {
     relation:
-      "这里是连接公共模型和供应商的映射层。每条上游实现代表“某个供应商提供某个公共模型的一种实现”。这里填写的是供应商成本，不是用户售价。",
-    prerequisite: "必须同时先有供应商、公共模型和可用凭证。没有这三者，上游实现就没有意义。",
+      "这里是连接可售模型和供应商的映射层。每条供应商模型代表“某个供应商提供某个可售模型的一种实现”。这里填写的是供应商成本，不是用户售价。",
+    prerequisite: "必须同时先有供应商、可售模型和可用凭证。没有这三者，供应商模型就没有意义。",
     next: "映射建好后去路由，决定线上主路由和回退实现走哪条。",
   },
   routes: {
     relation:
-      "路由决定某个公共模型当前把流量发到哪个上游实现，是全链路真正生效的切换层。",
-    prerequisite: "必须先有兼容的上游实现。你已经建好一套链路后，这里就是上线、切流和故障切换面板。",
+      "路由决定某个可售模型当前把流量发到哪个供应商模型，是全链路真正生效的切换层。",
+    prerequisite: "必须先有兼容的供应商模型。你已经建好一套链路后，这里就是上线、切流和故障切换面板。",
     next: "切流后去请求记录看真实调用表现，去审计看变更记录。",
   },
 };
@@ -292,17 +292,17 @@ function GuidanceCard({
 function SetupOrderCard() {
   const steps = [
     "1. 先建供应商：只填 Google / WaveSpeed 这类上游基础信息，例如名称、slug、base URL。",
-    "2. 再建公共模型：定义用户可见的模型入口，例如 `openoctopus/gemini-image`，这里填的是用户售价。",
+    "2. 再建可售模型：定义用户可见的模型型号，例如 `openoctopus/gemini-2.5-flash-image`，这里填的是用户售价。",
     "3. 然后配凭证：把真实密钥绑定到供应商。",
-    "4. 再建上游实现：把“某个供应商的某个真实模型”挂到某个公共模型上，这里填的是供应商成本。",
-    "5. 最后配路由：决定线上默认走哪个上游实现，是否有回退实现。",
+    "4. 再建供应商模型：把“某个供应商的某个真实模型”挂到某个可售模型上，这里填的是供应商成本。",
+    "5. 最后配路由：决定线上默认走哪个供应商模型，是否有回退实现。",
   ];
 
   return (
     <section className="mb-6 rounded-sm border border-black/10 bg-white p-4">
       <h2 className="text-xl font-semibold text-black">推荐操作顺序</h2>
       <p className="mt-1 text-sm text-black/55">
-        先把供应商、售价、凭证、上游实现、路由这五层分清，再去录数据，整个后台就不会绕。
+        先把供应商、售价、凭证、供应商模型、路由这五层分清，再去录数据，整个后台就不会绕。
       </p>
       <div className="mt-4 grid gap-3">
         {steps.map((step) => (
@@ -536,12 +536,12 @@ export default async function InternalPage({
               <article className="mb-6 space-y-3 md:mb-8">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <OverviewCard
-                    title="公共模型（用户售价）"
+                    title="可售模型（用户售价）"
                     value={data.metrics.publicModels}
                     note={
                       hasSupportedModels
                         ? `${data.metrics.publicModels} 个已启用的客户侧能力`
-                        : "还没有定义公共能力"
+                        : "还没有定义可售模型"
                     }
                     icon={Network}
                   />
@@ -556,11 +556,11 @@ export default async function InternalPage({
                     icon={ShieldCheck}
                   />
                   <OverviewCard
-                    title="上游实现（供应商成本）"
+                    title="供应商模型（供应商成本）"
                     value={data.metrics.providerModels}
                     note={
                       hasProviderModels
-                        ? `${data.metrics.providerModels} 条供应商侧模型记录`
+                        ? `${data.metrics.providerModels} 条供应商模型记录`
                         : "还没有接入供应商模型"
                     }
                     icon={ShieldCheck}
@@ -599,8 +599,8 @@ export default async function InternalPage({
                       <p className="text-sm font-medium text-black">当前链路</p>
                       <div className="mt-4 grid gap-3 text-sm text-black/65">
                         <ReadinessItem
-                          label="公共模型"
-                          detail={hasSupportedModels ? "已配置，可作为客户侧能力入口参与路由。" : "缺少公共能力定义。"}
+                          label="可售模型"
+                          detail={hasSupportedModels ? "已配置，可作为客户侧能力入口参与路由。" : "缺少可售模型定义。"}
                           ready={hasSupportedModels}
                         />
                         <ReadinessItem
@@ -610,7 +610,7 @@ export default async function InternalPage({
                         />
                         <ReadinessItem
                           label="供应商模型与路由"
-                          detail={hasProviderModels && hasRoutes ? "供应商侧实现已完成映射，并可被路由。" : "供应商模型映射或路由配置还不完整。"}
+                          detail={hasProviderModels && hasRoutes ? "供应商模型已完成映射，并可被路由。" : "供应商模型映射或路由配置还不完整。"}
                           ready={hasProviderModels && hasRoutes}
                         />
                       </div>
@@ -623,7 +623,7 @@ export default async function InternalPage({
                           Dashboard 是否可见取决于是否存在全局路由，或是否存在当前工作区级别的启用路由。
                         </div>
                         <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
-                          API 是否接收请求取决于 API Key 是否启用，以及是否存在匹配请求公共模型 slug 的路由。
+                          API 是否接收请求取决于 API Key 是否启用，以及是否存在匹配请求可售模型 slug 的路由。
                         </div>
                         <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
                           最终执行仍然依赖 worker adapter 和真实上游凭证。
@@ -642,13 +642,13 @@ export default async function InternalPage({
               <section className="mb-6">
                 <SectionShell
                 id="public-models-panel"
-                title="公共模型（用户售价）"
-                description="这里定义用户看到的模型入口，以及用户侧售价。多个供应商可以共同实现同一个公共模型。"
+                title="可售模型（用户售价）"
+                description="这里定义用户看到的模型型号，以及用户侧售价。多个供应商可以共同实现同一个可售模型。"
                 >
                 <div className="mb-4 flex items-center gap-1.5 bg-[#e8f0ff] px-3 py-2.5">
                   <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
                   <p className="text-xs leading-[1.35] text-[#355fb4]">
-                    这里填的是用户看到的模型入口和用户售价，不是供应商成本。如果两个供应商都提供 Gemini 2.5 图片生成能力，它们应该都挂到同一个公共模型，例如 <code className="rounded bg-white px-1 py-0.5">openoctopus/gemini-image</code>。
+                    这里填的是用户看到的模型型号和用户售价，不是供应商成本。如果两个供应商都提供同一个对外型号，它们应该都挂到同一个可售模型，例如 <code className="rounded bg-white px-1 py-0.5">openoctopus/gemini-2.5-flash-image</code>。
                   </p>
                 </div>
                 <PublicModelsPanel models={data.supportedModels} capabilityOptions={capabilityOptions} />
@@ -706,7 +706,7 @@ export default async function InternalPage({
               <div className="mb-4 flex items-center gap-1.5 bg-[#eef3ea] px-3 py-2.5">
                 <CircleAlert className="size-3.5 shrink-0 text-[#335d2d]" />
                 <p className="text-xs leading-[1.35] text-[#335d2d]">
-                  供应商是供给来源，不是客户看到的模型。多个供应商可以映射到同一个公共模型，例如 Gemini Image。
+                  供应商是供给来源，不是客户看到的模型。多个供应商可以映射到同一个可售模型，例如 Gemini 2.5 Flash Image。
                 </p>
               </div>
               <ProvidersPanel
@@ -750,13 +750,13 @@ export default async function InternalPage({
               <section className="mt-6">
                 <SectionShell
                 id="models-panel"
-                title="上游实现（供应商成本）"
-                description="把公共模型映射到真实上游模型，并填写内部供应商成本。这里不是用户售价。"
+                title="供应商模型（供应商成本）"
+                description="把可售模型映射到真实上游模型，并填写内部供应商成本。这里不是用户售价。"
                 >
                 <div className="mb-4 flex items-center gap-1.5 bg-[#e8f0ff] px-3 py-2.5">
                   <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
                   <p className="text-xs leading-[1.35] text-[#355fb4]">
-                    这里填的是供应商真实结算成本，不是用户售价。用户售价在“公共模型”里维护；这里维护的是某个供应商对这个公共模型的一种实现和进货成本。
+                    这里填的是供应商真实结算成本，不是用户售价。用户售价在“可售模型”里维护；这里维护的是某个供应商对这个可售模型的一种实现和进货成本。
                   </p>
                 </div>
                 <ModelsPanel
@@ -776,13 +776,13 @@ export default async function InternalPage({
               <section className="mt-6">
                 <SectionShell
                 id="routes-panel"
-                title="公共模型路由"
-                description="在这里切换真实流量应该走哪个上游实现。默认为空，需要你自己创建路由。"
+                title="可售模型路由"
+                description="在这里切换真实流量应该走哪个供应商模型。默认为空，需要你自己创建路由。"
                 >
                 <div className="mb-4 flex items-center gap-1.5 bg-[#eef3ea] px-3 py-2.5">
                   <CircleAlert className="size-3.5 shrink-0 text-[#335d2d]" />
                   <p className="text-xs leading-[1.35] text-[#335d2d]">
-                    操作员在这里选择每个公共模型当前上线哪个实现。客户侧仍然只看到 OpenOctopus 的公共能力。
+                    操作员在这里选择每个可售模型当前上线哪个供应商模型。客户侧仍然只看到 OpenOctopus 的可售型号。
                   </p>
                 </div>
                 <RoutesPanel

@@ -381,23 +381,23 @@ export function PublicModelsPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-black/55">已有公共模型</div>
+        <div className="text-sm text-black/55">已有可售模型</div>
         <ManagementDialog
           trigger={
             <button type="button">
               <ModalButton>
                 <Plus className="size-3.5" />
-                新建公共模型
+                新建可售模型
               </ModalButton>
             </button>
           }
-          title="新建公共模型"
+          title="新建可售模型"
           description="在独立弹窗中创建新的客户侧模型定义。"
         >
           {({ close }) => (
           <ManagedDialogForm action={createSupportedModel} close={close}>
             <FormField label="提供方名称" name="provider" defaultValue="OpenOctopus" required />
-            <FormField label="公共模型 Slug" name="modelSlug" defaultValue="openoctopus/gemini-image" required />
+            <FormField label="可售模型 Slug" name="modelSlug" defaultValue="openoctopus/gemini-2.5-flash-image" required />
             <FormField label="显示名称" name="displayName" defaultValue="Gemini Image" required />
             <FormSelect
               label="模态"
@@ -419,7 +419,7 @@ export function PublicModelsPanel({
             />
             <ActiveCheckbox name="active" defaultChecked />
             <div className="flex justify-end">
-              <SubmitButton label="创建公共模型" />
+              <SubmitButton label="创建可售模型" />
             </div>
           </ManagedDialogForm>
           )}
@@ -427,7 +427,7 @@ export function PublicModelsPanel({
       </div>
 
       <div className="rounded-sm border border-[#d8e4f8] bg-[#f2f7ff] px-4 py-3 text-sm text-[#274a86]">
-        这里维护的是用户看到的模型入口和用户售价。不要在这里填写供应商成本。
+        这里维护的是用户看到的模型型号和用户售价。不要在这里填写供应商成本。
       </div>
 
       {models.length > 0 ? (
@@ -458,13 +458,13 @@ export function PublicModelsPanel({
                   </button>
                 }
                 title={`编辑 ${model.display_name}`}
-                description="在独立弹窗中编辑这个公共模型。"
+                description="在独立弹窗中编辑这个可售模型。"
               >
                 {({ close }) => (
                 <ManagedDialogForm action={updateSupportedModelDetails} close={close}>
                   <input type="hidden" name="supportedModelId" value={model.id} />
                   <FormField label="提供方名称" name="provider" defaultValue={model.provider} required />
-                  <FormField label="公共模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
+                  <FormField label="可售模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
                   <FormField label="显示名称" name="displayName" defaultValue={model.display_name} required />
                   <FormSelect
                     label="模态"
@@ -485,7 +485,7 @@ export function PublicModelsPanel({
                   <BillingConfigEditor initialValue={model.billingConfigText} />
                   <ActiveCheckbox name="active" defaultChecked={model.active} />
                   <div className="flex justify-end">
-                    <SubmitButton label="保存公共模型" />
+                    <SubmitButton label="保存可售模型" />
                   </div>
                 </ManagedDialogForm>
                 )}
@@ -507,9 +507,9 @@ export function PublicModelsPanel({
         ))
       ) : (
         <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
-          <p className="text-sm font-medium text-black">还没有公共模型</p>
+          <p className="text-sm font-medium text-black">还没有可售模型</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
-            先创建一个公共能力入口，例如 `openoctopus/gemini-image`。
+            先创建一个可售模型，例如 `openoctopus/gemini-2.5-flash-image`。
           </p>
         </div>
       )}
@@ -863,24 +863,24 @@ export function ModelsPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-black/55">已有上游实现</div>
+        <div className="text-sm text-black/55">已有供应商模型</div>
         <ManagementDialog
           trigger={
             <button type="button" disabled={!hasProviders || !hasSupportedModels}>
               <ModalButton>
                 <Plus className="size-3.5" />
-                新建上游实现
+                新建供应商模型
               </ModalButton>
             </button>
           }
-          title="新建上游实现"
-          description="在独立弹窗中，把公共模型映射到某个供应商的具体上游实现。"
+          title="新建供应商模型"
+          description="在独立弹窗中，把可售模型映射到某个供应商的具体模型。"
         >
           {({ close }) => (
             <CreateProviderModelForm
               supportedModels={supportedModelOptions}
               providers={providerOptions}
-              defaultSupportedModelSlug="openoctopus/gemini-image"
+              defaultSupportedModelSlug="openoctopus/gemini-2.5-flash-image"
               defaultUpstreamModelSlug={selectedTemplate?.providerModel.upstreamModelSlug}
               defaultPricing={selectedTemplate?.providerModel.pricing}
               disabled={!hasProviders || !hasSupportedModels}
@@ -892,7 +892,7 @@ export function ModelsPanel({
       </div>
 
       <div className="rounded-sm border border-[#f1dfc6] bg-[#fff8ee] px-4 py-3 text-sm text-[#8a5b12]">
-        这里维护的是供应商真实成本和上游实现，不是用户售价。用户售价请去“公共模型”里改。
+        这里维护的是供应商真实成本和供应商模型，不是用户售价。用户售价请去“可售模型”里改。
       </div>
 
       {providerModels.length > 0 ? (
@@ -907,7 +907,7 @@ export function ModelsPanel({
                   <span className="text-sm font-medium text-black">{item.providerName}</span>
                 </div>
                 <p className="mt-3 text-sm font-medium text-black">{item.public_model_slug}</p>
-                <p className="mt-1 text-xs text-black/50">公共模型：{item.supportedModelName}</p>
+                <p className="mt-1 text-xs text-black/50">可售模型：{item.supportedModelName}</p>
                 <p className="mt-1 text-xs text-black/50">上游模型：{item.upstream_model_slug}</p>
                 <p className="mt-1 text-xs text-[#8a5b12]">
                   这里的价格 = 供应商成本；用户售价不在这里改。
@@ -941,7 +941,7 @@ export function ModelsPanel({
                     defaultPricingSourceEvidence={JSON.stringify(item.pricingSourceEvidence)}
                     defaultActive={item.active}
                     disabled={!hasProviders || !hasSupportedModels}
-                    submitLabel="保存上游实现"
+                    submitLabel="保存供应商模型"
                     className="grid gap-4"
                     onSuccess={close}
                   />
@@ -1009,7 +1009,7 @@ export function ModelsPanel({
         ))
       ) : (
         <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
-          <p className="text-sm font-medium text-black">还没有上游实现</p>
+          <p className="text-sm font-medium text-black">还没有供应商模型</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             创建供应商后，在这里补齐真实上游模型标识和成本配置。
           </p>
