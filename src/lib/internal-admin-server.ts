@@ -41,6 +41,9 @@ type ProviderModelRow = {
   capability: "image_generation" | "image_edit" | "video_generation";
   active: boolean;
   pricing: Record<string, unknown> | null;
+  pricing_source_url: string | null;
+  pricing_source_note: string | null;
+  pricing_source_evidence: unknown[] | null;
   input_schema: Record<string, unknown> | null;
   output_schema: Record<string, unknown> | null;
   created_at: string;
@@ -206,6 +209,45 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+async function buildPricingEvidenceItems(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  value: unknown
+) {
+  if (!Array.isArray(value) || value.length === 0) {
+    return [];
+  }
+
+  return Promise.all(
+    value.map(async (item, index) => {
+      const record = asRecord(item);
+      const path =
+        typeof record?.path === "string" && record.path.trim().length > 0 ? record.path : null;
+
+      if (!path) {
+        return {
+          type: typeof record?.type === "string" ? record.type : undefined,
+          path: null,
+          label: typeof record?.label === "string" ? record.label : `证据 ${index + 1}`,
+          uploadedAt: typeof record?.uploadedAt === "string" ? record.uploadedAt : undefined,
+          signedUrl: null,
+        };
+      }
+
+      const { data } = await supabase.storage
+        .from("provider-pricing-evidence")
+        .createSignedUrl(path, 60 * 60);
+
+      return {
+        type: typeof record?.type === "string" ? record.type : undefined,
+        path,
+        label: typeof record?.label === "string" ? record.label : `证据 ${index + 1}`,
+        uploadedAt: typeof record?.uploadedAt === "string" ? record.uploadedAt : undefined,
+        signedUrl: data?.signedUrl ?? null,
+      };
+    })
+  );
+}
+
 function readNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -335,9 +377,9 @@ export async function getInternalAdminData() {
         )
         .order("created_at", { ascending: false }),
       supabase
-        .from("provider_models")
-        .select(
-          "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, input_schema, output_schema, created_at"
+      .from("provider_models")
+      .select(
+          "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, pricing_source_url, pricing_source_note, pricing_source_evidence, input_schema, output_schema, created_at"
         )
         .order("created_at", { ascending: true }),
       supabase
@@ -450,7 +492,7 @@ export async function getInternalAdminData() {
     };
   });
 
-  const providerModelSummaries = providerModels.map((providerModel) => {
+  const providerModelSummaries = await Promise.all(providerModels.map(async (providerModel) => {
     const provider = providerById.get(providerModel.provider_id);
     const supportedModel = providerModel.supported_model_id
       ? supportedModelById.get(providerModel.supported_model_id)
@@ -462,10 +504,15 @@ export async function getInternalAdminData() {
       providerSlug: provider?.slug ?? "unknown",
       supportedModelName: supportedModel?.display_name ?? providerModel.public_model_slug,
       pricingText: formatJson(providerModel.pricing),
-      inputSchemaText: formatJson(providerModel.input_schema),
-      outputSchemaText: formatJson(providerModel.output_schema),
+      pricingSummary: summarizeBilling(providerModel.pricing),
+      pricingSourceUrl: providerModel.pricing_source_url ?? null,
+      pricingSourceNote: providerModel.pricing_source_note ?? null,
+      pricingSourceEvidence: await buildPricingEvidenceItems(
+        supabase,
+        providerModel.pricing_source_evidence
+      ),
     };
-  });
+  }));
 
   const routingRuleSummaries = routingRules.map((rule) => {
     const primaryModel = providerModelById.get(rule.primary_provider_model_id) ?? null;

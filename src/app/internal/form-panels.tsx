@@ -325,8 +325,9 @@ export function CreateProviderModelForm({
   defaultProviderId,
   defaultUpstreamModelSlug,
   defaultPricing,
-  defaultInputSchema,
-  defaultOutputSchema,
+  defaultPricingSourceUrl,
+  defaultPricingSourceNote,
+  defaultPricingSourceEvidence = "[]",
   defaultActive = true,
   providerModelId,
   disabled,
@@ -341,8 +342,9 @@ export function CreateProviderModelForm({
   defaultProviderId?: string;
   defaultUpstreamModelSlug?: string;
   defaultPricing?: string;
-  defaultInputSchema?: string;
-  defaultOutputSchema?: string;
+  defaultPricingSourceUrl?: string;
+  defaultPricingSourceNote?: string;
+  defaultPricingSourceEvidence?: string;
   defaultActive?: boolean;
   providerModelId?: string;
   disabled: boolean;
@@ -376,6 +378,7 @@ export function CreateProviderModelForm({
       {providerModelId ? (
         <input type="hidden" name="providerModelId" value={providerModelId} />
       ) : null}
+      <input type="hidden" name="pricingSourceEvidence" value={defaultPricingSourceEvidence} />
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">公共模型</span>
@@ -463,34 +466,44 @@ export function CreateProviderModelForm({
           />
         </div>
 
-        <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">输入 Schema JSON</span>
+        <input type="hidden" name="inputSchema" value="{}" />
+        <input type="hidden" name="outputSchema" value="{}" />
+
+        <label className="block md:col-span-2">
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">官方成本价格链接</span>
+          <input
+            name="pricingSourceUrl"
+            type="url"
+            defaultValue={defaultPricingSourceUrl}
+            placeholder="https://ai.google.dev/gemini-api/docs/pricing"
+            disabled={disabled}
+            className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+          />
+          <FieldHint help="填写官方价格页、模型文档或公开结算说明链接，便于后续溯源。" />
+        </label>
+
+        <label className="block md:col-span-2">
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">成本说明备注</span>
           <textarea
-            name="inputSchema"
-            rows={4}
-            defaultValue={defaultInputSchema ?? "{}"}
+            name="pricingSourceNote"
+            rows={3}
+            defaultValue={defaultPricingSourceNote}
             disabled={disabled}
             className="w-full rounded-sm border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
-          />
-          <FieldHint
-            help="可选，描述这个上游模型接收哪些请求字段。"
-            example='{"prompt":{"type":"string","required":true},"size":{"type":"string"}}'
+            placeholder="例如：Google 官方写明 image output 按 $30 / 1M output tokens，1024x1024 约等于 1290 output tokens。"
           />
         </label>
 
-        <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">输出 Schema JSON</span>
-          <textarea
-            name="outputSchema"
-            rows={4}
-            defaultValue={defaultOutputSchema ?? "{}"}
+        <label className="block md:col-span-2">
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">价格证据截图</span>
+          <input
+            type="file"
+            name="pricingSourceEvidenceFile"
+            accept="image/png,image/jpeg,image/webp"
             disabled={disabled}
-            className="w-full rounded-sm border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+            className="block w-full rounded-sm border border-black/10 bg-white px-3 py-2 text-sm text-black file:mr-3 file:rounded-sm file:border-0 file:bg-black file:px-3 file:py-2 file:text-xs file:font-medium file:text-white"
           />
-          <FieldHint
-            help="可选，描述标准化后的输出结构。"
-            example='{"images":{"type":"array"},"mimeType":{"type":"string"}}'
-          />
+          <FieldHint help="可选，上传官方价格页截图。保存后会把文件路径记录到上游实现里。" />
         </label>
 
         <label className="flex items-center gap-3 rounded-sm border border-black/10 bg-white px-3 py-3 text-sm text-black/72">

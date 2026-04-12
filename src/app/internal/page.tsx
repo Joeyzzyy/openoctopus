@@ -194,11 +194,8 @@ const providerTemplates = {
     providerModel: {
       capability: "image_generation",
       upstreamModelSlug: "gemini-2.5-flash-image",
-      pricing: '{\n  "billingMode": "per_image",\n  "costPerUnit": 0.04,\n  "currency": "USD"\n}',
-      inputSchema:
-        '{\n  "prompt": { "type": "string", "required": true },\n  "size": { "type": "string" }\n}',
-      outputSchema:
-        '{\n  "images": { "type": "array" },\n  "mimeType": { "type": "string" }\n}',
+      pricing:
+        '{\n  "billingMode": "hybrid",\n  "currency": "USD",\n  "charges": {\n    "inputTextTokensPerMillion": 0.3,\n    "outputTextTokensPerMillion": 30\n  }\n}',
     },
     route: {
       capability: "image_generation",
@@ -227,11 +224,8 @@ const providerTemplates = {
     providerModel: {
       capability: "image_generation",
       upstreamModelSlug: "gemini-2.5-flash-image",
-      pricing: '{\n  "billingMode": "per_image"\n}',
-      inputSchema:
-        '{\n  "prompt": { "type": "string", "required": true }\n}',
-      outputSchema:
-        '{\n  "images": { "type": "array" }\n}',
+      pricing:
+        '{\n  "billingMode": "hybrid",\n  "currency": "USD",\n  "charges": {\n    "inputTextTokensPerMillion": 0.3,\n    "outputTextTokensPerMillion": 30\n  }\n}',
     },
     route: {
       capability: "image_generation",

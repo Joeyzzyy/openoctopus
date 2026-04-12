@@ -66,6 +66,65 @@ function assertBillingConfig(value: unknown) {
   parseBillingConfig(value);
 }
 
+function normalizeOptionalUrl(value: FormDataEntryValue | null) {
+  const normalized = normalizeOptionalText(value);
+  if (!normalized) {
+    return null;
+  }
+
+  return z.string().url().parse(normalized);
+}
+
+function parseJsonArrayField(value: FormDataEntryValue | null) {
+  const raw = normalizeOptionalText(value);
+  if (!raw) {
+    return [];
+  }
+
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) {
+    throw new Error("JSON field must contain an array");
+  }
+
+  return parsed as Array<Record<string, unknown>>;
+}
+
+async function uploadPricingEvidenceFile(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  providerId: string;
+  upstreamModelSlug: string;
+  file: File | null;
+}) {
+  const { supabase, providerId, upstreamModelSlug, file } = input;
+
+  if (!file || file.size === 0) {
+    return null;
+  }
+
+  const sanitizedSlug = upstreamModelSlug.toLowerCase().replace(/[^a-z0-9._-]+/g, "-");
+  const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : null;
+  const fileExt = extension && /^[a-z0-9]+$/.test(extension) ? extension : "bin";
+  const path = `${providerId}/${sanitizedSlug}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+
+  const { error } = await supabase.storage
+    .from("provider-pricing-evidence")
+    .upload(path, file, {
+      contentType: file.type || undefined,
+      upsert: false,
+    });
+
+  if (error) {
+    throw new Error(`Failed to upload pricing evidence: ${error.message}`);
+  }
+
+  return {
+    type: "image",
+    path,
+    label: file.name || "pricing evidence",
+    uploadedAt: new Date().toISOString(),
+  };
+}
+
 async function getInternalAdminContext() {
   const supabase = await createClient();
   const {
@@ -939,6 +998,9 @@ const createProviderModelSchema = z.object({
   capability: capabilitySchema,
   active: z.boolean(),
   pricing: z.record(z.string(), z.unknown()).default({}),
+  pricingSourceUrl: z.string().url().nullable(),
+  pricingSourceNote: z.string().trim().max(2000).nullable(),
+  pricingSourceEvidence: z.array(z.record(z.string(), z.unknown())).default([]),
   inputSchema: z.record(z.string(), z.unknown()).default({}),
   outputSchema: z.record(z.string(), z.unknown()).default({}),
 });
@@ -952,6 +1014,9 @@ export async function createProviderModel(formData: FormData) {
     capability: formData.get("capability"),
     active: parseBooleanField(formData.get("active")),
     pricing: parseJsonField(formData.get("pricing")),
+    pricingSourceUrl: normalizeOptionalUrl(formData.get("pricingSourceUrl")),
+    pricingSourceNote: normalizeOptionalText(formData.get("pricingSourceNote")),
+    pricingSourceEvidence: parseJsonArrayField(formData.get("pricingSourceEvidence")),
     inputSchema: parseJsonField(formData.get("inputSchema")),
     outputSchema: parseJsonField(formData.get("outputSchema")),
   });
@@ -976,19 +1041,32 @@ export async function createProviderModel(formData: FormData) {
 
   assertBillingConfig(supportedModelRow.billing_config);
   const pricingConfig = parseBillingConfig(parsed.pricing);
+  const pricingEvidenceFile = formData.get("pricingSourceEvidenceFile");
+  const uploadedEvidence = await uploadPricingEvidenceFile({
+    supabase,
+    providerId: parsed.providerId,
+    upstreamModelSlug: parsed.upstreamModelSlug,
+    file: pricingEvidenceFile instanceof File ? pricingEvidenceFile : null,
+  });
+  const pricingSourceEvidence = uploadedEvidence
+    ? [...parsed.pricingSourceEvidence, uploadedEvidence]
+    : parsed.pricingSourceEvidence;
 
   const { data, error } = await supabase
     .from("provider_models")
     .insert({
-    provider_id: parsed.providerId,
-    supported_model_id: parsed.supportedModelId,
-    public_model_slug: supportedModelRow.model_slug,
-    upstream_model_slug: parsed.upstreamModelSlug,
-    capability: parsed.capability,
-    active: parsed.active,
-    pricing: pricingConfig,
-    input_schema: parsed.inputSchema,
-    output_schema: parsed.outputSchema,
+      provider_id: parsed.providerId,
+      supported_model_id: parsed.supportedModelId,
+      public_model_slug: supportedModelRow.model_slug,
+      upstream_model_slug: parsed.upstreamModelSlug,
+      capability: parsed.capability,
+      active: parsed.active,
+      pricing: pricingConfig,
+      pricing_source_url: parsed.pricingSourceUrl,
+      pricing_source_note: parsed.pricingSourceNote,
+      pricing_source_evidence: pricingSourceEvidence,
+      input_schema: parsed.inputSchema,
+      output_schema: parsed.outputSchema,
     })
     .select("id")
     .maybeSingle();
@@ -1008,6 +1086,7 @@ export async function createProviderModel(formData: FormData) {
     details: {
       ...parsed,
       pricing: pricingConfig,
+      pricingSourceEvidence,
       publicModelSlug: supportedModelRow.model_slug,
     },
   });
@@ -1058,6 +1137,9 @@ const updateProviderModelDetailsSchema = z.object({
   capability: capabilitySchema,
   active: z.boolean(),
   pricing: z.record(z.string(), z.unknown()).default({}),
+  pricingSourceUrl: z.string().url().nullable(),
+  pricingSourceNote: z.string().trim().max(2000).nullable(),
+  pricingSourceEvidence: z.array(z.record(z.string(), z.unknown())).default([]),
   inputSchema: z.record(z.string(), z.unknown()).default({}),
   outputSchema: z.record(z.string(), z.unknown()).default({}),
 });
@@ -1072,6 +1154,9 @@ export async function updateProviderModelDetails(formData: FormData) {
     capability: formData.get("capability"),
     active: parseBooleanField(formData.get("active")),
     pricing: parseJsonField(formData.get("pricing")),
+    pricingSourceUrl: normalizeOptionalUrl(formData.get("pricingSourceUrl")),
+    pricingSourceNote: normalizeOptionalText(formData.get("pricingSourceNote")),
+    pricingSourceEvidence: parseJsonArrayField(formData.get("pricingSourceEvidence")),
     inputSchema: parseJsonField(formData.get("inputSchema")),
     outputSchema: parseJsonField(formData.get("outputSchema")),
   });
@@ -1096,6 +1181,16 @@ export async function updateProviderModelDetails(formData: FormData) {
 
   assertBillingConfig(supportedModelRow.billing_config);
   const pricingConfig = parseBillingConfig(parsed.pricing);
+  const pricingEvidenceFile = formData.get("pricingSourceEvidenceFile");
+  const uploadedEvidence = await uploadPricingEvidenceFile({
+    supabase,
+    providerId: parsed.providerId,
+    upstreamModelSlug: parsed.upstreamModelSlug,
+    file: pricingEvidenceFile instanceof File ? pricingEvidenceFile : null,
+  });
+  const pricingSourceEvidence = uploadedEvidence
+    ? [...parsed.pricingSourceEvidence, uploadedEvidence]
+    : parsed.pricingSourceEvidence;
 
   const { error } = await supabase
     .from("provider_models")
@@ -1107,6 +1202,9 @@ export async function updateProviderModelDetails(formData: FormData) {
       capability: parsed.capability,
       active: parsed.active,
       pricing: pricingConfig,
+      pricing_source_url: parsed.pricingSourceUrl,
+      pricing_source_note: parsed.pricingSourceNote,
+      pricing_source_evidence: pricingSourceEvidence,
       input_schema: parsed.inputSchema,
       output_schema: parsed.outputSchema,
     })
@@ -1127,6 +1225,7 @@ export async function updateProviderModelDetails(formData: FormData) {
     details: {
       ...parsed,
       pricing: pricingConfig,
+      pricingSourceEvidence,
       publicModelSlug: supportedModelRow.model_slug,
     },
   });

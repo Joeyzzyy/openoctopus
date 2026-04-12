@@ -91,8 +91,16 @@ type ProviderModelSummary = {
   capability: "image_generation" | "image_edit" | "video_generation";
   active: boolean;
   pricingText: string;
-  inputSchemaText: string;
-  outputSchemaText: string;
+  pricingSummary: string;
+  pricingSourceUrl: string | null;
+  pricingSourceNote: string | null;
+  pricingSourceEvidence: Array<{
+    type?: string;
+    path?: string | null;
+    label?: string;
+    uploadedAt?: string;
+    signedUrl?: string | null;
+  }>;
 };
 
 type RoutingRuleSummary = {
@@ -129,8 +137,6 @@ type ProviderTemplate = {
   providerModel: {
     upstreamModelSlug?: string;
     pricing?: string;
-    inputSchema?: string;
-    outputSchema?: string;
   };
   route: {
     routeStrategy?: string;
@@ -877,8 +883,6 @@ export function ModelsPanel({
               defaultSupportedModelSlug="openoctopus/gemini-image"
               defaultUpstreamModelSlug={selectedTemplate?.providerModel.upstreamModelSlug}
               defaultPricing={selectedTemplate?.providerModel.pricing}
-              defaultInputSchema={selectedTemplate?.providerModel.inputSchema}
-              defaultOutputSchema={selectedTemplate?.providerModel.outputSchema}
               disabled={!hasProviders || !hasSupportedModels}
               className="grid gap-4"
               onSuccess={close}
@@ -932,8 +936,9 @@ export function ModelsPanel({
                     defaultProviderId={item.provider_id}
                     defaultUpstreamModelSlug={item.upstream_model_slug}
                     defaultPricing={item.pricingText}
-                    defaultInputSchema={item.inputSchemaText}
-                    defaultOutputSchema={item.outputSchemaText}
+                    defaultPricingSourceUrl={item.pricingSourceUrl ?? undefined}
+                    defaultPricingSourceNote={item.pricingSourceNote ?? undefined}
+                    defaultPricingSourceEvidence={JSON.stringify(item.pricingSourceEvidence)}
                     defaultActive={item.active}
                     disabled={!hasProviders || !hasSupportedModels}
                     submitLabel="保存上游实现"
@@ -947,15 +952,57 @@ export function ModelsPanel({
             <div className="mt-4 grid gap-3 text-xs text-black/55 xl:grid-cols-3">
               <div className="rounded-sm border border-black/8 bg-white p-3">
                 <p className="text-[11px] tracking-[0.35px] text-black/45">成本配置</p>
-                <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{item.pricingText}</pre>
+                <p className="mt-2 text-sm font-medium text-black">{item.pricingSummary}</p>
+                <pre className="mt-3 overflow-x-auto whitespace-pre-wrap">{item.pricingText}</pre>
               </div>
               <div className="rounded-sm border border-black/8 bg-white p-3">
-                <p className="text-[11px] tracking-[0.35px] text-black/45">输入 Schema</p>
-                <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{item.inputSchemaText}</pre>
+                <p className="text-[11px] tracking-[0.35px] text-black/45">官方成本来源</p>
+                {item.pricingSourceUrl ? (
+                  <a
+                    href={item.pricingSourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 block break-all text-sm text-[#355fb4] underline-offset-2 hover:underline"
+                  >
+                    {item.pricingSourceUrl}
+                  </a>
+                ) : (
+                  <p className="mt-2 text-sm text-black/45">未填写来源链接</p>
+                )}
+                {item.pricingSourceNote ? (
+                  <p className="mt-3 text-xs leading-5 text-black/58">{item.pricingSourceNote}</p>
+                ) : null}
               </div>
               <div className="rounded-sm border border-black/8 bg-white p-3">
-                <p className="text-[11px] tracking-[0.35px] text-black/45">输出 Schema</p>
-                <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{item.outputSchemaText}</pre>
+                <p className="text-[11px] tracking-[0.35px] text-black/45">价格证据</p>
+                {item.pricingSourceEvidence.length > 0 ? (
+                  <div className="mt-2 grid gap-2">
+                    {item.pricingSourceEvidence.map((evidence, index) => (
+                      <div
+                        key={`${item.id}-evidence-${index}`}
+                        className="rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-2"
+                      >
+                        {evidence.signedUrl ? (
+                          <a
+                            href={evidence.signedUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sm text-[#355fb4] underline-offset-2 hover:underline"
+                          >
+                            {evidence.label ?? `证据 ${index + 1}`}
+                          </a>
+                        ) : (
+                          <p className="text-sm text-black">{evidence.label ?? `证据 ${index + 1}`}</p>
+                        )}
+                        {evidence.path ? (
+                          <p className="mt-1 break-all text-xs text-black/50">{evidence.path}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-black/45">未上传证据图片</p>
+                )}
               </div>
             </div>
           </div>
