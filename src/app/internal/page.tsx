@@ -29,6 +29,11 @@ const tabs = [
     description: "控制台健康状态与配置指引。",
   },
   {
+    key: "monitoring",
+    label: "数据监控",
+    description: "资源调度管理监测中心。",
+  },
+  {
     key: "providers",
     label: "1. 供应商",
     description: "先登记 Google、WaveSpeed 等上游。",
@@ -49,13 +54,8 @@ const tabs = [
     description: "把供应商挂到可售模型，并填写内部成本。",
   },
   {
-    key: "monitoring",
-    label: "5. 数据监控",
-    description: "资源调度管理监测中心。",
-  },
-  {
     key: "routes",
-    label: "6. 路由",
+    label: "5. 路由",
     description: "决定当前流量走哪个供应商模型。",
   },
   {
@@ -457,17 +457,17 @@ function OverviewCard({
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="rounded-sm border border-black/8 bg-[#f7f7f4] px-4 py-4 shadow-[0_18px_40px_rgba(17,17,17,0.03)]">
-      <div className="flex items-start gap-3">
-        <div className="inline-flex size-8 shrink-0 items-center justify-center rounded-sm bg-white text-black/55">
-          <Icon className="size-4" />
+    <div className="rounded-sm border border-black/8 bg-[#f7f7f4] px-3 py-2.5 shadow-[0_18px_40px_rgba(17,17,17,0.03)]">
+      <div className="flex items-center gap-2.5">
+        <div className="inline-flex size-7 shrink-0 items-center justify-center rounded-sm bg-white text-black/55">
+          <Icon className="size-3.5" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-[11px] tracking-[0.35px] text-black/60">{title}</p>
-          <p className="mt-1 text-2xl font-medium tracking-tight text-black">{value}</p>
-          <p className="mt-2 text-xs leading-5 text-black/50">{note}</p>
+          <p className="text-lg font-medium tracking-tight text-black">{value}</p>
         </div>
       </div>
+      <p className="mt-1 text-[11px] leading-4 text-black/50">{note}</p>
     </div>
   );
 }
@@ -1145,77 +1145,80 @@ export default async function InternalPage({
                 title="资源调度管理监测中心"
                 description="查看全系统所有模型的调用量走势，支持分钟、小时、天三种粒度，以及多个时间范围切换。"
               >
-                <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                  <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
-                    <p className="text-[11px] tracking-[0.35px] text-black/45">时间粒度</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {monitoringIntervalOptions.map((option) => (
-                        <a
-                          key={option.value}
-                          href={buildMonitoringHref({
-                            interval: option.value,
-                            range: selectedMonitoringRange,
-                            status: selectedMonitoringStatus,
-                          })}
-                          className={`inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors ${
-                            selectedMonitoringInterval === option.value
-                              ? "border-black bg-black text-white"
-                              : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                          }`}
-                        >
-                          {option.label}
-                        </a>
-                      ))}
+                <div className="mb-4 rounded-sm border border-black/8 bg-[#faf9f6] p-3">
+                  <div className="grid gap-3 lg:grid-cols-3">
+                    <div>
+                      <p className="text-[11px] tracking-[0.35px] text-black/45">时间粒度</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {monitoringIntervalOptions.map((option) => (
+                          <a
+                            key={option.value}
+                            href={buildMonitoringHref({
+                              interval: option.value,
+                              range: selectedMonitoringRange,
+                              status: selectedMonitoringStatus,
+                            })}
+                            className={`inline-flex h-7 items-center rounded-sm border px-2.5 text-[11px] font-medium transition-colors ${
+                              selectedMonitoringInterval === option.value
+                                ? "border-black bg-black text-white"
+                                : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                            }`}
+                          >
+                            {option.label}
+                          </a>
+                        ))}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
-                    <p className="text-[11px] tracking-[0.35px] text-black/45">时间范围</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {monitoringRangeOptions.map((option) => (
-                        <a
-                          key={option.value}
-                          href={buildMonitoringHref({
-                            interval: selectedMonitoringInterval,
-                            range: option.value,
-                            status: selectedMonitoringStatus,
-                          })}
-                          className={`inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors ${
-                            selectedMonitoringRange === option.value
-                              ? "border-black bg-black text-white"
-                              : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                          }`}
-                        >
-                          {option.label}
-                        </a>
-                      ))}
+                    <div>
+                      <p className="text-[11px] tracking-[0.35px] text-black/45">时间范围</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {monitoringRangeOptions.map((option) => (
+                          <a
+                            key={option.value}
+                            href={buildMonitoringHref({
+                              interval: selectedMonitoringInterval,
+                              range: option.value,
+                              status: selectedMonitoringStatus,
+                            })}
+                            className={`inline-flex h-7 items-center rounded-sm border px-2.5 text-[11px] font-medium transition-colors ${
+                              selectedMonitoringRange === option.value
+                                ? "border-black bg-black text-white"
+                                : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                            }`}
+                          >
+                            {option.label}
+                          </a>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4 lg:col-span-2">
-                    <p className="text-[11px] tracking-[0.35px] text-black/45">请求状态</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {monitoringStatusOptions.map((option) => (
-                        <a
-                          key={option.value}
-                          href={buildMonitoringHref({
-                            interval: selectedMonitoringInterval,
-                            range: selectedMonitoringRange,
-                            status: option.value,
-                          })}
-                          className={`inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors ${
-                            selectedMonitoringStatus === option.value
-                              ? "border-black bg-black text-white"
-                              : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                          }`}
-                        >
-                          {option.label}
-                        </a>
-                      ))}
+
+                    <div>
+                      <p className="text-[11px] tracking-[0.35px] text-black/45">请求状态</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {monitoringStatusOptions.map((option) => (
+                          <a
+                            key={option.value}
+                            href={buildMonitoringHref({
+                              interval: selectedMonitoringInterval,
+                              range: selectedMonitoringRange,
+                              status: option.value,
+                            })}
+                            className={`inline-flex h-7 items-center rounded-sm border px-2.5 text-[11px] font-medium transition-colors ${
+                              selectedMonitoringStatus === option.value
+                                ? "border-black bg-black text-white"
+                                : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                            }`}
+                          >
+                            {option.label}
+                          </a>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="mb-4 grid gap-3 md:grid-cols-4">
+                <div className="mb-4 grid gap-2 md:grid-cols-6">
                   <OverviewCard
                     title="模型总数"
                     value={monitoringSummary.modelCount}
@@ -1231,25 +1234,25 @@ export default async function InternalPage({
                   <OverviewCard
                     title="总调用量"
                     value={monitoringSummary.requestCount}
-                    note={`统计范围：${selectedMonitoringRangeLabel} · ${selectedMonitoringStatusLabel}`}
+                    note={`${selectedMonitoringRangeLabel} · ${selectedMonitoringStatusLabel}`}
                     icon={Fingerprint}
                   />
                   <OverviewCard
                     title="单桶峰值"
                     value={monitoringSummary.peakValue}
-                    note={`统计粒度：${selectedMonitoringIntervalLabel}`}
+                    note={`${selectedMonitoringIntervalLabel}`}
                     icon={Waypoints}
                   />
                   <OverviewCard
                     title="成功率"
                     value={formatPercent(monitoringSuccessRate)}
-                    note={`已结算请求 ${monitoringHealthSummary.settled} 条`}
+                    note={`已结算 ${monitoringHealthSummary.settled} 条`}
                     icon={ShieldCheck}
                   />
                   <OverviewCard
                     title="失败率"
                     value={formatPercent(monitoringFailureRate)}
-                    note={`失败 ${monitoringHealthSummary.failed} 条 · 已取消 ${monitoringHealthSummary.cancelled} 条`}
+                    note={`失败 ${monitoringHealthSummary.failed} · 取消 ${monitoringHealthSummary.cancelled}`}
                     icon={ShieldAlert}
                   />
                 </div>
@@ -1262,7 +1265,7 @@ export default async function InternalPage({
                 </div>
 
                 {monitoringSeries.length > 0 ? (
-                  <div className="grid gap-4 xl:grid-cols-2">
+                  <div className="grid gap-4">
                     {monitoringSeries.map((series) => {
                       const health = monitoringHealthByModel.get(series.modelSlug) ?? {
                         total: 0,
