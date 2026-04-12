@@ -54,22 +54,22 @@ interface ModelRow {
 }
 
 const MODELS: ModelRow[] = [
-  { path: "wan-2.7/text-to-video", href: "/models", provider: "alibaba", type: "text-to-video", price: "$0.5", image: "1773982486991777301_pAKnxHQ0.webp" },
-  { path: "wan-2.7/image-to-video", href: "/models", provider: "alibaba", type: "image-to-video", price: "$0.5", image: "1773982485921091987_9RfY7gqA.webp" },
-  { path: "wan-2.7/reference-to-video", href: "/models", provider: "alibaba", type: "image-to-video", price: "$0.5", image: "1773982487527428587_7V5eoxHR.webp" },
-  { path: "wan-2.7/video-edit", href: "/models", provider: "alibaba", type: "video-to-video", price: "$0.5", image: "1773982485462820141_SWBsOay0.webp" },
-  { path: "nano-banana-pro/edit", href: "/models", provider: "google", type: "image-to-image", price: "$0.119", discount: { percent: 15, original: "$0.14" }, image: "1773982488096109393_g2UoRiPf.webp" },
-  { path: "nano-banana-2/edit", href: "/models", provider: "google", type: "image-to-image", price: "$0.0595", discount: { percent: 15, original: "$0.07" }, image: "1773982488033922443_4GhqzJT3.webp" },
-  { path: "nano-banana-2/text-to-image", href: "/models", provider: "google", type: "text-to-image", price: "$0.0595", discount: { percent: 15, original: "$0.07" }, image: "1773982488103867536_m9YmHYnM.webp" },
-  { path: "nano-banana-pro/text-to-image", href: "/models", provider: "google", type: "text-to-image", price: "$0.119", discount: { percent: 15, original: "$0.14" }, image: "1773982488677021111_Z5wmwFPZ.webp" },
-  { path: "seedream-v4.5/edit", href: "/models", provider: "bytedance", type: "image-to-image", price: "$0.04", image: "1773982486529320898_2EA1uWkK.webp" },
-  { path: "infinitetalk", href: "/models", provider: "openoctopus", type: "digital-human", price: "$0.15", image: "1773982487109684599_qpWYmG5z.webp" },
-  { path: "wan-2.7/image-edit", href: "/models", provider: "alibaba", type: "image-to-image", price: "$0.03", image: "1773982486219725120_geW0oOkK.webp" },
-  { path: "wan-2.7/image-edit-pro", href: "/models", provider: "alibaba", type: "image-to-image", price: "$0.075", image: "1773982487225168510_bW7gpyIR.webp" },
-  { path: "wan-2.2/animate", href: "/models", provider: "openoctopus", type: "motion-control", price: "$0.2", image: "1773982488807980452_SkV5eoxG.webp" },
-  { path: "kling-v2.6-pro/motion-control", href: "/models", provider: "kwaivgi", type: "motion-control", price: "$0.336", image: "1773982486480192004_ShKT2clu.webp" },
-  { path: "wan-2.6/image-to-video-spicy", href: "/models", provider: "alibaba", type: "image-to-video", price: "$0.5", image: "1773982487369289135_VsisBLU3.webp" },
-  { path: "wan-2.6/image-to-video", href: "/models", provider: "alibaba", type: "image-to-video", price: "$0.5", image: "1773982488389173191_Oq1bluEO.webp" },
+  { path: "wan-2.7/text-to-video", href: "/login", provider: "alibaba", type: "text-to-video", price: "$0.5", image: "1773982486991777301_pAKnxHQ0.webp" },
+  { path: "wan-2.7/image-to-video", href: "/login", provider: "alibaba", type: "image-to-video", price: "$0.5", image: "1773982485921091987_9RfY7gqA.webp" },
+  { path: "wan-2.7/reference-to-video", href: "/login", provider: "alibaba", type: "image-to-video", price: "$0.5", image: "1773982487527428587_7V5eoxHR.webp" },
+  { path: "wan-2.7/video-edit", href: "/login", provider: "alibaba", type: "video-to-video", price: "$0.5", image: "1773982485462820141_SWBsOay0.webp" },
+  { path: "nano-banana-pro/edit", href: "/login", provider: "google", type: "image-to-image", price: "$0.119", discount: { percent: 15, original: "$0.14" }, image: "1773982488096109393_g2UoRiPf.webp" },
+  { path: "nano-banana-2/edit", href: "/login", provider: "google", type: "image-to-image", price: "$0.0595", discount: { percent: 15, original: "$0.07" }, image: "1773982488033922443_4GhqzJT3.webp" },
+  { path: "nano-banana-2/text-to-image", href: "/login", provider: "google", type: "text-to-image", price: "$0.0595", discount: { percent: 15, original: "$0.07" }, image: "1773982488103867536_m9YmHYnM.webp" },
+  { path: "nano-banana-pro/text-to-image", href: "/login", provider: "google", type: "text-to-image", price: "$0.119", discount: { percent: 15, original: "$0.14" }, image: "1773982488677021111_Z5wmwFPZ.webp" },
+  { path: "seedream-v4.5/edit", href: "/login", provider: "bytedance", type: "image-to-image", price: "$0.04", image: "1773982486529320898_2EA1uWkK.webp" },
+  { path: "infinitetalk", href: "/login", provider: "openoctopus", type: "digital-human", price: "$0.15", image: "1773982487109684599_qpWYmG5z.webp" },
+  { path: "wan-2.7/image-edit", href: "/login", provider: "alibaba", type: "image-to-image", price: "$0.03", image: "1773982486219725120_geW0oOkK.webp" },
+  { path: "wan-2.7/image-edit-pro", href: "/login", provider: "alibaba", type: "image-to-image", price: "$0.075", image: "1773982487225168510_bW7gpyIR.webp" },
+  { path: "wan-2.2/animate", href: "/login", provider: "openoctopus", type: "motion-control", price: "$0.2", image: "1773982488807980452_SkV5eoxG.webp" },
+  { path: "kling-v2.6-pro/motion-control", href: "/login", provider: "kwaivgi", type: "motion-control", price: "$0.336", image: "1773982486480192004_ShKT2clu.webp" },
+  { path: "wan-2.6/image-to-video-spicy", href: "/login", provider: "alibaba", type: "image-to-video", price: "$0.5", image: "1773982487369289135_VsisBLU3.webp" },
+  { path: "wan-2.6/image-to-video", href: "/login", provider: "alibaba", type: "image-to-video", price: "$0.5", image: "1773982488389173191_Oq1bluEO.webp" },
 ];
 
 function StatusDots() {
@@ -189,7 +189,7 @@ export function FeaturedModels() {
       {/* Explore all button */}
       <div className="mx-auto mt-10 flex max-w-[1160px] justify-center">
         <Link
-          href="/models"
+          href="/login"
           className="rounded-xs bg-[#111] px-4 py-3 font-mono text-sm font-medium tracking-[1.2px] text-white transition-colors duration-150 hover:bg-[#111]/80"
         >
           Explore <span className="font-bold">All 1000+</span> models

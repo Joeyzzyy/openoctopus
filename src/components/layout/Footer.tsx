@@ -9,7 +9,7 @@ const FOOTER_SECTIONS = [
     title: "Learn More",
     links: [
       { label: "Home", href: "/" },
-      { label: "Explore", href: "/models" },
+      { label: "Documentation", href: "/docs" },
       { label: "Pricing", href: "/pricing" },
       { label: "Enterprise", href: "/enterprise" },
       { label: "About Us", href: "/about" },

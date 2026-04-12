@@ -7,9 +7,7 @@ import { FadeIn } from "@/components/animations/FadeIn";
 type PricingResponse = {
   name: string;
   billingUnit: string;
-  costUsd: number | null;
   sellUsd: number;
-  costLabel: string;
   sellLabel: string;
 };
 
@@ -98,16 +96,15 @@ export function ImageVideoTable() {
   return (
     <PricingSection
       title="Image & Video Models"
-      description="Temporary pricing preview for the current featured image model."
+      description="Current public model prices synced from internal configuration."
       className="px-6 pt-12 md:px-12 md:pt-16 lg:px-20"
     >
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[560px] text-sm">
+        <table className="w-full min-w-[420px] text-sm">
           <thead>
             <tr className="border-b border-black/10">
               <TableHeaderCell>Model</TableHeaderCell>
-              <TableHeaderCell>Cost</TableHeaderCell>
-              <TableHeaderCell>Sell</TableHeaderCell>
+              <TableHeaderCell>Price</TableHeaderCell>
             </tr>
           </thead>
           <tbody>
@@ -119,9 +116,6 @@ export function ImageVideoTable() {
                   </span>
                 </TableCell>
                 <TableCell className="font-mono text-[#111111]">
-                  {pricing.costLabel}
-                </TableCell>
-                <TableCell className="font-mono text-[#111111]">
                   {pricing.sellLabel}
                 </TableCell>
               </tr>
@@ -130,11 +124,8 @@ export function ImageVideoTable() {
                 <TableCell className="font-medium text-[#111111]">
                   Nano Banana Pro
                 </TableCell>
-                <TableCell className="font-mono text-black/50">
-                  {error ? "Unavailable" : "Loading..."}
-                </TableCell>
                 <TableCell className="font-mono text-[#111111]">
-                  $0.10 / image
+                  {error ? "Unavailable" : "Loading..."}
                 </TableCell>
               </tr>
             )}
@@ -142,8 +133,8 @@ export function ImageVideoTable() {
         </table>
       </div>
       <p className="mt-4 text-xs text-black/40">
-        Cost and sell price are loaded from the active marketing route and the
-        current public model pricing configured in internal.{" "}
+        Prices are loaded from the current public model pricing configured in
+        internal.{" "}
         <Link href="/docs" className="text-brand hover:underline">
           See full pricing documentation
         </Link>

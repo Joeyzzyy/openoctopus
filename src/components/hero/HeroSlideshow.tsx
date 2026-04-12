@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ImageIcon, VideoIcon } from "lucide-react";
+import { ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Slide {
@@ -27,8 +27,8 @@ const SLIDES: Slide[] = [
     title: "Ultimate AI Media Generation Platform",
     description:
       "The fastest way to run image, video, audio, and multimodal generation through one unified inference platform.",
-    cta: { text: "Start Building", href: "/sign-in" },
-    docsHref: "/about",
+    cta: { text: "Start Building", href: "/login" },
+    docsHref: "/docs",
   },
   {
     id: 2,
@@ -37,8 +37,8 @@ const SLIDES: Slide[] = [
     title: "Nano Banana 2",
     description:
       "Fast, low-cost image generation with polished prompt following and production-ready quality.",
-    cta: { text: "Try Model", href: "/models" },
-    docsHref: "/models",
+    cta: { text: "Try Model", href: "/login" },
+    docsHref: "/docs",
   },
   {
     id: 3,
@@ -47,8 +47,8 @@ const SLIDES: Slide[] = [
     title: "Seedream 4.5",
     description:
       "Designed for typography and posters, with precise layouts and strong prompt control.",
-    cta: { text: "Try Model", href: "/models" },
-    docsHref: "/models",
+    cta: { text: "Try Model", href: "/login" },
+    docsHref: "/docs",
   },
   {
     id: 4,
@@ -56,8 +56,8 @@ const SLIDES: Slide[] = [
     title: "InfiniteTalk",
     description:
       "Create expressive talking characters with high fidelity lip sync and stable identity across scenes.",
-    cta: { text: "Try Model", href: "/models" },
-    docsHref: "/models",
+    cta: { text: "Try Model", href: "/login" },
+    docsHref: "/docs",
   },
   {
     id: 5,
@@ -65,8 +65,8 @@ const SLIDES: Slide[] = [
     title: "Kling V3 Motion Control",
     description:
       "Guide camera movement and subject motion with stronger control for cinematic video generation.",
-    cta: { text: "Try Model", href: "/models" },
-    docsHref: "/models",
+    cta: { text: "Try Model", href: "/login" },
+    docsHref: "/docs",
   },
 ];
 
@@ -178,22 +178,12 @@ export function HeroSlideshow() {
 
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 <Link
-                  href="/models"
+                  href="/login"
                   className="relative flex h-8 items-center gap-1.5 rounded-[2px] border border-white/20 bg-black/15 px-3 text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
                 >
                   <ImageIcon className="size-3" />
                   <span className="font-mono text-[10px] font-medium uppercase tracking-[1.1px]">
                     Image Generator
-                  </span>
-                  <span className="absolute -right-2 -top-2 text-[10px]">🔥</span>
-                </Link>
-                <Link
-                  href="/models"
-                  className="relative flex h-8 items-center gap-1.5 rounded-[2px] border border-white/20 bg-black/15 px-3 text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-                >
-                  <VideoIcon className="size-3" />
-                  <span className="font-mono text-[10px] font-medium uppercase tracking-[1.1px]">
-                    Video Generator
                   </span>
                   <span className="absolute -right-2 -top-2 text-[10px]">🔥</span>
                 </Link>

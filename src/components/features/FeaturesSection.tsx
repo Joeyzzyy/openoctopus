@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { FadeIn } from "@/components/animations/FadeIn";
@@ -122,13 +121,13 @@ export function FeaturesSection() {
           </p>
           <div className="mt-2 flex items-center gap-3">
             <Link
-              href="/about"
+              href="/docs"
               className="inline-flex items-center gap-2 rounded-xs bg-white px-5 py-2.5 font-mono text-sm uppercase tracking-[1.2px] text-black transition-colors duration-150 hover:bg-white/90"
             >
               API Docs
             </Link>
             <Link
-              href="/models"
+              href="/login"
               className="inline-flex items-center gap-2 rounded-xs border border-white/20 px-5 py-2.5 font-mono text-sm uppercase tracking-[1.2px] text-white transition-colors duration-150 hover:bg-white/10"
             >
               Quickstart

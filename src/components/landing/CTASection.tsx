@@ -28,8 +28,6 @@ export function CTASection() {
         </h2>
         <Link
           href="/login"
-          target="_blank"
-          rel="noopener noreferrer"
           className="flex shrink-0 items-center gap-3 rounded-xs bg-black px-8 py-4 text-white transition-colors duration-150 hover:bg-black/80"
         >
           <span className="font-mono text-sm font-medium leading-4 tracking-[1.2px]">

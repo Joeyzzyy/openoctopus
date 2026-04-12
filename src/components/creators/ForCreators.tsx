@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowRight, Download, ImageIcon, Video } from "lucide-react";
+import { Download, ImageIcon } from "lucide-react";
 import Link from "next/link";
 import { FadeIn } from "@/components/animations/FadeIn";
 
@@ -25,14 +25,14 @@ export function ForCreators() {
           <div className="mt-2 flex flex-col gap-2">
             <div className="flex shrink-0 items-center gap-3">
               <Link
-                href="/"
+                href="/login"
                 className="group inline-flex items-center gap-2 rounded-xs bg-white px-5 py-2.5 font-mono text-sm uppercase text-black transition-colors duration-150 hover:bg-white/90"
               >
                 <span className="font-medium tracking-[1.2px]">Download App</span>
                 <Download className="h-4 w-4 transition-transform group-hover:translate-y-0.5" />
               </Link>
               <Link
-                href="/models"
+                href="/login"
                 className="inline-flex items-center gap-2 rounded-xs border border-white/20 px-5 py-2.5 font-mono text-sm uppercase text-white transition-colors duration-150 hover:bg-white/10"
               >
                 <span className="font-medium tracking-[1.2px]">Try Studio</span>
@@ -41,22 +41,12 @@ export function ForCreators() {
 
             <div className="mt-1 flex items-center gap-1.5">
               <Link
-                href="/models"
+                href="/login"
                 className="relative inline-flex items-center gap-1.5 rounded-xs border border-white/20 px-3 py-1.5 text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
               >
                 <ImageIcon className="h-3 w-3" />
                 <span className="font-mono text-xs font-medium uppercase leading-4 tracking-[1.2px]">
                   Image Generator
-                </span>
-                <span className="absolute -right-1.5 -top-1.5 text-[10px]">🔥</span>
-              </Link>
-              <Link
-                href="/models"
-                className="relative inline-flex items-center gap-1.5 rounded-xs border border-white/20 px-3 py-1.5 text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-              >
-                <Video className="h-3 w-3" />
-                <span className="font-mono text-xs font-medium uppercase leading-4 tracking-[1.2px]">
-                  Video Generator
                 </span>
                 <span className="absolute -right-1.5 -top-1.5 text-[10px]">🔥</span>
               </Link>

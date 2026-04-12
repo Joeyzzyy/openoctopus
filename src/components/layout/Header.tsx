@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
 
 const NAV_ITEMS = [
-  { label: "Explore", href: "/models" },
+  { label: "Docs", href: "/docs" },
   { label: "Pricing", href: "/pricing" },
   { label: "Enterprise", href: "/enterprise" },
 ];
@@ -68,7 +68,7 @@ export function Header({
           </button>
 
           <Link
-            href={isLoggedIn ? "/dashboard" : "/sign-in"}
+            href={isLoggedIn ? "/dashboard" : "/login"}
             className="flex h-8 w-[90px] items-center justify-center rounded-[4px] bg-white text-center font-mono text-[11px] font-bold uppercase tracking-[1.1px] text-black shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-colors hover:bg-white/90"
           >
             {isLoggedIn ? "Dashboard" : "Sign In"}

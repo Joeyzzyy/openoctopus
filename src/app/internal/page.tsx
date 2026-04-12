@@ -34,7 +34,7 @@ const tabs = [
   },
   {
     key: "credentials",
-    label: "2. 凭证",
+    label: "2. 供应商密钥管理",
     description: "给供应商绑定真实密钥。",
   },
   {
@@ -95,46 +95,6 @@ function formatCurrency(value: number) {
     maximumFractionDigits: fractionDigits,
   }).format(value);
 }
-
-const tabGuidance: Record<
-  Exclude<InternalTabKey, "overview" | "requests" | "audit">,
-  {
-    relation: string;
-    prerequisite: string;
-    next: string;
-  }
-> = {
-  providers: {
-    relation:
-      "这里记录真实上游供应商，例如 Google、WaveSpeed。它只描述供应商本身的基础信息，不代表用户可见的模型。",
-    prerequisite: "这是第一步。先把供应商录进去，后面的凭证和供应商模型都要依附在供应商下面。",
-    next: "供应商创建后，去可售模型定义用户可见的模型型号和售价。",
-  },
-  "public-models": {
-    relation:
-      "这里定义用户看到的模型型号，例如 `openoctopus/gemini-2.5-flash-image`。这里的价格是用户售价，不是供应商成本。",
-    prerequisite: "通常是第三步。供应商和可售模型彼此独立，但后面的供应商模型需要同时依附这两者。",
-    next: "可售模型定义好后，去供应商模型把真实上游模型挂上来，并填写内部成本。",
-  },
-  credentials: {
-    relation:
-      "凭证只属于供应商，用来保存真实可用的密钥引用和环境信息。它不影响用户售价，只决定这个供应商能不能调用。",
-    prerequisite: "必须先有供应商。这通常是第二步。",
-    next: "凭证准备好后，去可售模型或供应商模型继续完成对外型号和成本配置。",
-  },
-  models: {
-    relation:
-      "这里是连接可售模型和供应商的映射层。每条供应商模型代表“某个供应商提供某个可售模型的一种实现”。这里填写的是供应商成本，不是用户售价。",
-    prerequisite: "必须同时先有供应商、可售模型和可用凭证。没有这三者，供应商模型就没有意义。",
-    next: "映射建好后去路由，决定线上主路由和回退实现走哪条。",
-  },
-  routes: {
-    relation:
-      "路由决定某个可售模型当前把流量发到哪个供应商模型，是全链路真正生效的切换层。",
-    prerequisite: "必须先有兼容的供应商模型。你已经建好一套链路后，这里就是上线、切流和故障切换面板。",
-    next: "切流后去请求记录看真实调用表现，去审计看变更记录。",
-  },
-};
 
 function getSearchValue(
   searchParams: Record<string, string | string[] | undefined>,
@@ -262,38 +222,11 @@ function OverviewCard({
   );
 }
 
-function GuidanceCard({
-  tab,
-}: {
-  tab: Exclude<InternalTabKey, "overview" | "requests" | "audit">;
-}) {
-  const guidance = tabGuidance[tab];
-
-  return (
-    <section className="mb-6 rounded-sm border border-black/10 bg-white p-4">
-      <div className="grid gap-3 lg:grid-cols-3">
-        <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
-          <p className="text-[11px] tracking-[0.35px] text-black/45">关系</p>
-          <p className="mt-2 text-sm leading-6 text-black/68">{guidance.relation}</p>
-        </div>
-        <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
-          <p className="text-[11px] tracking-[0.35px] text-black/45">前置条件</p>
-          <p className="mt-2 text-sm leading-6 text-black/68">{guidance.prerequisite}</p>
-        </div>
-        <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
-          <p className="text-[11px] tracking-[0.35px] text-black/45">下一步</p>
-          <p className="mt-2 text-sm leading-6 text-black/68">{guidance.next}</p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function SetupOrderCard() {
   const steps = [
     "1. 先建供应商：只填 Google / WaveSpeed 这类上游基础信息，例如名称、slug、base URL。",
     "2. 再建可售模型：定义用户可见的模型型号，例如 `openoctopus/gemini-2.5-flash-image`，这里填的是用户售价。",
-    "3. 然后配凭证：把真实密钥绑定到供应商。",
+    "3. 然后配供应商密钥：把真实密钥绑定到供应商。",
     "4. 再建供应商模型：把“某个供应商的某个真实模型”挂到某个可售模型上，这里填的是供应商成本。",
     "5. 最后配路由：决定线上默认走哪个供应商模型，是否有回退实现。",
   ];
@@ -302,7 +235,7 @@ function SetupOrderCard() {
     <section className="mb-6 rounded-sm border border-black/10 bg-white p-4">
       <h2 className="text-xl font-semibold text-black">推荐操作顺序</h2>
       <p className="mt-1 text-sm text-black/55">
-        先把供应商、售价、凭证、供应商模型、路由这五层分清，再去录数据，整个后台就不会绕。
+        先把供应商、售价、供应商密钥、供应商模型、路由这五层分清，再去录数据，整个后台就不会绕。
       </p>
       <div className="mt-4 grid gap-3">
         {steps.map((step) => (
@@ -521,7 +454,7 @@ export default async function InternalPage({
                 内部控制台
               </h1>
               <p className="mt-2 text-sm text-black/55">
-                用于管理真实供应商接入、路由、凭证和调用可观测性。
+                用于管理真实供应商接入、路由、供应商密钥和调用可观测性。
               </p>
               <p className="mt-3 text-xs text-black/42">
                 {data.workspace.name} · {data.role}
@@ -566,7 +499,7 @@ export default async function InternalPage({
                     icon={ShieldCheck}
                   />
                   <OverviewCard
-                    title="凭证"
+                    title="供应商密钥"
                     value={data.metrics.credentials}
                     note={
                       hasCredentials
@@ -604,8 +537,8 @@ export default async function InternalPage({
                           ready={hasSupportedModels}
                         />
                         <ReadinessItem
-                          label="供应商与凭证"
-                          detail={hasProviders && hasCredentials ? "上游供应商和密钥引用已就位。" : "供应商接入或凭证配置还不完整。"}
+                          label="供应商与密钥"
+                          detail={hasProviders && hasCredentials ? "上游供应商和密钥引用已就位。" : "供应商接入或密钥配置还不完整。"}
                           ready={hasProviders && hasCredentials}
                         />
                         <ReadinessItem
@@ -626,7 +559,7 @@ export default async function InternalPage({
                           API 是否接收请求取决于 API Key 是否启用，以及是否存在匹配请求可售模型 slug 的路由。
                         </div>
                         <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
-                          最终执行仍然依赖 worker adapter 和真实上游凭证。
+                          最终执行仍然依赖 worker adapter 和真实上游密钥。
                         </div>
                       </div>
                     </div>
@@ -638,7 +571,6 @@ export default async function InternalPage({
 
           {activeTab === "public-models" ? (
             <>
-              <GuidanceCard tab="public-models" />
               <section className="mb-6">
                 <SectionShell
                 id="public-models-panel"
@@ -659,7 +591,6 @@ export default async function InternalPage({
 
           {activeTab === "providers" ? (
             <>
-              <GuidanceCard tab="providers" />
               <section className="mb-6 rounded-sm border border-black/10 bg-white p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
@@ -721,11 +652,10 @@ export default async function InternalPage({
 
           {activeTab === "credentials" ? (
             <>
-              <GuidanceCard tab="credentials" />
               <section className="mt-6">
                 <SectionShell
                 id="credentials-panel"
-                title="供应商凭证"
+                title="供应商密钥管理"
                 description="在这里保存加密后的供应商密钥。密钥保存后会被掩码展示，不再明文显示。"
                 >
                 <div className="mb-4 flex items-center gap-1.5 bg-amber-500/10 px-3 py-2.5">
@@ -746,7 +676,6 @@ export default async function InternalPage({
 
           {activeTab === "models" ? (
             <>
-              <GuidanceCard tab="models" />
               <section className="mt-6">
                 <SectionShell
                 id="models-panel"
@@ -772,7 +701,6 @@ export default async function InternalPage({
 
           {activeTab === "routes" ? (
             <>
-              <GuidanceCard tab="routes" />
               <section className="mt-6">
                 <SectionShell
                 id="routes-panel"
@@ -1044,7 +972,7 @@ export default async function InternalPage({
                 ) : (
                   <EmptyState
                     title="还没有审计事件"
-                    detail="当你在内部后台创建供应商、凭证、模型或路由规则后，审计轨迹会从这里开始记录。"
+                    detail="当你在内部后台创建供应商、供应商密钥、模型或路由规则后，审计轨迹会从这里开始记录。"
                   />
                 )}
               </SectionShell>

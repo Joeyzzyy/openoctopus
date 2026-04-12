@@ -627,7 +627,7 @@ export function ProvidersPanel({
                 模型：{provider.activeModelCount}/{provider.modelCount} 已启用
               </div>
               <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                凭证：{provider.credentialCount}
+                供应商密钥：{provider.credentialCount}
               </div>
             </div>
           </div>
@@ -658,18 +658,18 @@ export function CredentialsPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-black/55">已有凭证</div>
+        <div className="text-sm text-black/55">已有供应商密钥</div>
         <ManagementDialog
           trigger={
             <button type="button" disabled={!hasProviders}>
               <ModalButton>
                 <Plus className="size-3.5" />
-                新建凭证
+                新建供应商密钥
               </ModalButton>
             </button>
           }
-          title="新建供应商凭证"
-          description="在独立弹窗中创建新的凭证，不直接嵌在列表里编辑。"
+          title="新建供应商密钥"
+          description="在独立弹窗中创建新的供应商密钥，不直接嵌在列表里编辑。"
         >
           {({ close }) => (
           <ManagedDialogForm action={createProviderCredential} close={close}>
@@ -691,7 +691,7 @@ export function CredentialsPanel({
             <FormTextArea label="Metadata JSON" name="metadata" defaultValue={selectedTemplate?.credential.metadata ?? "{}"} disabled={!hasProviders} />
             <ActiveCheckbox name="isActive" defaultChecked disabled={!hasProviders} label="启用" />
             <div className="flex justify-end">
-              <SubmitButton label="创建凭证" disabled={!hasProviders} />
+              <SubmitButton label="创建供应商密钥" disabled={!hasProviders} />
             </div>
           </ManagedDialogForm>
           )}
@@ -743,7 +743,7 @@ export function CredentialsPanel({
                     </button>
                   }
                 title={`编辑 ${credential.label}`}
-                description="在弹窗中编辑这个已有凭证。"
+                description="在弹窗中编辑这个已有供应商密钥。"
               >
                   {({ close }) => (
                   <ManagedDialogForm action={updateProviderCredentialDetails} close={close}>
@@ -755,7 +755,7 @@ export function CredentialsPanel({
                     <FormTextArea label="Metadata JSON" name="metadata" defaultValue={credential.metadataText} />
                     <ActiveCheckbox name="isActive" defaultChecked={credential.is_active} label="启用" />
                     <div className="flex justify-end">
-                      <SubmitButton label="保存凭证" />
+                      <SubmitButton label="保存供应商密钥" />
                     </div>
                   </ManagedDialogForm>
                   )}
@@ -789,17 +789,17 @@ export function CredentialsPanel({
                     </button>
                   }
                   title={`删除 ${credential.label}`}
-                  description="确认是否删除这个未启用的凭证。"
+                  description="确认是否删除这个未启用的供应商密钥。"
                 >
                   {({ close }) => (
                   <ManagedDialogForm action={deleteProviderCredential} close={close}>
                     <input type="hidden" name="credentialId" value={credential.id} />
                     <div className="rounded-sm border border-[#f0d5d0] bg-[#fff5f3] px-4 py-3 text-sm text-[#8d4336]">
-                      这个操作会永久删除凭证记录。必须先停用后才能删除。
+                      这个操作会永久删除供应商密钥记录。必须先停用后才能删除。
                     </div>
                     <div className="flex justify-end">
                       <SubmitButton
-                        label="删除凭证"
+                        label="删除供应商密钥"
                         pendingLabel="删除中..."
                         disabled={credential.is_active}
                         tone="danger"
@@ -823,7 +823,7 @@ export function CredentialsPanel({
         ))
       ) : (
         <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
-          <p className="text-sm font-medium text-black">还没有凭证</p>
+          <p className="text-sm font-medium text-black">还没有供应商密钥</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             创建供应商后，在这里登记真实的密钥引用。
           </p>

@@ -6,7 +6,7 @@ const footerSections = [
     title: "Learn More",
     links: [
       { label: "Home", href: "/" },
-      { label: "Explore", href: "/explore" },
+      { label: "Documentation", href: "/docs" },
       { label: "Pricing", href: "/pricing" },
       { label: "Enterprise", href: "/enterprise" },
       { label: "About Us", href: "/about" },
@@ -15,21 +15,19 @@ const footerSections = [
   {
     title: "Resources",
     links: [
-      { label: "Image Generator", href: "/generators/image" },
-      { label: "Video Generator", href: "/generators/video" },
-      { label: "Desktop App", href: "/desktop" },
-      { label: "Studio", href: "/studio" },
+      { label: "Image Generator", href: "/login" },
+      { label: "Studio", href: "/login" },
       { label: "Documentation", href: "/docs" },
-      { label: "Blog", href: "/blog" },
+      { label: "Sign In", href: "/login" },
     ],
   },
   {
     title: "Legal",
     links: [
-      { label: "Terms of Service", href: "/terms" },
-      { label: "Privacy Policy", href: "/privacy" },
-      { label: "Support", href: "/support" },
-      { label: "Affiliate", href: "/affiliate" },
+      { label: "Terms of Service", href: "/about" },
+      { label: "Privacy Policy", href: "/about" },
+      { label: "Support", href: "mailto:support@openoctopus.ai" },
+      { label: "Status", href: "https://status.wavespeed.ai/" },
     ],
   },
 ];
