@@ -283,13 +283,17 @@ export function resolveBillingMetrics(input: {
   const output = input.output ?? null;
   const providerRaw = input.providerRaw ?? null;
   const usage = resolveTokenUsage(requestInput, output, providerRaw);
+  const generatedImageCount = countGeneratedAssets(output, "image");
+  const generatedVideoCount = countGeneratedAssets(output, "video");
 
   return {
     requestCount: 1,
     imageCount:
-      countGeneratedAssets(output, "image") || resolveRequestedAssetCount(requestInput, "image"),
+      generatedImageCount ||
+      (generatedVideoCount > 0 ? 0 : resolveRequestedAssetCount(requestInput, "image")),
     videoCount:
-      countGeneratedAssets(output, "video") || resolveRequestedAssetCount(requestInput, "video"),
+      generatedVideoCount ||
+      (generatedImageCount > 0 ? 0 : resolveRequestedAssetCount(requestInput, "video")),
     durationSeconds: resolveDurationSeconds(requestInput, output, providerRaw),
     inputTokens: usage.inputTokens,
     outputTokens: usage.outputTokens,

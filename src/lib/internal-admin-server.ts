@@ -188,12 +188,16 @@ function formatRelativeTimestamp(value: string | null) {
 }
 
 function formatCurrency(value: number | null | undefined) {
+  const normalizedValue = value ?? 0;
+  const absValue = Math.abs(normalizedValue);
+  const fractionDigits = absValue > 0 && absValue < 0.1 ? 6 : 2;
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value ?? 0);
+    maximumFractionDigits: fractionDigits,
+  }).format(normalizedValue);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

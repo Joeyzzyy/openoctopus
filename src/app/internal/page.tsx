@@ -83,6 +83,18 @@ const providerKindOptions = [
   { value: "custom", label: "Custom" },
 ] as const;
 
+function formatCurrency(value: number) {
+  const absValue = Math.abs(value);
+  const fractionDigits = absValue > 0 && absValue < 0.1 ? 6 : 2;
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: fractionDigits,
+  }).format(value);
+}
+
 const tabGuidance: Record<
   Exclude<InternalTabKey, "overview" | "requests" | "audit">,
   {
@@ -383,7 +395,6 @@ export default async function InternalPage({
   const hasProviderModels = data.providerModels.length > 0;
   const hasCredentials = data.providerCredentials.length > 0;
   const hasRoutes = data.routingRules.length > 0;
-  const hasRequests = data.requests.length > 0;
   const hasAudit = data.auditLogs.length > 0;
   const selectedTemplateKey = getSearchValue(resolvedSearchParams, "template");
   const activeTab = getTabValue(getSearchValue(resolvedSearchParams, "tab"));
@@ -801,34 +812,19 @@ export default async function InternalPage({
                   />
                   <OverviewCard
                     title="Customer Charge"
-                    value={new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: "USD",
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }).format(requestSummary.customerCharge)}
+                    value={formatCurrency(requestSummary.customerCharge)}
                     note="Authoritative source: inference_requests customer charge fields"
                     icon={Fingerprint}
                   />
                   <OverviewCard
                     title="Provider Cost"
-                    value={new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: "USD",
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }).format(requestSummary.providerCost)}
+                    value={formatCurrency(requestSummary.providerCost)}
                     note="Authoritative source: inference_requests provider cost fields"
                     icon={ShieldCheck}
                   />
                   <OverviewCard
                     title="Profit"
-                    value={new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: "USD",
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }).format(requestSummary.profit)}
+                    value={formatCurrency(requestSummary.profit)}
                     note="Customer charge minus provider cost"
                     icon={Waypoints}
                   />
