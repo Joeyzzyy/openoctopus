@@ -7,7 +7,24 @@ type BudgetState = "healthy" | "watch" | "critical";
 type KeyState = "active" | "warning" | "paused";
 type LedgerTone = "positive" | "negative" | "neutral";
 type ProviderState = "healthy" | "degraded" | "offline";
-type RequestState = "queued" | "processing" | "succeeded" | "failed";
+type RequestState = "queued" | "processing" | "succeeded" | "failed" | "cancelled";
+
+type DashboardDataOptions = {
+  requestsPage?: number;
+  requestsApiKeyId?: string | null;
+  analyticsLookbackMs?: number;
+  analyticsApiKeyId?: string | null;
+};
+
+type AnalyticsRequestRow = {
+  id: string;
+  api_key_id: string | null;
+  public_model_slug: string;
+  status: string;
+  actual_cost: number | null;
+  estimated_cost: number | null;
+  created_at: string;
+};
 
 export type DashboardData = {
   user: {
@@ -93,6 +110,34 @@ export type DashboardData = {
     fallback: string;
     strategy: string;
   }>;
+  modelCatalogRows: Array<{
+    id: string;
+    publicModel: string;
+    providerName: string;
+    providerKind: string;
+    upstreamModelSlug: string;
+    capability: string;
+    strategy: string;
+    primary: string;
+    fallback: string;
+  }>;
+  requestFilters: {
+    apiKeys: Array<{
+      id: string;
+      name: string;
+      prefix: string;
+      environment: string;
+    }>;
+  };
+  analyticsRequests: Array<{
+    id: string;
+    apiKeyId: string | null;
+    apiKeyName: string;
+    model: string;
+    status: string;
+    createdAt: string;
+    costValue: number;
+  }>;
   requestPagination: {
     page: number;
     pageSize: number;
@@ -101,6 +146,9 @@ export type DashboardData = {
   };
   requestQueueRows: Array<{
     requestId: string;
+    createdAtLabel: string;
+    apiKeyId: string | null;
+    apiKeyName: string;
     capability: string;
     model: string;
     provider: string;
@@ -124,6 +172,61 @@ function formatCompactNumber(value: number | null | undefined) {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value ?? 0);
+}
+
+function formatTimestamp(value: string) {
+  return new Date(value).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+async function fetchAnalyticsRequests(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  input: {
+    workspaceId: string;
+    apiKeyId?: string | null;
+    lookbackMs: number;
+  }
+) {
+  const batchSize = 5000;
+  const maxBatches = 20;
+  const sinceIso = new Date(Date.now() - input.lookbackMs).toISOString();
+  const rows: AnalyticsRequestRow[] = [];
+
+  for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
+    const from = batchIndex * batchSize;
+    const to = from + batchSize - 1;
+    let query = supabase
+      .from("inference_requests")
+      .select(
+        "id, api_key_id, public_model_slug, status, actual_cost, estimated_cost, created_at"
+      )
+      .eq("workspace_id", input.workspaceId)
+      .gte("created_at", sinceIso)
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (input.apiKeyId) {
+      query = query.eq("api_key_id", input.apiKeyId);
+    }
+
+    const response = await query;
+    if (response.error) {
+      break;
+    }
+
+    const batchRows = (response.data ?? []) as AnalyticsRequestRow[];
+    rows.push(...batchRows);
+
+    if (batchRows.length < batchSize) {
+      break;
+    }
+  }
+
+  return rows;
 }
 
 function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardData["workspace"]): DashboardData {
@@ -168,6 +271,11 @@ function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardDa
     ledgerRows: [],
     providerSummaries: [],
     routingRules: [],
+    modelCatalogRows: [],
+    requestFilters: {
+      apiKeys: [],
+    },
+    analyticsRequests: [],
     requestPagination: {
       page: 1,
       pageSize: 10,
@@ -180,9 +288,10 @@ function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardDa
 
 export async function getDashboardData({
   requestsPage = 1,
-}: {
-  requestsPage?: number;
-} = {}): Promise<DashboardData | null> {
+  requestsApiKeyId = null,
+  analyticsLookbackMs = 24 * 60 * 60 * 1000,
+  analyticsApiKeyId = null,
+}: DashboardDataOptions = {}): Promise<DashboardData | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -250,6 +359,7 @@ export async function getDashboardData({
       providerModelResponse,
       routingRuleResponse,
       requestResponse,
+      analyticsRequestRows,
     ] = await Promise.all([
       supabase.from("v_api_key_spend_summary").select("*").eq("workspace_id", workspace.id),
       supabase.from("v_model_spend_summary").select("*").eq("workspace_id", workspace.id).order("total_spend", { ascending: false }),
@@ -262,12 +372,28 @@ export async function getDashboardData({
       supabase.from("providers").select("id, name, kind, regions, status"),
       supabase.from("provider_models").select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id"),
       supabase.from("routing_rules").select("id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy").or(`workspace_id.eq.${workspace.id},workspace_id.is.null`).eq("active", true).order("created_at", { ascending: true }),
-      supabase
-        .from("inference_requests")
-        .select("id, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, created_at, queued_at, started_at, completed_at", { count: "exact" })
-        .eq("workspace_id", workspace.id)
-        .order("created_at", { ascending: false })
-        .range(requestFrom, requestTo),
+      (() => {
+        let query = supabase
+          .from("inference_requests")
+          .select(
+            "id, api_key_id, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, created_at, queued_at, started_at, completed_at",
+            { count: "exact" }
+          )
+          .eq("workspace_id", workspace.id)
+          .order("created_at", { ascending: false })
+          .range(requestFrom, requestTo);
+
+        if (requestsApiKeyId) {
+          query = query.eq("api_key_id", requestsApiKeyId);
+        }
+
+        return query;
+      })(),
+      fetchAnalyticsRequests(supabase, {
+        workspaceId: workspace.id,
+        apiKeyId: analyticsApiKeyId,
+        lookbackMs: analyticsLookbackMs,
+      }),
     ]);
 
     const currentMonthSpend = (keySummary ?? []).reduce((sum, row) => sum + Number(row.current_month_spend ?? 0), 0);
@@ -288,6 +414,7 @@ export async function getDashboardData({
     const routingRuleRows = routingRuleResponse.error ? [] : routingRuleResponse.data ?? [];
     const requestRows = requestResponse.error ? [] : requestResponse.data ?? [];
     const requestTotal = requestResponse.error ? 0 : requestResponse.count ?? 0;
+    const analyticsRows = analyticsRequestRows ?? [];
     const providerNameById = new Map(providers.map((row) => [row.id, row.name]));
     const providerById = new Map(providers.map((row) => [row.id, row]));
     const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
@@ -360,6 +487,18 @@ export async function getDashboardData({
       };
     });
 
+    const modelCatalogRows = routingRules.map((rule, index) => ({
+      id: `${rule.publicModel}-${rule.upstreamModelSlug}-${index}`,
+      publicModel: rule.publicModel,
+      providerName: rule.providerName,
+      providerKind: rule.providerKind,
+      upstreamModelSlug: rule.upstreamModelSlug,
+      capability: rule.capability,
+      strategy: rule.strategy,
+      primary: rule.primary,
+      fallback: rule.fallback,
+    }));
+
     const requestQueueRows = requestRows.map((row) => {
       const startedAt = row.started_at ? new Date(row.started_at).getTime() : null;
       const completedAt = row.completed_at ? new Date(row.completed_at).getTime() : null;
@@ -378,6 +517,9 @@ export async function getDashboardData({
 
       return {
         requestId: row.id,
+        createdAtLabel: formatTimestamp(row.created_at),
+        apiKeyId: row.api_key_id ?? null,
+        apiKeyName: row.api_key_id ? keyNameById.get(row.api_key_id) ?? "Unknown key" : "No key",
         capability: row.capability,
         model: row.public_model_slug,
         provider: row.provider_id ? providerNameById.get(row.provider_id) ?? "Unknown provider" : "Unrouted",
@@ -521,6 +663,24 @@ export async function getDashboardData({
       })),
       providerSummaries,
       routingRules,
+      modelCatalogRows,
+      requestFilters: {
+        apiKeys: (keyRows ?? []).map((row) => ({
+          id: row.id,
+          name: row.name,
+          prefix: row.key_prefix,
+          environment: row.environment,
+        })),
+      },
+      analyticsRequests: analyticsRows.map((row) => ({
+        id: row.id,
+        apiKeyId: row.api_key_id ?? null,
+        apiKeyName: row.api_key_id ? keyNameById.get(row.api_key_id) ?? "Unknown key" : "No key",
+        model: row.public_model_slug,
+        status: row.status,
+        createdAt: row.created_at,
+        costValue: Number(row.actual_cost ?? row.estimated_cost ?? 0),
+      })),
       requestPagination: {
         page: normalizedRequestsPage,
         pageSize,
