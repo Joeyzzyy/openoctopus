@@ -918,6 +918,7 @@ export async function createProviderModel(formData: FormData) {
   }
 
   assertBillingConfig(supportedModelRow.billing_config);
+  const pricingConfig = parseBillingConfig(parsed.pricing);
 
   const { data, error } = await supabase
     .from("provider_models")
@@ -928,7 +929,7 @@ export async function createProviderModel(formData: FormData) {
     upstream_model_slug: parsed.upstreamModelSlug,
     capability: parsed.capability,
     active: parsed.active,
-    pricing: parsed.pricing,
+    pricing: pricingConfig,
     input_schema: parsed.inputSchema,
     output_schema: parsed.outputSchema,
     })
@@ -949,6 +950,7 @@ export async function createProviderModel(formData: FormData) {
     summary: `Created provider model ${supportedModelRow.model_slug}`,
     details: {
       ...parsed,
+      pricing: pricingConfig,
       publicModelSlug: supportedModelRow.model_slug,
     },
   });
@@ -1036,6 +1038,7 @@ export async function updateProviderModelDetails(formData: FormData) {
   }
 
   assertBillingConfig(supportedModelRow.billing_config);
+  const pricingConfig = parseBillingConfig(parsed.pricing);
 
   const { error } = await supabase
     .from("provider_models")
@@ -1046,7 +1049,7 @@ export async function updateProviderModelDetails(formData: FormData) {
       upstream_model_slug: parsed.upstreamModelSlug,
       capability: parsed.capability,
       active: parsed.active,
-      pricing: parsed.pricing,
+      pricing: pricingConfig,
       input_schema: parsed.inputSchema,
       output_schema: parsed.outputSchema,
     })
@@ -1066,6 +1069,7 @@ export async function updateProviderModelDetails(formData: FormData) {
     summary: `Updated provider model ${supportedModelRow.model_slug}`,
     details: {
       ...parsed,
+      pricing: pricingConfig,
       publicModelSlug: supportedModelRow.model_slug,
     },
   });

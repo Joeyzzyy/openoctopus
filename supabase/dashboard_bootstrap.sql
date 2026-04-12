@@ -212,6 +212,9 @@ create table if not exists public.usage_events (
   input_units numeric(18,4) not null default 0,
   output_units numeric(18,4) not null default 0,
   total_cost numeric(12,6) not null default 0,
+  customer_charge numeric(12,6) not null default 0,
+  provider_cost numeric(12,6) not null default 0,
+  gross_profit numeric(12,6) not null default 0,
   status_code integer,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default timezone('utc', now())
@@ -335,7 +338,7 @@ select
 from public.usage_events u
 group by u.workspace_id, date_trunc('day', u.created_at)::date;
 
-create or replace function public.record_usage_event(
+create or replace function public.record_request_settlement(
   p_workspace_id uuid,
   p_api_key_id uuid,
   p_model_id uuid,
@@ -344,7 +347,8 @@ create or replace function public.record_usage_event(
   p_request_count integer,
   p_input_units numeric,
   p_output_units numeric,
-  p_total_cost numeric,
+  p_customer_charge numeric,
+  p_provider_cost numeric,
   p_status_code integer,
   p_metadata jsonb default '{}'::jsonb
 )
@@ -367,6 +371,9 @@ begin
     input_units,
     output_units,
     total_cost,
+    customer_charge,
+    provider_cost,
+    gross_profit,
     status_code,
     metadata
   )
@@ -379,7 +386,10 @@ begin
     coalesce(p_request_count, 1),
     coalesce(p_input_units, 0),
     coalesce(p_output_units, 0),
-    coalesce(p_total_cost, 0),
+    coalesce(p_customer_charge, 0),
+    coalesce(p_customer_charge, 0),
+    coalesce(p_provider_cost, 0),
+    coalesce(p_customer_charge, 0) - coalesce(p_provider_cost, 0),
     p_status_code,
     coalesce(p_metadata, '{}'::jsonb)
   )
@@ -390,30 +400,35 @@ begin
   from public.wallet_transactions
   where workspace_id = p_workspace_id;
 
-  running_balance := running_balance - coalesce(p_total_cost, 0)::numeric(12,2);
+  if coalesce(p_customer_charge, 0) > 0 then
+    running_balance := running_balance - coalesce(p_customer_charge, 0)::numeric(12,2);
 
-  insert into public.wallet_transactions (
-    workspace_id,
-    entry_type,
-    amount_delta,
-    balance_after,
-    description,
-    reference_id,
-    metadata
-  )
-  values (
-    p_workspace_id,
-    'usage',
-    -coalesce(p_total_cost, 0)::numeric(12,2),
-    running_balance,
-    'Model usage settlement',
-    inserted_event.id,
-    jsonb_build_object(
-      'api_key_id', p_api_key_id,
-      'model_id', p_model_id,
-      'endpoint', p_endpoint
+    insert into public.wallet_transactions (
+      workspace_id,
+      entry_type,
+      amount_delta,
+      balance_after,
+      description,
+      reference_id,
+      metadata
     )
-  );
+    values (
+      p_workspace_id,
+      'usage',
+      -coalesce(p_customer_charge, 0)::numeric(12,2),
+      running_balance,
+      'Model usage settlement',
+      inserted_event.id,
+      jsonb_build_object(
+        'api_key_id', p_api_key_id,
+        'model_id', p_model_id,
+        'endpoint', p_endpoint,
+        'customer_charge', coalesce(p_customer_charge, 0),
+        'provider_cost', coalesce(p_provider_cost, 0),
+        'gross_profit', coalesce(p_customer_charge, 0) - coalesce(p_provider_cost, 0)
+      )
+    );
+  end if;
 
   update public.api_keys
   set last_used_at = timezone('utc', now())

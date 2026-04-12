@@ -142,7 +142,7 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
 
   const { data: providerModelRow, error: providerModelError } = await supabaseAdmin
     .from("provider_models")
-    .select("id, provider_id, upstream_model_slug")
+    .select("id, provider_id, upstream_model_slug, pricing")
     .eq("id", routeRow.primary_provider_model_id)
     .maybeSingle();
 
@@ -152,6 +152,16 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
 
   if (!providerModelRow) {
     throw new Error("Primary provider model is missing");
+  }
+
+  try {
+    parseBillingConfig(providerModelRow.pricing);
+  } catch {
+    throw new RequestValidationError(
+      `Provider pricing is missing a valid billing configuration for ${input.model}`,
+      409,
+      "provider_pricing_not_configured"
+    );
   }
 
   const { data: providerRow, error: providerError } = await supabaseAdmin

@@ -68,6 +68,12 @@ type RequestRow = {
   status: string;
   estimated_cost: number | null;
   actual_cost: number | null;
+  estimated_customer_charge: number | null;
+  actual_customer_charge: number | null;
+  estimated_provider_cost: number | null;
+  actual_provider_cost: number | null;
+  estimated_profit: number | null;
+  actual_profit: number | null;
   error_code: string | null;
   error_message: string | null;
   created_at: string;
@@ -107,8 +113,13 @@ type ApiKeySpendSummaryRow = {
 
 type RequestCostRow = {
   api_key_id: string | null;
-  estimated_cost: number | null;
-  actual_cost: number | null;
+  estimated_provider_cost: number | null;
+  actual_provider_cost: number | null;
+};
+
+type UsageEventRow = {
+  external_request_id: string | null;
+  metadata: Record<string, unknown> | null;
 };
 
 type ProviderCredentialRow = {
@@ -185,6 +196,44 @@ function formatCurrency(value: number | null | undefined) {
   }).format(value ?? 0);
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function formatMetricValue(key: string, value: number) {
+  if (key.toLowerCase().includes("token")) {
+    return new Intl.NumberFormat("en-US").format(Math.round(value));
+  }
+
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+
+  return value.toFixed(2);
+}
+
+function labelBreakdownKey(key: string) {
+  return key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export async function getInternalAdminData() {
   const supabase = await createClient();
   const {
@@ -239,6 +288,7 @@ export async function getInternalAdminData() {
     apiKeysResponse,
     apiKeySpendSummaryResponse,
     requestCostResponse,
+    usageEventsResponse,
     attemptsResponse,
     adminAuditLogsResponse,
   ] =
@@ -277,7 +327,7 @@ export async function getInternalAdminData() {
       supabase
         .from("inference_requests")
         .select(
-          "id, api_key_id, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, error_code, error_message, created_at, started_at, completed_at"
+          "id, api_key_id, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, created_at, started_at, completed_at"
         )
         .eq("workspace_id", membership.workspace_id)
         .order("created_at", { ascending: false })
@@ -293,9 +343,15 @@ export async function getInternalAdminData() {
         .eq("workspace_id", membership.workspace_id),
       supabase
         .from("inference_requests")
-        .select("api_key_id, estimated_cost, actual_cost")
+        .select("api_key_id, estimated_provider_cost, actual_provider_cost")
         .eq("workspace_id", membership.workspace_id)
         .gte("created_at", currentMonthStart.toISOString()),
+      supabase
+        .from("usage_events")
+        .select("external_request_id, metadata")
+        .eq("workspace_id", membership.workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(100),
       supabase
         .from("provider_attempts")
         .select(
@@ -330,6 +386,9 @@ export async function getInternalAdminData() {
   const requestCosts = (requestCostResponse.error
     ? []
     : requestCostResponse.data ?? []) as RequestCostRow[];
+  const usageEvents = (usageEventsResponse.error
+    ? []
+    : usageEventsResponse.data ?? []) as UsageEventRow[];
   const attempts = (attemptsResponse.error ? [] : attemptsResponse.data ?? []) as AttemptRow[];
   const adminAuditLogs = (adminAuditLogsResponse.error
     ? []
@@ -339,6 +398,11 @@ export async function getInternalAdminData() {
   const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
   const supportedModelById = new Map(supportedModels.map((row) => [row.id, row]));
   const apiKeySpendById = new Map(apiKeySpendSummaries.map((row) => [row.api_key_id, row]));
+  const usageEventByRequestId = new Map(
+    usageEvents
+      .filter((row) => row.external_request_id)
+      .map((row) => [row.external_request_id as string, row])
+  );
 
   const requestAttempts = new Map<string, AttemptRow[]>();
   for (const attempt of attempts) {
@@ -410,6 +474,65 @@ export async function getInternalAdminData() {
       ? providerModelById.get(request.provider_model_id) ?? null
       : null;
     const relatedAttempts = requestAttempts.get(request.id) ?? [];
+    const usageEvent = usageEventByRequestId.get(request.id) ?? null;
+    const economics = asRecord(usageEvent?.metadata)?.economics;
+    const economicsRecord = asRecord(economics);
+    const customerBreakdown = asRecord(economicsRecord?.customer);
+    const providerBreakdown = asRecord(economicsRecord?.provider);
+    const customerComponents = asRecord(customerBreakdown?.components);
+    const providerComponents = asRecord(providerBreakdown?.components);
+    const metricsRecord = asRecord(customerBreakdown?.metrics) ?? asRecord(providerBreakdown?.metrics);
+
+    const customerCharge = Number(
+      request.actual_customer_charge ?? request.actual_cost ?? request.estimated_customer_charge ?? request.estimated_cost ?? 0
+    );
+    const providerCost = Number(
+      request.actual_provider_cost ?? request.estimated_provider_cost ?? 0
+    );
+    const profit = Number(
+      request.actual_profit ??
+        request.estimated_profit ??
+        customerCharge - providerCost
+    );
+    const usageBreakdown = Object.entries(metricsRecord ?? {})
+      .map(([key, rawValue]) => {
+        const value = readNumber(rawValue);
+        if (value === null || value <= 0) {
+          return null;
+        }
+
+        return {
+          label: labelBreakdownKey(key),
+          value: formatMetricValue(key, value),
+        };
+      })
+      .filter((item) => item !== null);
+    const customerComponentBreakdown = Object.entries(customerComponents ?? {})
+      .map(([key, rawValue]) => {
+        const value = readNumber(rawValue);
+        if (value === null || value <= 0) {
+          return null;
+        }
+
+        return {
+          label: labelBreakdownKey(key),
+          value: formatCurrency(value),
+        };
+      })
+      .filter((item) => item !== null);
+    const providerComponentBreakdown = Object.entries(providerComponents ?? {})
+      .map(([key, rawValue]) => {
+        const value = readNumber(rawValue);
+        if (value === null || value <= 0) {
+          return null;
+        }
+
+        return {
+          label: labelBreakdownKey(key),
+          value: formatCurrency(value),
+        };
+      })
+      .filter((item) => item !== null);
 
     return {
       ...request,
@@ -417,6 +540,15 @@ export async function getInternalAdminData() {
       upstreamModelSlug: providerModel?.upstream_model_slug ?? "unknown",
       attemptCount: relatedAttempts.length,
       lastAttempt: relatedAttempts[0] ?? null,
+      customerCharge,
+      providerCost,
+      profit,
+      customerChargeLabel: formatCurrency(customerCharge),
+      providerCostLabel: formatCurrency(providerCost),
+      profitLabel: formatCurrency(profit),
+      usageBreakdown,
+      customerComponentBreakdown,
+      providerComponentBreakdown,
       createdLabel: formatRelativeTimestamp(request.created_at),
       completedLabel: formatRelativeTimestamp(request.completed_at),
     };
@@ -470,7 +602,7 @@ export async function getInternalAdminData() {
     map.set(
       request.api_key_id,
       (map.get(request.api_key_id) ?? 0) +
-        Number(request.actual_cost ?? request.estimated_cost ?? 0)
+        Number(request.actual_provider_cost ?? request.estimated_provider_cost ?? 0)
     );
 
     return map;

@@ -484,7 +484,7 @@ export default async function InternalPage({
                 <SectionShell
                   id="customer-economics-panel"
                   title="Customer Economics"
-                  description="Current workspace revenue, estimated internal cost, and profit by API key."
+                  description="Current workspace customer charge, provider cost, and profit by API key."
                 >
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[820px] text-sm">
@@ -497,7 +497,7 @@ export default async function InternalPage({
                             Revenue
                           </th>
                           <th className="py-3 pr-4 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
-                            Cost
+                            Provider Cost
                           </th>
                           <th className="py-3 pr-4 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
                             Profit
@@ -551,7 +551,7 @@ export default async function InternalPage({
                                       Revenue
                                     </th>
                                     <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                                      Cost
+                                      Provider Cost
                                     </th>
                                     <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
                                       Profit
@@ -818,7 +818,13 @@ export default async function InternalPage({
                             Attempts: {request.attemptCount}
                           </div>
                           <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                            Cost: {request.actual_cost ?? request.estimated_cost ?? 0}
+                            Customer charge: {request.customerChargeLabel}
+                          </div>
+                          <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
+                            Provider cost: {request.providerCostLabel}
+                          </div>
+                          <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
+                            Profit: {request.profitLabel}
                           </div>
                         </div>
 
@@ -837,6 +843,71 @@ export default async function InternalPage({
                                 {request.error_message ?? request.lastAttempt.error_message}
                               </p>
                             ) : null}
+                          </div>
+                        ) : null}
+
+                        {request.usageBreakdown.length > 0 ? (
+                          <div className="mt-4 rounded-sm border border-black/8 bg-white px-3 py-3">
+                            <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                              Usage Metrics
+                            </p>
+                            <div className="mt-3 grid gap-2 md:grid-cols-3">
+                              {request.usageBreakdown.map((item) => (
+                                <div
+                                  key={`${request.id}-usage-${item.label}`}
+                                  className="rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-2 text-xs text-black/60"
+                                >
+                                  {item.label}: <span className="font-mono text-black">{item.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {request.customerComponentBreakdown.length > 0 ||
+                        request.providerComponentBreakdown.length > 0 ? (
+                          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                            <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                              <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                                Customer Pricing Breakdown
+                              </p>
+                              {request.customerComponentBreakdown.length > 0 ? (
+                                <div className="mt-3 grid gap-2">
+                                  {request.customerComponentBreakdown.map((item) => (
+                                    <div
+                                      key={`${request.id}-customer-${item.label}`}
+                                      className="flex items-center justify-between rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-2 text-xs text-black/60"
+                                    >
+                                      <span>{item.label}</span>
+                                      <span className="font-mono text-black">{item.value}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="mt-3 text-xs text-black/45">No billable customer components</p>
+                              )}
+                            </div>
+
+                            <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                              <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                                Provider Cost Breakdown
+                              </p>
+                              {request.providerComponentBreakdown.length > 0 ? (
+                                <div className="mt-3 grid gap-2">
+                                  {request.providerComponentBreakdown.map((item) => (
+                                    <div
+                                      key={`${request.id}-provider-${item.label}`}
+                                      className="flex items-center justify-between rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-2 text-xs text-black/60"
+                                    >
+                                      <span>{item.label}</span>
+                                      <span className="font-mono text-black">{item.value}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="mt-3 text-xs text-black/45">No billable provider components</p>
+                              )}
+                            </div>
                           </div>
                         ) : null}
                       </article>

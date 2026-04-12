@@ -3,9 +3,8 @@ import { decryptProviderSecret } from "../lib/provider-secret-crypto.js";
 import { getProviderAdapter } from "../providers/index.js";
 import { persistGeneratedAssets } from "../services/assets-service.js";
 import {
-  recordUsageEvent,
-  recordWalletSettlement,
-  resolveBillableCost,
+  recordRequestSettlement,
+  resolveSettlementAmounts,
 } from "../services/billing-service.js";
 
 type QueueMessage = {
@@ -58,6 +57,30 @@ function normalizeQueueRows(data: unknown): QueueEnvelope[] {
       "msg_id" in row &&
       "message" in row
   );
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function buildSettlementBreakdown(input: {
+  customerCharge: number;
+  providerCost: number;
+  profit: number;
+  customerBreakdown?: Record<string, unknown>;
+  providerBreakdown?: Record<string, unknown>;
+}) {
+  return {
+    economics: {
+      customerCharge: input.customerCharge,
+      providerCost: input.providerCost,
+      profit: input.profit,
+      customer: input.customerBreakdown ?? {},
+      provider: input.providerBreakdown ?? {},
+    },
+  };
 }
 
 export async function queueRpcAvailable() {
@@ -189,14 +212,20 @@ export async function processNextInferenceJob() {
       .eq("request_id", message.requestId)
       .eq("attempt_no", 1);
 
-    await recordUsageEvent({
+    await recordRequestSettlement({
       requestId: message.requestId,
       workspaceId: message.workspaceId,
       apiKeyId: message.apiKeyId,
       publicModelSlug: message.publicModelSlug,
       endpoint: message.endpoint,
-      totalCost: 0,
+      customerCharge: 0,
+      providerCost: 0,
       statusCode: 500,
+      breakdown: buildSettlementBreakdown({
+        customerCharge: 0,
+        providerCost: 0,
+        profit: 0,
+      }),
     });
 
     await supabaseAdmin.rpc("queue_delete", {
@@ -208,20 +237,28 @@ export async function processNextInferenceJob() {
   }
 
   if (result.mode === "sync") {
-    const totalCost = await resolveBillableCost({
+    const providerRaw = asRecord(result.output.raw);
+    const settlement = await resolveSettlementAmounts({
+      providerModelId: message.providerModelId,
       publicModelSlug: message.publicModelSlug,
       requestInput: message.input,
       output: result.output,
-      providerRaw: typeof result.output.raw === "object" && result.output.raw !== null && !Array.isArray(result.output.raw)
-        ? (result.output.raw as Record<string, unknown>)
-        : null,
+      providerRaw,
+      providerReportedAmount: result.estimatedCost,
     });
     await supabaseAdmin
       .from("inference_requests")
       .update({
         status: "succeeded",
         output_payload: result.output,
-        actual_cost: totalCost,
+        actual_cost: settlement.customer.total,
+        actual_customer_charge: settlement.customer.total,
+        actual_provider_cost: settlement.provider.total,
+        actual_profit: settlement.actualProfit,
+        estimated_cost: settlement.customer.total,
+        estimated_customer_charge: settlement.customer.total,
+        estimated_provider_cost: settlement.provider.total,
+        estimated_profit: settlement.actualProfit,
         started_at: new Date(attemptStartedAt).toISOString(),
         completed_at: new Date().toISOString(),
       })
@@ -244,33 +281,47 @@ export async function processNextInferenceJob() {
       output: result.output,
     });
 
-    await recordUsageEvent({
+    await recordRequestSettlement({
       requestId: message.requestId,
       workspaceId: message.workspaceId,
       apiKeyId: message.apiKeyId,
       publicModelSlug: message.publicModelSlug,
       endpoint: message.endpoint,
-      totalCost,
+      customerCharge: settlement.customer.total,
+      providerCost: settlement.provider.total,
       statusCode: 200,
-    });
-
-    await recordWalletSettlement({
-      requestId: message.requestId,
-      workspaceId: message.workspaceId,
-      amount: totalCost,
-      description: `${message.publicModelSlug} usage settlement`,
+      breakdown: buildSettlementBreakdown({
+        customerCharge: settlement.customer.total,
+        providerCost: settlement.provider.total,
+        profit: settlement.actualProfit,
+        customerBreakdown: {
+          currency: settlement.customer.currency,
+          components: settlement.customer.components,
+          metrics: settlement.customer.metrics,
+        },
+        providerBreakdown: {
+          currency: settlement.provider.currency,
+          components: settlement.provider.components,
+          metrics: settlement.provider.metrics,
+        },
+      }),
     });
   } else {
-    const estimatedCost = await resolveBillableCost({
+    const settlement = await resolveSettlementAmounts({
+      providerModelId: message.providerModelId,
       publicModelSlug: message.publicModelSlug,
       requestInput: message.input,
+      providerReportedAmount: result.estimatedCost,
     });
     await supabaseAdmin
       .from("inference_requests")
       .update({
         status: "processing",
         started_at: new Date().toISOString(),
-        estimated_cost: estimatedCost,
+        estimated_cost: settlement.customer.total,
+        estimated_customer_charge: settlement.customer.total,
+        estimated_provider_cost: settlement.provider.total,
+        estimated_profit: settlement.estimatedProfit,
       })
       .eq("id", message.requestId);
 
@@ -392,6 +443,22 @@ export async function processNextPollingJob() {
       .eq("request_id", message.requestId)
       .eq("attempt_no", 1);
 
+    await recordRequestSettlement({
+      requestId: message.requestId,
+      workspaceId: message.workspaceId,
+      apiKeyId: message.apiKeyId,
+      publicModelSlug: message.publicModelSlug,
+      endpoint: message.endpoint,
+      customerCharge: 0,
+      providerCost: 0,
+      statusCode: 500,
+      breakdown: buildSettlementBreakdown({
+        customerCharge: 0,
+        providerCost: 0,
+        profit: 0,
+      }),
+    });
+
     await supabaseAdmin.rpc("queue_delete", {
       queue_name: "inference_polling",
       message_id: row.msg_id,
@@ -415,18 +482,23 @@ export async function processNextPollingJob() {
   }
 
   if (result.success) {
-    const totalCost = await resolveBillableCost({
+    const settlement = await resolveSettlementAmounts({
+      providerModelId: message.providerModelId,
       publicModelSlug: message.publicModelSlug,
       requestInput: message.input,
       output: result.output,
       providerRaw: result.raw,
+      providerReportedAmount: result.actualCost,
     });
     await supabaseAdmin
       .from("inference_requests")
       .update({
         status: "succeeded",
         output_payload: result.output,
-        actual_cost: totalCost,
+        actual_cost: settlement.customer.total,
+        actual_customer_charge: settlement.customer.total,
+        actual_provider_cost: settlement.provider.total,
+        actual_profit: settlement.actualProfit,
         completed_at: new Date().toISOString(),
       })
       .eq("id", message.requestId);
@@ -446,21 +518,30 @@ export async function processNextPollingJob() {
       output: result.output,
     });
 
-    await recordUsageEvent({
+    await recordRequestSettlement({
       requestId: message.requestId,
       workspaceId: message.workspaceId,
       apiKeyId: message.apiKeyId,
       publicModelSlug: message.publicModelSlug,
       endpoint: message.endpoint,
-      totalCost,
+      customerCharge: settlement.customer.total,
+      providerCost: settlement.provider.total,
       statusCode: 200,
-    });
-
-    await recordWalletSettlement({
-      requestId: message.requestId,
-      workspaceId: message.workspaceId,
-      amount: totalCost,
-      description: `${message.publicModelSlug} usage settlement`,
+      breakdown: buildSettlementBreakdown({
+        customerCharge: settlement.customer.total,
+        providerCost: settlement.provider.total,
+        profit: settlement.actualProfit,
+        customerBreakdown: {
+          currency: settlement.customer.currency,
+          components: settlement.customer.components,
+          metrics: settlement.customer.metrics,
+        },
+        providerBreakdown: {
+          currency: settlement.provider.currency,
+          components: settlement.provider.components,
+          metrics: settlement.provider.metrics,
+        },
+      }),
     });
   } else {
     await supabaseAdmin
@@ -469,6 +550,10 @@ export async function processNextPollingJob() {
         status: "failed",
         error_code: result.errorCode,
         error_message: result.errorMessage,
+        actual_cost: 0,
+        actual_customer_charge: 0,
+        actual_provider_cost: 0,
+        actual_profit: 0,
         completed_at: new Date().toISOString(),
       })
       .eq("id", message.requestId);
@@ -482,6 +567,22 @@ export async function processNextPollingJob() {
       })
       .eq("request_id", message.requestId)
       .eq("attempt_no", 1);
+
+    await recordRequestSettlement({
+      requestId: message.requestId,
+      workspaceId: message.workspaceId,
+      apiKeyId: message.apiKeyId,
+      publicModelSlug: message.publicModelSlug,
+      endpoint: message.endpoint,
+      customerCharge: 0,
+      providerCost: 0,
+      statusCode: 500,
+      breakdown: buildSettlementBreakdown({
+        customerCharge: 0,
+        providerCost: 0,
+        profit: 0,
+      }),
+    });
   }
 
   await supabaseAdmin.rpc("queue_delete", {

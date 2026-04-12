@@ -1,98 +1,165 @@
 import { supabaseAdmin } from "../lib/supabase.js";
 import {
   parseBillingConfig,
-  resolveChargeFromBilling,
+  resolveBillingBreakdown,
+  type BillingResolution,
 } from "../lib/billing-config.js";
 
-type RecordUsageInput = {
+type SettlementAmounts = {
+  customer: BillingResolution;
+  provider: BillingResolution;
+  estimatedProfit: number;
+  actualProfit: number;
+};
+
+type ResolveSettlementInput = {
+  providerModelId: string;
+  publicModelSlug: string;
+  requestInput?: Record<string, unknown> | null;
+  output?: Record<string, unknown> | null;
+  providerRaw?: Record<string, unknown> | null;
+  providerReportedAmount?: number | null;
+};
+
+type RecordSettlementInput = {
   requestId: string;
   workspaceId: string;
   apiKeyId: string | null;
   publicModelSlug: string;
   endpoint: string;
-  totalCost: number;
+  customerCharge: number;
+  providerCost: number;
   statusCode: number;
+  breakdown?: Record<string, unknown>;
 };
 
-export async function recordUsageEvent(input: RecordUsageInput) {
-  const { data: modelRow } = await supabaseAdmin
-    .from("supported_models")
-    .select("id")
-    .eq("model_slug", input.publicModelSlug)
-    .maybeSingle();
-
-  const { error } = await supabaseAdmin.from("usage_events").insert({
-    workspace_id: input.workspaceId,
-    api_key_id: input.apiKeyId,
-    model_id: modelRow?.id ?? null,
-    external_request_id: input.requestId,
-    endpoint: input.endpoint,
-    request_count: 1,
-    total_cost: input.totalCost,
-    status_code: input.statusCode,
-    metadata: {
-      source: "gateway-worker",
-    },
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
+function roundCurrency(value: number) {
+  return Math.round(value * 1_000_000) / 1_000_000;
 }
 
-export async function resolveBillableCost(input: {
-  publicModelSlug: string;
-  requestInput?: Record<string, unknown> | null;
-  output?: Record<string, unknown> | null;
-  providerRaw?: Record<string, unknown> | null;
-}) {
+function normalizeReportedAmount(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+export async function validateProviderPricing(input: { providerModelId: string }) {
   const { data, error } = await supabaseAdmin
-    .from("supported_models")
-    .select("billing_config")
-    .eq("model_slug", input.publicModelSlug)
+    .from("provider_models")
+    .select("pricing")
+    .eq("id", input.providerModelId)
     .maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
 
-  if (!data?.billing_config) {
+  if (!data?.pricing) {
+    throw new Error("Provider pricing is missing");
+  }
+
+  parseBillingConfig(data.pricing);
+}
+
+export async function resolveSettlementAmounts(
+  input: ResolveSettlementInput
+): Promise<SettlementAmounts> {
+  const [{ data: supportedModelRow, error: supportedModelError }, { data: providerModelRow, error: providerModelError }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("supported_models")
+        .select("billing_config")
+        .eq("model_slug", input.publicModelSlug)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("provider_models")
+        .select("pricing")
+        .eq("id", input.providerModelId)
+        .maybeSingle(),
+    ]);
+
+  if (supportedModelError) {
+    throw new Error(supportedModelError.message);
+  }
+
+  if (providerModelError) {
+    throw new Error(providerModelError.message);
+  }
+
+  if (!supportedModelRow?.billing_config) {
     throw new Error(`Billing config is missing for ${input.publicModelSlug}`);
   }
 
-  const config = parseBillingConfig(data.billing_config);
-  const cost = resolveChargeFromBilling({
-    config,
+  if (!providerModelRow?.pricing) {
+    throw new Error(`Provider pricing is missing for provider model ${input.providerModelId}`);
+  }
+
+  const customerConfig = parseBillingConfig(supportedModelRow.billing_config);
+  const providerConfig = parseBillingConfig(providerModelRow.pricing);
+
+  const customer = resolveBillingBreakdown({
+    config: customerConfig,
     requestInput: input.requestInput,
     output: input.output,
     providerRaw: input.providerRaw,
   });
 
-  if (!Number.isFinite(cost) || cost <= 0) {
-    throw new Error(`Billing config produced a non-positive charge for ${input.publicModelSlug}`);
-  }
+  const providerComputed = resolveBillingBreakdown({
+    config: providerConfig,
+    requestInput: input.requestInput,
+    output: input.output,
+    providerRaw: input.providerRaw,
+  });
 
-  return cost;
+  const providerReportedAmount = normalizeReportedAmount(input.providerReportedAmount);
+  const provider: BillingResolution = providerReportedAmount
+    ? {
+        ...providerComputed,
+        total: providerReportedAmount,
+      }
+    : providerComputed;
+
+  const customerTotal = roundCurrency(customer.total);
+  const providerTotal = roundCurrency(provider.total);
+
+  return {
+    customer: {
+      ...customer,
+      total: customerTotal,
+    },
+    provider: {
+      ...provider,
+      total: providerTotal,
+    },
+    estimatedProfit: roundCurrency(customerTotal - providerTotal),
+    actualProfit: roundCurrency(customerTotal - providerTotal),
+  };
 }
 
-export async function recordWalletSettlement(input: {
-  requestId: string;
-  workspaceId: string;
-  amount: number;
-  description: string;
-}) {
-  if (input.amount <= 0) {
-    return;
+export async function recordRequestSettlement(input: RecordSettlementInput) {
+  const { data: modelRow, error: modelError } = await supabaseAdmin
+    .from("supported_models")
+    .select("id")
+    .eq("model_slug", input.publicModelSlug)
+    .maybeSingle();
+
+  if (modelError) {
+    throw new Error(modelError.message);
   }
 
-  const { error } = await supabaseAdmin.from("wallet_transactions").insert({
-    workspace_id: input.workspaceId,
-    entry_type: "usage",
-    amount_delta: -Math.abs(input.amount),
-    description: input.description,
-    metadata: {
+  const { error } = await supabaseAdmin.rpc("record_request_settlement", {
+    p_workspace_id: input.workspaceId,
+    p_api_key_id: input.apiKeyId,
+    p_model_id: modelRow?.id ?? null,
+    p_external_request_id: input.requestId,
+    p_endpoint: input.endpoint,
+    p_request_count: 1,
+    p_input_units: 0,
+    p_output_units: 0,
+    p_customer_charge: input.customerCharge,
+    p_provider_cost: input.providerCost,
+    p_status_code: input.statusCode,
+    p_metadata: {
       source: "gateway-worker",
-      request_id: input.requestId,
+      ...(input.breakdown ?? {}),
     },
   });
 
