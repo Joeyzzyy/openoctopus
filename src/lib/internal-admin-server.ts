@@ -84,6 +84,13 @@ type RequestRow = {
   completed_at: string | null;
 };
 
+type MonitoringRequestRow = {
+  id: string;
+  public_model_slug: string;
+  status: string;
+  created_at: string;
+};
+
 type AttemptRow = {
   id: string;
   request_id: string;
@@ -150,6 +157,10 @@ type AdminAuditLogRow = {
   summary: string;
   details: Record<string, unknown> | null;
   created_at: string;
+};
+
+type InternalAdminDataOptions = {
+  monitoringLookbackMs?: number;
 };
 
 function formatJson(value: Record<string, unknown> | null | undefined) {
@@ -299,7 +310,41 @@ function labelBreakdownKey(key: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-export async function getInternalAdminData() {
+async function fetchMonitoringRequests(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  lookbackMs: number
+) {
+  const batchSize = 5000;
+  const maxBatches = 20;
+  const sinceIso = new Date(Date.now() - lookbackMs).toISOString();
+  const rows: MonitoringRequestRow[] = [];
+
+  for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
+    const from = batchIndex * batchSize;
+    const to = from + batchSize - 1;
+    const response = await supabase
+      .from("inference_requests")
+      .select("id, public_model_slug, status, created_at")
+      .gte("created_at", sinceIso)
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (response.error) {
+      break;
+    }
+
+    const batchRows = (response.data ?? []) as MonitoringRequestRow[];
+    rows.push(...batchRows);
+
+    if (batchRows.length < batchSize) {
+      break;
+    }
+  }
+
+  return rows;
+}
+
+export async function getInternalAdminData(options: InternalAdminDataOptions = {}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -339,6 +384,8 @@ export async function getInternalAdminData() {
   const workspaceRelation = Array.isArray(membership.workspaces)
     ? membership.workspaces[0]
     : membership.workspaces;
+  const monitoringLookbackMs =
+    options.monitoringLookbackMs ?? 90 * 24 * 60 * 60 * 1000;
   const currentMonthStart = new Date();
   currentMonthStart.setUTCDate(1);
   currentMonthStart.setUTCHours(0, 0, 0, 0);
@@ -458,6 +505,7 @@ export async function getInternalAdminData() {
   const adminAuditLogs = (adminAuditLogsResponse.error
     ? []
     : adminAuditLogsResponse.data ?? []) as AdminAuditLogRow[];
+  const monitoringRequests = await fetchMonitoringRequests(supabase, monitoringLookbackMs);
 
   const providerById = new Map(providers.map((row) => [row.id, row]));
   const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
@@ -738,6 +786,7 @@ export async function getInternalAdminData() {
     providerModels: providerModelSummaries,
     routingRules: routingRuleSummaries,
     requests: recentRequestSummaries,
+    monitoringRequests,
     auditLogs: auditLogSummaries,
     requestFilters: {
       customers: [

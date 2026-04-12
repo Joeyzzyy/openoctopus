@@ -10,6 +10,7 @@ type InternalTabKey =
   | "providers"
   | "credentials"
   | "models"
+  | "monitoring"
   | "routes"
   | "requests"
   | "audit";

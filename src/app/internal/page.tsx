@@ -3,6 +3,7 @@ import {
   CircleAlert,
   Fingerprint,
   Network,
+  Activity,
   ShieldAlert,
   ShieldCheck,
   Waypoints,
@@ -48,18 +49,23 @@ const tabs = [
     description: "把供应商挂到可售模型，并填写内部成本。",
   },
   {
+    key: "monitoring",
+    label: "5. 数据监控",
+    description: "资源调度管理监测中心。",
+  },
+  {
     key: "routes",
-    label: "5. 路由",
+    label: "6. 路由",
     description: "决定当前流量走哪个供应商模型。",
   },
   {
     key: "requests",
-    label: "请求记录",
+    label: "用户请求记录",
     description: "近期调用与成本明细。",
   },
   {
     key: "audit",
-    label: "审计",
+    label: "配置变更历史",
     description: "配置变更历史与追踪。",
   },
 ] as const;
@@ -130,6 +136,250 @@ function buildRequestsFilterHref(input: {
     params.set("requestKey", input.key);
   }
   return `/internal?${params.toString()}`;
+}
+
+const monitoringIntervalOptions = [
+  { value: "minute", label: "按分钟" },
+  { value: "hour", label: "按小时" },
+  { value: "day", label: "按天" },
+] as const;
+
+const monitoringRangeOptions = [
+  { value: "60m", label: "最近 60 分钟" },
+  { value: "6h", label: "最近 6 小时" },
+  { value: "24h", label: "最近 24 小时" },
+  { value: "7d", label: "最近 7 天" },
+  { value: "30d", label: "最近 30 天" },
+  { value: "90d", label: "最近 90 天" },
+] as const;
+
+const monitoringStatusOptions = [
+  { value: "all", label: "全部请求" },
+  { value: "inflight", label: "进行中" },
+  { value: "succeeded", label: "成功" },
+  { value: "failed", label: "失败" },
+  { value: "cancelled", label: "已取消" },
+] as const;
+
+type MonitoringInterval = (typeof monitoringIntervalOptions)[number]["value"];
+type MonitoringRange = (typeof monitoringRangeOptions)[number]["value"];
+type MonitoringStatus = (typeof monitoringStatusOptions)[number]["value"];
+
+function parseMonitoringInterval(value: string | undefined): MonitoringInterval {
+  return monitoringIntervalOptions.some((option) => option.value === value)
+    ? (value as MonitoringInterval)
+    : "hour";
+}
+
+function parseMonitoringRange(value: string | undefined): MonitoringRange {
+  return monitoringRangeOptions.some((option) => option.value === value)
+    ? (value as MonitoringRange)
+    : "24h";
+}
+
+function parseMonitoringStatus(value: string | undefined): MonitoringStatus {
+  return monitoringStatusOptions.some((option) => option.value === value)
+    ? (value as MonitoringStatus)
+    : "all";
+}
+
+function parseMonitoringRangeMs(value: MonitoringRange) {
+  if (value.endsWith("m")) {
+    return Number(value.replace("m", "")) * 60 * 1000;
+  }
+
+  if (value.endsWith("h")) {
+    return Number(value.replace("h", "")) * 60 * 60 * 1000;
+  }
+
+  return Number(value.replace("d", "")) * 24 * 60 * 60 * 1000;
+}
+
+function getMonitoringBucketMs(interval: MonitoringInterval) {
+  if (interval === "minute") {
+    return 60 * 1000;
+  }
+
+  if (interval === "hour") {
+    return 60 * 60 * 1000;
+  }
+
+  return 24 * 60 * 60 * 1000;
+}
+
+function formatMonitoringBucketLabel(date: Date, interval: MonitoringInterval) {
+  if (interval === "minute") {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  }
+
+  if (interval === "hour") {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+    }).format(date);
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function buildMonitoringHref(input: {
+  interval: MonitoringInterval;
+  range: MonitoringRange;
+  status: MonitoringStatus;
+}) {
+  const params = new URLSearchParams();
+  params.set("tab", "monitoring");
+  params.set("monitoringInterval", input.interval);
+  params.set("monitoringRange", input.range);
+  params.set("monitoringStatus", input.status);
+  return `/internal?${params.toString()}`;
+}
+
+function buildMonitoringSeries(
+  modelLabels: Map<string, string>,
+  requests: Array<{ public_model_slug: string; created_at: string; status: string }>,
+  interval: MonitoringInterval,
+  range: MonitoringRange
+) {
+  const bucketMs = getMonitoringBucketMs(interval);
+  const rangeMs = parseMonitoringRangeMs(range);
+  const now = Date.now();
+  const end = Math.floor(now / bucketMs) * bucketMs;
+  const start = end - rangeMs + bucketMs;
+  const bucketCount = Math.max(1, Math.floor(rangeMs / bucketMs));
+  const buckets = Array.from({ length: bucketCount }, (_, index) => start + index * bucketMs);
+  const labels = buckets.map((bucket) => formatMonitoringBucketLabel(new Date(bucket), interval));
+  const createEmptyPoints = () => Array.from({ length: bucketCount }, () => 0);
+
+  const seriesMap = new Map<string, number[]>();
+
+  for (const modelSlug of modelLabels.keys()) {
+    seriesMap.set(modelSlug, createEmptyPoints());
+  }
+
+  for (const request of requests) {
+    const timestamp = new Date(request.created_at).getTime();
+    if (!Number.isFinite(timestamp) || timestamp < start || timestamp > end + bucketMs - 1) {
+      continue;
+    }
+
+    const bucketIndex = Math.floor((timestamp - start) / bucketMs);
+    if (bucketIndex < 0 || bucketIndex >= bucketCount) {
+      continue;
+    }
+
+    const currentSeries =
+      seriesMap.get(request.public_model_slug) ?? createEmptyPoints();
+    currentSeries[bucketIndex] += 1;
+    seriesMap.set(request.public_model_slug, currentSeries);
+  }
+
+  return Array.from(seriesMap.entries())
+    .map(([modelSlug, values]) => ({
+      modelSlug,
+      title: modelLabels.get(modelSlug) ?? modelSlug,
+      total: values.reduce((sum, value) => sum + value, 0),
+      peak: Math.max(...values, 0),
+      points: values,
+      labels,
+    }))
+    .sort((a, b) => b.total - a.total || a.modelSlug.localeCompare(b.modelSlug));
+}
+
+function matchesMonitoringStatus(status: string, filter: MonitoringStatus) {
+  if (filter === "all") {
+    return true;
+  }
+
+  if (filter === "inflight") {
+    return status === "queued" || status === "submitted" || status === "processing";
+  }
+
+  return status === filter;
+}
+
+function formatPercent(value: number) {
+  return `${value.toFixed(value >= 10 || value === 0 ? 0 : 1)}%`;
+}
+
+function buildMonitoringHealthByModel(
+  modelLabels: Map<string, string>,
+  requests: Array<{ public_model_slug: string; status: string }>
+) {
+  const statsMap = new Map<
+    string,
+    {
+      total: number;
+      settled: number;
+      succeeded: number;
+      failed: number;
+      cancelled: number;
+      inflight: number;
+    }
+  >();
+
+  for (const modelSlug of modelLabels.keys()) {
+    statsMap.set(modelSlug, {
+      total: 0,
+      settled: 0,
+      succeeded: 0,
+      failed: 0,
+      cancelled: 0,
+      inflight: 0,
+    });
+  }
+
+  for (const request of requests) {
+    const current = statsMap.get(request.public_model_slug) ?? {
+      total: 0,
+      settled: 0,
+      succeeded: 0,
+      failed: 0,
+      cancelled: 0,
+      inflight: 0,
+    };
+
+    current.total += 1;
+
+    if (request.status === "succeeded") {
+      current.succeeded += 1;
+      current.settled += 1;
+    } else if (request.status === "failed") {
+      current.failed += 1;
+      current.settled += 1;
+    } else if (request.status === "cancelled") {
+      current.cancelled += 1;
+      current.settled += 1;
+    } else {
+      current.inflight += 1;
+    }
+
+    statsMap.set(request.public_model_slug, current);
+  }
+
+  return statsMap;
+}
+
+function buildLinePath(points: number[], width: number, height: number) {
+  if (points.length === 0) {
+    return "";
+  }
+
+  const maxValue = Math.max(...points, 1);
+  return points
+    .map((point, index) => {
+      const x = points.length === 1 ? width / 2 : (index / (points.length - 1)) * width;
+      const y = height - (point / maxValue) * height;
+      return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(" ");
 }
 
 const providerTemplates = {
@@ -361,13 +611,117 @@ function ReadinessItem({
   );
 }
 
+function MonitoringChartCard({
+  title,
+  points,
+  labels,
+  total,
+  peak,
+  intervalLabel,
+  successRate,
+  failureRate,
+  settledCount,
+  inflightCount,
+}: {
+  title: string;
+  points: number[];
+  labels: string[];
+  total: number;
+  peak: number;
+  intervalLabel: string;
+  successRate: string;
+  failureRate: string;
+  settledCount: number;
+  inflightCount: number;
+}) {
+  const width = 520;
+  const height = 180;
+  const path = buildLinePath(points, width, height);
+  const maxValue = Math.max(...points, 1);
+
+  return (
+    <div className="rounded-sm border border-black/10 bg-white p-4">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
+          <p className="break-all text-sm font-medium text-black">{title}</p>
+          <p className="mt-1 text-xs text-black/45">
+            总调用 {total} · {intervalLabel}峰值 {peak}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-2 rounded-sm border border-[#d7eadb] bg-[#edf8f0] px-2.5 py-1 text-[11px] text-[#1f6b3b]">
+            <span>成功率 {successRate}</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-sm border border-[#f0d1cb] bg-[#fff1ee] px-2.5 py-1 text-[11px] text-[#b54432]">
+            <span>失败率 {failureRate}</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-sm border border-black/10 bg-[#faf9f6] px-2.5 py-1 text-[11px] text-black/60">
+            <Activity className="size-3.5" />
+            <span>峰值 {maxValue}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-black/45">
+        <span>已结算 {settledCount}</span>
+        <span>进行中 {inflightCount}</span>
+      </div>
+
+      <div className="mt-4 rounded-sm border border-black/8 bg-[#faf9f6] p-3">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="h-44 w-full"
+          role="img"
+          aria-label={`${title} usage chart`}
+        >
+          {[0.25, 0.5, 0.75, 1].map((ratio) => (
+            <line
+              key={ratio}
+              x1="0"
+              x2={width}
+              y1={height - height * ratio}
+              y2={height - height * ratio}
+              stroke="rgba(17,17,17,0.08)"
+              strokeDasharray="4 6"
+            />
+          ))}
+          <path
+            d={path}
+            fill="none"
+            stroke="#111111"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <div className="mt-3 flex items-center justify-between gap-4 text-[11px] text-black/45">
+          <span>{labels[0] ?? ""}</span>
+          <span>{labels[Math.floor(labels.length / 2)] ?? ""}</span>
+          <span>{labels[labels.length - 1] ?? ""}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function InternalPage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
   const resolvedSearchParams = await searchParams;
-  const data = await getInternalAdminData();
+  const selectedMonitoringInterval = parseMonitoringInterval(
+    getSearchValue(resolvedSearchParams, "monitoringInterval")
+  );
+  const selectedMonitoringRange = parseMonitoringRange(
+    getSearchValue(resolvedSearchParams, "monitoringRange")
+  );
+  const selectedMonitoringStatus = parseMonitoringStatus(
+    getSearchValue(resolvedSearchParams, "monitoringStatus")
+  );
+  const data = await getInternalAdminData({
+    monitoringLookbackMs: parseMonitoringRangeMs(selectedMonitoringRange),
+  });
 
   if (!data) {
     redirect("/login");
@@ -440,6 +794,66 @@ export default async function InternalPage({
     selectedRequestKey === "all"
       ? null
       : data.requestFilters.apiKeys.find((item) => item.id === selectedRequestKey) ?? null;
+  const monitoringModelLabels = new Map(
+    data.supportedModels.map((model) => [
+      model.model_slug,
+      `${model.display_name} (${model.model_slug})`,
+    ])
+  );
+  const monitoringRequestsInRange = data.monitoringRequests;
+  const monitoringHealthByModel = buildMonitoringHealthByModel(
+    monitoringModelLabels,
+    monitoringRequestsInRange
+  );
+  const monitoringSeries = buildMonitoringSeries(
+    monitoringModelLabels,
+    monitoringRequestsInRange.filter((request) =>
+      matchesMonitoringStatus(request.status, selectedMonitoringStatus)
+    ),
+    selectedMonitoringInterval,
+    selectedMonitoringRange
+  );
+  const monitoringHealthSummary = Array.from(monitoringHealthByModel.values()).reduce(
+    (summary, item) => ({
+      total: summary.total + item.total,
+      settled: summary.settled + item.settled,
+      succeeded: summary.succeeded + item.succeeded,
+      failed: summary.failed + item.failed,
+      cancelled: summary.cancelled + item.cancelled,
+      inflight: summary.inflight + item.inflight,
+    }),
+    {
+      total: 0,
+      settled: 0,
+      succeeded: 0,
+      failed: 0,
+      cancelled: 0,
+      inflight: 0,
+    }
+  );
+  const monitoringSummary = {
+    requestCount: monitoringSeries.reduce((sum, series) => sum + series.total, 0),
+    modelCount: monitoringSeries.length,
+    activeModelCount: monitoringSeries.filter((series) => series.total > 0).length,
+    peakValue: monitoringSeries.reduce((peak, series) => Math.max(peak, series.peak), 0),
+  };
+  const monitoringSuccessRate =
+    monitoringHealthSummary.settled > 0
+      ? monitoringHealthSummary.succeeded / monitoringHealthSummary.settled * 100
+      : 0;
+  const monitoringFailureRate =
+    monitoringHealthSummary.settled > 0
+      ? monitoringHealthSummary.failed / monitoringHealthSummary.settled * 100
+      : 0;
+  const selectedMonitoringIntervalLabel =
+    monitoringIntervalOptions.find((option) => option.value === selectedMonitoringInterval)?.label ??
+    "按小时";
+  const selectedMonitoringRangeLabel =
+    monitoringRangeOptions.find((option) => option.value === selectedMonitoringRange)?.label ??
+    "最近 24 小时";
+  const selectedMonitoringStatusLabel =
+    monitoringStatusOptions.find((option) => option.value === selectedMonitoringStatus)?.label ??
+    "全部请求";
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#f7f6f1] text-[#111111]">
@@ -724,12 +1138,178 @@ export default async function InternalPage({
             </>
           ) : null}
 
+          {activeTab === "monitoring" ? (
+            <section className="mt-6">
+              <SectionShell
+                id="monitoring-panel"
+                title="资源调度管理监测中心"
+                description="查看全系统所有模型的调用量走势，支持分钟、小时、天三种粒度，以及多个时间范围切换。"
+              >
+                <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                    <p className="text-[11px] tracking-[0.35px] text-black/45">时间粒度</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {monitoringIntervalOptions.map((option) => (
+                        <a
+                          key={option.value}
+                          href={buildMonitoringHref({
+                            interval: option.value,
+                            range: selectedMonitoringRange,
+                            status: selectedMonitoringStatus,
+                          })}
+                          className={`inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors ${
+                            selectedMonitoringInterval === option.value
+                              ? "border-black bg-black text-white"
+                              : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                          }`}
+                        >
+                          {option.label}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                    <p className="text-[11px] tracking-[0.35px] text-black/45">时间范围</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {monitoringRangeOptions.map((option) => (
+                        <a
+                          key={option.value}
+                          href={buildMonitoringHref({
+                            interval: selectedMonitoringInterval,
+                            range: option.value,
+                            status: selectedMonitoringStatus,
+                          })}
+                          className={`inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors ${
+                            selectedMonitoringRange === option.value
+                              ? "border-black bg-black text-white"
+                              : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                          }`}
+                        >
+                          {option.label}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4 lg:col-span-2">
+                    <p className="text-[11px] tracking-[0.35px] text-black/45">请求状态</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {monitoringStatusOptions.map((option) => (
+                        <a
+                          key={option.value}
+                          href={buildMonitoringHref({
+                            interval: selectedMonitoringInterval,
+                            range: selectedMonitoringRange,
+                            status: option.value,
+                          })}
+                          className={`inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors ${
+                            selectedMonitoringStatus === option.value
+                              ? "border-black bg-black text-white"
+                              : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                          }`}
+                        >
+                          {option.label}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-4 grid gap-3 md:grid-cols-4">
+                  <OverviewCard
+                    title="模型总数"
+                    value={monitoringSummary.modelCount}
+                    note="按可售模型逐张展示折线图"
+                    icon={Network}
+                  />
+                  <OverviewCard
+                    title="活跃模型"
+                    value={monitoringSummary.activeModelCount}
+                    note={`${selectedMonitoringRangeLabel} 内至少调用过一次`}
+                    icon={Activity}
+                  />
+                  <OverviewCard
+                    title="总调用量"
+                    value={monitoringSummary.requestCount}
+                    note={`统计范围：${selectedMonitoringRangeLabel} · ${selectedMonitoringStatusLabel}`}
+                    icon={Fingerprint}
+                  />
+                  <OverviewCard
+                    title="单桶峰值"
+                    value={monitoringSummary.peakValue}
+                    note={`统计粒度：${selectedMonitoringIntervalLabel}`}
+                    icon={Waypoints}
+                  />
+                  <OverviewCard
+                    title="成功率"
+                    value={formatPercent(monitoringSuccessRate)}
+                    note={`已结算请求 ${monitoringHealthSummary.settled} 条`}
+                    icon={ShieldCheck}
+                  />
+                  <OverviewCard
+                    title="失败率"
+                    value={formatPercent(monitoringFailureRate)}
+                    note={`失败 ${monitoringHealthSummary.failed} 条 · 已取消 ${monitoringHealthSummary.cancelled} 条`}
+                    icon={ShieldAlert}
+                  />
+                </div>
+
+                <div className="mb-4 flex items-center gap-1.5 bg-[#e8f0ff] px-3 py-2.5">
+                  <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
+                  <p className="text-xs leading-[1.35] text-[#355fb4]">
+                    当前展示的是全系统维度的 `inference_requests`，不是单个 workspace 的局部数据。支持按请求状态筛选；即使某个模型当前时间范围内没有调用，也会保留一张零值折线图。
+                  </p>
+                </div>
+
+                {monitoringSeries.length > 0 ? (
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    {monitoringSeries.map((series) => {
+                      const health = monitoringHealthByModel.get(series.modelSlug) ?? {
+                        total: 0,
+                        settled: 0,
+                        succeeded: 0,
+                        failed: 0,
+                        cancelled: 0,
+                        inflight: 0,
+                      };
+                      const successRate =
+                        health.settled > 0 ? (health.succeeded / health.settled) * 100 : 0;
+                      const failureRate =
+                        health.settled > 0 ? (health.failed / health.settled) * 100 : 0;
+
+                      return (
+                        <MonitoringChartCard
+                          key={series.modelSlug}
+                          title={series.title}
+                          points={series.points}
+                          labels={series.labels}
+                          total={series.total}
+                          peak={series.peak}
+                          intervalLabel={selectedMonitoringIntervalLabel.replace("按", "")}
+                          successRate={formatPercent(successRate)}
+                          failureRate={formatPercent(failureRate)}
+                          settledCount={health.settled}
+                          inflightCount={health.inflight}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="还没有模型监控数据"
+                    detail="先创建可售模型，或者等待网关产生新的 inference_requests。这里会按模型自动生成对应的调用折线图。"
+                  />
+                )}
+              </SectionShell>
+            </section>
+          ) : null}
+
           {activeTab === "requests" ? (
             <section className="mt-6">
               <SectionShell
                 id="requests-panel"
-                title="近期请求"
-                description="按客户和 API Key 筛选，查看每条请求的收入、成本和计费拆分。"
+                title="用户请求记录"
+                description="按客户和 API Key 筛选，查看每条用户请求的收入、成本和计费拆分。"
               >
                 <div className="mb-4 grid gap-3 rounded-sm border border-black/8 bg-[#faf9f6] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                   <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
@@ -938,8 +1518,8 @@ export default async function InternalPage({
             <section className="mt-6">
               <SectionShell
                 id="audit-panel"
-                title="变更日志"
-                description="所有真实控制台配置变更都会记录在这里，便于审计追踪。"
+                title="配置变更历史"
+                description="所有真实控制台配置变更都会记录在这里，便于追踪是谁在什么时候改了什么。"
               >
                 {hasAudit ? (
                   <div className="space-y-3">
@@ -971,8 +1551,8 @@ export default async function InternalPage({
                   </div>
                 ) : (
                   <EmptyState
-                    title="还没有审计事件"
-                    detail="当你在内部后台创建供应商、供应商密钥、模型或路由规则后，审计轨迹会从这里开始记录。"
+                    title="还没有配置变更记录"
+                    detail="当你在内部后台创建或修改供应商、供应商密钥、模型、路由规则后，这里会开始沉淀完整的配置变更历史。"
                   />
                 )}
               </SectionShell>
