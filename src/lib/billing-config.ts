@@ -335,22 +335,22 @@ export function summarizeBillingConfig(config: BillingConfig) {
   const { charges } = normalized;
 
   if (charges.perRequest) {
-    parts.push(`${charges.perRequest} per request`);
+    parts.push(`每次请求 ${charges.perRequest}`);
   }
   if (charges.perImage) {
-    parts.push(`${charges.perImage} per image`);
+    parts.push(`每张图片 ${charges.perImage}`);
   }
   if (charges.perVideo) {
-    parts.push(`${charges.perVideo} per video`);
+    parts.push(`每个视频 ${charges.perVideo}`);
   }
   if (charges.perSecond) {
-    parts.push(`${charges.perSecond} per second`);
+    parts.push(`每秒 ${charges.perSecond}`);
   }
   if (charges.inputTextTokensPerMillion) {
-    parts.push(`${charges.inputTextTokensPerMillion} per 1M input tokens`);
+    parts.push(`每百万输入 Token ${charges.inputTextTokensPerMillion}`);
   }
   if (charges.outputTextTokensPerMillion) {
-    parts.push(`${charges.outputTextTokensPerMillion} per 1M output tokens`);
+    parts.push(`每百万输出 Token ${charges.outputTextTokensPerMillion}`);
   }
 
   return `${normalized.currency} ${parts.join(" + ")}`;
@@ -365,13 +365,17 @@ export function resolveBillingMetrics(input: {
   const output = input.output ?? null;
   const providerRaw = input.providerRaw ?? null;
   const tokens = resolveTokenUsage(requestInput, output, providerRaw);
+  const generatedImageCount = countGeneratedAssets(output, "image");
+  const generatedVideoCount = countGeneratedAssets(output, "video");
 
   return {
     requestCount: 1,
     imageCount:
-      countGeneratedAssets(output, "image") || resolveRequestedAssetCount(requestInput, "image"),
+      generatedImageCount ||
+      (generatedVideoCount > 0 ? 0 : resolveRequestedAssetCount(requestInput, "image")),
     videoCount:
-      countGeneratedAssets(output, "video") || resolveRequestedAssetCount(requestInput, "video"),
+      generatedVideoCount ||
+      (generatedImageCount > 0 ? 0 : resolveRequestedAssetCount(requestInput, "video")),
     durationSeconds: resolveDurationSeconds(requestInput, output, providerRaw),
     inputTokens: tokens.inputTokens,
     outputTokens: tokens.outputTokens,

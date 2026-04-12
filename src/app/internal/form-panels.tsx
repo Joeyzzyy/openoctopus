@@ -99,10 +99,10 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
       chargePerSecond: parsed.billingMode === "per_second",
       chargeInputTokens: parsed.billingMode === "per_million_tokens",
       chargeOutputTokens: parsed.billingMode === "per_million_tokens",
-      costPerRequest: String(parsed.costPerRequest ?? fallback.costPerRequest),
-      costPerImage: String(parsed.costPerImage ?? fallback.costPerImage),
-      costPerVideo: String(parsed.costPerVideo ?? fallback.costPerVideo),
-      costPerSecond: String(parsed.costPerSecond ?? fallback.costPerSecond),
+      costPerRequest: String(parsed.costPerRequest ?? parsed.costPerUnit ?? fallback.costPerRequest),
+      costPerImage: String(parsed.costPerImage ?? parsed.costPerUnit ?? fallback.costPerImage),
+      costPerVideo: String(parsed.costPerVideo ?? parsed.costPerUnit ?? fallback.costPerVideo),
+      costPerSecond: String(parsed.costPerSecond ?? parsed.costPerUnit ?? fallback.costPerSecond),
       inputCostPerMillion: String(parsed.inputCostPerMillion ?? fallback.inputCostPerMillion),
       outputCostPerMillion: String(parsed.outputCostPerMillion ?? fallback.outputCostPerMillion),
     };
@@ -152,7 +152,7 @@ function FieldHint({
       {help ? <span className="mt-2 block text-xs leading-5 text-black/50">{help}</span> : null}
       {example ? (
         <span className="mt-1 block text-xs leading-5 text-black/40">
-          Example: <code className="rounded bg-black/[0.04] px-1 py-0.5 text-[11px]">{example}</code>
+          示例：<code className="rounded bg-black/[0.04] px-1 py-0.5 text-[11px]">{example}</code>
         </span>
       ) : null}
     </>
@@ -160,10 +160,10 @@ function FieldHint({
 }
 
 function capabilityLabel(value: SupportedModelOption["capability"]) {
-  if (value === "image_generation") return "image_generation";
-  if (value === "image_edit") return "image_edit";
-  if (value === "video_generation") return "video_generation";
-  return "unknown";
+  if (value === "image_generation") return "图片生成";
+  if (value === "image_edit") return "图片编辑";
+  if (value === "video_generation") return "视频生成";
+  return "未知";
 }
 
 function BillingNumberField({
@@ -197,9 +197,13 @@ function BillingNumberField({
 export function BillingConfigEditor({
   name = "billingConfig",
   initialValue,
+  componentHint = "启用一个或多个计费维度。Gemini 2.5 Flash Image 通常按输入 token 和输出图片共同计费。",
+  generatedLabel = "生成的计费配置",
 }: {
   name?: string;
   initialValue?: string;
+  componentHint?: string;
+  generatedLabel?: string;
 }) {
   const [state, setState] = useState(() => parseBillingFormState(initialValue));
   const hiddenValue = buildBillingConfigValue(state);
@@ -209,7 +213,7 @@ export function BillingConfigEditor({
       <input type="hidden" name={name} value={hiddenValue} />
       <div className="grid gap-3 md:grid-cols-[120px_minmax(0,1fr)]">
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Currency</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">币种</span>
           <input
             value={state.currency}
             onChange={(event) =>
@@ -224,15 +228,15 @@ export function BillingConfigEditor({
         </label>
 
         <div className="rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-3">
-          <p className="text-[11px] tracking-[0.35px] text-black/45">Charge Components</p>
+          <p className="text-[11px] tracking-[0.35px] text-black/45">计费组件</p>
           <div className="mt-2 grid gap-2 md:grid-cols-3">
             {[
-              ["chargePerRequest", "Per request"],
-              ["chargePerImage", "Per image"],
-              ["chargePerVideo", "Per video"],
-              ["chargePerSecond", "Per second"],
-              ["chargeInputTokens", "Input tokens"],
-              ["chargeOutputTokens", "Output tokens"],
+              ["chargePerRequest", "按请求"],
+              ["chargePerImage", "按图片"],
+              ["chargePerVideo", "按视频"],
+              ["chargePerSecond", "按秒"],
+              ["chargeInputTokens", "输入 Token"],
+              ["chargeOutputTokens", "输出 Token"],
             ].map(([key, label]) => (
               <label
                 key={key}
@@ -253,44 +257,44 @@ export function BillingConfigEditor({
               </label>
             ))}
           </div>
-          <FieldHint help="Enable one or more charge dimensions. Gemini 2.5 Flash Image should usually charge input tokens plus output images." />
+          <FieldHint help={componentHint} />
         </div>
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         {state.chargePerRequest ? (
           <BillingNumberField
-            label="Cost Per Request"
+            label="每次请求成本"
             value={state.costPerRequest}
             onChange={(value) => setState((current) => ({ ...current, costPerRequest: value }))}
           />
         ) : null}
         {state.chargePerImage ? (
           <BillingNumberField
-            label="Cost Per Image"
+            label="每张图片成本"
             value={state.costPerImage}
             onChange={(value) => setState((current) => ({ ...current, costPerImage: value }))}
           />
         ) : null}
         {state.chargePerVideo ? (
           <BillingNumberField
-            label="Cost Per Video"
+            label="每个视频成本"
             value={state.costPerVideo}
             onChange={(value) => setState((current) => ({ ...current, costPerVideo: value }))}
           />
         ) : null}
         {state.chargePerSecond ? (
           <BillingNumberField
-            label="Cost Per Second"
+            label="每秒成本"
             value={state.costPerSecond}
             onChange={(value) => setState((current) => ({ ...current, costPerSecond: value }))}
-            help="Worker reads duration from request input or provider output."
+            help="后台任务会从请求参数或供应商返回结果中读取时长。"
           />
         ) : null}
         {state.chargeInputTokens ? (
           <>
             <BillingNumberField
-              label="Input Cost Per 1M Tokens"
+              label="每百万输入 Token 成本"
               value={state.inputCostPerMillion}
               onChange={(value) => setState((current) => ({ ...current, inputCostPerMillion: value }))}
             />
@@ -298,7 +302,7 @@ export function BillingConfigEditor({
         ) : null}
         {state.chargeOutputTokens ? (
           <BillingNumberField
-            label="Output Cost Per 1M Tokens"
+            label="每百万输出 Token 成本"
             value={state.outputCostPerMillion}
             onChange={(value) => setState((current) => ({ ...current, outputCostPerMillion: value }))}
           />
@@ -306,7 +310,7 @@ export function BillingConfigEditor({
       </div>
 
       <div className="mt-3 rounded-sm bg-[#faf9f6] px-3 py-2">
-        <p className="text-[11px] tracking-[0.35px] text-black/45">Generated billing config</p>
+        <p className="text-[11px] tracking-[0.35px] text-black/45">{generatedLabel}</p>
         <code className="mt-1 block break-all text-xs leading-5 text-black/55">{hiddenValue}</code>
       </div>
     </div>
@@ -327,7 +331,7 @@ export function CreateProviderModelForm({
   providerModelId,
   disabled,
   onSuccess,
-  submitLabel = "Add provider model",
+  submitLabel = "添加供应商模型",
   className = "rounded-sm border border-black/10 bg-[#faf9f6] p-4",
 }: {
   action?: (formData: FormData) => void | Promise<void>;
@@ -374,7 +378,7 @@ export function CreateProviderModelForm({
       ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Public Model</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">公共模型</span>
           <select
             name="supportedModelId"
             value={supportedModelId}
@@ -389,16 +393,16 @@ export function CreateProviderModelForm({
                 </option>
               ))
             ) : (
-              <option value="">Add a public model first</option>
+              <option value="">请先创建公共模型</option>
             )}
           </select>
           <FieldHint
-            help="Choose the customer-facing capability this provider model implements. Capability is inferred from the selected public model."
+            help="选择这个供应商模型所实现的对外能力。能力类型会跟随所选公共模型自动推断。"
           />
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Provider</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">供应商</span>
           <select
             name="providerId"
             defaultValue={defaultProviderId}
@@ -412,14 +416,14 @@ export function CreateProviderModelForm({
                 </option>
               ))
             ) : (
-              <option value="">Add a provider first</option>
+              <option value="">请先创建供应商</option>
             )}
           </select>
-          <FieldHint help="Choose which provider exposes this upstream model." />
+          <FieldHint help="选择这个上游模型属于哪个供应商。" />
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Capability</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">能力类型</span>
           <input
             value={capabilityLabel(selectedSupportedModel?.capability ?? null)}
             readOnly
@@ -430,11 +434,11 @@ export function CreateProviderModelForm({
             name="capability"
             value={selectedSupportedModel?.capability ?? ""}
           />
-          <FieldHint help="Locked to the selected public model so image and video implementations cannot be mixed." />
+          <FieldHint help="这里跟随公共模型锁定，避免把图片和视频实现混在一起。" />
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Upstream Model Slug</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上游模型标识</span>
           <input
             name="upstreamModelSlug"
             defaultValue={defaultUpstreamModelSlug}
@@ -444,28 +448,23 @@ export function CreateProviderModelForm({
             className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
           />
           <FieldHint
-            help="Real upstream model identifier required by the provider API."
+            help="填写供应商 API 真实使用的模型标识。"
             example="gemini-2.5-flash-image"
           />
         </label>
 
-        <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Pricing JSON</span>
-          <textarea
+        <div className="block md:col-span-2">
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">供应商成本配置</span>
+          <BillingConfigEditor
             name="pricing"
-            rows={4}
-            defaultValue={defaultPricing ?? "{}"}
-            disabled={disabled}
-            className="w-full rounded-sm border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+            initialValue={defaultPricing}
+            componentHint="按供应商真实结算方式填写内部成本。这里决定请求的 provider cost。"
+            generatedLabel="生成的供应商计费配置"
           />
-          <FieldHint
-            help="Optional internal cost and billing metadata for this provider model."
-            example='{"billingMode":"hybrid","currency":"USD","charges":{"perImage":0.039,"inputTextTokensPerMillion":0.30}}'
-          />
-        </label>
+        </div>
 
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Input Schema JSON</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">输入 Schema JSON</span>
           <textarea
             name="inputSchema"
             rows={4}
@@ -474,13 +473,13 @@ export function CreateProviderModelForm({
             className="w-full rounded-sm border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
           />
           <FieldHint
-            help="Optional description of accepted request fields."
+            help="可选，描述这个上游模型接收哪些请求字段。"
             example='{"prompt":{"type":"string","required":true},"size":{"type":"string"}}'
           />
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Output Schema JSON</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">输出 Schema JSON</span>
           <textarea
             name="outputSchema"
             rows={4}
@@ -489,7 +488,7 @@ export function CreateProviderModelForm({
             className="w-full rounded-sm border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
           />
           <FieldHint
-            help="Optional description of the normalized output structure."
+            help="可选，描述标准化后的输出结构。"
             example='{"images":{"type":"array"},"mimeType":{"type":"string"}}'
           />
         </label>
@@ -502,7 +501,7 @@ export function CreateProviderModelForm({
             disabled={disabled}
             className="size-4 rounded border-black/20 bg-white accent-black"
           />
-          Active
+          启用
         </label>
       </div>
 
@@ -529,7 +528,7 @@ export function CreateRoutingRuleForm({
   routingRuleId,
   disabled,
   onSuccess,
-  submitLabel = "Add routing rule",
+  submitLabel = "添加路由规则",
   className = "rounded-sm border border-black/10 bg-[#faf9f6] p-4",
 }: {
   action?: (formData: FormData) => void | Promise<void>;
@@ -577,7 +576,7 @@ export function CreateRoutingRuleForm({
       ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Public Model</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">公共模型</span>
           <select
             name="supportedModelId"
             value={supportedModelId}
@@ -592,14 +591,14 @@ export function CreateRoutingRuleForm({
                 </option>
               ))
             ) : (
-              <option value="">Add a public model first</option>
+              <option value="">请先创建公共模型</option>
             )}
           </select>
-          <FieldHint help="Select the customer-facing capability that should go online." />
+          <FieldHint help="选择要上线的客户侧能力入口。" />
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Capability</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">能力类型</span>
           <input
             value={capabilityLabel(selectedSupportedModel?.capability ?? null)}
             readOnly
@@ -610,11 +609,11 @@ export function CreateRoutingRuleForm({
             name="capability"
             value={selectedSupportedModel?.capability ?? ""}
           />
-          <FieldHint help="Locked to the selected public model." />
+          <FieldHint help="跟随所选公共模型自动锁定。" />
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Primary Provider Model</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">主供应商模型</span>
           <select
             name="primaryProviderModelId"
             defaultValue={defaultPrimaryProviderModelId}
@@ -628,46 +627,46 @@ export function CreateRoutingRuleForm({
                 </option>
               ))
             ) : (
-              <option value="">No compatible provider models yet</option>
+              <option value="">暂无兼容的供应商模型</option>
             )}
           </select>
-          <FieldHint help="Only implementations that belong to this public model and capability are shown." />
+          <FieldHint help="这里只展示属于当前公共模型和能力类型的实现。" />
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Fallback Provider Model</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">回退供应商模型</span>
           <select
             name="fallbackProviderModelId"
             defaultValue={defaultFallbackProviderModelId}
             disabled={disabled}
             className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
           >
-            <option value="">No fallback</option>
+            <option value="">不设置回退</option>
             {filteredProviderModels.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.supportedModelName} / {item.providerName} / {item.upstreamModelSlug}
               </option>
             ))}
           </select>
-          <FieldHint help="Optional backup implementation from the same public model." />
+          <FieldHint help="可选，必须来自同一个公共模型的备用实现。" />
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Scope</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">生效范围</span>
           <select
             name="workspaceScope"
             defaultValue={defaultWorkspaceScope}
             disabled={disabled}
             className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
           >
-            <option value="workspace">Workspace override</option>
-            <option value="global">Global route</option>
+            <option value="workspace">当前工作区覆盖</option>
+            <option value="global">全局默认路由</option>
           </select>
-          <FieldHint help="Global route affects platform defaults. Workspace override is only for one workspace." />
+          <FieldHint help="全局路由影响平台默认行为；工作区覆盖只影响当前空间。" />
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Strategy</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">路由策略</span>
           <select
             name="routeStrategy"
             defaultValue={defaultStrategy}
@@ -679,7 +678,7 @@ export function CreateRoutingRuleForm({
             <option value="manual_failover">manual_failover</option>
             <option value="route_by_capability_tag">route_by_capability_tag</option>
           </select>
-          <FieldHint help="Use primary_only when only one implementation exists. Use primary_then_fallback when you have a real backup." />
+          <FieldHint help="只有一个实现时用 primary_only；有真实备用供应商时用 primary_then_fallback。" />
         </label>
 
         <label className="flex items-center gap-3 rounded-sm border border-black/10 bg-white px-3 py-3 text-sm text-black/72">
@@ -690,7 +689,7 @@ export function CreateRoutingRuleForm({
             disabled={disabled}
             className="size-4 rounded border-black/20 bg-white accent-black"
           />
-          Active
+          启用
         </label>
       </div>
 

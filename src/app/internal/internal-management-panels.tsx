@@ -343,7 +343,7 @@ function FormSelect({
 function ActiveCheckbox({
   name,
   defaultChecked,
-  label = "Active",
+  label = "启用",
   disabled = false,
 }: {
   name: string;
@@ -375,35 +375,35 @@ export function PublicModelsPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-black/55">Existing public models</div>
+        <div className="text-sm text-black/55">已有公共模型</div>
         <ManagementDialog
           trigger={
             <button type="button">
               <ModalButton>
                 <Plus className="size-3.5" />
-                Add public model
+                新建公共模型
               </ModalButton>
             </button>
           }
-          title="Add Public Model"
-          description="Create a new customer-facing model entry without mixing it into the record list."
+          title="新建公共模型"
+          description="在独立弹窗中创建新的客户侧模型定义。"
         >
           {({ close }) => (
           <ManagedDialogForm action={createSupportedModel} close={close}>
-            <FormField label="Provider Label" name="provider" defaultValue="OpenOctopus" required />
-            <FormField label="Public Model Slug" name="modelSlug" defaultValue="openoctopus/gemini-image" required />
-            <FormField label="Display Name" name="displayName" defaultValue="Gemini Image" required />
+            <FormField label="提供方名称" name="provider" defaultValue="OpenOctopus" required />
+            <FormField label="公共模型 Slug" name="modelSlug" defaultValue="openoctopus/gemini-image" required />
+            <FormField label="显示名称" name="displayName" defaultValue="Gemini Image" required />
             <FormSelect
-              label="Modality"
+              label="模态"
               name="modality"
               options={[
-                { value: "image", label: "Image" },
-                { value: "video", label: "Video" },
-                { value: "audio", label: "Audio" },
+                { value: "image", label: "图片" },
+                { value: "video", label: "视频" },
+                { value: "audio", label: "音频" },
               ]}
             />
             <FormSelect
-              label="Capability"
+              label="能力类型"
               name="capability"
               options={[...capabilityOptions]}
               defaultValue="image_generation"
@@ -413,7 +413,7 @@ export function PublicModelsPanel({
             />
             <ActiveCheckbox name="active" defaultChecked />
             <div className="flex justify-end">
-              <SubmitButton label="Create public model" />
+              <SubmitButton label="创建公共模型" />
             </div>
           </ManagedDialogForm>
           )}
@@ -427,15 +427,15 @@ export function PublicModelsPanel({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
-                    {model.modality}
+                    {model.modality === "image" ? "图片" : model.modality === "video" ? "视频" : "音频"}
                   </span>
                   <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
-                    {model.active ? "active" : "inactive"}
+                    {model.active ? "已启用" : "未启用"}
                   </span>
                 </div>
                 <p className="mt-3 text-sm font-medium text-black">{model.display_name}</p>
                 <p className="mt-1 text-xs text-black/50">{model.model_slug}</p>
-                <p className="mt-1 text-xs text-black/50">billing: {model.billingSummary}</p>
+                <p className="mt-1 text-xs text-black/50">计费：{model.billingSummary}</p>
               </div>
 
               <ManagementDialog
@@ -443,31 +443,31 @@ export function PublicModelsPanel({
                   <button type="button">
                     <ModalButton tone="secondary">
                       <Pencil className="size-3.5" />
-                      Edit
+                      编辑
                     </ModalButton>
                   </button>
                 }
-                title={`Edit ${model.display_name}`}
-                description="Edit this existing public model in a dedicated modal."
+                title={`编辑 ${model.display_name}`}
+                description="在独立弹窗中编辑这个公共模型。"
               >
                 {({ close }) => (
                 <ManagedDialogForm action={updateSupportedModelDetails} close={close}>
                   <input type="hidden" name="supportedModelId" value={model.id} />
-                  <FormField label="Provider Label" name="provider" defaultValue={model.provider} required />
-                  <FormField label="Public Model Slug" name="modelSlug" defaultValue={model.model_slug} required />
-                  <FormField label="Display Name" name="displayName" defaultValue={model.display_name} required />
+                  <FormField label="提供方名称" name="provider" defaultValue={model.provider} required />
+                  <FormField label="公共模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
+                  <FormField label="显示名称" name="displayName" defaultValue={model.display_name} required />
                   <FormSelect
-                    label="Modality"
+                    label="模态"
                     name="modality"
                     defaultValue={model.modality}
                     options={[
-                      { value: "image", label: "Image" },
-                      { value: "video", label: "Video" },
-                      { value: "audio", label: "Audio" },
+                      { value: "image", label: "图片" },
+                      { value: "video", label: "视频" },
+                      { value: "audio", label: "音频" },
                     ]}
                   />
                   <FormSelect
-                    label="Capability"
+                    label="能力类型"
                     name="capability"
                     defaultValue={model.capability ?? "image_generation"}
                     options={[...capabilityOptions]}
@@ -475,7 +475,7 @@ export function PublicModelsPanel({
                   <BillingConfigEditor initialValue={model.billingConfigText} />
                   <ActiveCheckbox name="active" defaultChecked={model.active} />
                   <div className="flex justify-end">
-                    <SubmitButton label="Save public model" />
+                    <SubmitButton label="保存公共模型" />
                   </div>
                 </ManagedDialogForm>
                 )}
@@ -484,22 +484,22 @@ export function PublicModelsPanel({
 
             <div className="mt-4 grid gap-2 text-xs text-black/55 sm:grid-cols-3">
               <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                Provider label: {model.provider}
+                提供方名称：{model.provider}
               </div>
               <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                Implementations: {model.activeProviderModelCount}/{model.providerModelCount} active
+                实现数量：{model.activeProviderModelCount}/{model.providerModelCount} 已启用
               </div>
               <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                Created: {model.createdLabel}
+                创建时间：{model.createdLabel}
               </div>
             </div>
           </div>
         ))
       ) : (
         <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
-          <p className="text-sm font-medium text-black">No public models yet</p>
+          <p className="text-sm font-medium text-black">还没有公共模型</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
-            Create a public capability first, for example openoctopus/gemini-image.
+            先创建一个公共能力入口，例如 `openoctopus/gemini-image`。
           </p>
         </div>
       )}
@@ -521,40 +521,40 @@ export function ProvidersPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-black/55">Existing providers</div>
+        <div className="text-sm text-black/55">已有供应商</div>
         <ManagementDialog
           trigger={
             <button type="button">
               <ModalButton>
                 <Plus className="size-3.5" />
-                Add provider
+                新建供应商
               </ModalButton>
             </button>
           }
-          title="Add Provider"
-          description="Create a new upstream provider in its own modal."
+          title="新建供应商"
+          description="在独立弹窗中创建新的上游供应商。"
         >
           {({ close }) => (
           <ManagedDialogForm action={createProvider} close={close}>
-            <FormField label="Name" name="name" defaultValue={selectedTemplate?.provider.name} required />
+            <FormField label="名称" name="name" defaultValue={selectedTemplate?.provider.name} required />
             <FormField label="Slug" name="slug" defaultValue={selectedTemplate?.provider.slug} required />
             <FormSelect
-              label="Kind"
+              label="类型"
               name="kind"
               defaultValue={selectedTemplate?.provider.kind}
               options={[...providerKindOptions]}
             />
-            <FormField label="Base URL" name="baseUrl" defaultValue={selectedTemplate?.provider.baseUrl} />
+            <FormField label="基础 URL" name="baseUrl" defaultValue={selectedTemplate?.provider.baseUrl} />
             <FormSelect
-              label="Status"
+              label="状态"
               name="status"
               defaultValue={selectedTemplate?.provider.status ?? "healthy"}
               options={[...providerStatusOptions]}
             />
-            <FormField label="Regions" name="regions" defaultValue={selectedTemplate?.provider.regions} />
-            <FormTextArea label="Config JSON" name="config" defaultValue={selectedTemplate?.provider.config ?? "{}"} />
+            <FormField label="区域" name="regions" defaultValue={selectedTemplate?.provider.regions} />
+            <FormTextArea label="配置 JSON" name="config" defaultValue={selectedTemplate?.provider.config ?? "{}"} />
             <div className="flex justify-end">
-              <SubmitButton label="Create provider" />
+              <SubmitButton label="创建供应商" />
             </div>
           </ManagedDialogForm>
           )}
@@ -568,15 +568,15 @@ export function ProvidersPanel({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex h-6 items-center rounded-sm bg-[#eef3ea] px-2 text-[11px] text-[#335d2d]">
-                    {provider.kind}
+                    {provider.kind === "wavespeed" ? "WaveSpeed" : provider.kind === "partner" ? "合作方" : "自定义"}
                   </span>
                   <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
-                    {provider.status}
+                    {provider.status === "healthy" ? "健康" : provider.status === "degraded" ? "降级" : "离线"}
                   </span>
                 </div>
                 <p className="mt-3 text-sm font-medium text-black">{provider.name}</p>
                 <p className="mt-1 text-xs text-black/50">{provider.slug}</p>
-                <p className="mt-1 text-xs text-black/50">{provider.base_url ?? "No base URL"}</p>
+                <p className="mt-1 text-xs text-black/50">{provider.base_url ?? "未填写基础 URL"}</p>
               </div>
 
               <ManagementDialog
@@ -584,25 +584,25 @@ export function ProvidersPanel({
                   <button type="button">
                     <ModalButton tone="secondary">
                       <Pencil className="size-3.5" />
-                      Edit
+                      编辑
                     </ModalButton>
                   </button>
                 }
-                title={`Edit ${provider.name}`}
-                description="Update this provider in a dedicated modal."
+                title={`编辑 ${provider.name}`}
+                description="在独立弹窗中编辑这个供应商。"
               >
                 {({ close }) => (
                 <ManagedDialogForm action={updateProvider} close={close}>
                   <input type="hidden" name="providerId" value={provider.id} />
-                  <FormField label="Name" name="name" defaultValue={provider.name} required />
+                  <FormField label="名称" name="name" defaultValue={provider.name} required />
                   <FormField label="Slug" name="slug" defaultValue={provider.slug} required />
-                  <FormSelect label="Kind" name="kind" defaultValue={provider.kind} options={[...providerKindOptions]} />
-                  <FormField label="Base URL" name="baseUrl" defaultValue={provider.base_url ?? ""} />
-                  <FormSelect label="Status" name="status" defaultValue={provider.status} options={[...providerStatusOptions]} />
-                  <FormField label="Regions" name="regions" defaultValue={(provider.regions ?? []).join(", ")} />
-                  <FormTextArea label="Config JSON" name="config" defaultValue={provider.configText} />
+                  <FormSelect label="类型" name="kind" defaultValue={provider.kind} options={[...providerKindOptions]} />
+                  <FormField label="基础 URL" name="baseUrl" defaultValue={provider.base_url ?? ""} />
+                  <FormSelect label="状态" name="status" defaultValue={provider.status} options={[...providerStatusOptions]} />
+                  <FormField label="区域" name="regions" defaultValue={(provider.regions ?? []).join(", ")} />
+                  <FormTextArea label="配置 JSON" name="config" defaultValue={provider.configText} />
                   <div className="flex justify-end">
-                    <SubmitButton label="Save provider" />
+                    <SubmitButton label="保存供应商" />
                   </div>
                 </ManagedDialogForm>
                 )}
@@ -611,22 +611,22 @@ export function ProvidersPanel({
 
             <div className="mt-4 grid gap-2 text-xs text-black/55 sm:grid-cols-3">
               <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                Regions: {provider.regionsLabel}
+                区域：{provider.regionsLabel}
               </div>
               <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                Models: {provider.activeModelCount}/{provider.modelCount} active
+                模型：{provider.activeModelCount}/{provider.modelCount} 已启用
               </div>
               <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
-                Credentials: {provider.credentialCount}
+                凭证：{provider.credentialCount}
               </div>
             </div>
           </div>
         ))
       ) : (
         <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
-          <p className="text-sm font-medium text-black">No providers yet</p>
+          <p className="text-sm font-medium text-black">还没有供应商</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
-            Start by adding your first real upstream provider.
+            从这里开始录入第一个真实上游供应商。
           </p>
         </div>
       )}
@@ -648,40 +648,40 @@ export function CredentialsPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-black/55">Existing credentials</div>
+        <div className="text-sm text-black/55">已有凭证</div>
         <ManagementDialog
           trigger={
             <button type="button" disabled={!hasProviders}>
               <ModalButton>
                 <Plus className="size-3.5" />
-                Add credential
+                新建凭证
               </ModalButton>
             </button>
           }
-          title="Add Provider Credential"
-          description="Create a new credential in a separate modal instead of inside the list."
+          title="新建供应商凭证"
+          description="在独立弹窗中创建新的凭证，不直接嵌在列表里编辑。"
         >
           {({ close }) => (
           <ManagedDialogForm action={createProviderCredential} close={close}>
             <FormSelect
-              label="Provider"
+              label="供应商"
               name="providerId"
               disabled={!hasProviders}
               options={
                 hasProviders
                   ? providers.map((item) => ({ value: item.id, label: `${item.name} (${item.slug})` }))
-                  : [{ value: "", label: "Add a provider first" }]
+                  : [{ value: "", label: "请先创建供应商" }]
               }
             />
-            <FormField label="Label" name="label" defaultValue={selectedTemplate?.credential.label} required disabled={!hasProviders} />
-            <FormField label="Secret" name="secret" type="password" required disabled={!hasProviders} />
-            <FormField label="Reference" name="secretRef" defaultValue={selectedTemplate?.credential.secretRef} disabled={!hasProviders} />
-            <FormField label="Environment" name="environment" defaultValue={selectedTemplate?.credential.environment} required disabled={!hasProviders} />
-            <FormTextArea label="Notes" name="notes" defaultValue={selectedTemplate?.credential.notes} disabled={!hasProviders} />
+            <FormField label="名称" name="label" defaultValue={selectedTemplate?.credential.label} required disabled={!hasProviders} />
+            <FormField label="密钥" name="secret" type="password" required disabled={!hasProviders} />
+            <FormField label="引用说明" name="secretRef" defaultValue={selectedTemplate?.credential.secretRef} disabled={!hasProviders} />
+            <FormField label="环境" name="environment" defaultValue={selectedTemplate?.credential.environment} required disabled={!hasProviders} />
+            <FormTextArea label="备注" name="notes" defaultValue={selectedTemplate?.credential.notes} disabled={!hasProviders} />
             <FormTextArea label="Metadata JSON" name="metadata" defaultValue={selectedTemplate?.credential.metadata ?? "{}"} disabled={!hasProviders} />
-            <ActiveCheckbox name="isActive" defaultChecked disabled={!hasProviders} />
+            <ActiveCheckbox name="isActive" defaultChecked disabled={!hasProviders} label="启用" />
             <div className="flex justify-end">
-              <SubmitButton label="Create credential" disabled={!hasProviders} />
+              <SubmitButton label="创建凭证" disabled={!hasProviders} />
             </div>
           </ManagedDialogForm>
           )}
@@ -703,7 +703,7 @@ export function CredentialsPanel({
                   {credential.is_active ? (
                     <span className="inline-flex h-6 items-center gap-1 rounded-sm bg-[#eef3ea] px-2 text-[11px] text-[#335d2d]">
                       <BadgeCheck className="size-3" />
-                      active
+                      已启用
                     </span>
                   ) : null}
                 </div>
@@ -712,10 +712,10 @@ export function CredentialsPanel({
                   {credential.providerName} · {credential.secretMask}
                 </p>
                 {credential.secret_ref ? (
-                  <p className="mt-1 text-xs text-black/50">reference: {credential.secret_ref}</p>
+                  <p className="mt-1 text-xs text-black/50">引用：{credential.secret_ref}</p>
                 ) : null}
                 <p className="mt-1 text-xs text-black/50">
-                  secret updated: {credential.secretUpdatedLabel}
+                  密钥更新时间：{credential.secretUpdatedLabel}
                 </p>
                 {credential.notes ? (
                   <p className="mt-2 text-xs leading-5 text-black/55">{credential.notes}</p>
@@ -728,24 +728,24 @@ export function CredentialsPanel({
                     <button type="button">
                       <ModalButton tone="secondary">
                         <Pencil className="size-3.5" />
-                        Edit
+                        编辑
                       </ModalButton>
                     </button>
                   }
-                title={`Edit ${credential.label}`}
-                description="Edit this existing credential in a modal."
+                title={`编辑 ${credential.label}`}
+                description="在弹窗中编辑这个已有凭证。"
               >
                   {({ close }) => (
                   <ManagedDialogForm action={updateProviderCredentialDetails} close={close}>
                     <input type="hidden" name="credentialId" value={credential.id} />
-                    <FormField label="Label" name="label" defaultValue={credential.label} required />
-                    <FormField label="Reference" name="secretRef" defaultValue={credential.secret_ref ?? ""} />
-                    <FormField label="Environment" name="environment" defaultValue={credential.environment} required />
-                    <FormTextArea label="Notes" name="notes" defaultValue={credential.notes ?? ""} />
+                    <FormField label="名称" name="label" defaultValue={credential.label} required />
+                    <FormField label="引用说明" name="secretRef" defaultValue={credential.secret_ref ?? ""} />
+                    <FormField label="环境" name="environment" defaultValue={credential.environment} required />
+                    <FormTextArea label="备注" name="notes" defaultValue={credential.notes ?? ""} />
                     <FormTextArea label="Metadata JSON" name="metadata" defaultValue={credential.metadataText} />
-                    <ActiveCheckbox name="isActive" defaultChecked={credential.is_active} />
+                    <ActiveCheckbox name="isActive" defaultChecked={credential.is_active} label="启用" />
                     <div className="flex justify-end">
-                      <SubmitButton label="Save credential" />
+                      <SubmitButton label="保存凭证" />
                     </div>
                   </ManagedDialogForm>
                   )}
@@ -754,19 +754,19 @@ export function CredentialsPanel({
                 <ManagementDialog
                   trigger={
                     <button type="button">
-                      <ModalButton tone="secondary">Rotate secret</ModalButton>
+                      <ModalButton tone="secondary">轮换密钥</ModalButton>
                     </button>
                   }
-                  title={`Rotate Secret: ${credential.label}`}
-                  description="Secret rotation is separated from metadata editing so operators do not confuse the two."
+                  title={`轮换密钥：${credential.label}`}
+                  description="将密钥轮换与元数据编辑拆开，避免操作员混淆。"
                 >
                   {({ close }) => (
                   <ManagedDialogForm action={rotateProviderCredentialSecret} close={close}>
                     <input type="hidden" name="credentialId" value={credential.id} />
-                    <FormField label="New Secret" name="secret" type="password" required />
-                    <FormField label="Reference" name="secretRef" defaultValue={credential.secret_ref ?? ""} />
+                    <FormField label="新密钥" name="secret" type="password" required />
+                    <FormField label="引用说明" name="secretRef" defaultValue={credential.secret_ref ?? ""} />
                     <div className="flex justify-end">
-                      <SubmitButton label="Rotate secret" />
+                      <SubmitButton label="提交轮换" />
                     </div>
                   </ManagedDialogForm>
                   )}
@@ -775,22 +775,22 @@ export function CredentialsPanel({
                 <ManagementDialog
                   trigger={
                     <button type="button" disabled={credential.is_active}>
-                      <ModalButton tone="secondary">Delete</ModalButton>
+                      <ModalButton tone="secondary">删除</ModalButton>
                     </button>
                   }
-                  title={`Delete ${credential.label}`}
-                  description="Confirm deletion for this inactive credential."
+                  title={`删除 ${credential.label}`}
+                  description="确认是否删除这个未启用的凭证。"
                 >
                   {({ close }) => (
                   <ManagedDialogForm action={deleteProviderCredential} close={close}>
                     <input type="hidden" name="credentialId" value={credential.id} />
                     <div className="rounded-sm border border-[#f0d5d0] bg-[#fff5f3] px-4 py-3 text-sm text-[#8d4336]">
-                      This action permanently removes the credential record. Active credentials must be deactivated first.
+                      这个操作会永久删除凭证记录。必须先停用后才能删除。
                     </div>
                     <div className="flex justify-end">
                       <SubmitButton
-                        label="Delete credential"
-                        pendingLabel="Deleting..."
+                        label="删除凭证"
+                        pendingLabel="删除中..."
                         disabled={credential.is_active}
                         tone="danger"
                       />
@@ -805,7 +805,7 @@ export function CredentialsPanel({
               <div className="mt-4 flex items-center gap-1.5 bg-[#ffe7e3] px-3 py-2.5">
                 <CircleAlert className="size-3.5 shrink-0 text-[#b54432]" />
                 <p className="text-xs leading-[1.35] text-[#b54432]">
-                  This is a legacy external reference only. Rotate it before sending live traffic.
+                  当前还是旧的外部引用形式。正式放量前应先完成密钥轮换。
                 </p>
               </div>
             ) : null}
@@ -813,9 +813,9 @@ export function CredentialsPanel({
         ))
       ) : (
         <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
-          <p className="text-sm font-medium text-black">No credentials yet</p>
+          <p className="text-sm font-medium text-black">还没有凭证</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
-            Once you add a provider, record the real secret reference here.
+            创建供应商后，在这里登记真实的密钥引用。
           </p>
         </div>
       )}
@@ -853,18 +853,18 @@ export function ModelsPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-black/55">Existing provider models</div>
+        <div className="text-sm text-black/55">已有供应商模型</div>
         <ManagementDialog
           trigger={
             <button type="button" disabled={!hasProviders || !hasSupportedModels}>
               <ModalButton>
                 <Plus className="size-3.5" />
-                Add provider model
+                新建供应商模型
               </ModalButton>
             </button>
           }
-          title="Add Provider Model"
-          description="Map a public model to a concrete upstream implementation in a separate modal."
+          title="新建供应商模型"
+          description="在独立弹窗中，把公共模型映射到具体的上游实现。"
         >
           {({ close }) => (
             <CreateProviderModelForm
@@ -890,13 +890,13 @@ export function ModelsPanel({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
-                    {item.capability}
+                    {item.capability === "image_generation" ? "图片生成" : item.capability === "image_edit" ? "图片编辑" : "视频生成"}
                   </span>
                   <span className="text-sm font-medium text-black">{item.providerName}</span>
                 </div>
                 <p className="mt-3 text-sm font-medium text-black">{item.public_model_slug}</p>
-                <p className="mt-1 text-xs text-black/50">public model: {item.supportedModelName}</p>
-                <p className="mt-1 text-xs text-black/50">upstream: {item.upstream_model_slug}</p>
+                <p className="mt-1 text-xs text-black/50">公共模型：{item.supportedModelName}</p>
+                <p className="mt-1 text-xs text-black/50">上游模型：{item.upstream_model_slug}</p>
               </div>
 
               <ManagementDialog
@@ -904,12 +904,12 @@ export function ModelsPanel({
                   <button type="button">
                     <ModalButton tone="secondary">
                       <Pencil className="size-3.5" />
-                      Edit
+                      编辑
                     </ModalButton>
                   </button>
                 }
-                title={`Edit ${item.upstream_model_slug}`}
-                description="Edit this existing provider model in a dedicated modal."
+                title={`编辑 ${item.upstream_model_slug}`}
+                description="在独立弹窗中编辑这个供应商模型。"
               >
                 {({ close }) => (
                   <CreateProviderModelForm
@@ -925,7 +925,7 @@ export function ModelsPanel({
                     defaultOutputSchema={item.outputSchemaText}
                     defaultActive={item.active}
                     disabled={!hasProviders || !hasSupportedModels}
-                    submitLabel="Save provider model"
+                    submitLabel="保存供应商模型"
                     className="grid gap-4"
                     onSuccess={close}
                   />
@@ -935,15 +935,15 @@ export function ModelsPanel({
 
             <div className="mt-4 grid gap-3 text-xs text-black/55 xl:grid-cols-3">
               <div className="rounded-sm border border-black/8 bg-white p-3">
-                <p className="text-[11px] tracking-[0.35px] text-black/45">Pricing</p>
+                <p className="text-[11px] tracking-[0.35px] text-black/45">成本配置</p>
                 <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{item.pricingText}</pre>
               </div>
               <div className="rounded-sm border border-black/8 bg-white p-3">
-                <p className="text-[11px] tracking-[0.35px] text-black/45">Input schema</p>
+                <p className="text-[11px] tracking-[0.35px] text-black/45">输入 Schema</p>
                 <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{item.inputSchemaText}</pre>
               </div>
               <div className="rounded-sm border border-black/8 bg-white p-3">
-                <p className="text-[11px] tracking-[0.35px] text-black/45">Output schema</p>
+                <p className="text-[11px] tracking-[0.35px] text-black/45">输出 Schema</p>
                 <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{item.outputSchemaText}</pre>
               </div>
             </div>
@@ -951,9 +951,9 @@ export function ModelsPanel({
         ))
       ) : (
         <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
-          <p className="text-sm font-medium text-black">No provider models yet</p>
+          <p className="text-sm font-medium text-black">还没有供应商模型</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
-            After creating a provider, add the real upstream model IDs here.
+            创建供应商后，在这里补齐真实上游模型标识和成本配置。
           </p>
         </div>
       )}
@@ -994,18 +994,18 @@ export function RoutesPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-black/55">Existing routes</div>
+        <div className="text-sm text-black/55">已有路由</div>
         <ManagementDialog
           trigger={
             <button type="button" disabled={!hasProviderModels || !hasSupportedModels}>
               <ModalButton>
                 <Plus className="size-3.5" />
-                Add route
+                新建路由
               </ModalButton>
             </button>
           }
-          title="Add Routing Rule"
-          description="Create a new route in a modal instead of mixing it with live route records."
+          title="新建路由规则"
+          description="在弹窗中创建新路由，避免与现有线上路由记录混在一起。"
         >
           {({ close }) => (
             <CreateRoutingRuleForm
@@ -1039,12 +1039,12 @@ export function RoutesPanel({
                   <button type="button">
                     <ModalButton tone="secondary">
                       <Pencil className="size-3.5" />
-                      Edit
+                      编辑
                     </ModalButton>
                   </button>
                 }
-                title={`Edit Route: ${rule.public_model_slug}`}
-                description="Edit this existing route in a dedicated modal."
+                title={`编辑路由：${rule.public_model_slug}`}
+                description="在独立弹窗中编辑这个路由。"
               >
                 {({ close }) => (
                   <CreateRoutingRuleForm
@@ -1059,7 +1059,7 @@ export function RoutesPanel({
                     defaultWorkspaceScope={rule.scopeLabel}
                     defaultActive={rule.active}
                     disabled={!hasProviderModels || !hasSupportedModels}
-                    submitLabel="Save route"
+                    submitLabel="保存路由"
                     className="grid gap-4"
                     onSuccess={close}
                   />
@@ -1068,16 +1068,16 @@ export function RoutesPanel({
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-black/52">
-              <span>Primary: {rule.primaryLabel}</span>
-              <span>Fallback: {rule.fallbackLabel}</span>
+              <span>主路由：{rule.primaryLabel}</span>
+              <span>回退路由：{rule.fallbackLabel}</span>
             </div>
           </div>
         ))
       ) : (
         <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
-          <p className="text-sm font-medium text-black">No routes yet</p>
+          <p className="text-sm font-medium text-black">还没有路由</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
-            Create routes only after you have at least one real provider model.
+            至少要先有一个真实供应商模型，才能创建路由。
           </p>
         </div>
       )}

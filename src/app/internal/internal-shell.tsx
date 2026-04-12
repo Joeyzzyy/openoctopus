@@ -99,7 +99,7 @@ export function InternalShell({
             <div className="rounded-sm border border-black/10 bg-white px-4 py-3 shadow-[0_18px_40px_rgba(17,17,17,0.06)]">
               <div className="flex items-center gap-3 text-sm text-black/70">
                 <span className="inline-flex size-4 animate-spin rounded-full border-2 border-black/15 border-t-black" />
-                Loading section...
+                正在加载当前分区...
               </div>
             </div>
           </div>

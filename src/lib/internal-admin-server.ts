@@ -159,19 +159,19 @@ function formatJson(value: Record<string, unknown> | null | undefined) {
 
 function summarizeBilling(value: Record<string, unknown> | null | undefined) {
   if (!value) {
-    return "missing billing config";
+    return "缺少计费配置";
   }
 
   try {
     return summarizeBillingConfig(parseBillingConfig(value));
   } catch {
-    return "invalid billing config";
+    return "计费配置无效";
   }
 }
 
 function formatRelativeTimestamp(value: string | null) {
   if (!value) {
-    return "pending";
+    return "等待中";
   }
 
   const date = new Date(value);
@@ -232,6 +232,25 @@ function formatMetricValue(key: string, value: number) {
 }
 
 function labelBreakdownKey(key: string) {
+  const labels: Record<string, string> = {
+    requestCount: "请求数",
+    imageCount: "图片数",
+    videoCount: "视频数",
+    durationSeconds: "时长（秒）",
+    inputTokens: "输入 Token",
+    outputTokens: "输出 Token",
+    perRequest: "按请求",
+    perImage: "按图片",
+    perVideo: "按视频",
+    perSecond: "按秒",
+    inputTextTokens: "输入 Token",
+    outputTextTokens: "输出 Token",
+  };
+
+  if (labels[key]) {
+    return labels[key];
+  }
+
   return key
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/_/g, " ")
