@@ -23,7 +23,9 @@ const GPU_FEATURES = [
 function TryForFreeButton() {
   return (
     <Link
-      href="/models"
+      href="/login"
+      target="_blank"
+      rel="noopener noreferrer"
       className="inline-flex w-fit items-center gap-2 rounded-xs bg-[#111111] px-4 py-2 font-mono text-sm font-bold text-white transition-colors hover:bg-[#111111]/80"
     >
       Try for free

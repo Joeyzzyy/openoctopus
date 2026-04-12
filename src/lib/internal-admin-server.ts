@@ -397,6 +397,7 @@ export async function getInternalAdminData() {
   const providerById = new Map(providers.map((row) => [row.id, row]));
   const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
   const supportedModelById = new Map(supportedModels.map((row) => [row.id, row]));
+  const apiKeyById = new Map(apiKeys.map((row) => [row.id, row]));
   const apiKeySpendById = new Map(apiKeySpendSummaries.map((row) => [row.api_key_id, row]));
   const usageEventByRequestId = new Map(
     usageEvents
@@ -473,6 +474,7 @@ export async function getInternalAdminData() {
     const providerModel = request.provider_model_id
       ? providerModelById.get(request.provider_model_id) ?? null
       : null;
+    const apiKey = request.api_key_id ? apiKeyById.get(request.api_key_id) ?? null : null;
     const relatedAttempts = requestAttempts.get(request.id) ?? [];
     const usageEvent = usageEventByRequestId.get(request.id) ?? null;
     const economics = asRecord(usageEvent?.metadata)?.economics;
@@ -538,6 +540,11 @@ export async function getInternalAdminData() {
       ...request,
       providerName: provider?.name ?? "Unknown provider",
       upstreamModelSlug: providerModel?.upstream_model_slug ?? "unknown",
+      customerName: workspaceRelation?.name ?? "Workspace",
+      workspaceSlug: workspaceRelation?.slug ?? "workspace",
+      apiKeyName: apiKey?.name ?? "Unknown key",
+      apiKeyPrefix: apiKey?.key_prefix ?? "unknown",
+      apiKeyEnvironment: apiKey?.environment ?? "unknown",
       attemptCount: relatedAttempts.length,
       lastAttempt: relatedAttempts[0] ?? null,
       customerCharge,
@@ -628,24 +635,6 @@ export async function getInternalAdminData() {
     };
   });
 
-  const customerEconomics = {
-    customerName: workspaceRelation?.name ?? "Workspace",
-    workspaceSlug: workspaceRelation?.slug ?? "workspace",
-    revenue: keyEconomics.reduce((sum, key) => sum + key.revenue, 0),
-    cost: keyEconomics.reduce((sum, key) => sum + key.cost, 0),
-    profit: keyEconomics.reduce((sum, key) => sum + key.profit, 0),
-    requestCount: keyEconomics.reduce((sum, key) => sum + key.requestCount, 0),
-    keys: keyEconomics.map((key) => ({
-      ...key,
-      revenueLabel: formatCurrency(key.revenue),
-      costLabel: formatCurrency(key.cost),
-      profitLabel: formatCurrency(key.profit),
-    })),
-    revenueLabel: formatCurrency(keyEconomics.reduce((sum, key) => sum + key.revenue, 0)),
-    costLabel: formatCurrency(keyEconomics.reduce((sum, key) => sum + key.cost, 0)),
-    profitLabel: formatCurrency(keyEconomics.reduce((sum, key) => sum + key.profit, 0)),
-  };
-
   return {
     authorized: true as const,
     user: {
@@ -680,6 +669,20 @@ export async function getInternalAdminData() {
     routingRules: routingRuleSummaries,
     requests: recentRequestSummaries,
     auditLogs: auditLogSummaries,
-    customerEconomics,
+    requestFilters: {
+      customers: [
+        {
+          id: workspaceRelation?.id ?? membership.workspace_id,
+          name: workspaceRelation?.name ?? "Workspace",
+          slug: workspaceRelation?.slug ?? "workspace",
+        },
+      ],
+      apiKeys: keyEconomics.map((key) => ({
+        id: key.id,
+        name: key.name,
+        keyPrefix: key.keyPrefix,
+        environment: key.environment,
+      })),
+    },
   };
 }

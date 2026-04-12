@@ -86,10 +86,19 @@ export type DashboardData = {
   routingRules: Array<{
     capability: string;
     publicModel: string;
+    providerName: string;
+    providerKind: string;
+    upstreamModelSlug: string;
     primary: string;
     fallback: string;
     strategy: string;
   }>;
+  requestPagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
   requestQueueRows: Array<{
     requestId: string;
     capability: string;
@@ -159,11 +168,21 @@ function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardDa
     ledgerRows: [],
     providerSummaries: [],
     routingRules: [],
+    requestPagination: {
+      page: 1,
+      pageSize: 10,
+      total: 0,
+      totalPages: 1,
+    },
     requestQueueRows: [],
   };
 }
 
-export async function getDashboardData(): Promise<DashboardData | null> {
+export async function getDashboardData({
+  requestsPage = 1,
+}: {
+  requestsPage?: number;
+} = {}): Promise<DashboardData | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -213,6 +232,11 @@ export async function getDashboardData(): Promise<DashboardData | null> {
       monthly_budget: Number(workspaceRow.monthly_budget ?? 0),
     };
 
+    const pageSize = 10;
+    const normalizedRequestsPage = Math.max(1, Math.floor(requestsPage));
+    const requestFrom = (normalizedRequestsPage - 1) * pageSize;
+    const requestTo = requestFrom + pageSize - 1;
+
     const [
       { data: keySummary },
       { data: modelSummary },
@@ -234,9 +258,14 @@ export async function getDashboardData(): Promise<DashboardData | null> {
       supabase.from("usage_events").select("id, endpoint, request_count, total_cost, status_code, created_at, api_key_id, model_id").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
       supabase.from("wallet_transactions").select("id, entry_type, amount_delta, description, created_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
       supabase.from("providers").select("id, name, kind, regions, status"),
-      supabase.from("provider_models").select("id, provider_id"),
+      supabase.from("provider_models").select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id"),
       supabase.from("routing_rules").select("id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy").or(`workspace_id.eq.${workspace.id},workspace_id.is.null`).eq("active", true).order("created_at", { ascending: true }),
-      supabase.from("inference_requests").select("id, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, created_at, queued_at, started_at, completed_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
+      supabase
+        .from("inference_requests")
+        .select("id, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, created_at, queued_at, started_at, completed_at", { count: "exact" })
+        .eq("workspace_id", workspace.id)
+        .order("created_at", { ascending: false })
+        .range(requestFrom, requestTo),
     ]);
 
     const currentMonthSpend = (keySummary ?? []).reduce((sum, row) => sum + Number(row.current_month_spend ?? 0), 0);
@@ -256,6 +285,7 @@ export async function getDashboardData(): Promise<DashboardData | null> {
     const providerModels = providerModelResponse.error ? [] : providerModelResponse.data ?? [];
     const routingRuleRows = routingRuleResponse.error ? [] : routingRuleResponse.data ?? [];
     const requestRows = requestResponse.error ? [] : requestResponse.data ?? [];
+    const requestTotal = requestResponse.error ? 0 : requestResponse.count ?? 0;
     const providerNameById = new Map(providers.map((row) => [row.id, row.name]));
     const providerById = new Map(providers.map((row) => [row.id, row]));
     const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
@@ -311,11 +341,18 @@ export async function getDashboardData(): Promise<DashboardData | null> {
       return {
         capability: row.capability.replaceAll("_", " "),
         publicModel: row.public_model_slug,
+        providerName: primaryProviderModel
+          ? providerNameById.get(primaryProviderModel.provider_id) ?? "Unknown provider"
+          : "Unassigned",
+        providerKind: primaryProviderModel
+          ? providerById.get(primaryProviderModel.provider_id)?.kind ?? "custom"
+          : "custom",
+        upstreamModelSlug: primaryProviderModel?.upstream_model_slug ?? row.public_model_slug,
         primary: primaryProviderModel
-          ? `${providerNameById.get(primaryProviderModel.provider_id) ?? "Unknown provider"} / ${row.public_model_slug}`
+          ? `${providerNameById.get(primaryProviderModel.provider_id) ?? "Unknown provider"} / ${primaryProviderModel.upstream_model_slug}`
           : "unassigned",
         fallback: fallbackProviderModel
-          ? `${providerNameById.get(fallbackProviderModel.provider_id) ?? "Unknown provider"} / ${row.public_model_slug}`
+          ? `${providerNameById.get(fallbackProviderModel.provider_id) ?? "Unknown provider"} / ${fallbackProviderModel.upstream_model_slug}`
           : "manual failover only",
         strategy: row.route_strategy.replaceAll("_", " "),
       };
@@ -482,6 +519,12 @@ export async function getDashboardData(): Promise<DashboardData | null> {
       })),
       providerSummaries,
       routingRules,
+      requestPagination: {
+        page: normalizedRequestsPage,
+        pageSize,
+        total: requestTotal,
+        totalPages: Math.max(1, Math.ceil(requestTotal / pageSize)),
+      },
       requestQueueRows,
     };
   } catch {

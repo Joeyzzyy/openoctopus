@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import {
   CircleAlert,
   KeyRound,
@@ -28,29 +29,81 @@ const requestStatusStyles = {
   failed: "bg-[#ffe7e3] text-[#b54432]",
 };
 
-export default async function DashboardPage() {
-  const data = await getDashboardData();
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function getSearchValue(
+  searchParams: Record<string, string | string[] | undefined>,
+  key: string
+) {
+  const value = searchParams[key];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function buildRequestsPageHref(page: number) {
+  const params = new URLSearchParams();
+  params.set("requestsPage", String(page));
+  return `/dashboard?${params.toString()}#requests`;
+}
+
+function ProviderLogo({
+  name,
+  kind,
+}: {
+  name: string;
+  kind: string;
+}) {
+  const isGoogle = name.toLowerCase().includes("google") || name.toLowerCase().includes("gemini");
+  const label = isGoogle ? "G" : name.slice(0, 2).toUpperCase();
+
+  return (
+    <div
+      className={cn(
+        "flex size-12 shrink-0 items-center justify-center rounded-sm border text-sm font-semibold",
+        isGoogle
+          ? "border-[#4285f4]/25 bg-white text-[#4285f4]"
+          : kind === "wavespeed"
+            ? "border-[#1f5f39]/20 bg-[#edf6ef] text-[#1f5f39]"
+            : "border-black/10 bg-[#f4f5f0] text-black/65"
+      )}
+      aria-label={`${name} provider`}
+    >
+      {label}
+    </div>
+  );
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const resolvedSearchParams = await searchParams;
+  const requestsPage = Number(getSearchValue(resolvedSearchParams, "requestsPage") ?? "1");
+  const data = await getDashboardData({
+    requestsPage: Number.isFinite(requestsPage) ? requestsPage : 1,
+  });
 
   if (!data) {
     redirect("/login");
   }
 
-  const { apiKeys, metrics, requestQueueRows, routingRules, usageRows, user } = data;
+  const { apiKeys, metrics, requestPagination, requestQueueRows, routingRules, usageRows, user } = data;
 
   const walletMetric = metrics.find((metric) => metric.label === "Wallet Balance");
   const topupMetric = metrics.find((metric) => metric.label === "Total Top-Ups");
   const spendMetric = metrics.find((metric) => metric.label === "Month Spend");
   const keyMetric = metrics.find((metric) => metric.label === "Active API Keys");
 
-  const requestsLast7Days = usageRows.length;
   const modelsUsed = new Set(
     [...requestQueueRows.map((row) => row.model), ...usageRows.map((row) => row.model)].filter(Boolean)
   ).size;
 
   const latestModels = routingRules.slice(0, 8).map((rule, index) => ({
-    id: rule.publicModel,
-    name: rule.publicModel.split("/").at(-1) ?? rule.publicModel,
+    id: `${rule.publicModel}-${rule.upstreamModelSlug}`,
+    name: rule.upstreamModelSlug,
     slug: rule.publicModel,
+    providerName: rule.providerName,
+    providerKind: rule.providerKind,
     capability: rule.capability,
     tone: index % 4,
   }));
@@ -155,32 +208,25 @@ export default async function DashboardPage() {
                   Model catalog
                 </h2>
                 <p className="mt-1 text-sm text-black/55">
-                  Live public model slugs available in your current routing layer.
+                  Provider models currently enabled by your routing layer.
                 </p>
               </div>
             </div>
 
-            <div className="mt-2 grid grid-cols-1 gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-2 grid grid-cols-1 gap-2 p-4 md:grid-cols-2">
               {latestModels.map((model) => (
                 <div
                   key={model.id}
-                  className="flex cursor-pointer gap-2.5 rounded-sm border border-black/10 p-2 transition-all duration-300 hover:-translate-y-0.5 hover:border-black/15 hover:shadow-md"
+                  className="flex cursor-pointer gap-3 rounded-sm border border-black/10 p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-black/15 hover:shadow-md"
                 >
-                  <div
-                    className={cn(
-                      "flex size-14 shrink-0 items-center justify-center rounded-sm text-sm font-semibold text-white",
-                      model.tone === 0 && "bg-[#1f5f39]",
-                      model.tone === 1 && "bg-[#355fb4]",
-                      model.tone === 2 && "bg-[#8d5cf6]",
-                      model.tone === 3 && "bg-[#d07a1d]"
-                    )}
-                  >
-                    {model.name.slice(0, 2).toUpperCase()}
-                  </div>
+                  <ProviderLogo name={model.providerName} kind={model.providerKind} />
                   <div className="min-w-0 flex flex-col justify-center">
-                    <p className="line-clamp-1 text-sm text-black">{model.name}</p>
+                    <p className="break-all font-mono text-sm text-black">{model.name}</p>
                     <p className="mt-0.5 text-xs leading-tight text-black/50">
-                      {model.capability}
+                      {model.providerName} · {model.capability}
+                    </p>
+                    <p className="mt-1 break-all text-[11px] leading-tight text-black/38">
+                      public: {model.slug}
                     </p>
                   </div>
                 </div>
@@ -219,7 +265,7 @@ export default async function DashboardPage() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
-                  <span>{requestsLast7Days} in 7d</span>
+                  <span>{requestPagination.total} total</span>
                 </div>
                 <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
                   <span>{modelsUsed} models used</span>
@@ -357,6 +403,34 @@ export default async function DashboardPage() {
                   </table>
                 </div>
               </div>
+
+              {requestPagination.totalPages > 1 ? (
+                <div className="flex items-center justify-between border-t border-black/10 px-3 py-3">
+                  <Link
+                    href={buildRequestsPageHref(Math.max(1, requestPagination.page - 1))}
+                    aria-disabled={requestPagination.page <= 1}
+                    className={cn(
+                      "inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
+                      requestPagination.page <= 1 && "pointer-events-none opacity-40"
+                    )}
+                  >
+                    Previous
+                  </Link>
+                  <span className="text-xs text-black/50">
+                    Page {requestPagination.page} of {requestPagination.totalPages}
+                  </span>
+                  <Link
+                    href={buildRequestsPageHref(Math.min(requestPagination.totalPages, requestPagination.page + 1))}
+                    aria-disabled={requestPagination.page >= requestPagination.totalPages}
+                    className={cn(
+                      "inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
+                      requestPagination.page >= requestPagination.totalPages && "pointer-events-none opacity-40"
+                    )}
+                  >
+                    Next
+                  </Link>
+                </div>
+              ) : null}
             </div>
           </section>
           </section>

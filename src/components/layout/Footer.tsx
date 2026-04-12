@@ -16,23 +16,6 @@ const FOOTER_SECTIONS = [
     ],
   },
   {
-    title: "Models",
-    links: [
-      { label: "Wan 2.7", href: "/collections/wan-2.7" },
-      { label: "Qwen Image 2", href: "/collections/qwen-image-2" },
-      { label: "Seedance 1.5 Pro", href: "/collections/seedance-1.5" },
-      { label: "Kling O3", href: "/collections/kling-o3" },
-      { label: "OpenAI", href: "/collections/openai" },
-      { label: "Seedream", href: "/collections/seedream" },
-      { label: "Flux Kontext", href: "/collections/flux-kontext" },
-      { label: "Runwayml AI", href: "/collections/runwayml" },
-      { label: "Wan 2.1 Video", href: "/collections/wan" },
-      { label: "Ideogram Image", href: "/collections/ideogram" },
-      { label: "Recraft Image", href: "/collections/recraft" },
-      { label: "Pixverse AI", href: "/collections/pixverse" },
-    ],
-  },
-  {
     title: "Legal",
     links: [
       { label: "Terms of Service", href: "/about" },
@@ -61,7 +44,7 @@ export function Footer() {
             </Link>
           </div>
 
-          <div className="mb-10 mt-8 grid grid-cols-2 gap-x-8 gap-y-9 md:grid-cols-3">
+          <div className="mb-10 mt-8 grid grid-cols-2 gap-x-8 gap-y-9 md:grid-cols-2">
             {FOOTER_SECTIONS.map((section) => (
               <div key={section.title} className="flex w-auto flex-col gap-3">
                 <h4 className="font-mono text-[11px] uppercase tracking-[1.1px] text-white/45">
@@ -88,14 +71,6 @@ export function Footer() {
           <p className="font-mono text-[10px] uppercase tracking-[1px] text-white/40">
             © {new Date().getFullYear()} OpenOctopus
           </p>
-          <div className="flex items-center gap-4.5">
-            <span className="font-mono text-[10px] uppercase tracking-[1px] text-white/40">
-              Light
-            </span>
-            <span className="font-mono text-[10px] uppercase tracking-[1px] text-white/40">
-              GitHub
-            </span>
-          </div>
         </div>
       </div>
     </footer>

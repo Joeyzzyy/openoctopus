@@ -24,17 +24,6 @@ const footerSections = [
     ],
   },
   {
-    title: "Models",
-    links: [
-      { label: "Wan 2.1", href: "/models/wan" },
-      { label: "Flux", href: "/models/flux" },
-      { label: "Kling", href: "/models/kling" },
-      { label: "Seedream", href: "/models/seedream" },
-      { label: "Gemini", href: "/models/gemini" },
-      { label: "View All", href: "/explore" },
-    ],
-  },
-  {
     title: "Legal",
     links: [
       { label: "Terms of Service", href: "/terms" },
@@ -49,7 +38,7 @@ export function Footer() {
   return (
     <footer className="bg-white/70 border-t border-slate-200/60 pt-16 pb-8 backdrop-blur-sm">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-12">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 mb-12">
           {footerSections.map((section) => (
             <div key={section.title}>
               <h3 className="text-sm font-semibold text-slate-900 mb-4">{section.title}</h3>
@@ -75,12 +64,6 @@ export function Footer() {
           <p className="text-xs text-slate-400">
             © 2024 OpenOctopus. All rights reserved.
           </p>
-          <div className="flex items-center gap-4">
-            {/* Social icons as text for now */}
-            <a href="#" className="text-slate-500 hover:text-slate-700 transition-colors text-sm">GitHub</a>
-            <a href="#" className="text-slate-500 hover:text-slate-700 transition-colors text-sm">Discord</a>
-            <a href="#" className="text-slate-500 hover:text-slate-700 transition-colors text-sm">𝕏</a>
-          </div>
         </div>
       </div>
     </footer>

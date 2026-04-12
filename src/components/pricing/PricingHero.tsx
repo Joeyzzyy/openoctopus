@@ -17,7 +17,9 @@ export function PricingHero() {
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-3">
               <Link
-                href="/sign-in"
+                href="/login"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center gap-2.5 rounded-xs bg-[#111111] px-6 py-3 text-white transition-colors duration-150 hover:bg-[#111111]/80"
               >
                 <span className="font-mono text-sm font-bold uppercase leading-4 tracking-[1.2px]">

@@ -4,6 +4,7 @@ import {
   Fingerprint,
   Network,
   ReceiptText,
+  ShieldAlert,
   ShieldCheck,
   Waypoints,
 } from "lucide-react";
@@ -139,6 +140,21 @@ function buildInternalHref(tab: InternalTabKey, template?: string) {
   params.set("tab", tab);
   if (template) {
     params.set("template", template);
+  }
+  return `/internal?${params.toString()}`;
+}
+
+function buildRequestsFilterHref(input: {
+  customer?: string;
+  key?: string;
+}) {
+  const params = new URLSearchParams();
+  params.set("tab", "requests");
+  if (input.customer && input.customer !== "all") {
+    params.set("requestCustomer", input.customer);
+  }
+  if (input.key && input.key !== "all") {
+    params.set("requestKey", input.key);
   }
   return `/internal?${params.toString()}`;
 }
@@ -303,6 +319,36 @@ function EmptyState({
   );
 }
 
+function ReadinessItem({
+  label,
+  detail,
+  ready,
+}: {
+  label: string;
+  detail: string;
+  ready: boolean;
+}) {
+  const Icon = ready ? ShieldCheck : ShieldAlert;
+
+  return (
+    <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+      <div className="flex items-start gap-3">
+        <div
+          className={`inline-flex size-7 shrink-0 items-center justify-center rounded-sm ${
+            ready ? "bg-[#e7f4ea] text-[#1f6b3b]" : "bg-[#fff1dc] text-[#9a5a00]"
+          }`}
+        >
+          <Icon className="size-4" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-black">{label}</p>
+          <p className="mt-1 text-xs leading-5 text-black/55">{detail}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function InternalPage({
   searchParams,
 }: {
@@ -341,6 +387,8 @@ export default async function InternalPage({
   const hasAudit = data.auditLogs.length > 0;
   const selectedTemplateKey = getSearchValue(resolvedSearchParams, "template");
   const activeTab = getTabValue(getSearchValue(resolvedSearchParams, "tab"));
+  const selectedRequestCustomer = getSearchValue(resolvedSearchParams, "requestCustomer") ?? "all";
+  const selectedRequestKey = getSearchValue(resolvedSearchParams, "requestKey") ?? "all";
   const selectedTemplate =
     selectedTemplateKey && selectedTemplateKey in providerTemplates
       ? providerTemplates[selectedTemplateKey as keyof typeof providerTemplates]
@@ -358,8 +406,29 @@ export default async function InternalPage({
               ? data.metrics.providerModels
               : tab.key === "routes"
                 ? data.metrics.activeRoutes
-                : undefined,
+              : undefined,
   }));
+  const filteredRequests = data.requests.filter((request) => {
+    const matchesCustomer =
+      selectedRequestCustomer === "all" ||
+      request.workspaceSlug === selectedRequestCustomer;
+    const matchesKey =
+      selectedRequestKey === "all" ||
+      request.api_key_id === selectedRequestKey;
+
+    return matchesCustomer && matchesKey;
+  });
+  const requestSummary = {
+    customerCharge: filteredRequests.reduce((sum, request) => sum + request.customerCharge, 0),
+    providerCost: filteredRequests.reduce((sum, request) => sum + request.providerCost, 0),
+    profit: filteredRequests.reduce((sum, request) => sum + request.profit, 0),
+    requestCount: filteredRequests.length,
+  };
+  const hasFilteredRequests = filteredRequests.length > 0;
+  const selectedRequestKeyRecord =
+    selectedRequestKey === "all"
+      ? null
+      : data.requestFilters.apiKeys.find((item) => item.id === selectedRequestKey) ?? null;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#f7f6f1] text-[#111111]">
@@ -450,15 +519,21 @@ export default async function InternalPage({
                     <div className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
                       <p className="text-sm font-medium text-black">Current chain</p>
                       <div className="mt-4 grid gap-3 text-sm text-black/65">
-                        <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
-                          Public models: {hasSupportedModels ? "configured" : "missing"}
-                        </div>
-                        <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
-                          Providers and credentials: {hasProviders && hasCredentials ? "configured" : "incomplete"}
-                        </div>
-                        <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
-                          Provider models and routes: {hasProviderModels && hasRoutes ? "configured" : "incomplete"}
-                        </div>
+                        <ReadinessItem
+                          label="Public models"
+                          detail={hasSupportedModels ? "Configured and ready for customer-facing capability routing." : "Missing public capability definitions."}
+                          ready={hasSupportedModels}
+                        />
+                        <ReadinessItem
+                          label="Providers and credentials"
+                          detail={hasProviders && hasCredentials ? "Upstream vendors and credential references are in place." : "Provider onboarding or credentials are still incomplete."}
+                          ready={hasProviders && hasCredentials}
+                        />
+                        <ReadinessItem
+                          label="Provider models and routes"
+                          detail={hasProviderModels && hasRoutes ? "Provider-side implementations are mapped and routable." : "Provider mappings or routes are not fully configured yet."}
+                          ready={hasProviderModels && hasRoutes}
+                        />
                       </div>
                     </div>
 
@@ -476,143 +551,6 @@ export default async function InternalPage({
                         </div>
                       </div>
                     </div>
-                  </div>
-                </SectionShell>
-              </section>
-
-              <section className="mb-6">
-                <SectionShell
-                  id="customer-economics-panel"
-                  title="Customer Economics"
-                  description="Current workspace customer charge, provider cost, and profit by API key."
-                >
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[820px] text-sm">
-                      <thead>
-                        <tr className="border-b border-black/10 text-left">
-                          <th className="py-3 pr-4 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
-                            Customer
-                          </th>
-                          <th className="py-3 pr-4 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
-                            Revenue
-                          </th>
-                          <th className="py-3 pr-4 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
-                            Provider Cost
-                          </th>
-                          <th className="py-3 pr-4 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
-                            Profit
-                          </th>
-                          <th className="py-3 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
-                            Requests
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b border-black/10 bg-[#faf9f6] align-top">
-                          <td className="py-4 pr-4">
-                            <div>
-                              <p className="font-medium text-black">
-                                {data.customerEconomics.customerName}
-                              </p>
-                              <p className="mt-1 text-xs text-black/45">
-                                {data.customerEconomics.workspaceSlug}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="py-4 pr-4 font-mono text-black">
-                            {data.customerEconomics.revenueLabel}
-                          </td>
-                          <td className="py-4 pr-4 font-mono text-black/70">
-                            {data.customerEconomics.costLabel}
-                          </td>
-                          <td className="py-4 pr-4 font-mono text-black">
-                            {data.customerEconomics.profitLabel}
-                          </td>
-                          <td className="py-4 font-mono text-black/70">
-                            {data.customerEconomics.requestCount}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td colSpan={5} className="px-0 py-0">
-                            <div className="border-b border-black/10 bg-white px-4 py-4">
-                              <p className="mb-3 font-mono text-[11px] uppercase tracking-[1px] text-black/45">
-                                API Key Breakdown
-                              </p>
-                              <table className="w-full min-w-[760px] text-sm">
-                                <thead>
-                                  <tr className="border-b border-black/8 text-left">
-                                    <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                                      Key
-                                    </th>
-                                    <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                                      Environment
-                                    </th>
-                                    <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                                      Revenue
-                                    </th>
-                                    <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                                      Provider Cost
-                                    </th>
-                                    <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                                      Profit
-                                    </th>
-                                    <th className="py-2 pr-4 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                                      Requests
-                                    </th>
-                                    <th className="py-2 font-mono text-[10px] uppercase tracking-[1px] text-black/45">
-                                      Created
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {data.customerEconomics.keys.length > 0 ? (
-                                    data.customerEconomics.keys.map((key) => (
-                                      <tr key={key.id} className="border-b border-black/6">
-                                        <td className="py-3 pr-4">
-                                          <div>
-                                            <p className="font-medium text-black">{key.name}</p>
-                                            <p className="mt-1 font-mono text-[11px] text-black/40">
-                                              {key.keyPrefix}
-                                            </p>
-                                          </div>
-                                        </td>
-                                        <td className="py-3 pr-4 text-black/60">
-                                          {key.environment}
-                                        </td>
-                                        <td className="py-3 pr-4 font-mono text-black">
-                                          {key.revenueLabel}
-                                        </td>
-                                        <td className="py-3 pr-4 font-mono text-black/70">
-                                          {key.costLabel}
-                                        </td>
-                                        <td className="py-3 pr-4 font-mono text-black">
-                                          {key.profitLabel}
-                                        </td>
-                                        <td className="py-3 pr-4 font-mono text-black/60">
-                                          {key.requestCount}
-                                        </td>
-                                        <td className="py-3 font-mono text-black/40">
-                                          {key.createdLabel}
-                                        </td>
-                                      </tr>
-                                    ))
-                                  ) : (
-                                    <tr>
-                                      <td
-                                        colSpan={7}
-                                        className="py-8 text-center text-sm text-black/45"
-                                      >
-                                        No API key economics yet
-                                      </td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
                   </div>
                 </SectionShell>
               </section>
@@ -784,11 +722,121 @@ export default async function InternalPage({
               <SectionShell
                 id="requests-panel"
                 title="Recent Requests"
-                description="Execution records will appear here after real traffic starts flowing."
+                description="Filter by customer and API key, then inspect request-level economics and pricing breakdowns."
               >
-                {hasRequests ? (
+                <div className="mb-4 grid gap-3 rounded-sm border border-black/8 bg-[#faf9f6] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                  <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                    <p className="text-[11px] tracking-[0.35px] text-black/45">Customer</p>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-black">{data.workspace.name}</p>
+                        <p className="mt-1 text-xs text-black/45">{data.workspace.slug}</p>
+                      </div>
+                      <a
+                        href={buildRequestsFilterHref({
+                          customer: data.workspace.slug,
+                          key: selectedRequestKey,
+                        })}
+                        className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
+                      >
+                        Current
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                    <p className="text-[11px] tracking-[0.35px] text-black/45">API Key Filter</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <a
+                        href={buildRequestsFilterHref({
+                          customer: selectedRequestCustomer,
+                          key: "all",
+                        })}
+                        className={`inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors ${
+                          selectedRequestKey === "all"
+                            ? "border-black bg-black text-white"
+                            : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                        }`}
+                      >
+                        All keys
+                      </a>
+                      {data.requestFilters.apiKeys.map((item) => (
+                        <a
+                          key={item.id}
+                          href={buildRequestsFilterHref({
+                            customer: selectedRequestCustomer,
+                            key: item.id,
+                          })}
+                          className={`inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors ${
+                            selectedRequestKey === item.id
+                              ? "border-black bg-black text-white"
+                              : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                          }`}
+                        >
+                          {item.name}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                    <p className="text-[11px] tracking-[0.35px] text-black/45">Selection</p>
+                    <p className="mt-2 text-sm font-medium text-black">
+                      {selectedRequestKeyRecord ? selectedRequestKeyRecord.name : "All keys"}
+                    </p>
+                    <p className="mt-1 text-xs text-black/45">
+                      {selectedRequestKeyRecord
+                        ? `${selectedRequestKeyRecord.keyPrefix} · ${selectedRequestKeyRecord.environment}`
+                        : `${data.workspace.slug} · all request records`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-4 grid gap-3 md:grid-cols-4">
+                  <OverviewCard
+                    title="Requests"
+                    value={requestSummary.requestCount}
+                    note="Filtered request rows in this view"
+                    icon={Network}
+                  />
+                  <OverviewCard
+                    title="Customer Charge"
+                    value={new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }).format(requestSummary.customerCharge)}
+                    note="Authoritative source: inference_requests customer charge fields"
+                    icon={Fingerprint}
+                  />
+                  <OverviewCard
+                    title="Provider Cost"
+                    value={new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }).format(requestSummary.providerCost)}
+                    note="Authoritative source: inference_requests provider cost fields"
+                    icon={ShieldCheck}
+                  />
+                  <OverviewCard
+                    title="Profit"
+                    value={new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }).format(requestSummary.profit)}
+                    note="Customer charge minus provider cost"
+                    icon={Waypoints}
+                  />
+                </div>
+
+                {hasFilteredRequests ? (
                   <div className="space-y-3">
-                    {data.requests.map((request) => (
+                    {filteredRequests.map((request) => (
                       <article
                         key={request.id}
                         className="rounded-sm border border-black/10 bg-[#faf9f6] p-4"
@@ -805,6 +853,9 @@ export default async function InternalPage({
                         <p className="mt-3 text-sm font-medium text-black">{request.public_model_slug}</p>
                         <p className="mt-1 text-xs text-black/50">
                           {request.providerName} / {request.upstreamModelSlug}
+                        </p>
+                        <p className="mt-1 text-xs text-black/45">
+                          {request.customerName} · {request.apiKeyName} · {request.apiKeyPrefix}
                         </p>
 
                         <div className="mt-4 grid gap-2 text-xs text-black/55 md:grid-cols-2">
@@ -915,8 +966,8 @@ export default async function InternalPage({
                   </div>
                 ) : (
                   <EmptyState
-                    title="No request traffic yet"
-                    detail="This stays empty until you send real requests through the gateway. Once routing is configured and traffic starts, execution history will appear here."
+                    title="No requests match the current filters"
+                    detail="Adjust the current customer or API key filter, or send new traffic through the gateway. Request-level economics will appear here once settled."
                   />
                 )}
               </SectionShell>
