@@ -18,6 +18,7 @@ export type SubmitRequestInput = {
 };
 
 export type PollRequestInput = {
+  requestId: string;
   upstreamTaskId: string;
   provider: ProviderRuntimeContext;
 };

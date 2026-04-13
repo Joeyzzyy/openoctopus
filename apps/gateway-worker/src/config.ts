@@ -19,6 +19,7 @@ const envSchema = z.object({
   WAVESPEED_IMAGE_STATUS_FIELD: z.string().default("status"),
   WAVESPEED_IMAGE_TASK_ID_FIELD: z.string().default("id"),
   WAVESPEED_IMAGE_REQUEST_ID_FIELD: z.string().default("id"),
+  GATEWAY_PUBLIC_BASE_URL: z.string().url().optional(),
 });
 
 export const env = envSchema.parse(process.env);

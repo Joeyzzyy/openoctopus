@@ -1,4 +1,5 @@
 import { getJson, postJson } from "../lib/http.js";
+import { env } from "../config.js";
 import type {
   PollRequestInput,
   PollRequestResult,
@@ -27,6 +28,27 @@ function buildOperationUrl(operationName: string, baseUrl: string) {
   }
 
   return new URL(operationName.replace(/^\/+/, ""), `${baseUrl}/`).toString();
+}
+
+function isGeminiFileDownloadUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.hostname === "generativelanguage.googleapis.com" &&
+      /^\/v[^/]+\/files\/[^/]+:download$/.test(parsed.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function buildProxiedAssetUrl(requestId: string, assetIndex: number) {
+  const path = `/v1/files/${encodeURIComponent(requestId)}/assets/${assetIndex}`;
+  if (!env.GATEWAY_PUBLIC_BASE_URL) {
+    return path;
+  }
+
+  return new URL(path, env.GATEWAY_PUBLIC_BASE_URL).toString();
 }
 
 export class GeminiDirectImageAdapter implements ProviderAdapter {
@@ -131,7 +153,10 @@ export class GeminiDirectImageAdapter implements ProviderAdapter {
         raw: data,
         assets: [
           {
-            url: videoUri,
+            url: isGeminiFileDownloadUrl(videoUri)
+              ? buildProxiedAssetUrl(input.requestId, 0)
+              : videoUri,
+            sourceUrl: videoUri,
             type: "video",
             ...(durationSeconds !== null ? { durationSeconds } : {}),
           },

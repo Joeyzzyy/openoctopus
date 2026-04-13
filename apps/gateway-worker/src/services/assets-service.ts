@@ -60,7 +60,7 @@ export async function persistGeneratedAssets(input: PersistAssetInput) {
       request_id: input.requestId,
       workspace_id: input.workspaceId,
       asset_type: asset.type === "video" ? "video" : "image",
-      source_url: asset.url,
+      source_url: typeof asset.sourceUrl === "string" ? asset.sourceUrl : asset.url,
       duration_ms:
         asset.type === "video" ? resolveAssetDurationMs(asset, input.output) : null,
       metadata: input.output,

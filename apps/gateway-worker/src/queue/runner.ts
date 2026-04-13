@@ -717,6 +717,7 @@ export async function processNextPollingJob() {
   let result;
   try {
     result = await adapter.poll({
+      requestId: message.requestId,
       upstreamTaskId: message.upstreamTaskId,
       provider: {
         slug: message.providerSlug,

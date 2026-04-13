@@ -158,6 +158,7 @@ test("polls Veo operations and extracts generated video uri", async () => {
     },
     async (baseUrl, captured) => {
       const result = await adapter.poll({
+        requestId: "00000000-0000-4000-8000-000000000001",
         upstreamTaskId: "models/veo-3.0-generate-preview/operations/op-1",
         provider: {
           slug: "gemini-direct",
@@ -171,7 +172,8 @@ test("polls Veo operations and extracts generated video uri", async () => {
       assert.equal(result.success, true);
       assert.deepEqual(result.output.assets, [
         {
-          url: "https://generativelanguage.googleapis.com/v1beta/files/video-1:download",
+          url: "/v1/files/00000000-0000-4000-8000-000000000001/assets/0",
+          sourceUrl: "https://generativelanguage.googleapis.com/v1beta/files/video-1:download",
           type: "video",
           durationSeconds: 8,
         },
@@ -194,6 +196,7 @@ test("reports pending Veo operations as not done", async () => {
     },
     async (baseUrl) => {
       const result = await adapter.poll({
+        requestId: "request-1",
         upstreamTaskId: "models/veo-3.0-generate-preview/operations/op-1",
         provider: {
           slug: "gemini-direct",
@@ -230,6 +233,7 @@ test("surfaces Veo operation errors from poll responses", async () => {
     },
     async (baseUrl, captured) => {
       const result = await adapter.poll({
+        requestId: "request-1",
         upstreamTaskId: "/models/veo-3.0-generate-preview/operations/op-1",
         provider: {
           slug: "gemini-direct",

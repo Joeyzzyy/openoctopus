@@ -6,6 +6,7 @@ import {
   queueRpcAvailable,
 } from "./queue/runner.js";
 import { registerHealthRoute } from "./routes/health.js";
+import { registerFileRoutes } from "./routes/files.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
 
 const app = Fastify({
@@ -21,6 +22,7 @@ const app = Fastify({
 });
 
 await registerHealthRoute(app);
+await registerFileRoutes(app);
 await registerTaskRoutes(app);
 
 const queueEnabled = await queueRpcAvailable();

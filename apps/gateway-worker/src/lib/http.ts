@@ -1,4 +1,4 @@
-import http from "node:http";
+import http, { type IncomingHttpHeaders, type IncomingMessage } from "node:http";
 import https from "node:https";
 import { ProxyAgent } from "proxy-agent";
 
@@ -102,5 +102,55 @@ export function getJson<TResponse>(
   return requestJson<TResponse>(url, {
     method: "GET",
     headers: options?.headers,
+  });
+}
+
+export function getStream(
+  url: string,
+  options?: {
+    headers?: Record<string, string>;
+  }
+): Promise<{
+  status: number;
+  headers: IncomingHttpHeaders;
+  stream: IncomingMessage;
+}> {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const transport = target.protocol === "https:" ? https : http;
+
+    const req = transport.request(
+      {
+        protocol: target.protocol,
+        hostname: target.hostname,
+        port: target.port || undefined,
+        path: `${target.pathname}${target.search}`,
+        method: "GET",
+        family: 4,
+        timeout: REQUEST_TIMEOUT_MS,
+        agent: proxyAgent ?? undefined,
+        headers: {
+          accept: "*/*",
+          ...(options?.headers ?? {}),
+        },
+      },
+      (res) => {
+        resolve({
+          status: res.statusCode ?? 500,
+          headers: res.headers,
+          stream: res,
+        });
+      }
+    );
+
+    req.on("timeout", () => {
+      req.destroy(new Error(`Upstream GET timed out after ${REQUEST_TIMEOUT_MS}ms`));
+    });
+
+    req.on("error", (error) => {
+      reject(error);
+    });
+
+    req.end();
   });
 }
