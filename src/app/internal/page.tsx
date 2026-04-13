@@ -11,6 +11,7 @@ import {
 import { getInternalAdminData } from "@/lib/internal-admin-server";
 import { clearApiKeyRequestRecords } from "./actions";
 import { InternalShell } from "./internal-shell";
+import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
 import {
   CredentialsPanel,
   ModelsPanel,
@@ -307,6 +308,32 @@ function matchesMonitoringStatus(status: string, filter: MonitoringStatus) {
 
 function formatPercent(value: number) {
   return `${value.toFixed(value >= 10 || value === 0 ? 0 : 1)}%`;
+}
+
+function isInflightRequestStatus(status: string) {
+  return status === "queued" || status === "submitted" || status === "processing";
+}
+
+function formatElapsedDuration(value: string) {
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) {
+    return "时间未知";
+  }
+
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  const hours = Math.floor(diffSeconds / 3600);
+  const minutes = Math.floor((diffSeconds % 3600) / 60);
+  const seconds = diffSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
 }
 
 function buildMonitoringHealthByModel(
@@ -704,6 +731,147 @@ function MonitoringChartCard({
   );
 }
 
+function VideoTaskMonitoringCard({
+  request,
+}: {
+  request: {
+    id: string;
+    publicModelSlug: string;
+    status: string;
+    workspaceName: string;
+    workspaceSlug: string;
+    createdAt: string;
+    createdLabel: string;
+    startedLabel: string;
+    completedLabel: string;
+    errorMessage: string | null;
+    lastAttempt: {
+      attemptNo: number;
+      status: string;
+      upstreamTaskId: string | null;
+      latencyMs: number | null;
+      errorMessage: string | null;
+      updatedLabel: string;
+    } | null;
+  };
+}) {
+  const inflight = isInflightRequestStatus(request.status);
+  const elapsedLabel = inflight ? formatElapsedDuration(request.createdAt) : request.completedLabel;
+
+  return (
+    <article className="rounded-sm border border-black/10 bg-white p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex h-6 items-center rounded-sm px-2 text-[11px] ${
+                inflight
+                  ? "bg-[#fff1dc] text-[#9a5a00]"
+                  : request.status === "succeeded"
+                    ? "bg-[#edf8f0] text-[#1f6b3b]"
+                    : "bg-[#fff1ee] text-[#b54432]"
+              }`}
+            >
+              {request.status}
+            </span>
+            <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
+              video_generation
+            </span>
+          </div>
+          <p className="mt-3 break-all text-sm font-medium text-black">{request.publicModelSlug}</p>
+          <p className="mt-1 text-xs text-black/50">
+            {request.workspaceName} · {request.workspaceSlug}
+          </p>
+          <p className="mt-2 break-all font-mono text-[11px] text-black/45">{request.id}</p>
+        </div>
+
+        <div className="grid min-w-[300px] gap-2 sm:grid-cols-2 lg:w-[420px]">
+          <RequestMetricCard label="创建时间" value={request.createdLabel} />
+          <RequestMetricCard label="已运行" value={elapsedLabel} />
+          <RequestMetricCard label="开始处理" value={request.startedLabel} />
+          <RequestMetricCard
+            label="最后尝试"
+            value={
+              request.lastAttempt
+                ? `#${request.lastAttempt.attemptNo} · ${request.lastAttempt.status}`
+                : "无尝试"
+            }
+          />
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <section className="rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-3">
+          <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">上游轮询</p>
+          {request.lastAttempt ? (
+            <div className="mt-3 space-y-2 text-xs text-black/60">
+              <p>最近回写：{request.lastAttempt.updatedLabel}</p>
+              <p>提交延迟：{request.lastAttempt.latencyMs ?? "等待中"} ms</p>
+              <p className="break-all font-mono text-[11px] text-black/45">
+                {request.lastAttempt.upstreamTaskId ?? "尚无 upstream task id"}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-black/45">还没有 provider_attempts 记录。</p>
+          )}
+        </section>
+
+        <section className="rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-3">
+          <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">错误 / 诊断</p>
+          {request.errorMessage || request.lastAttempt?.errorMessage ? (
+            <p className="mt-3 text-xs leading-5 text-[#b54432]">
+              {request.errorMessage ?? request.lastAttempt?.errorMessage}
+            </p>
+          ) : (
+            <p className="mt-3 text-xs text-black/45">
+              {inflight ? "当前没有错误，正在等待上游结果。" : "当前没有错误信息。"}
+            </p>
+          )}
+        </section>
+      </div>
+    </article>
+  );
+}
+
+function ImageTaskLogRow({
+  request,
+}: {
+  request: {
+    id: string;
+    capability: string;
+    publicModelSlug: string;
+    status: string;
+    workspaceSlug: string;
+    createdLabel: string;
+    errorMessage: string | null;
+  };
+}) {
+  return (
+    <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
+              {request.status}
+            </span>
+            <span className="inline-flex h-6 items-center rounded-sm bg-[#eef3ea] px-2 text-[11px] text-[#436b39]">
+              {request.capability}
+            </span>
+          </div>
+          <p className="mt-2 break-all text-sm font-medium text-black">{request.publicModelSlug}</p>
+          <p className="mt-1 text-xs text-black/45">
+            {request.workspaceSlug} · {request.createdLabel}
+          </p>
+          <p className="mt-1 break-all font-mono text-[11px] text-black/40">{request.id}</p>
+        </div>
+        <div className="max-w-md text-xs leading-5 text-black/55">
+          {request.errorMessage ?? "无错误，整体状态正常。"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function InternalPage({
   searchParams,
 }: {
@@ -854,6 +1022,18 @@ export default async function InternalPage({
   const selectedMonitoringStatusLabel =
     monitoringStatusOptions.find((option) => option.value === selectedMonitoringStatus)?.label ??
     "全部请求";
+  const globalVideoInflightRequests = data.globalMonitoring.videoInflightRequests;
+  const recentVideoSettledRequests = data.globalMonitoring.recentVideoRequests.filter(
+    (request) => !isInflightRequestStatus(request.status)
+  );
+  const recentVideoFailedCount = recentVideoSettledRequests.filter(
+    (request) => request.status === "failed"
+  ).length;
+  const recentVideoSucceededCount = recentVideoSettledRequests.filter(
+    (request) => request.status === "succeeded"
+  ).length;
+  const imageMonitoringSummary = data.globalMonitoring.imageSummary;
+  const imageRecentLogs = data.globalMonitoring.recentImageRequests.slice(0, 12);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#f7f6f1] text-[#111111]">
@@ -1145,6 +1325,8 @@ export default async function InternalPage({
                 title="资源调度管理监测中心"
                 description="查看全系统所有模型的调用量走势，支持分钟、小时、天三种粒度，以及多个时间范围切换。"
               >
+                <MonitoringAutoRefresh enabled={activeTab === "monitoring"} />
+
                 <div className="mb-4 rounded-sm border border-black/8 bg-[#faf9f6] p-3">
                   <div className="grid gap-3 lg:grid-cols-3">
                     <div>
@@ -1263,6 +1445,133 @@ export default async function InternalPage({
                     当前展示的是全系统维度的 `inference_requests`，不是单个 workspace 的局部数据。支持按请求状态筛选；即使某个模型当前时间范围内没有调用，也会保留一张零值折线图。
                   </p>
                 </div>
+
+                <div className="mb-4 grid gap-3 md:grid-cols-4">
+                  <OverviewCard
+                    title="进行中视频任务"
+                    value={globalVideoInflightRequests.length}
+                    note="全系统当前 queued / processing 的视频请求"
+                    icon={Activity}
+                  />
+                  <OverviewCard
+                    title="近期成功视频"
+                    value={recentVideoSucceededCount}
+                    note="最近抓取到的已结算视频任务"
+                    icon={ShieldCheck}
+                  />
+                  <OverviewCard
+                    title="近期失败视频"
+                    value={recentVideoFailedCount}
+                    note="用于排查上游 provider 错误"
+                    icon={ShieldAlert}
+                  />
+                  <OverviewCard
+                    title="图片任务总量"
+                    value={imageMonitoringSummary.total}
+                    note="图片任务只展示汇总和整体日志"
+                    icon={Fingerprint}
+                  />
+                </div>
+
+                <div className="mb-6 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+                  <section className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-black">全局视频任务实时监控</p>
+                        <p className="mt-1 text-xs leading-5 text-black/50">
+                          这里只盯全系统“正在发生中的”视频任务，展示 task id、workspace、最近一次 provider attempt 和上游 task id。
+                        </p>
+                      </div>
+                      <div className="rounded-sm border border-black/8 bg-white px-3 py-2 text-[11px] text-black/55">
+                        30 秒自动刷新
+                      </div>
+                    </div>
+
+                    {globalVideoInflightRequests.length > 0 ? (
+                      <div className="grid gap-3">
+                        {globalVideoInflightRequests.map((request) => (
+                          <VideoTaskMonitoringCard key={request.id} request={request} />
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState
+                        title="当前没有进行中的视频任务"
+                        detail="新的全局 video_generation 请求进入 queued / processing 后会自动出现在这里。"
+                      />
+                    )}
+                  </section>
+
+                  <section className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+                    <div className="mb-4">
+                      <p className="text-sm font-medium text-black">图片任务汇总与整体日志</p>
+                      <p className="mt-1 text-xs leading-5 text-black/50">
+                        图片任务不做逐任务实时盯盘，只保留总量、状态拆分和最近整体状态日志。
+                      </p>
+                    </div>
+
+                    <div className="mb-4 grid gap-2 sm:grid-cols-2">
+                      <OverviewCard
+                        title="图片进行中"
+                        value={imageMonitoringSummary.inflight}
+                        note="queued / processing"
+                        icon={Activity}
+                      />
+                      <OverviewCard
+                        title="图片成功"
+                        value={imageMonitoringSummary.succeeded}
+                        note="最近抓取窗口内 succeeded"
+                        icon={ShieldCheck}
+                      />
+                      <OverviewCard
+                        title="图片失败"
+                        value={imageMonitoringSummary.failed}
+                        note="最近抓取窗口内 failed"
+                        icon={ShieldAlert}
+                      />
+                      <OverviewCard
+                        title="图片取消"
+                        value={imageMonitoringSummary.cancelled}
+                        note="最近抓取窗口内 cancelled"
+                        icon={CircleAlert}
+                      />
+                    </div>
+
+                    {imageRecentLogs.length > 0 ? (
+                      <div className="grid gap-2">
+                        {imageRecentLogs.map((request) => (
+                          <ImageTaskLogRow key={request.id} request={request} />
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState
+                        title="最近没有图片任务日志"
+                        detail="当前窗口内还没有 image_generation 或 image_edit 请求。"
+                      />
+                    )}
+                  </section>
+                </div>
+
+                <section className="mb-6 rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+                  <div className="mb-4">
+                    <p className="text-sm font-medium text-black">最近完成的视频任务日志</p>
+                    <p className="mt-1 text-xs leading-5 text-black/50">
+                      用于确认新部署后的 polling 是否能把视频任务正确推进到最终成功或最终失败。
+                    </p>
+                  </div>
+
+                  {recentVideoSettledRequests.length > 0 ? (
+                    <div className="grid gap-3">
+                      {recentVideoSettledRequests.slice(0, 10).map((request) => (
+                        <VideoTaskMonitoringCard key={request.id} request={request} />
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      title="最近还没有已结算的视频任务"
+                      detail="新的视频任务完成后，会在这里保留成功或失败日志。"
+                    />
+                  )}
+                </section>
 
                 {monitoringSeries.length > 0 ? (
                   <div className="grid gap-4">

@@ -91,9 +91,33 @@ type RequestRow = {
 
 type MonitoringRequestRow = {
   id: string;
+  capability: string;
   public_model_slug: string;
   status: string;
   created_at: string;
+};
+
+type GlobalMonitoringRequestRow = {
+  id: string;
+  workspace_id: string | null;
+  capability: string;
+  public_model_slug: string;
+  status: string;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  workspaces:
+    | {
+        name: string | null;
+        slug: string | null;
+      }
+    | Array<{
+        name: string | null;
+        slug: string | null;
+      }>
+    | null;
 };
 
 type AttemptRow = {
@@ -108,6 +132,17 @@ type AttemptRow = {
   latency_ms: number | null;
   error_message: string | null;
   created_at: string;
+};
+
+type MonitoringAttemptRow = {
+  request_id: string;
+  attempt_no: number;
+  status: string;
+  upstream_request_id: string | null;
+  upstream_task_id: string | null;
+  latency_ms: number | null;
+  error_message: string | null;
+  updated_at: string;
 };
 
 type ApiKeyRow = {
@@ -332,7 +367,7 @@ async function fetchMonitoringRequests(
     const to = from + batchSize - 1;
     const response = await supabase
       .from("inference_requests")
-      .select("id, public_model_slug, status, created_at")
+      .select("id, capability, public_model_slug, status, created_at")
       .gte("created_at", sinceIso)
       .order("created_at", { ascending: false })
       .range(from, to);
@@ -350,6 +385,141 @@ async function fetchMonitoringRequests(
   }
 
   return rows;
+}
+
+async function fetchGlobalMonitoringData(
+  supabase: Awaited<ReturnType<typeof createClient>>
+) {
+  const [videoInflightResponse, videoRecentResponse, imageRecentResponse, attemptResponse] =
+    await Promise.all([
+      supabase
+        .from("inference_requests")
+        .select(
+          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, created_at, started_at, completed_at, workspaces(name, slug)"
+        )
+        .eq("capability", "video_generation")
+        .in("status", ["queued", "submitted", "processing"])
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("inference_requests")
+        .select(
+          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, created_at, started_at, completed_at, workspaces(name, slug)"
+        )
+        .eq("capability", "video_generation")
+        .order("created_at", { ascending: false })
+        .limit(80),
+      supabase
+        .from("inference_requests")
+        .select(
+          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, created_at, started_at, completed_at, workspaces(name, slug)"
+        )
+        .in("capability", ["image_generation", "image_edit"])
+        .order("created_at", { ascending: false })
+        .limit(120),
+      supabase
+        .from("provider_attempts")
+        .select(
+          "request_id, attempt_no, status, upstream_request_id, upstream_task_id, latency_ms, error_message, updated_at"
+        )
+        .order("created_at", { ascending: false })
+        .limit(400),
+    ]);
+
+  const videoInflightRequests = (videoInflightResponse.error
+    ? []
+    : videoInflightResponse.data ?? []) as GlobalMonitoringRequestRow[];
+  const recentVideoRequests = (videoRecentResponse.error
+    ? []
+    : videoRecentResponse.data ?? []) as GlobalMonitoringRequestRow[];
+  const recentImageRequests = (imageRecentResponse.error
+    ? []
+    : imageRecentResponse.data ?? []) as GlobalMonitoringRequestRow[];
+  const monitoringAttempts = (attemptResponse.error
+    ? []
+    : attemptResponse.data ?? []) as MonitoringAttemptRow[];
+
+  const latestAttemptByRequestId = new Map<string, MonitoringAttemptRow>();
+  for (const attempt of monitoringAttempts) {
+    if (!latestAttemptByRequestId.has(attempt.request_id)) {
+      latestAttemptByRequestId.set(attempt.request_id, attempt);
+    }
+  }
+
+  const toWorkspace = (
+    value: GlobalMonitoringRequestRow["workspaces"]
+  ): { name: string; slug: string } => {
+    const row = Array.isArray(value) ? value[0] ?? null : value;
+    return {
+      name: row?.name ?? "Unknown workspace",
+      slug: row?.slug ?? "unknown-workspace",
+    };
+  };
+
+  const enrichRequest = (request: GlobalMonitoringRequestRow) => {
+    const workspace = toWorkspace(request.workspaces);
+    const lastAttempt = latestAttemptByRequestId.get(request.id) ?? null;
+
+    return {
+      id: request.id,
+      capability: request.capability,
+      publicModelSlug: request.public_model_slug,
+      status: request.status,
+      errorCode: request.error_code,
+      errorMessage: request.error_message,
+      createdAt: request.created_at,
+      startedAt: request.started_at,
+      completedAt: request.completed_at,
+      createdLabel: formatRelativeTimestamp(request.created_at),
+      startedLabel: formatRelativeTimestamp(request.started_at),
+      completedLabel: formatRelativeTimestamp(request.completed_at),
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+      lastAttempt: lastAttempt
+        ? {
+            attemptNo: lastAttempt.attempt_no,
+            status: lastAttempt.status,
+            upstreamRequestId: lastAttempt.upstream_request_id,
+            upstreamTaskId: lastAttempt.upstream_task_id,
+            latencyMs: lastAttempt.latency_ms,
+            errorMessage: lastAttempt.error_message,
+            updatedLabel: formatRelativeTimestamp(lastAttempt.updated_at),
+          }
+        : null,
+    };
+  };
+
+  const imageStatusSummary = recentImageRequests.reduce(
+    (summary, request) => {
+      summary.total += 1;
+
+      if (request.status === "succeeded") {
+        summary.succeeded += 1;
+      } else if (request.status === "failed") {
+        summary.failed += 1;
+      } else if (request.status === "cancelled") {
+        summary.cancelled += 1;
+      } else {
+        summary.inflight += 1;
+      }
+
+      return summary;
+    },
+    {
+      total: 0,
+      inflight: 0,
+      succeeded: 0,
+      failed: 0,
+      cancelled: 0,
+    }
+  );
+
+  return {
+    videoInflightRequests: videoInflightRequests.map(enrichRequest),
+    recentVideoRequests: recentVideoRequests.map(enrichRequest),
+    imageSummary: imageStatusSummary,
+    recentImageRequests: recentImageRequests.map(enrichRequest),
+  };
 }
 
 export async function getInternalAdminData(options: InternalAdminDataOptions = {}) {
@@ -833,6 +1003,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     };
   });
 
+  const globalMonitoring = await fetchGlobalMonitoringData(supabase);
+
   return {
     authorized: true as const,
     user: {
@@ -867,6 +1039,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     routingRules: routingRuleSummaries,
     requests: recentRequestSummaries,
     monitoringRequests,
+    globalMonitoring,
     auditLogs: auditLogSummaries,
     requestFilters: {
       customers: [
