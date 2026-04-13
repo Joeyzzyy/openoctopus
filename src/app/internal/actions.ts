@@ -4,6 +4,15 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod/v4";
 import { deriveLegacyBillingFields, parseBillingConfig } from "@/lib/billing-config";
 import { encryptProviderSecret } from "@/lib/provider-secret-crypto";
+import {
+  getProviderModelRuntimeDiagnostics,
+  getRoutingRuleRuntimeDiagnostics,
+  type RuntimeCredential,
+  type RuntimeProvider,
+  type RuntimeProviderModel,
+  type RuntimeRoutingRule,
+  type RuntimeSupportedModel,
+} from "@/lib/provider-runtime-guard";
 import { createClient } from "@/lib/supabase/server";
 
 const providerKindSchema = z.enum(["wavespeed", "partner", "custom"]);
@@ -66,6 +75,14 @@ function assertBillingConfig(value: unknown) {
   parseBillingConfig(value);
 }
 
+function formatRuntimeDiagnosticsForError(summary: string, diagnostics: string[]) {
+  if (diagnostics.length === 0) {
+    return summary;
+  }
+
+  return `${summary}\n- ${diagnostics.join("\n- ")}`;
+}
+
 function normalizeOptionalUrl(value: FormDataEntryValue | null) {
   const normalized = normalizeOptionalText(value);
   if (!normalized) {
@@ -87,6 +104,114 @@ function parseJsonArrayField(value: FormDataEntryValue | null) {
   }
 
   return parsed as Array<Record<string, unknown>>;
+}
+
+async function loadProviderRuntimeContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  input: {
+    providerId?: string;
+    providerModelIds?: string[];
+    supportedModelIds?: string[];
+  }
+) {
+  const providerIds = new Set<string>();
+
+  if (input.providerId) {
+    providerIds.add(input.providerId);
+  }
+
+  const providerModels = input.providerModelIds && input.providerModelIds.length > 0
+    ? await supabase
+        .from("provider_models")
+        .select("id, provider_id, supported_model_id, upstream_model_slug, capability, active")
+        .in("id", input.providerModelIds)
+    : { data: [], error: null };
+
+  if (providerModels.error) {
+    throw new Error(providerModels.error.message);
+  }
+
+  for (const providerModel of providerModels.data ?? []) {
+    providerIds.add(providerModel.provider_id);
+  }
+
+  const supportedModelIds = new Set<string>(input.supportedModelIds ?? []);
+  for (const providerModel of providerModels.data ?? []) {
+    if (providerModel.supported_model_id) {
+      supportedModelIds.add(providerModel.supported_model_id);
+    }
+  }
+
+  const [providersResponse, credentialsResponse, supportedModelsResponse] = await Promise.all([
+    providerIds.size > 0
+      ? supabase
+          .from("providers")
+          .select("id, name, slug, status")
+          .in("id", Array.from(providerIds))
+      : Promise.resolve({ data: [], error: null }),
+    providerIds.size > 0
+      ? supabase
+          .from("provider_credentials")
+          .select("id, label, provider_id, secret_source, environment, is_active, secret_ciphertext, secret_iv, secret_auth_tag")
+          .in("provider_id", Array.from(providerIds))
+      : Promise.resolve({ data: [], error: null }),
+    supportedModelIds.size > 0
+      ? supabase
+          .from("supported_models")
+          .select("id, model_slug, capability")
+          .in("id", Array.from(supportedModelIds))
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (providersResponse.error) {
+    throw new Error(providersResponse.error.message);
+  }
+  if (credentialsResponse.error) {
+    throw new Error(credentialsResponse.error.message);
+  }
+  if (supportedModelsResponse.error) {
+    throw new Error(supportedModelsResponse.error.message);
+  }
+
+  return {
+    providersById: new Map(
+      ((providersResponse.data ?? []) as RuntimeProvider[]).map((provider) => [provider.id, provider])
+    ),
+    providerModelsById: new Map(
+      ((providerModels.data ?? []) as RuntimeProviderModel[]).map((providerModel) => [
+        providerModel.id,
+        providerModel,
+      ])
+    ),
+    supportedModelsById: new Map(
+      ((supportedModelsResponse.data ?? []) as RuntimeSupportedModel[]).map((supportedModel) => [
+        supportedModel.id,
+        supportedModel,
+      ])
+    ),
+    credentialsByProviderId: ((credentialsResponse.data ?? []) as Array<
+      RuntimeCredential & {
+        secret_ciphertext?: string | null;
+        secret_iv?: string | null;
+        secret_auth_tag?: string | null;
+      }
+    >).reduce((map, credential) => {
+      const list = map.get(credential.provider_id) ?? [];
+      list.push({
+        id: credential.id,
+        label: credential.label,
+        provider_id: credential.provider_id,
+        secret_source: credential.secret_source,
+        environment: credential.environment,
+        is_active: credential.is_active,
+        has_encrypted_secret_material: Boolean(
+          credential.secret_ciphertext && credential.secret_iv && credential.secret_auth_tag
+        ),
+      });
+      map.set(credential.provider_id, list);
+      return map;
+    }, new Map<string, RuntimeCredential[]>()),
+  };
 }
 
 async function uploadPricingEvidenceFile(input: {
@@ -485,7 +610,7 @@ export async function updateProviderCredentialState(formData: FormData) {
 
   const { data: credentialRow, error: credentialRowError } = await supabase
     .from("provider_credentials")
-    .select("provider_id")
+    .select("provider_id, secret_source, secret_ciphertext, secret_iv, secret_auth_tag")
     .eq("id", parsed.credentialId)
     .maybeSingle();
 
@@ -495,6 +620,16 @@ export async function updateProviderCredentialState(formData: FormData) {
 
   if (!credentialRow) {
     throw new Error("Provider credential is missing");
+  }
+
+  if (
+    parsed.isActive &&
+    (credentialRow.secret_source !== "internal_encrypted" ||
+      !credentialRow.secret_ciphertext ||
+      !credentialRow.secret_iv ||
+      !credentialRow.secret_auth_tag)
+  ) {
+    throw new Error("不能启用缺少 managed 加密密文字段的供应商密钥。请先轮换或重新保存密钥。");
   }
 
   if (parsed.isActive) {
@@ -662,7 +797,7 @@ export async function updateProviderCredentialDetails(formData: FormData) {
 
   const { data: credentialRow, error: credentialRowError } = await supabase
     .from("provider_credentials")
-    .select("provider_id")
+    .select("provider_id, secret_source, secret_ciphertext, secret_iv, secret_auth_tag")
     .eq("id", parsed.credentialId)
     .maybeSingle();
 
@@ -672,6 +807,16 @@ export async function updateProviderCredentialDetails(formData: FormData) {
 
   if (!credentialRow) {
     throw new Error("Provider credential is missing");
+  }
+
+  if (
+    parsed.isActive &&
+    (credentialRow.secret_source !== "internal_encrypted" ||
+      !credentialRow.secret_ciphertext ||
+      !credentialRow.secret_iv ||
+      !credentialRow.secret_auth_tag)
+  ) {
+    throw new Error("不能启用缺少 managed 加密密文字段的供应商密钥。请先轮换或重新保存密钥。");
   }
 
   if (parsed.isActive) {
@@ -1040,6 +1185,35 @@ export async function createProviderModel(formData: FormData) {
   }
 
   assertBillingConfig(supportedModelRow.billing_config);
+  const runtimeContext = await loadProviderRuntimeContext(supabase, {
+    providerId: parsed.providerId,
+    supportedModelIds: [parsed.supportedModelId],
+  });
+  const provider = runtimeContext.providersById.get(parsed.providerId) ?? null;
+  const supportedModel = runtimeContext.supportedModelsById.get(parsed.supportedModelId) ?? null;
+  const runtimeDiagnostics = getProviderModelRuntimeDiagnostics({
+    providerModel: {
+      id: "new",
+      provider_id: parsed.providerId,
+      supported_model_id: parsed.supportedModelId,
+      upstream_model_slug: parsed.upstreamModelSlug,
+      capability: parsed.capability,
+      active: parsed.active,
+    },
+    provider,
+    supportedModel,
+    credentials: runtimeContext.credentialsByProviderId.get(parsed.providerId) ?? [],
+  });
+
+  if (parsed.active && runtimeDiagnostics.length > 0) {
+    throw new Error(
+      formatRuntimeDiagnosticsForError(
+        "这个供应商模型当前不能直接启用，请先修复下面的问题：",
+        runtimeDiagnostics
+      )
+    );
+  }
+
   const pricingConfig = parseBillingConfig(parsed.pricing);
   const pricingEvidenceFile = formData.get("pricingSourceEvidenceFile");
   const uploadedEvidence = await uploadPricingEvidenceFile({
@@ -1105,6 +1279,51 @@ export async function updateProviderModelState(formData: FormData) {
     providerModelId: formData.get("providerModelId"),
     active: parseBooleanField(formData.get("active")),
   });
+
+  if (parsed.active) {
+    const { data: providerModel, error: providerModelError } = await supabase
+      .from("provider_models")
+      .select("id, provider_id, supported_model_id, upstream_model_slug, capability, active")
+      .eq("id", parsed.providerModelId)
+      .maybeSingle();
+
+    if (providerModelError) {
+      throw new Error(providerModelError.message);
+    }
+
+    if (!providerModel) {
+      throw new Error("Provider model is missing");
+    }
+
+    const runtimeContext = await loadProviderRuntimeContext(supabase, {
+      providerId: providerModel.provider_id,
+      supportedModelIds: providerModel.supported_model_id ? [providerModel.supported_model_id] : [],
+    });
+    const runtimeDiagnostics = getProviderModelRuntimeDiagnostics({
+      providerModel: {
+        id: providerModel.id,
+        provider_id: providerModel.provider_id,
+        supported_model_id: providerModel.supported_model_id,
+        upstream_model_slug: providerModel.upstream_model_slug,
+        capability: providerModel.capability,
+        active: true,
+      },
+      provider: runtimeContext.providersById.get(providerModel.provider_id) ?? null,
+      supportedModel: providerModel.supported_model_id
+        ? runtimeContext.supportedModelsById.get(providerModel.supported_model_id) ?? null
+        : null,
+      credentials: runtimeContext.credentialsByProviderId.get(providerModel.provider_id) ?? [],
+    });
+
+    if (runtimeDiagnostics.length > 0) {
+      throw new Error(
+        formatRuntimeDiagnosticsForError(
+          "这个供应商模型当前不能启用，请先修复下面的问题：",
+          runtimeDiagnostics
+        )
+      );
+    }
+  }
 
   const { error } = await supabase
     .from("provider_models")
@@ -1180,6 +1399,35 @@ export async function updateProviderModelDetails(formData: FormData) {
   }
 
   assertBillingConfig(supportedModelRow.billing_config);
+  const runtimeContext = await loadProviderRuntimeContext(supabase, {
+    providerId: parsed.providerId,
+    supportedModelIds: [parsed.supportedModelId],
+  });
+  const provider = runtimeContext.providersById.get(parsed.providerId) ?? null;
+  const supportedModel = runtimeContext.supportedModelsById.get(parsed.supportedModelId) ?? null;
+  const runtimeDiagnostics = getProviderModelRuntimeDiagnostics({
+    providerModel: {
+      id: parsed.providerModelId,
+      provider_id: parsed.providerId,
+      supported_model_id: parsed.supportedModelId,
+      upstream_model_slug: parsed.upstreamModelSlug,
+      capability: parsed.capability,
+      active: parsed.active,
+    },
+    provider,
+    supportedModel,
+    credentials: runtimeContext.credentialsByProviderId.get(parsed.providerId) ?? [],
+  });
+
+  if (parsed.active && runtimeDiagnostics.length > 0) {
+    throw new Error(
+      formatRuntimeDiagnosticsForError(
+        "这个供应商模型当前不能直接启用，请先修复下面的问题：",
+        runtimeDiagnostics
+      )
+    );
+  }
+
   const pricingConfig = parseBillingConfig(parsed.pricing);
   const pricingEvidenceFile = formData.get("pricingSourceEvidenceFile");
   const uploadedEvidence = await uploadPricingEvidenceFile({
@@ -1304,6 +1552,34 @@ export async function createRoutingRule(formData: FormData) {
     }
   }
 
+  const runtimeContext = await loadProviderRuntimeContext(supabase, {
+    providerModelIds,
+    supportedModelIds: [parsed.supportedModelId],
+  });
+  const runtimeDiagnostics = getRoutingRuleRuntimeDiagnostics({
+    routingRule: {
+      id: "new",
+      public_model_slug: supportedModelRow.model_slug,
+      capability: parsed.capability,
+      primary_provider_model_id: parsed.primaryProviderModelId,
+      fallback_provider_model_id: parsed.fallbackProviderModelId,
+      active: parsed.active,
+    },
+    providerModelsById: runtimeContext.providerModelsById,
+    providersById: runtimeContext.providersById,
+    supportedModelsById: runtimeContext.supportedModelsById,
+    credentialsByProviderId: runtimeContext.credentialsByProviderId,
+  });
+
+  if (parsed.active && runtimeDiagnostics.length > 0) {
+    throw new Error(
+      formatRuntimeDiagnosticsForError(
+        "这个路由当前不能直接启用，请先修复下面的问题：",
+        runtimeDiagnostics
+      )
+    );
+  }
+
   const { data, error } = await supabase
     .from("routing_rules")
     .insert({
@@ -1359,20 +1635,6 @@ export async function updateRoutingRule(formData: FormData) {
     active: parseBooleanField(formData.get("active")),
   });
 
-  const { error } = await supabase
-    .from("routing_rules")
-    .update({
-      primary_provider_model_id: parsed.primaryProviderModelId,
-      fallback_provider_model_id: parsed.fallbackProviderModelId,
-      route_strategy: parsed.routeStrategy,
-      active: parsed.active,
-    })
-    .eq("id", parsed.routingRuleId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
   const { data: currentRule, error: currentRuleError } = await supabase
     .from("routing_rules")
     .select("public_model_slug, capability")
@@ -1411,6 +1673,47 @@ export async function updateRoutingRule(formData: FormData) {
     if (invalidModel) {
       throw new Error("Primary and fallback provider models must stay within the same public model and capability");
     }
+  }
+
+  const runtimeContext = await loadProviderRuntimeContext(supabase, {
+    providerModelIds,
+  });
+  const runtimeDiagnostics = getRoutingRuleRuntimeDiagnostics({
+    routingRule: {
+      id: parsed.routingRuleId,
+      public_model_slug: currentRule.public_model_slug,
+      capability: currentRule.capability,
+      primary_provider_model_id: parsed.primaryProviderModelId,
+      fallback_provider_model_id: parsed.fallbackProviderModelId,
+      active: parsed.active,
+    },
+    providerModelsById: runtimeContext.providerModelsById,
+    providersById: runtimeContext.providersById,
+    supportedModelsById: runtimeContext.supportedModelsById,
+    credentialsByProviderId: runtimeContext.credentialsByProviderId,
+  });
+
+  if (parsed.active && runtimeDiagnostics.length > 0) {
+    throw new Error(
+      formatRuntimeDiagnosticsForError(
+        "这个路由当前不能直接启用，请先修复下面的问题：",
+        runtimeDiagnostics
+      )
+    );
+  }
+
+  const { error } = await supabase
+    .from("routing_rules")
+    .update({
+      primary_provider_model_id: parsed.primaryProviderModelId,
+      fallback_provider_model_id: parsed.fallbackProviderModelId,
+      route_strategy: parsed.routeStrategy,
+      active: parsed.active,
+    })
+    .eq("id", parsed.routingRuleId);
+
+  if (error) {
+    throw new Error(error.message);
   }
 
   await logAdminAudit({

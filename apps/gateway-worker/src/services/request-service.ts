@@ -1,5 +1,10 @@
 import crypto from "node:crypto";
 import { parseBillingConfig } from "../lib/billing-config.js";
+import {
+  isSupportedProviderAdapterSlug,
+  pickRuntimeCredential,
+  type RuntimeProviderCredential,
+} from "../lib/provider-runtime-guard.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 
 type ProviderCredentialRow = {
@@ -7,6 +12,10 @@ type ProviderCredentialRow = {
   provider_id: string;
   secret_source: string;
   environment: string;
+  is_active: boolean;
+  secret_ciphertext: string | null;
+  secret_iv: string | null;
+  secret_auth_tag: string | null;
 };
 
 export type UnifiedRequestInput = {
@@ -29,24 +38,54 @@ export class RequestValidationError extends Error {
   }
 }
 
-function pickRuntimeCredential(rows: ProviderCredentialRow[]) {
-  const encryptedProduction = rows.find(
-    (row) => row.secret_source === "internal_encrypted" && row.environment === "production"
-  );
-  if (encryptedProduction) {
-    return encryptedProduction;
+function resolveRuntimeCredential(rows: ProviderCredentialRow[]) {
+  const runtimeCredentials: RuntimeProviderCredential[] = rows.map((row) => ({
+    id: row.id,
+    secret_source: row.secret_source,
+    environment: row.environment,
+    is_active: row.is_active,
+    has_encrypted_secret_material: Boolean(
+      row.secret_ciphertext && row.secret_iv && row.secret_auth_tag
+    ),
+  }));
+
+  const credential = pickRuntimeCredential(runtimeCredentials);
+  if (credential) {
+    const selectedRow = rows.find((row) => row.id === credential.id);
+    if (selectedRow) {
+      return selectedRow;
+    }
   }
 
-  const encryptedAny = rows.find((row) => row.secret_source === "internal_encrypted");
-  if (encryptedAny) {
-    return encryptedAny;
+  if (rows.some((row) => row.secret_source !== "internal_encrypted")) {
+    throw new RequestValidationError(
+      "Active provider credential still uses a legacy external reference. Rotate it in /internal before sending live traffic.",
+      409,
+      "provider_credential_legacy"
+    );
+  }
+
+  if (rows.some((row) => !row.secret_ciphertext || !row.secret_iv || !row.secret_auth_tag)) {
+    throw new RequestValidationError(
+      "Active provider credential is missing encrypted secret material. Re-save or rotate the key in /internal.",
+      409,
+      "provider_credential_incomplete"
+    );
   }
 
   if (rows.length > 0) {
-    throw new Error("Active provider credential is still using a legacy external reference. Rotate it in /internal before live traffic.");
+    throw new RequestValidationError(
+      "No runnable active provider credential found for this provider.",
+      409,
+      "provider_credential_unusable"
+    );
   }
 
-  throw new Error("No active provider credential found for this provider");
+  throw new RequestValidationError(
+    "No active provider credential found for this provider.",
+    409,
+    "provider_credential_missing"
+  );
 }
 
 export async function createQueuedRequest(input: UnifiedRequestInput) {
@@ -142,7 +181,7 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
 
   const { data: providerModelRow, error: providerModelError } = await supabaseAdmin
     .from("provider_models")
-    .select("id, provider_id, upstream_model_slug, pricing")
+    .select("id, provider_id, upstream_model_slug, pricing, active")
     .eq("id", routeRow.primary_provider_model_id)
     .maybeSingle();
 
@@ -152,6 +191,14 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
 
   if (!providerModelRow) {
     throw new Error("Primary provider model is missing");
+  }
+
+  if (!providerModelRow.active) {
+    throw new RequestValidationError(
+      `Primary provider model for ${input.model} is not active.`,
+      409,
+      "provider_model_inactive"
+    );
   }
 
   try {
@@ -166,7 +213,7 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
 
   const { data: providerRow, error: providerError } = await supabaseAdmin
     .from("providers")
-    .select("slug, base_url, config")
+    .select("slug, base_url, config, status")
     .eq("id", providerModelRow.provider_id)
     .maybeSingle();
 
@@ -178,9 +225,27 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     throw new Error("Provider row is missing");
   }
 
+  if (providerRow.status === "offline") {
+    throw new RequestValidationError(
+      `Provider ${providerRow.slug} is offline.`,
+      409,
+      "provider_offline"
+    );
+  }
+
+  if (!isSupportedProviderAdapterSlug(providerRow.slug)) {
+    throw new RequestValidationError(
+      `Provider ${providerRow.slug} is not wired to a worker adapter yet.`,
+      409,
+      "provider_adapter_missing"
+    );
+  }
+
   const { data: credentialRows, error: credentialError } = await supabaseAdmin
     .from("provider_credentials")
-    .select("id, provider_id, secret_source, environment")
+    .select(
+      "id, provider_id, secret_source, environment, is_active, secret_ciphertext, secret_iv, secret_auth_tag"
+    )
     .eq("provider_id", providerModelRow.provider_id)
     .eq("is_active", true)
     .order("updated_at", { ascending: false });
@@ -189,7 +254,7 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     throw new Error(credentialError.message);
   }
 
-  const credential = pickRuntimeCredential((credentialRows ?? []) as ProviderCredentialRow[]);
+  const credential = resolveRuntimeCredential((credentialRows ?? []) as ProviderCredentialRow[]);
 
   const requestId = crypto.randomUUID();
   const providerSlug = providerRow.slug;

@@ -33,6 +33,7 @@ type PollingMessage = {
   providerSlug: string;
   providerBaseUrl: string | null;
   providerConfig: Record<string, unknown> | null;
+  capability: "image_generation" | "video_generation";
   publicModelSlug: string;
   upstreamModelSlug: string;
   endpoint: string;
@@ -63,6 +64,94 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function readNumericCandidate(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function getNestedNumber(source: Record<string, unknown> | null, path: string[]) {
+  let current: unknown = source;
+
+  for (const key of path) {
+    const record = asRecord(current);
+    if (!record || !(key in record)) {
+      return null;
+    }
+    current = record[key];
+  }
+
+  return readNumericCandidate(current);
+}
+
+function resolveVideoDurationSeconds(input: {
+  requestInput?: Record<string, unknown> | null;
+  output?: Record<string, unknown> | null;
+  providerRaw?: Record<string, unknown> | null;
+}) {
+  const requestInput = input.requestInput ?? null;
+  const output = input.output ?? null;
+  const providerRaw = input.providerRaw ?? null;
+
+  return (
+    readNumericCandidate(requestInput?.durationSeconds) ??
+    readNumericCandidate(requestInput?.duration_seconds) ??
+    readNumericCandidate(requestInput?.duration) ??
+    getNestedNumber(output, ["durationSeconds"]) ??
+    getNestedNumber(output, ["duration_seconds"]) ??
+    getNestedNumber(providerRaw, ["durationSeconds"]) ??
+    getNestedNumber(providerRaw, ["duration_seconds"]) ??
+    null
+  );
+}
+
+function withNormalizedVideoDuration(input: {
+  capability: "image_generation" | "video_generation";
+  requestInput?: Record<string, unknown> | null;
+  output?: Record<string, unknown> | null;
+  providerRaw?: Record<string, unknown> | null;
+}) {
+  const output = input.output ?? null;
+  const providerRaw = input.providerRaw ?? null;
+
+  if (input.capability !== "video_generation" || !output) {
+    return {
+      output,
+      providerRaw,
+    };
+  }
+
+  const durationSeconds = resolveVideoDurationSeconds(input);
+  if (durationSeconds === null) {
+    return {
+      output,
+      providerRaw,
+    };
+  }
+
+  return {
+    output: {
+      ...output,
+      durationSeconds,
+    },
+    providerRaw: providerRaw
+      ? {
+          ...providerRaw,
+          durationSeconds,
+        }
+      : {
+          durationSeconds,
+        },
+  };
 }
 
 function buildSettlementBreakdown(input: {
@@ -237,12 +326,19 @@ export async function processNextInferenceJob() {
   }
 
   if (result.mode === "sync") {
-    const providerRaw = asRecord(result.output.raw);
+    const normalizedSyncResult = withNormalizedVideoDuration({
+      capability: message.capability,
+      requestInput: message.input,
+      output: result.output,
+      providerRaw: asRecord(result.output.raw),
+    });
+    const providerRaw = normalizedSyncResult.providerRaw;
+    const normalizedOutput = normalizedSyncResult.output ?? result.output;
     const settlement = await resolveSettlementAmounts({
       providerModelId: message.providerModelId,
       publicModelSlug: message.publicModelSlug,
       requestInput: message.input,
-      output: result.output,
+      output: normalizedOutput,
       providerRaw,
       providerReportedAmount: result.estimatedCost,
     });
@@ -250,7 +346,7 @@ export async function processNextInferenceJob() {
       .from("inference_requests")
       .update({
         status: "succeeded",
-        output_payload: result.output,
+        output_payload: normalizedOutput,
         actual_cost: settlement.customer.total,
         actual_customer_charge: settlement.customer.total,
         actual_provider_cost: settlement.provider.total,
@@ -269,7 +365,7 @@ export async function processNextInferenceJob() {
       .update({
         status: "succeeded",
         upstream_request_id: result.upstreamRequestId,
-        response_payload: result.output,
+        response_payload: normalizedOutput,
         latency_ms: Date.now() - attemptStartedAt,
       })
       .eq("request_id", message.requestId)
@@ -278,7 +374,7 @@ export async function processNextInferenceJob() {
     await persistGeneratedAssets({
       requestId: message.requestId,
       workspaceId: message.workspaceId,
-      output: result.output,
+      output: normalizedOutput,
     });
 
     await recordRequestSettlement({
@@ -347,6 +443,7 @@ export async function processNextInferenceJob() {
         providerSlug: message.providerSlug,
         providerBaseUrl: message.providerBaseUrl,
         providerConfig: message.providerConfig,
+        capability: message.capability,
         publicModelSlug: message.publicModelSlug,
         upstreamModelSlug: message.upstreamModelSlug,
         endpoint: message.endpoint,
@@ -482,19 +579,27 @@ export async function processNextPollingJob() {
   }
 
   if (result.success) {
+    const normalizedPollingResult = withNormalizedVideoDuration({
+      capability: message.capability,
+      requestInput: message.input,
+      output: result.output,
+      providerRaw: result.raw,
+    });
+    const normalizedOutput = normalizedPollingResult.output ?? result.output;
+    const normalizedProviderRaw = normalizedPollingResult.providerRaw ?? result.raw;
     const settlement = await resolveSettlementAmounts({
       providerModelId: message.providerModelId,
       publicModelSlug: message.publicModelSlug,
       requestInput: message.input,
-      output: result.output,
-      providerRaw: result.raw,
+      output: normalizedOutput,
+      providerRaw: normalizedProviderRaw,
       providerReportedAmount: result.actualCost,
     });
     await supabaseAdmin
       .from("inference_requests")
       .update({
         status: "succeeded",
-        output_payload: result.output,
+        output_payload: normalizedOutput,
         actual_cost: settlement.customer.total,
         actual_customer_charge: settlement.customer.total,
         actual_provider_cost: settlement.provider.total,
@@ -507,7 +612,7 @@ export async function processNextPollingJob() {
       .from("provider_attempts")
       .update({
         status: "succeeded",
-        response_payload: result.raw,
+        response_payload: normalizedProviderRaw,
       })
       .eq("request_id", message.requestId)
       .eq("attempt_no", 1);
@@ -515,7 +620,7 @@ export async function processNextPollingJob() {
     await persistGeneratedAssets({
       requestId: message.requestId,
       workspaceId: message.workspaceId,
-      output: result.output,
+      output: normalizedOutput,
     });
 
     await recordRequestSettlement({

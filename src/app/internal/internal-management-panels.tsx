@@ -61,6 +61,7 @@ type ProviderSummary = {
   modelCount: number;
   activeModelCount: number;
   configText: string;
+  runtimeDiagnostics: string[];
 };
 
 type ProviderCredentialSummary = {
@@ -77,6 +78,8 @@ type ProviderCredentialSummary = {
   metadataText: string;
   is_active: boolean;
   secretUpdatedLabel: string;
+  hasEncryptedSecretMaterial: boolean;
+  runtimeDiagnostics: string[];
 };
 
 type ProviderModelSummary = {
@@ -101,6 +104,7 @@ type ProviderModelSummary = {
     uploadedAt?: string;
     signedUrl?: string | null;
   }>;
+  runtimeDiagnostics: string[];
 };
 
 type RoutingRuleSummary = {
@@ -115,7 +119,36 @@ type RoutingRuleSummary = {
   scopeLabel: string;
   primaryLabel: string;
   fallbackLabel: string;
+  runtimeDiagnostics: string[];
 };
+
+function RuntimeDiagnostics({
+  diagnostics,
+}: {
+  diagnostics: string[];
+}) {
+  if (diagnostics.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 rounded-sm border border-[#f0d5d0] bg-[#fff5f3] px-4 py-3">
+      <div className="flex items-start gap-2">
+        <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-[#b54432]" />
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-[#8d4336]">运行时诊断</p>
+          <div className="mt-2 grid gap-2">
+            {diagnostics.map((message) => (
+              <p key={message} className="text-xs leading-5 text-[#b54432]">
+                {message}
+              </p>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type ProviderTemplate = {
   provider: {
@@ -630,6 +663,7 @@ export function ProvidersPanel({
                 供应商密钥：{provider.credentialCount}
               </div>
             </div>
+            <RuntimeDiagnostics diagnostics={provider.runtimeDiagnostics} />
           </div>
         ))
       ) : (
@@ -819,6 +853,7 @@ export function CredentialsPanel({
                 </p>
               </div>
             ) : null}
+            <RuntimeDiagnostics diagnostics={credential.runtimeDiagnostics} />
           </div>
         ))
       ) : (
@@ -1005,6 +1040,7 @@ export function ModelsPanel({
                 )}
               </div>
             </div>
+            <RuntimeDiagnostics diagnostics={item.runtimeDiagnostics} />
           </div>
         ))
       ) : (
@@ -1129,6 +1165,7 @@ export function RoutesPanel({
               <span>主路由：{rule.primaryLabel}</span>
               <span>回退路由：{rule.fallbackLabel}</span>
             </div>
+            <RuntimeDiagnostics diagnostics={rule.runtimeDiagnostics} />
           </div>
         ))
       ) : (

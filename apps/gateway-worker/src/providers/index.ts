@@ -6,6 +6,7 @@ import { WaveSpeedVideoAdapter } from "./wavespeed-video.js";
 
 const adapters: ProviderAdapter[] = [
   new GeminiDirectImageAdapter(),
+  new GeminiDirectImageAdapter("vertex-veo"),
   new WaveSpeedImageAdapter(),
   new WaveSpeedVideoAdapter(),
   new PartnerProviderAAdapter(),

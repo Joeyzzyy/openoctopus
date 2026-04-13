@@ -164,11 +164,13 @@ function resolveDurationSeconds(
   raw: Record<string, unknown> | null
 ) {
   return (
-    readNumericCandidate(input?.duration) ??
-    readNumericCandidate(input?.durationSeconds) ??
     getNestedNumber(output, ["durationSeconds"]) ??
+    getNestedNumber(output, ["duration_seconds"]) ??
     getNestedNumber(raw, ["durationSeconds"]) ??
     getNestedNumber(raw, ["duration_seconds"]) ??
+    readNumericCandidate(input?.durationSeconds) ??
+    readNumericCandidate(input?.duration_seconds) ??
+    readNumericCandidate(input?.duration) ??
     0
   );
 }

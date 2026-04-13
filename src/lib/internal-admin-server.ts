@@ -1,6 +1,11 @@
 import "server-only";
 
 import { parseBillingConfig, summarizeBillingConfig } from "@/lib/billing-config";
+import {
+  getProviderModelRuntimeDiagnostics,
+  getProviderRuntimeDiagnostics,
+  getRoutingRuleRuntimeDiagnostics,
+} from "@/lib/provider-runtime-guard";
 import { createClient } from "@/lib/supabase/server";
 
 type AdminRole = "owner" | "admin";
@@ -139,6 +144,9 @@ type ProviderCredentialRow = {
   secret_ref: string | null;
   secret_mask: string | null;
   secret_source: string;
+  secret_ciphertext: string | null;
+  secret_iv: string | null;
+  secret_auth_tag: string | null;
   secret_last_updated_at: string | null;
   environment: string;
   is_active: boolean;
@@ -420,7 +428,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       supabase
         .from("provider_credentials")
         .select(
-          "id, provider_id, label, secret_ref, secret_mask, secret_source, secret_last_updated_at, environment, is_active, notes, metadata, created_at"
+          "id, provider_id, label, secret_ref, secret_mask, secret_source, secret_ciphertext, secret_iv, secret_auth_tag, secret_last_updated_at, environment, is_active, notes, metadata, created_at"
         )
         .order("created_at", { ascending: false }),
       supabase
@@ -510,6 +518,12 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const providerById = new Map(providers.map((row) => [row.id, row]));
   const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
   const supportedModelById = new Map(supportedModels.map((row) => [row.id, row]));
+  const credentialsByProviderId = providerCredentials.reduce((map, credential) => {
+    const list = map.get(credential.provider_id) ?? [];
+    list.push(credential);
+    map.set(credential.provider_id, list);
+    return map;
+  }, new Map<string, ProviderCredentialRow[]>());
   const apiKeyById = new Map(apiKeys.map((row) => [row.id, row]));
   const apiKeySpendById = new Map(apiKeySpendSummaries.map((row) => [row.api_key_id, row]));
   const usageEventByRequestId = new Map(
@@ -528,15 +542,31 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const providerSummaries = providers.map((provider) => {
     const models = providerModels.filter((item) => item.provider_id === provider.id);
     const providerRequests = requests.filter((item) => item.provider_id === provider.id);
+    const credentials = credentialsByProviderId.get(provider.id) ?? [];
 
     return {
       ...provider,
       modelCount: models.length,
       activeModelCount: models.filter((item) => item.active).length,
-      credentialCount: providerCredentials.filter((item) => item.provider_id === provider.id).length,
+      credentialCount: credentials.length,
       requestCount: providerRequests.length,
       regionsLabel: (provider.regions ?? []).join(", ") || "global",
       configText: formatJson(provider.config),
+      runtimeDiagnostics: getProviderRuntimeDiagnostics({
+        provider,
+        credentials: credentials.map((credential) => ({
+          id: credential.id,
+          label: credential.label,
+          provider_id: credential.provider_id,
+          secret_source: credential.secret_source,
+          environment: credential.environment,
+          is_active: credential.is_active,
+          has_encrypted_secret_material: Boolean(
+            credential.secret_ciphertext && credential.secret_iv && credential.secret_auth_tag
+          ),
+        })),
+        models,
+      }),
     };
   });
 
@@ -545,6 +575,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     const supportedModel = providerModel.supported_model_id
       ? supportedModelById.get(providerModel.supported_model_id)
       : null;
+    const credentials = credentialsByProviderId.get(providerModel.provider_id) ?? [];
 
     return {
       ...providerModel,
@@ -559,6 +590,22 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         supabase,
         providerModel.pricing_source_evidence
       ),
+      runtimeDiagnostics: getProviderModelRuntimeDiagnostics({
+        providerModel,
+        provider: provider ?? null,
+        supportedModel: supportedModel ?? null,
+        credentials: credentials.map((credential) => ({
+          id: credential.id,
+          label: credential.label,
+          provider_id: credential.provider_id,
+          secret_source: credential.secret_source,
+          environment: credential.environment,
+          is_active: credential.is_active,
+          has_encrypted_secret_material: Boolean(
+            credential.secret_ciphertext && credential.secret_iv && credential.secret_auth_tag
+          ),
+        })),
+      }),
     };
   }));
 
@@ -584,6 +631,28 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         ? `${fallbackProvider?.name ?? "Unknown"} / ${fallbackModel.upstream_model_slug}`
         : "No fallback",
       scopeLabel: rule.workspace_id ? "workspace" : "global",
+      runtimeDiagnostics: getRoutingRuleRuntimeDiagnostics({
+        routingRule: rule,
+        providerModelsById: providerModelById,
+        providersById: providerById,
+        supportedModelsById: supportedModelById,
+        credentialsByProviderId: new Map(
+          Array.from(credentialsByProviderId.entries()).map(([providerId, credentials]) => [
+            providerId,
+            credentials.map((credential) => ({
+              id: credential.id,
+              label: credential.label,
+              provider_id: credential.provider_id,
+              secret_source: credential.secret_source,
+              environment: credential.environment,
+              is_active: credential.is_active,
+              has_encrypted_secret_material: Boolean(
+                credential.secret_ciphertext && credential.secret_iv && credential.secret_auth_tag
+              ),
+            })),
+          ])
+        ),
+      }),
     };
   });
 
@@ -687,6 +756,9 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       providerName: provider?.name ?? "Unknown provider",
       providerSlug: provider?.slug ?? "unknown",
       secretMask: credential.secret_mask ?? "[secret not set]",
+      hasEncryptedSecretMaterial: Boolean(
+        credential.secret_ciphertext && credential.secret_iv && credential.secret_auth_tag
+      ),
       secretSourceLabel:
         credential.secret_source === "internal_encrypted"
           ? "managed"
@@ -694,6 +766,14 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       metadataText: formatJson(credential.metadata),
       createdLabel: formatRelativeTimestamp(credential.created_at),
       secretUpdatedLabel: formatRelativeTimestamp(credential.secret_last_updated_at),
+      runtimeDiagnostics: [
+        ...(credential.secret_source !== "internal_encrypted"
+          ? ["当前密钥仍是 legacy external ref，worker 不会把它当作可运行的 managed 密钥。"]
+          : []),
+        ...(!credential.is_active ? [] : !credential.secret_ciphertext || !credential.secret_iv || !credential.secret_auth_tag
+          ? ["当前启用密钥缺少可解密的密文字段，worker 无法实际调用。"]
+          : []),
+      ],
     };
   });
 
