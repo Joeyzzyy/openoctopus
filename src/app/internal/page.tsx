@@ -162,9 +162,16 @@ const monitoringStatusOptions = [
   { value: "cancelled", label: "已取消" },
 ] as const;
 
+const monitoringViewOptions = [
+  { value: "overview", label: "整体数据监控" },
+  { value: "video", label: "视频任务监控" },
+  { value: "image", label: "图片任务监控" },
+] as const;
+
 type MonitoringInterval = (typeof monitoringIntervalOptions)[number]["value"];
 type MonitoringRange = (typeof monitoringRangeOptions)[number]["value"];
 type MonitoringStatus = (typeof monitoringStatusOptions)[number]["value"];
+type MonitoringView = (typeof monitoringViewOptions)[number]["value"];
 
 function parseMonitoringInterval(value: string | undefined): MonitoringInterval {
   return monitoringIntervalOptions.some((option) => option.value === value)
@@ -182,6 +189,12 @@ function parseMonitoringStatus(value: string | undefined): MonitoringStatus {
   return monitoringStatusOptions.some((option) => option.value === value)
     ? (value as MonitoringStatus)
     : "all";
+}
+
+function parseMonitoringView(value: string | undefined): MonitoringView {
+  return monitoringViewOptions.some((option) => option.value === value)
+    ? (value as MonitoringView)
+    : "overview";
 }
 
 function parseMonitoringRangeMs(value: MonitoringRange) {
@@ -231,12 +244,14 @@ function formatMonitoringBucketLabel(date: Date, interval: MonitoringInterval) {
 }
 
 function buildMonitoringHref(input: {
+  view: MonitoringView;
   interval: MonitoringInterval;
   range: MonitoringRange;
   status: MonitoringStatus;
 }) {
   const params = new URLSearchParams();
   params.set("tab", "monitoring");
+  params.set("monitoringView", input.view);
   params.set("monitoringInterval", input.interval);
   params.set("monitoringRange", input.range);
   params.set("monitoringStatus", input.status);
@@ -887,6 +902,9 @@ export default async function InternalPage({
   const selectedMonitoringStatus = parseMonitoringStatus(
     getSearchValue(resolvedSearchParams, "monitoringStatus")
   );
+  const selectedMonitoringView = parseMonitoringView(
+    getSearchValue(resolvedSearchParams, "monitoringView")
+  );
   const data = await getInternalAdminData({
     monitoringLookbackMs: parseMonitoringRangeMs(selectedMonitoringRange),
   });
@@ -1022,6 +1040,9 @@ export default async function InternalPage({
   const selectedMonitoringStatusLabel =
     monitoringStatusOptions.find((option) => option.value === selectedMonitoringStatus)?.label ??
     "全部请求";
+  const selectedMonitoringViewLabel =
+    monitoringViewOptions.find((option) => option.value === selectedMonitoringView)?.label ??
+    "整体数据监控";
   const globalVideoInflightRequests = data.globalMonitoring.videoInflightRequests;
   const recentVideoSettledRequests = data.globalMonitoring.recentVideoRequests.filter(
     (request) => !isInflightRequestStatus(request.status)
@@ -1325,7 +1346,28 @@ export default async function InternalPage({
                 title="资源调度管理监测中心"
                 description="查看全系统所有模型的调用量走势，支持分钟、小时、天三种粒度，以及多个时间范围切换。"
               >
-                <MonitoringAutoRefresh enabled={activeTab === "monitoring"} />
+                <MonitoringAutoRefresh enabled={activeTab === "monitoring" && selectedMonitoringView === "video"} />
+
+                <div className="mb-4 flex flex-wrap gap-2 rounded-sm border border-black/8 bg-[#faf9f6] p-3">
+                  {monitoringViewOptions.map((option) => (
+                    <a
+                      key={option.value}
+                      href={buildMonitoringHref({
+                        view: option.value,
+                        interval: selectedMonitoringInterval,
+                        range: selectedMonitoringRange,
+                        status: selectedMonitoringStatus,
+                      })}
+                      className={`inline-flex h-9 items-center rounded-sm border px-3 text-sm font-medium transition-colors ${
+                        selectedMonitoringView === option.value
+                          ? "border-black bg-black text-white"
+                          : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                      }`}
+                    >
+                      {option.label}
+                    </a>
+                  ))}
+                </div>
 
                 <div className="mb-4 rounded-sm border border-black/8 bg-[#faf9f6] p-3">
                   <div className="grid gap-3 lg:grid-cols-3">
@@ -1336,6 +1378,7 @@ export default async function InternalPage({
                           <a
                             key={option.value}
                             href={buildMonitoringHref({
+                              view: selectedMonitoringView,
                               interval: option.value,
                               range: selectedMonitoringRange,
                               status: selectedMonitoringStatus,
@@ -1359,6 +1402,7 @@ export default async function InternalPage({
                           <a
                             key={option.value}
                             href={buildMonitoringHref({
+                              view: selectedMonitoringView,
                               interval: selectedMonitoringInterval,
                               range: option.value,
                               status: selectedMonitoringStatus,
@@ -1382,6 +1426,7 @@ export default async function InternalPage({
                           <a
                             key={option.value}
                             href={buildMonitoringHref({
+                              view: selectedMonitoringView,
                               interval: selectedMonitoringInterval,
                               range: selectedMonitoringRange,
                               status: option.value,
@@ -1442,74 +1487,176 @@ export default async function InternalPage({
                 <div className="mb-4 flex items-center gap-1.5 bg-[#e8f0ff] px-3 py-2.5">
                   <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
                   <p className="text-xs leading-[1.35] text-[#355fb4]">
-                    当前展示的是全系统维度的 `inference_requests`，不是单个 workspace 的局部数据。支持按请求状态筛选；即使某个模型当前时间范围内没有调用，也会保留一张零值折线图。
+                    当前查看的是「{selectedMonitoringViewLabel}」。所有数据都来自全系统维度的 `inference_requests`，不是单个 workspace 的局部数据。
                   </p>
                 </div>
 
-                <div className="mb-4 grid gap-3 md:grid-cols-4">
-                  <OverviewCard
-                    title="进行中视频任务"
-                    value={globalVideoInflightRequests.length}
-                    note="全系统当前 queued / processing 的视频请求"
-                    icon={Activity}
-                  />
-                  <OverviewCard
-                    title="近期成功视频"
-                    value={recentVideoSucceededCount}
-                    note="最近抓取到的已结算视频任务"
-                    icon={ShieldCheck}
-                  />
-                  <OverviewCard
-                    title="近期失败视频"
-                    value={recentVideoFailedCount}
-                    note="用于排查上游 provider 错误"
-                    icon={ShieldAlert}
-                  />
-                  <OverviewCard
-                    title="图片任务总量"
-                    value={imageMonitoringSummary.total}
-                    note="图片任务只展示汇总和整体日志"
-                    icon={Fingerprint}
-                  />
-                </div>
-
-                <div className="mb-6 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-                  <section className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
-                    <div className="mb-4 flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-black">全局视频任务实时监控</p>
-                        <p className="mt-1 text-xs leading-5 text-black/50">
-                          这里只盯全系统“正在发生中的”视频任务，展示 task id、workspace、最近一次 provider attempt 和上游 task id。
-                        </p>
-                      </div>
-                      <div className="rounded-sm border border-black/8 bg-white px-3 py-2 text-[11px] text-black/55">
-                        30 秒自动刷新
-                      </div>
+                {selectedMonitoringView === "overview" ? (
+                  <>
+                    <div className="mb-4 grid gap-2 md:grid-cols-6">
+                      <OverviewCard
+                        title="模型总数"
+                        value={monitoringSummary.modelCount}
+                        note="按可售模型逐张展示折线图"
+                        icon={Network}
+                      />
+                      <OverviewCard
+                        title="活跃模型"
+                        value={monitoringSummary.activeModelCount}
+                        note={`${selectedMonitoringRangeLabel} 内至少调用过一次`}
+                        icon={Activity}
+                      />
+                      <OverviewCard
+                        title="总调用量"
+                        value={monitoringSummary.requestCount}
+                        note={`${selectedMonitoringRangeLabel} · ${selectedMonitoringStatusLabel}`}
+                        icon={Fingerprint}
+                      />
+                      <OverviewCard
+                        title="单桶峰值"
+                        value={monitoringSummary.peakValue}
+                        note={`${selectedMonitoringIntervalLabel}`}
+                        icon={Waypoints}
+                      />
+                      <OverviewCard
+                        title="成功率"
+                        value={formatPercent(monitoringSuccessRate)}
+                        note={`已结算 ${monitoringHealthSummary.settled} 条`}
+                        icon={ShieldCheck}
+                      />
+                      <OverviewCard
+                        title="失败率"
+                        value={formatPercent(monitoringFailureRate)}
+                        note={`失败 ${monitoringHealthSummary.failed} · 取消 ${monitoringHealthSummary.cancelled}`}
+                        icon={ShieldAlert}
+                      />
                     </div>
 
-                    {globalVideoInflightRequests.length > 0 ? (
-                      <div className="grid gap-3">
-                        {globalVideoInflightRequests.map((request) => (
-                          <VideoTaskMonitoringCard key={request.id} request={request} />
-                        ))}
+                    {monitoringSeries.length > 0 ? (
+                      <div className="grid gap-4">
+                        {monitoringSeries.map((series) => {
+                          const health = monitoringHealthByModel.get(series.modelSlug) ?? {
+                            total: 0,
+                            settled: 0,
+                            succeeded: 0,
+                            failed: 0,
+                            cancelled: 0,
+                            inflight: 0,
+                          };
+                          const successRate =
+                            health.settled > 0 ? (health.succeeded / health.settled) * 100 : 0;
+                          const failureRate =
+                            health.settled > 0 ? (health.failed / health.settled) * 100 : 0;
+
+                          return (
+                            <MonitoringChartCard
+                              key={series.modelSlug}
+                              title={series.title}
+                              points={series.points}
+                              labels={series.labels}
+                              total={series.total}
+                              peak={series.peak}
+                              intervalLabel={selectedMonitoringIntervalLabel.replace("按", "")}
+                              successRate={formatPercent(successRate)}
+                              failureRate={formatPercent(failureRate)}
+                              settledCount={health.settled}
+                              inflightCount={health.inflight}
+                            />
+                          );
+                        })}
                       </div>
                     ) : (
                       <EmptyState
-                        title="当前没有进行中的视频任务"
-                        detail="新的全局 video_generation 请求进入 queued / processing 后会自动出现在这里。"
+                        title="还没有模型监控数据"
+                        detail="先创建可售模型，或者等待网关产生新的 inference_requests。这里会按模型自动生成对应的调用折线图。"
                       />
                     )}
-                  </section>
+                  </>
+                ) : null}
 
-                  <section className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
-                    <div className="mb-4">
-                      <p className="text-sm font-medium text-black">图片任务汇总与整体日志</p>
-                      <p className="mt-1 text-xs leading-5 text-black/50">
-                        图片任务不做逐任务实时盯盘，只保留总量、状态拆分和最近整体状态日志。
-                      </p>
+                {selectedMonitoringView === "video" ? (
+                  <>
+                    <div className="mb-4 grid gap-3 md:grid-cols-3">
+                      <OverviewCard
+                        title="进行中视频任务"
+                        value={globalVideoInflightRequests.length}
+                        note="全系统当前 queued / processing 的视频请求"
+                        icon={Activity}
+                      />
+                      <OverviewCard
+                        title="近期成功视频"
+                        value={recentVideoSucceededCount}
+                        note="最近抓取到的已结算视频任务"
+                        icon={ShieldCheck}
+                      />
+                      <OverviewCard
+                        title="近期失败视频"
+                        value={recentVideoFailedCount}
+                        note="用于排查上游 provider 错误"
+                        icon={ShieldAlert}
+                      />
                     </div>
 
-                    <div className="mb-4 grid gap-2 sm:grid-cols-2">
+                    <section className="mb-6 rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+                      <div className="mb-4 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-black">全局视频任务实时监控</p>
+                          <p className="mt-1 text-xs leading-5 text-black/50">
+                            这里只盯全系统“正在发生中的”视频任务，展示 task id、workspace、最近一次 provider attempt 和上游 task id。
+                          </p>
+                        </div>
+                        <div className="rounded-sm border border-black/8 bg-white px-3 py-2 text-[11px] text-black/55">
+                          30 秒自动刷新
+                        </div>
+                      </div>
+
+                      {globalVideoInflightRequests.length > 0 ? (
+                        <div className="grid gap-3">
+                          {globalVideoInflightRequests.map((request) => (
+                            <VideoTaskMonitoringCard key={request.id} request={request} />
+                          ))}
+                        </div>
+                      ) : (
+                        <EmptyState
+                          title="当前没有进行中的视频任务"
+                          detail="新的全局 video_generation 请求进入 queued / processing 后会自动出现在这里。"
+                        />
+                      )}
+                    </section>
+
+                    <section className="mb-6 rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+                      <div className="mb-4">
+                        <p className="text-sm font-medium text-black">最近完成的视频任务日志</p>
+                        <p className="mt-1 text-xs leading-5 text-black/50">
+                          用于确认新部署后的 polling 是否能把视频任务正确推进到最终成功或最终失败。
+                        </p>
+                      </div>
+
+                      {recentVideoSettledRequests.length > 0 ? (
+                        <div className="grid gap-3">
+                          {recentVideoSettledRequests.slice(0, 10).map((request) => (
+                            <VideoTaskMonitoringCard key={request.id} request={request} />
+                          ))}
+                        </div>
+                      ) : (
+                        <EmptyState
+                          title="最近还没有已结算的视频任务"
+                          detail="新的视频任务完成后，会在这里保留成功或失败日志。"
+                        />
+                      )}
+                    </section>
+                  </>
+                ) : null}
+
+                {selectedMonitoringView === "image" ? (
+                  <>
+                    <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      <OverviewCard
+                        title="图片总量"
+                        value={imageMonitoringSummary.total}
+                        note="最近抓取窗口内图片请求总数"
+                        icon={Fingerprint}
+                      />
                       <OverviewCard
                         title="图片进行中"
                         value={imageMonitoringSummary.inflight}
@@ -1528,52 +1675,33 @@ export default async function InternalPage({
                         note="最近抓取窗口内 failed"
                         icon={ShieldAlert}
                       />
-                      <OverviewCard
-                        title="图片取消"
-                        value={imageMonitoringSummary.cancelled}
-                        note="最近抓取窗口内 cancelled"
-                        icon={CircleAlert}
-                      />
                     </div>
 
-                    {imageRecentLogs.length > 0 ? (
-                      <div className="grid gap-2">
-                        {imageRecentLogs.map((request) => (
-                          <ImageTaskLogRow key={request.id} request={request} />
-                        ))}
+                    <section className="mb-6 rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+                      <div className="mb-4">
+                        <p className="text-sm font-medium text-black">图片任务汇总与整体日志</p>
+                        <p className="mt-1 text-xs leading-5 text-black/50">
+                          图片任务不做逐任务实时盯盘，只保留总量、状态拆分和最近整体状态日志。
+                        </p>
                       </div>
-                    ) : (
-                      <EmptyState
-                        title="最近没有图片任务日志"
-                        detail="当前窗口内还没有 image_generation 或 image_edit 请求。"
-                      />
-                    )}
-                  </section>
-                </div>
 
-                <section className="mb-6 rounded-sm border border-black/10 bg-[#faf9f6] p-4">
-                  <div className="mb-4">
-                    <p className="text-sm font-medium text-black">最近完成的视频任务日志</p>
-                    <p className="mt-1 text-xs leading-5 text-black/50">
-                      用于确认新部署后的 polling 是否能把视频任务正确推进到最终成功或最终失败。
-                    </p>
-                  </div>
+                      {imageRecentLogs.length > 0 ? (
+                        <div className="grid gap-2">
+                          {imageRecentLogs.map((request) => (
+                            <ImageTaskLogRow key={request.id} request={request} />
+                          ))}
+                        </div>
+                      ) : (
+                        <EmptyState
+                          title="最近没有图片任务日志"
+                          detail="当前窗口内还没有 image_generation 或 image_edit 请求。"
+                        />
+                      )}
+                    </section>
+                  </>
+                ) : null}
 
-                  {recentVideoSettledRequests.length > 0 ? (
-                    <div className="grid gap-3">
-                      {recentVideoSettledRequests.slice(0, 10).map((request) => (
-                        <VideoTaskMonitoringCard key={request.id} request={request} />
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      title="最近还没有已结算的视频任务"
-                      detail="新的视频任务完成后，会在这里保留成功或失败日志。"
-                    />
-                  )}
-                </section>
-
-                {monitoringSeries.length > 0 ? (
+                {selectedMonitoringView === "overview" && monitoringSeries.length > 0 ? (
                   <div className="grid gap-4">
                     {monitoringSeries.map((series) => {
                       const health = monitoringHealthByModel.get(series.modelSlug) ?? {
@@ -1606,12 +1734,14 @@ export default async function InternalPage({
                       );
                     })}
                   </div>
-                ) : (
+                ) : null}
+
+                {selectedMonitoringView === "overview" && monitoringSeries.length === 0 ? (
                   <EmptyState
                     title="还没有模型监控数据"
                     detail="先创建可售模型，或者等待网关产生新的 inference_requests。这里会按模型自动生成对应的调用折线图。"
                   />
-                )}
+                ) : null}
               </SectionShell>
             </section>
           ) : null}
