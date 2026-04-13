@@ -46,6 +46,8 @@ type QueueEnvelope = {
   message: unknown;
 };
 
+type QueueName = "inference_jobs" | "inference_polling";
+
 function normalizeQueueRows(data: unknown): QueueEnvelope[] {
   if (!Array.isArray(data)) {
     return [];
@@ -172,8 +174,48 @@ function buildSettlementBreakdown(input: {
   };
 }
 
+function assertNoRpcError(error: { message?: string } | null | undefined, action: string) {
+  if (error) {
+    throw new Error(`${action} failed: ${error.message ?? "Unknown Supabase RPC error"}`);
+  }
+}
+
+async function sendQueueMessage(input: {
+  queueName: QueueName;
+  message: QueueMessage | PollingMessage;
+  delaySeconds?: number;
+}) {
+  const { data, error } = await supabaseAdmin.rpc("queue_send", {
+    queue_name: input.queueName,
+    msg: input.message,
+    delay: input.delaySeconds ?? 0,
+  });
+
+  assertNoRpcError(error, `queue_send(${input.queueName})`);
+
+  if (data === null || data === undefined) {
+    throw new Error(`queue_send(${input.queueName}) failed: no message id returned`);
+  }
+}
+
+async function deleteQueueMessage(input: {
+  queueName: QueueName;
+  messageId: number;
+}) {
+  const { data, error } = await supabaseAdmin.rpc("queue_delete", {
+    queue_name: input.queueName,
+    message_id: input.messageId,
+  });
+
+  assertNoRpcError(error, `queue_delete(${input.queueName})`);
+
+  if (data !== true) {
+    throw new Error(`queue_delete(${input.queueName}) failed: message ${input.messageId} was not deleted`);
+  }
+}
+
 async function failRequestAndDeleteQueueMessage(input: {
-  queueName: "inference_jobs" | "inference_polling";
+  queueName: QueueName;
   messageId: number;
   requestId: string;
   workspaceId: string;
@@ -220,9 +262,9 @@ async function failRequestAndDeleteQueueMessage(input: {
     // Do not let settlement backfill failures keep unrecoverable jobs alive.
   }
 
-  await supabaseAdmin.rpc("queue_delete", {
-    queue_name: input.queueName,
-    message_id: input.messageId,
+  await deleteQueueMessage({
+    queueName: input.queueName,
+    messageId: input.messageId,
   });
 }
 
@@ -237,14 +279,10 @@ export async function queueRpcAvailable() {
 }
 
 export async function enqueueInferenceJob(message: QueueMessage) {
-  const { error } = await supabaseAdmin.rpc("queue_send", {
-    queue_name: "inference_jobs",
-    msg: message,
+  await sendQueueMessage({
+    queueName: "inference_jobs",
+    message,
   });
-
-  if (error) {
-    throw new Error(error.message);
-  }
 }
 
 export async function processNextInferenceJob() {
@@ -300,12 +338,78 @@ export async function processNextInferenceJob() {
   const attemptStartedAt = Date.now();
   const { data: requestRow, error: requestRowError } = await supabaseAdmin
     .from("inference_requests")
-    .select("provider_id, provider_model_id")
+    .select("provider_id, provider_model_id, status")
     .eq("id", message.requestId)
     .maybeSingle();
 
   if (requestRowError) {
     throw new Error(requestRowError.message);
+  }
+
+  if (
+    requestRow?.status === "succeeded" ||
+    requestRow?.status === "failed" ||
+    requestRow?.status === "cancelled"
+  ) {
+    await deleteQueueMessage({
+      queueName: "inference_jobs",
+      messageId: row.msg_id,
+    });
+
+    return true;
+  }
+
+  const { data: existingAttempt, error: existingAttemptError } = await supabaseAdmin
+    .from("provider_attempts")
+    .select("status, upstream_request_id, upstream_task_id")
+    .eq("request_id", message.requestId)
+    .eq("attempt_no", 1)
+    .maybeSingle();
+
+  if (existingAttemptError) {
+    throw new Error(existingAttemptError.message);
+  }
+
+  if (
+    existingAttempt?.status === "processing" &&
+    typeof existingAttempt.upstream_task_id === "string" &&
+    existingAttempt.upstream_task_id.length > 0
+  ) {
+    await sendQueueMessage({
+      queueName: "inference_polling",
+      message: {
+        requestId: message.requestId,
+        workspaceId: message.workspaceId,
+        apiKeyId: message.apiKeyId,
+        providerModelId: message.providerModelId,
+        credentialId: message.credentialId,
+        providerSlug: message.providerSlug,
+        providerBaseUrl: message.providerBaseUrl,
+        providerConfig: message.providerConfig,
+        capability: message.capability,
+        publicModelSlug: message.publicModelSlug,
+        upstreamModelSlug: message.upstreamModelSlug,
+        endpoint: message.endpoint,
+        input: message.input,
+        upstreamTaskId: existingAttempt.upstream_task_id,
+      },
+    });
+
+    await deleteQueueMessage({
+      queueName: "inference_jobs",
+      messageId: row.msg_id,
+    });
+
+    return true;
+  }
+
+  if (existingAttempt?.status === "succeeded" || existingAttempt?.status === "failed") {
+    await deleteQueueMessage({
+      queueName: "inference_jobs",
+      messageId: row.msg_id,
+    });
+
+    return true;
   }
 
   const { error: attemptInsertError } = await supabaseAdmin
@@ -384,9 +488,9 @@ export async function processNextInferenceJob() {
       }),
     });
 
-    await supabaseAdmin.rpc("queue_delete", {
-      queue_name: "inference_jobs",
-      message_id: row.msg_id,
+    await deleteQueueMessage({
+      queueName: "inference_jobs",
+      messageId: row.msg_id,
     });
 
     return true;
@@ -499,9 +603,10 @@ export async function processNextInferenceJob() {
       .eq("request_id", message.requestId)
       .eq("attempt_no", 1);
 
-    await supabaseAdmin.rpc("pgmq_send", {
-      queue_name: "inference_polling",
-      msg: {
+    await sendQueueMessage({
+      queueName: "inference_polling",
+      delaySeconds: result.pollAfterSeconds,
+      message: {
         requestId: message.requestId,
         workspaceId: message.workspaceId,
         apiKeyId: message.apiKeyId,
@@ -520,9 +625,9 @@ export async function processNextInferenceJob() {
     });
   }
 
-  await supabaseAdmin.rpc("queue_delete", {
-    queue_name: "inference_jobs",
-    message_id: row.msg_id,
+  await deleteQueueMessage({
+    queueName: "inference_jobs",
+    messageId: row.msg_id,
   });
 
   return true;
@@ -546,6 +651,29 @@ export async function processNextPollingJob() {
 
   const message = row.message as PollingMessage;
   const adapter = getProviderAdapter(message.providerSlug);
+  const { data: requestRow, error: requestRowError } = await supabaseAdmin
+    .from("inference_requests")
+    .select("status")
+    .eq("id", message.requestId)
+    .maybeSingle();
+
+  if (requestRowError) {
+    throw new Error(requestRowError.message);
+  }
+
+  if (
+    requestRow?.status === "succeeded" ||
+    requestRow?.status === "failed" ||
+    requestRow?.status === "cancelled"
+  ) {
+    await deleteQueueMessage({
+      queueName: "inference_polling",
+      messageId: row.msg_id,
+    });
+
+    return true;
+  }
+
   const { data: credentialRow, error: credentialError } = await supabaseAdmin
     .from("provider_credentials")
     .select("secret_ciphertext, secret_iv, secret_auth_tag")
@@ -579,9 +707,9 @@ export async function processNextPollingJob() {
   });
 
   if (!adapter.poll) {
-    await supabaseAdmin.rpc("queue_delete", {
-      queue_name: "inference_polling",
-      message_id: row.msg_id,
+    await deleteQueueMessage({
+      queueName: "inference_polling",
+      messageId: row.msg_id,
     });
     return true;
   }
@@ -635,23 +763,27 @@ export async function processNextPollingJob() {
       }),
     });
 
-    await supabaseAdmin.rpc("queue_delete", {
-      queue_name: "inference_polling",
-      message_id: row.msg_id,
+    await deleteQueueMessage({
+      queueName: "inference_polling",
+      messageId: row.msg_id,
     });
 
     return true;
   }
 
   if (!result.done) {
-    await supabaseAdmin.rpc("queue_delete", {
-      queue_name: "inference_polling",
-      message_id: row.msg_id,
+    // Send the next poll before deleting the current message. If the send fails,
+    // the current message stays available after its visibility timeout instead
+    // of leaving the request permanently stuck in "processing".
+    await sendQueueMessage({
+      queueName: "inference_polling",
+      message,
+      delaySeconds: result.pollAfterSeconds,
     });
 
-    await supabaseAdmin.rpc("queue_send", {
-      queue_name: "inference_polling",
-      msg: message,
+    await deleteQueueMessage({
+      queueName: "inference_polling",
+      messageId: row.msg_id,
     });
 
     return true;
@@ -769,9 +901,9 @@ export async function processNextPollingJob() {
     });
   }
 
-  await supabaseAdmin.rpc("queue_delete", {
-    queue_name: "inference_polling",
-    message_id: row.msg_id,
+  await deleteQueueMessage({
+    queueName: "inference_polling",
+    messageId: row.msg_id,
   });
 
   return true;
