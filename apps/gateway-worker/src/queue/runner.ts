@@ -172,6 +172,55 @@ function buildSettlementBreakdown(input: {
   };
 }
 
+async function failRequestAndDeleteQueueMessage(input: {
+  queueName: "inference_jobs" | "inference_polling";
+  messageId: number;
+  requestId: string;
+  workspaceId: string;
+  apiKeyId: string | null;
+  publicModelSlug: string;
+  endpoint: string;
+  errorCode: string;
+  errorMessage: string;
+  startedAt?: Date;
+}) {
+  await supabaseAdmin
+    .from("inference_requests")
+    .update({
+      status: "failed",
+      error_code: input.errorCode,
+      error_message: input.errorMessage,
+      actual_cost: 0,
+      actual_customer_charge: 0,
+      actual_provider_cost: 0,
+      actual_profit: 0,
+      ...(input.startedAt ? { started_at: input.startedAt.toISOString() } : {}),
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", input.requestId);
+
+  await recordRequestSettlement({
+    requestId: input.requestId,
+    workspaceId: input.workspaceId,
+    apiKeyId: input.apiKeyId,
+    publicModelSlug: input.publicModelSlug,
+    endpoint: input.endpoint,
+    customerCharge: 0,
+    providerCost: 0,
+    statusCode: 500,
+    breakdown: buildSettlementBreakdown({
+      customerCharge: 0,
+      providerCost: 0,
+      profit: 0,
+    }),
+  });
+
+  await supabaseAdmin.rpc("queue_delete", {
+    queue_name: input.queueName,
+    message_id: input.messageId,
+  });
+}
+
 export async function queueRpcAvailable() {
   const { error } = await supabaseAdmin.rpc("queue_read", {
     queue_name: "inference_jobs",
@@ -222,7 +271,20 @@ export async function processNextInferenceJob() {
   }
 
   if (!credentialRow?.secret_ciphertext || !credentialRow.secret_iv || !credentialRow.secret_auth_tag) {
-    throw new Error("Provider credential secret is missing or not managed internally");
+    await failRequestAndDeleteQueueMessage({
+      queueName: "inference_jobs",
+      messageId: row.msg_id,
+      requestId: message.requestId,
+      workspaceId: message.workspaceId,
+      apiKeyId: message.apiKeyId,
+      publicModelSlug: message.publicModelSlug,
+      endpoint: message.endpoint,
+      errorCode: "provider_credential_unavailable",
+      errorMessage: "Provider credential secret is missing or not managed internally",
+      startedAt: new Date(),
+    });
+
+    return true;
   }
 
   const providerSecret = decryptProviderSecret({
@@ -490,7 +552,19 @@ export async function processNextPollingJob() {
   }
 
   if (!credentialRow?.secret_ciphertext || !credentialRow.secret_iv || !credentialRow.secret_auth_tag) {
-    throw new Error("Provider credential secret is missing or not managed internally");
+    await failRequestAndDeleteQueueMessage({
+      queueName: "inference_polling",
+      messageId: row.msg_id,
+      requestId: message.requestId,
+      workspaceId: message.workspaceId,
+      apiKeyId: message.apiKeyId,
+      publicModelSlug: message.publicModelSlug,
+      endpoint: message.endpoint,
+      errorCode: "provider_credential_unavailable",
+      errorMessage: "Provider credential secret is missing or not managed internally",
+    });
+
+    return true;
   }
 
   const providerSecret = decryptProviderSecret({
