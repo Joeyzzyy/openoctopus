@@ -199,21 +199,26 @@ async function failRequestAndDeleteQueueMessage(input: {
     })
     .eq("id", input.requestId);
 
-  await recordRequestSettlement({
-    requestId: input.requestId,
-    workspaceId: input.workspaceId,
-    apiKeyId: input.apiKeyId,
-    publicModelSlug: input.publicModelSlug,
-    endpoint: input.endpoint,
-    customerCharge: 0,
-    providerCost: 0,
-    statusCode: 500,
-    breakdown: buildSettlementBreakdown({
+  try {
+    await recordRequestSettlement({
+      requestId: input.requestId,
+      workspaceId: input.workspaceId,
+      apiKeyId: input.apiKeyId,
+      publicModelSlug: input.publicModelSlug,
+      endpoint: input.endpoint,
       customerCharge: 0,
       providerCost: 0,
-      profit: 0,
-    }),
-  });
+      statusCode: 500,
+      breakdown: buildSettlementBreakdown({
+        customerCharge: 0,
+        providerCost: 0,
+        profit: 0,
+      }),
+    });
+  } catch {
+    // Old queued messages can reference API keys that were later deleted.
+    // Do not let settlement backfill failures keep unrecoverable jobs alive.
+  }
 
   await supabaseAdmin.rpc("queue_delete", {
     queue_name: input.queueName,
