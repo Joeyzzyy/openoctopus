@@ -86,10 +86,10 @@ const CODE_DATA: Record<TabType, { lines: CodeLine[]; output: { label: string; m
 };
 
 const SPAN_COLORS: Record<string, string> = {
-  keyword: "text-purple-400",
+  keyword: "text-amber-400",
   ink: "text-white",
-  string: "text-green-400",
-  function: "text-blue-400",
+  string: "text-emerald-400",
+  function: "text-indigo-400",
   code: "text-white/60",
 };
 
@@ -108,27 +108,27 @@ export function FeaturesSection() {
   }
 
   return (
-    <section className="bg-[#111111] px-6 py-16 md:px-20 md:py-20">
+    <section className="bg-[#0C0A09] px-6 py-16 md:px-20 md:py-24">
       <div className="mx-auto flex max-w-7xl flex-col gap-8 lg:flex-row lg:items-center lg:gap-12">
         {/* Left — heading + CTAs */}
         <FadeIn className="flex flex-col gap-4 lg:w-80 lg:shrink-0 lg:pt-6">
-          <h2 className="font-display text-2xl font-bold leading-none tracking-tight text-balance text-white md:text-5xl">
-            Built For Developers
+          <h2 className="font-display text-2xl font-semibold leading-none tracking-tight text-balance text-white md:text-5xl">
+            One API. Every model.
           </h2>
-          <p className="font-mono text-sm text-pretty text-white/50">
-            Integrate any model with a single API call. Node, Python, or cURL
+          <p className="text-sm text-pretty text-white/50">
+            Integrate any model with a single call. Node, Python, or cURL
             — ship in minutes, not days.
           </p>
           <div className="mt-2 flex items-center gap-3">
             <Link
               href="/docs"
-              className="inline-flex items-center gap-2 rounded-xs bg-white px-5 py-2.5 font-mono text-sm uppercase tracking-[1.2px] text-black transition-colors duration-150 hover:bg-white/90"
+              className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-[#1C1917] transition-colors duration-150 hover:bg-white/90"
             >
               API Docs
             </Link>
             <Link
               href="/login"
-              className="inline-flex items-center gap-2 rounded-xs border border-white/20 px-5 py-2.5 font-mono text-sm uppercase tracking-[1.2px] text-white transition-colors duration-150 hover:bg-white/10"
+              className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-5 py-2.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-white/10"
             >
               Quickstart
             </Link>
@@ -139,9 +139,9 @@ export function FeaturesSection() {
         <FadeIn
           direction="right"
           delay={0.15}
-          className="min-w-0 overflow-hidden rounded-lg border border-white/20 lg:flex-1"
+          className="min-w-0 overflow-hidden rounded-2xl border border-white/10 lg:flex-1"
         >
-          <div className="flex flex-col gap-2 rounded-[5px] bg-[#09070B] p-2">
+          <div className="flex flex-col gap-2 rounded-2xl bg-[#0C0A09] p-3">
             {/* Tabs row */}
             <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center sm:gap-0">
               {/* File tabs */}
@@ -150,10 +150,10 @@ export function FeaturesSection() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`relative flex cursor-pointer items-center gap-1 rounded-[3px] px-4 py-2 font-mono text-xs transition-colors ${
+                    className={`relative flex cursor-pointer items-center gap-1 rounded-lg px-4 py-2 font-mono text-xs transition-colors ${
                       activeTab === tab.id
                         ? "bg-white/[0.06] text-white"
-                        : "text-white/50 hover:bg-white/[0.04] hover:text-white"
+                        : "text-white/40 hover:bg-white/[0.04] hover:text-white"
                     }`}
                   >
                     <span className="relative">{tab.label}</span>
@@ -165,7 +165,7 @@ export function FeaturesSection() {
                 {["node", "python", "curl"].map((lang) => (
                   <button
                     key={lang}
-                    className={`cursor-pointer rounded-[2px] px-2 py-1 font-mono text-xs transition-colors ${
+                    className={`cursor-pointer rounded-md px-2 py-1 font-mono text-xs transition-colors ${
                       lang === "node"
                         ? "bg-white/[0.08] text-white"
                         : "text-white/40 hover:text-white/70"
@@ -178,7 +178,7 @@ export function FeaturesSection() {
             </div>
 
             {/* Code + Output side by side */}
-            <div className="flex flex-col gap-2 overflow-hidden rounded-[3px] bg-[#09070B] md:flex-row">
+            <div className="flex flex-col gap-2 overflow-hidden rounded-xl bg-[#0C0A09] md:flex-row">
               {/* Code panel */}
               <div className="relative h-72 bg-white/[0.03] md:h-88 md:flex-1">
                 <div className="absolute top-10 left-6 flex">
@@ -204,7 +204,7 @@ export function FeaturesSection() {
                 {/* Copy button */}
                 <button
                   onClick={handleCopy}
-                  className="absolute bottom-3 left-6 flex cursor-pointer items-center gap-1.5 rounded bg-[#09070B] px-2 py-1 transition-colors hover:bg-white/[0.06]"
+                  className="absolute bottom-3 left-6 flex cursor-pointer items-center gap-1.5 rounded-md bg-[#0C0A09] px-2 py-1 transition-colors hover:bg-white/[0.06]"
                 >
                   <svg className="size-3.5 text-white/40" viewBox="0 0 16 16" fill="none">
                     <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
@@ -227,12 +227,12 @@ export function FeaturesSection() {
                   className="pointer-events-none object-cover"
                 />
                 {/* Info bar */}
-                <div className="relative flex h-13 w-full items-center gap-3 rounded-[2px] border border-white/10 bg-black/80 px-3 py-px backdrop-blur-md">
+                <div className="relative flex h-13 w-full items-center gap-3 rounded-lg border border-white/10 bg-black/80 px-3 py-px backdrop-blur-md">
                   <div className="flex flex-col">
                     <p className="text-xs leading-4 text-pretty text-white">
                       {data.output.label}
                     </p>
-                    <p className="font-mono text-xs leading-4 text-white/35">
+                    <p className="font-mono text-xs leading-4 text-white/40">
                       {data.output.meta}
                     </p>
                   </div>

@@ -10,11 +10,11 @@ export function PricingFAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section className="bg-white px-6 py-20 md:px-12 md:py-28 lg:px-20">
+    <section className="bg-[#FAFAF8] px-6 py-20 md:px-12 md:py-28 lg:px-20">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-col gap-12 lg:flex-row lg:gap-24">
           <FadeIn className="lg:w-80 lg:shrink-0">
-            <h2 className="font-display text-2xl font-bold leading-none tracking-tight text-[#111111] md:text-4xl">
+            <h2 className="font-display text-2xl font-bold leading-none tracking-tight text-[#1C1917] md:text-4xl">
               Frequently asked
               <br />
               questions
@@ -45,7 +45,7 @@ export function PricingFAQ() {
                     onClick={() => setOpenIndex(isOpen ? null : i)}
                     className="flex w-full cursor-pointer items-center justify-between gap-4 py-5 text-left"
                   >
-                    <span className="font-display text-base font-medium text-[#111111]">
+                    <span className="font-display text-base font-medium text-[#1C1917]">
                       {item.question}
                     </span>
                     <svg

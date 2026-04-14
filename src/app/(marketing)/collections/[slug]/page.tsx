@@ -47,11 +47,11 @@ export default async function CollectionPage({
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 pt-[60px]">
       <div className="mx-auto max-w-lg text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-[#f5f4ef] px-4 py-1.5 font-mono text-[10px] uppercase tracking-[1.1px] text-black/50">
+        <div className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-[#f5f4ef] px-4 py-1.5 text-[10px] uppercase tracking-[1.1px] text-black/50">
           Collection
         </div>
 
-        <h1 className="mt-6 font-display text-[36px] font-bold leading-[1] tracking-[-0.04em] text-[#111111] md:text-[52px]">
+        <h1 className="mt-6 font-display text-[36px] font-bold leading-[1] tracking-[-0.04em] text-[#1C1917] md:text-[52px]">
           {name}
         </h1>
 
@@ -64,14 +64,14 @@ export default async function CollectionPage({
         <div className="mt-8 flex items-center justify-center gap-3">
           <Link
             href="/models"
-            className="inline-flex h-10 items-center gap-2 rounded-[4px] bg-[#111111] px-5 font-mono text-[11px] font-bold uppercase tracking-[1.1px] text-white transition-colors hover:bg-[#333]"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1C1917] px-5 text-[11px] font-bold uppercase tracking-[1.1px] text-white transition-colors hover:bg-[#333]"
           >
             <ArrowLeft className="h-4 w-4" />
             Explore Models
           </Link>
           <Link
             href="/pricing"
-            className="inline-flex h-10 items-center gap-2 rounded-[4px] border border-black/10 bg-white px-5 font-mono text-[11px] font-bold uppercase tracking-[1.1px] text-[#111111] transition-colors hover:bg-black/[0.03]"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-black/10 bg-white px-5 text-[11px] font-bold uppercase tracking-[1.1px] text-[#1C1917] transition-colors hover:bg-black/[0.03]"
           >
             View Pricing
             <ArrowRight className="h-4 w-4" />

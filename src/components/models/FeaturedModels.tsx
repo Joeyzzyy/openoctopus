@@ -76,7 +76,7 @@ function StatusDots() {
   return (
     <div className="flex items-center gap-px">
       {[0, 1, 2, 3, 4].map((i) => (
-        <div key={i} className="bg-green h-3 w-1" />
+        <div key={i} className="h-3 w-1 rounded-full bg-[#C27B3B]" />
       ))}
     </div>
   );
@@ -84,13 +84,16 @@ function StatusDots() {
 
 export function FeaturedModels() {
   return (
-    <section className="py-20">
+    <section className="bg-[#FAFAF8] py-20">
       {/* Title */}
       <div className="mx-auto flex max-w-[1160px] flex-col items-center gap-10">
         <div className="flex max-w-[876px] flex-col items-center gap-4 text-center">
-          <h2 className="text-[32px] font-bold leading-none tracking-[-1px] text-balance text-[#111] md:text-[48px] font-display">
-            Featured Models
+          <h2 className="font-display text-[32px] leading-none tracking-[-0.03em] text-balance text-[#1C1917] md:text-[48px]">
+            Featured models
           </h2>
+          <p className="max-w-md text-[14px] leading-6 text-[#1C1917]/55">
+            Hand-picked models running on optimized infrastructure, ready to use.
+          </p>
         </div>
       </div>
 
@@ -101,8 +104,8 @@ export function FeaturedModels() {
           {LEFT_IMAGES.map((img) => (
             <div
               key={img}
-              className="relative overflow-hidden transition-all duration-300 ease-out"
-              style={{ height: 80, width: 80, opacity: 0.6 }}
+              className="relative overflow-hidden rounded-lg transition-all duration-300 ease-out"
+              style={{ height: 80, width: 80, opacity: 0.5 }}
             >
               <Image alt="" src={`${IMG}${img}`} fill className="object-cover" sizes="100vw" unoptimized />
             </div>
@@ -114,8 +117,8 @@ export function FeaturedModels() {
           {RIGHT_IMAGES.map((img) => (
             <div
               key={img}
-              className="relative overflow-hidden transition-all duration-300 ease-out"
-              style={{ height: 80, width: 80, opacity: 0.6 }}
+              className="relative overflow-hidden rounded-lg transition-all duration-300 ease-out"
+              style={{ height: 80, width: 80, opacity: 0.5 }}
             >
               <Image alt="" src={`${IMG}${img}`} fill className="object-cover" sizes="100vw" unoptimized />
             </div>
@@ -129,18 +132,18 @@ export function FeaturedModels() {
               <Link
                 key={model.href}
                 href={model.href}
-                className="grid grid-cols-[40px_1fr_auto] items-center gap-3 border-b border-black/5 px-4 py-3 transition-colors duration-150 md:h-20 md:grid-cols-12 md:gap-4 md:px-8 md:py-6 xl:grid-cols-12"
+                className="grid grid-cols-[40px_1fr_auto] items-center gap-3 border-b border-[#1C1917]/6 px-4 py-3 transition-colors duration-150 hover:bg-[#1C1917]/[0.02] md:h-20 md:grid-cols-12 md:gap-4 md:px-8 md:py-6 xl:grid-cols-12"
               >
                 {/* Thumbnail - below xl */}
-                <div className="relative size-10 shrink-0 overflow-hidden rounded-xs xl:hidden">
+                <div className="relative size-10 shrink-0 overflow-hidden rounded-lg xl:hidden">
                   <Image alt="" src={`${IMG}${model.image}`} fill className="object-cover" sizes="100vw" unoptimized />
                 </div>
 
                 {/* Model path + mobile discount */}
                 <div className="col-span-1 flex items-center justify-between gap-2 md:col-span-4">
-                  <span className="font-mono text-sm leading-5 text-[#111]">{model.path}</span>
+                  <span className="font-mono text-sm leading-5 text-[#1C1917]">{model.path}</span>
                   {model.discount && (
-                    <span className="block whitespace-nowrap rounded-full bg-orange-500 px-2 font-mono text-xs uppercase leading-4 text-white md:hidden">
+                    <span className="block whitespace-nowrap rounded-full bg-[#C27B3B] px-2.5 font-mono text-[11px] font-medium uppercase leading-5 text-white md:hidden">
                       {model.discount.percent}% off
                     </span>
                   )}
@@ -148,19 +151,19 @@ export function FeaturedModels() {
 
                 {/* Provider */}
                 <div className="col-span-2 hidden md:block">
-                  <span className="font-mono text-sm leading-5 text-[#111]">{model.provider}</span>
+                  <span className="font-mono text-sm leading-5 text-[#1C1917]/60">{model.provider}</span>
                 </div>
 
                 {/* Type */}
                 <div className="col-span-2 hidden md:block">
-                  <span className="font-mono text-sm leading-5 text-[#111]">{model.type}</span>
+                  <span className="font-mono text-sm leading-5 text-[#1C1917]/60">{model.type}</span>
                 </div>
 
                 {/* Price */}
                 <div className="col-span-1 hidden items-center md:flex">
-                  <span className="font-mono text-sm uppercase leading-4 text-[#111]">
+                  <span className="font-mono text-sm leading-4 text-[#1C1917]">
                     {model.discount ? (
-                      <><del>{model.discount.original}</del> {model.price}</>
+                      <><del className="text-[#1C1917]/35">{model.discount.original}</del> {model.price}</>
                     ) : (
                       model.price
                     )}
@@ -170,7 +173,7 @@ export function FeaturedModels() {
                 {/* Desktop discount badge */}
                 <div className="col-span-1 hidden items-center md:flex">
                   {model.discount && (
-                    <span className="ml-2 whitespace-nowrap rounded-full bg-orange-500 px-2 font-mono text-xs uppercase leading-4 text-white">
+                    <span className="ml-2 whitespace-nowrap rounded-full bg-[#C27B3B] px-2.5 font-mono text-[11px] font-medium uppercase leading-5 text-white">
                       {model.discount.percent}% off
                     </span>
                   )}
@@ -190,9 +193,9 @@ export function FeaturedModels() {
       <div className="mx-auto mt-10 flex max-w-[1160px] justify-center">
         <Link
           href="/login"
-          className="rounded-xs bg-[#111] px-4 py-3 font-mono text-sm font-medium tracking-[1.2px] text-white transition-colors duration-150 hover:bg-[#111]/80"
+          className="rounded-lg bg-[#1C1917] px-5 py-3 font-mono text-sm font-medium text-white shadow-sm transition-colors duration-150 hover:bg-[#1C1917]/85"
         >
-          Explore <span className="font-bold">All 1000+</span> models
+          Explore <span className="font-semibold">all 1000+</span> models
         </Link>
       </div>
     </section>

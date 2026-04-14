@@ -62,13 +62,13 @@ export function GoogleSignInButton() {
         onClick={handleGoogleLogin}
         disabled={loading}
         aria-label="Sign in with Google"
-        className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xs border border-black/10 bg-white px-4 font-mono text-sm font-medium text-black/80 shadow-xs transition-colors hover:bg-black/[0.04] hover:text-black disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-4 text-sm font-medium text-black/80 shadow-xs transition-colors hover:bg-black/[0.04] hover:text-black disabled:cursor-not-allowed disabled:opacity-60"
       >
         <GoogleIcon />
         {loading ? "Redirecting..." : "Sign in with Google"}
       </button>
       {error ? (
-        <p className="text-center font-mono text-[11px] uppercase tracking-[0.8px] text-[#b43828]">
+        <p className="text-center text-[11px] uppercase tracking-[0.8px] text-[#b43828]">
           {error}
         </p>
       ) : null}

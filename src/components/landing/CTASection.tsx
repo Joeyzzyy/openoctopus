@@ -23,15 +23,15 @@ export function CTASection() {
 
       {/* Content overlay */}
       <div className="relative mx-auto flex h-full max-w-[1440px] flex-col items-center justify-center gap-6 px-6 py-12 md:flex-row md:justify-between md:px-20 md:py-0">
-        <h2 className="text-center font-display text-[32px] font-bold leading-none tracking-[-1px] text-balance text-black md:text-left md:text-[48px]">
-          Unlock Your AI Potential Today
+        <h2 className="text-center font-display text-[30px] font-semibold leading-none tracking-[-0.03em] text-balance text-[#1C1917] md:text-left md:text-[46px]">
+          Start creating at scale
         </h2>
         <Link
           href="/login"
-          className="flex shrink-0 items-center gap-3 rounded-xs bg-black px-8 py-4 text-white transition-colors duration-150 hover:bg-black/80"
+          className="flex shrink-0 items-center gap-3 rounded-xl bg-[#1C1917] px-8 py-4 text-white shadow-lg shadow-black/15 transition-colors duration-150 hover:bg-[#1C1917]/85"
         >
-          <span className="font-mono text-sm font-medium leading-4 tracking-[1.2px]">
-            Start Building
+          <span className="text-sm font-semibold leading-4 tracking-[-0.01em]">
+            Get started
           </span>
           <ArrowRight className="size-4" />
         </Link>

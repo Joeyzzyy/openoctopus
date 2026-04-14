@@ -26,7 +26,7 @@ function PricingSection({
     <section className={className}>
       <div className="mx-auto max-w-7xl">
         <FadeIn className="mb-8 flex flex-col gap-2">
-          <h2 className="font-display text-xl font-bold leading-none tracking-tight text-[#111111] md:text-2xl">
+          <h2 className="font-display text-xl font-bold leading-none tracking-tight text-[#1C1917] md:text-2xl">
             {title}
           </h2>
           <p className="text-sm text-black/60 md:text-base">{description}</p>
@@ -39,7 +39,7 @@ function PricingSection({
 
 function TableHeaderCell({ children }: { children: React.ReactNode }) {
   return (
-    <th className="py-3 pr-4 text-left font-mono text-xs font-medium uppercase tracking-[1.1px] text-black/60 last:pr-0">
+    <th className="py-3 pr-4 text-left text-xs font-medium uppercase tracking-[1.1px] text-black/60 last:pr-0">
       {children}
     </th>
   );
@@ -111,20 +111,20 @@ export function ImageVideoTable() {
             {pricing ? (
               <tr className="border-b border-black/6 transition-colors hover:bg-black/[0.02]">
                 <TableCell>
-                  <span className="flex items-center gap-2 font-medium text-[#111111]">
+                  <span className="flex items-center gap-2 font-medium text-[#1C1917]">
                     {pricing.name}
                   </span>
                 </TableCell>
-                <TableCell className="font-mono text-[#111111]">
+                <TableCell className="text-[#1C1917]">
                   {pricing.sellLabel}
                 </TableCell>
               </tr>
             ) : (
               <tr className="border-b border-black/6">
-                <TableCell className="font-medium text-[#111111]">
+                <TableCell className="font-medium text-[#1C1917]">
                   Nano Banana Pro
                 </TableCell>
-                <TableCell className="font-mono text-[#111111]">
+                <TableCell className="text-[#1C1917]">
                   {error ? "Unavailable" : "Loading..."}
                 </TableCell>
               </tr>

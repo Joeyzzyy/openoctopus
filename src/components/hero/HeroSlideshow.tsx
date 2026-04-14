@@ -24,10 +24,10 @@ const SLIDES: Slide[] = [
   {
     id: 1,
     image: "https://static.wavespeed.ai/media/images/1773962750924385948_Ty3dmwFP.webp",
-    title: "Ultimate AI Media Generation Platform",
+    title: "Generate anything. Ship everything.",
     description:
-      "The fastest way to run image, video, audio, and multimodal generation through one unified inference platform.",
-    cta: { text: "Start Building", href: "/login" },
+      "One platform for image, video, audio, and multimodal creation — built for teams who move fast.",
+    cta: { text: "Start creating", href: "/login" },
     docsHref: "/docs",
   },
   {
@@ -37,7 +37,7 @@ const SLIDES: Slide[] = [
     title: "Nano Banana 2",
     description:
       "Fast, low-cost image generation with polished prompt following and production-ready quality.",
-    cta: { text: "Try Model", href: "/login" },
+    cta: { text: "Try model", href: "/login" },
     docsHref: "/docs",
   },
   {
@@ -47,7 +47,7 @@ const SLIDES: Slide[] = [
     title: "Seedream 4.5",
     description:
       "Designed for typography and posters, with precise layouts and strong prompt control.",
-    cta: { text: "Try Model", href: "/login" },
+    cta: { text: "Try model", href: "/login" },
     docsHref: "/docs",
   },
   {
@@ -56,7 +56,7 @@ const SLIDES: Slide[] = [
     title: "InfiniteTalk",
     description:
       "Create expressive talking characters with high fidelity lip sync and stable identity across scenes.",
-    cta: { text: "Try Model", href: "/login" },
+    cta: { text: "Try model", href: "/login" },
     docsHref: "/docs",
   },
   {
@@ -65,7 +65,7 @@ const SLIDES: Slide[] = [
     title: "Kling V3 Motion Control",
     description:
       "Guide camera movement and subject motion with stronger control for cinematic video generation.",
-    cta: { text: "Try Model", href: "/login" },
+    cta: { text: "Try model", href: "/login" },
     docsHref: "/docs",
   },
 ];
@@ -104,7 +104,7 @@ export function HeroSlideshow() {
   const currentSlide = SLIDES[currentIndex];
 
   return (
-    <section className="relative h-[420px] w-full overflow-hidden border-b border-white/10 bg-black sm:h-[480px] md:h-[560px] lg:h-[640px]">
+    <section className="relative h-[420px] w-full overflow-hidden bg-[#0C0A09] sm:h-[480px] md:h-[560px] lg:h-[640px]">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentSlide.id}
@@ -127,14 +127,14 @@ export function HeroSlideshow() {
             className="absolute inset-0"
             style={{
               background:
-                "linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.32) 38%, rgba(0,0,0,0.88) 100%)",
+                "linear-gradient(180deg, rgba(12,10,9,0.22) 0%, rgba(12,10,9,0.38) 38%, rgba(12,10,9,0.92) 100%)",
             }}
           />
-          <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black via-black/55 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[#0C0A09] via-[#0C0A09]/60 to-transparent" />
         </motion.div>
       </AnimatePresence>
 
-      <div className="relative flex h-full flex-col justify-end px-6 pb-6 sm:pb-8 md:px-12 md:pb-10 lg:px-20 lg:pb-12">
+      <div className="relative flex h-full flex-col justify-end px-6 pb-8 sm:pb-10 md:px-12 md:pb-12 lg:px-20 lg:pb-14">
         <div className="mx-auto flex w-full max-w-7xl flex-col items-start gap-5 sm:gap-6 lg:flex-row lg:items-end lg:justify-between">
           <AnimatePresence mode="wait">
             <motion.div
@@ -143,46 +143,46 @@ export function HeroSlideshow() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="flex max-w-[610px] flex-col items-start gap-2 sm:gap-2.5 lg:pb-1"
+              className="flex max-w-[640px] flex-col items-start gap-3 lg:pb-1"
             >
               {currentSlide.badge ? (
-                <span className="rounded-[2px] bg-[#24be58] px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[1.1px] text-white">
+                <span className="rounded-md bg-[#C27B3B] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[1px] text-white">
                   {currentSlide.badge}
                 </span>
               ) : null}
-              <h1 className="font-display text-[34px] leading-[0.92] font-bold tracking-[-0.05em] text-white sm:text-[44px] md:text-[58px] lg:text-[68px] xl:text-[72px]">
+              <h1 className="font-display text-[32px] leading-[1] font-semibold tracking-[-0.03em] text-white sm:text-[42px] md:text-[56px] lg:text-[64px]">
                 {currentSlide.title}
               </h1>
-              <p className="max-w-[350px] font-mono text-[12px] leading-5 text-white/60 md:max-w-[470px] md:text-[13px] md:leading-[1.55]">
+              <p className="max-w-[380px] text-[14px] leading-6 text-white/55 md:max-w-[460px] md:text-[15px] md:leading-7">
                 {currentSlide.description}
               </p>
 
-              <div className="mt-1.5 flex flex-wrap gap-2">
+              <div className="mt-2 flex flex-wrap gap-3">
                 <Link
                   href={currentSlide.cta.href}
-                  className="flex h-10 min-w-[122px] items-center justify-center gap-2 rounded-[2px] border border-transparent bg-white px-4 text-black transition-colors duration-150 hover:bg-white/90 sm:h-11 sm:min-w-[132px] sm:px-5"
+                  className="flex h-11 min-w-[130px] items-center justify-center gap-2 rounded-lg border border-transparent bg-white px-5 text-[#1C1917] transition-colors duration-150 hover:bg-white/90 sm:h-12 sm:min-w-[140px]"
                 >
-                  <span className="font-mono text-[11px] font-bold uppercase tracking-[1.25px] sm:text-xs">
+                  <span className="text-[13px] font-semibold">
                     {currentSlide.cta.text}
                   </span>
                 </Link>
                 <Link
                   href={currentSlide.docsHref}
-                  className="flex h-10 min-w-[144px] items-center justify-center rounded-[2px] border border-white/20 bg-black/15 px-4 text-white transition-colors duration-150 hover:bg-white/10 sm:h-11 sm:min-w-[156px] sm:px-5"
+                  className="flex h-11 min-w-[150px] items-center justify-center rounded-lg border border-white/20 bg-white/10 px-5 text-white backdrop-blur-sm transition-colors duration-150 hover:bg-white/15 sm:h-12 sm:min-w-[160px]"
                 >
-                  <span className="font-mono text-[11px] font-bold uppercase tracking-[1.25px] sm:text-xs">
+                  <span className="text-[13px] font-medium">
                     Documentation
                   </span>
                 </Link>
               </div>
 
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <div className="mt-1 flex flex-wrap gap-2">
                 <Link
                   href="/login"
-                  className="relative flex h-8 items-center gap-1.5 rounded-[2px] border border-white/20 bg-black/15 px-3 text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
+                  className="relative flex h-9 items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3.5 text-white/70 backdrop-blur-sm transition-colors duration-150 hover:bg-white/15 hover:text-white"
                 >
-                  <ImageIcon className="size-3" />
-                  <span className="font-mono text-[10px] font-medium uppercase tracking-[1.1px]">
+                  <ImageIcon className="size-4" />
+                  <span className="text-[11px] font-medium uppercase tracking-[0.8px]">
                     Image Generator
                   </span>
                   <span className="absolute -right-2 -top-2 text-[10px]">🔥</span>
@@ -191,32 +191,32 @@ export function HeroSlideshow() {
             </motion.div>
           </AnimatePresence>
 
-          <div className="flex flex-col items-start gap-2.5 lg:items-end lg:self-end lg:pb-1">
-            <div className="flex gap-1.5 sm:hidden">
+          <div className="flex flex-col items-start gap-3 lg:items-end lg:self-end lg:pb-1">
+            <div className="flex gap-2 sm:hidden">
               {SLIDES.map((slide, index) => (
                 <button
                   key={slide.id}
                   onClick={() => goToSlide(index)}
                   className={cn(
-                    "size-1.5 rounded-full transition-all duration-300",
+                    "size-2 rounded-full transition-all duration-300",
                     index === currentIndex ? "scale-125 bg-white" : "bg-white/30"
                   )}
                 />
               ))}
             </div>
-            <div className="hidden translate-y-[2px] gap-1.5 rounded-[2px] border border-white/10 bg-black/42 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-sm sm:flex">
+            <div className="hidden translate-y-[2px] gap-2 rounded-xl border border-white/10 bg-black/40 p-2 shadow-lg shadow-black/20 backdrop-blur-md sm:flex">
               {SLIDES.map((slide, index) => (
                 <button
                   key={slide.id}
                   onClick={() => goToSlide(index)}
                   className={cn(
-                    "relative flex cursor-pointer overflow-hidden rounded-[2px] border border-white/10 transition-all duration-300",
+                    "relative flex cursor-pointer overflow-hidden rounded-lg border border-white/10 transition-all duration-300",
                     index === currentIndex
                       ? "brightness-110"
-                      : "opacity-40 hover:opacity-60"
+                      : "opacity-40 hover:opacity-65"
                   )}
                 >
-                  <div className="relative h-9 w-14 sm:w-16 md:h-10 md:w-[72px]">
+                  <div className="relative h-10 w-16 sm:w-18 md:h-11 md:w-20">
                     <Image
                       src={slide.image}
                       alt={slide.title}

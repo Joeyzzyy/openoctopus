@@ -51,10 +51,10 @@ const ENTERPRISE_FEATURES = [
 
 export function EnterpriseUpsell() {
   return (
-    <section className="bg-white px-6 py-20 md:px-12 md:py-28 lg:px-20">
+    <section className="bg-[#FAFAF8] px-6 py-20 md:px-12 md:py-28 lg:px-20">
       <div className="mx-auto max-w-7xl">
         <FadeIn className="mb-12 flex max-w-xl flex-col gap-4">
-          <h2 className="font-display text-2xl font-bold leading-none tracking-tight text-[#111111] md:text-4xl">
+          <h2 className="font-display text-2xl font-bold leading-none tracking-tight text-[#1C1917] md:text-4xl">
             Need more? Talk to us.
           </h2>
           <p className="text-sm text-black/60 md:text-base">
@@ -63,9 +63,9 @@ export function EnterpriseUpsell() {
           </p>
           <Link
             href="/enterprise"
-            className="mt-2 inline-flex w-fit items-center gap-2.5 rounded-xs bg-[#111111] px-6 py-3 text-white transition-colors duration-150 hover:bg-[#111111]/80"
+            className="mt-2 inline-flex w-fit items-center gap-2.5 rounded-lg bg-[#1C1917] px-6 py-3 text-white transition-colors duration-150 hover:bg-[#1C1917]/80"
           >
-            <span className="font-mono text-sm font-bold uppercase leading-4 tracking-[1.2px]">
+            <span className="text-sm font-bold uppercase leading-4 tracking-[1.2px]">
               Contact Sales
             </span>
             <ArrowRight className="size-4" />
@@ -80,7 +80,7 @@ export function EnterpriseUpsell() {
               <FadeIn
                 key={feature.title}
                 delay={i * 0.05}
-                className="flex flex-col gap-4 rounded-xs bg-[#f5f5f3] p-6"
+                className="flex flex-col gap-4 rounded-lg bg-[#f5f5f3] p-6"
               >
                 <Icon
                   className="size-6 text-black/40"
@@ -88,7 +88,7 @@ export function EnterpriseUpsell() {
                   aria-hidden="true"
                 />
                 <div className="flex flex-col gap-2">
-                  <h3 className="text-base font-medium text-[#111111]">
+                  <h3 className="text-base font-medium text-[#1C1917]">
                     {feature.title}
                   </h3>
                   <p className="text-sm leading-relaxed text-black/60">

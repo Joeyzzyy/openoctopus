@@ -6,7 +6,7 @@ export function WhatDrivesUs() {
     <section className="border-y border-black/10 py-20">
       <div className="mx-auto max-w-5xl px-6">
         <FadeIn>
-          <h2 className="mb-12 text-center text-2xl font-bold text-[#111111] md:text-3xl">
+          <h2 className="mb-12 text-center text-2xl font-bold text-[#1C1917] md:text-3xl">
             What drives us
           </h2>
         </FadeIn>
@@ -15,7 +15,7 @@ export function WhatDrivesUs() {
           {aboutValues.map((value, i) => (
             <FadeIn key={value.title} delay={i * 0.1}>
               <div>
-                <h3 className="mb-2 font-semibold text-[#111111]">
+                <h3 className="mb-2 font-semibold text-[#1C1917]">
                   {value.title}
                 </h3>
                 <p className="text-sm leading-relaxed text-black/55">

@@ -6,10 +6,10 @@ import { ArrowRight } from "lucide-react";
 import { FadeIn } from "@/components/animations/FadeIn";
 
 const LANGUAGE_MODEL_BADGES = [
-  { label: "GPT-5.4", tone: "text-[#111111]" },
-  { label: "Claude Opus 4.6", tone: "text-[#111111]" },
-  { label: "Gemini 3.1 Pro", tone: "text-[#111111]" },
-  { label: "Qwen3 Max", tone: "text-[#111111]" },
+  { label: "GPT-5.4", tone: "text-[#1C1917]" },
+  { label: "Claude Opus 4.6", tone: "text-[#1C1917]" },
+  { label: "Gemini 3.1 Pro", tone: "text-[#1C1917]" },
+  { label: "Qwen3 Max", tone: "text-[#1C1917]" },
 ];
 
 const GPU_FEATURES = [
@@ -26,7 +26,7 @@ function TryForFreeButton() {
       href="/login"
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex w-fit items-center gap-2 rounded-xs bg-[#111111] px-4 py-2 font-mono text-sm font-bold text-white transition-colors hover:bg-[#111111]/80"
+      className="inline-flex w-fit items-center gap-2 rounded-lg bg-[#1C1917] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#1C1917]/80"
     >
       Try for free
       <ArrowRight className="size-3.5" />
@@ -36,10 +36,10 @@ function TryForFreeButton() {
 
 export function CapabilityCards() {
   return (
-    <section className="bg-white px-6 pt-16 md:px-12 md:pt-20 lg:px-20">
+    <section className="bg-[#FAFAF8] px-6 pt-16 md:px-12 md:pt-20 lg:px-20">
       <div className="mx-auto max-w-7xl">
         <FadeIn className="mb-12 flex flex-col items-center gap-4 text-center">
-          <h2 className="text-balance text-2xl font-bold leading-none tracking-tight text-[#111111] md:text-4xl lg:text-5xl">
+          <h2 className="text-balance text-2xl font-bold leading-none tracking-tight text-[#1C1917] md:text-4xl lg:text-5xl">
             Access State-of-the-Art AI Models
           </h2>
           <p className="max-w-2xl text-sm text-black/60 md:text-base">
@@ -51,7 +51,7 @@ export function CapabilityCards() {
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 lg:flex-row">
-            <FadeIn className="relative h-[420px] w-full overflow-hidden rounded-xs bg-[#f5f5f3] lg:h-[480px] lg:w-[55%] lg:shrink-0">
+            <FadeIn className="relative h-[420px] w-full overflow-hidden rounded-lg bg-[#f5f5f3] lg:h-[480px] lg:w-[55%] lg:shrink-0">
               <div className="absolute right-0 bottom-2.5 h-[220px] w-[600px] sm:h-[260px] md:h-[280px] lg:h-[288px]">
                 <Image
                   alt=""
@@ -62,7 +62,7 @@ export function CapabilityCards() {
                 />
               </div>
               <div className="absolute top-6 right-6 left-6 z-10">
-                <h3 className="mb-2 text-2xl font-medium leading-7 text-[#111111]">
+                <h3 className="mb-2 text-2xl font-medium leading-7 text-[#1C1917]">
                   Image & Video Models
                 </h3>
                 <p className="text-base text-black/60">
@@ -77,10 +77,10 @@ export function CapabilityCards() {
 
             <FadeIn
               delay={0.1}
-              className="relative h-[380px] w-full overflow-hidden rounded-xs bg-[#f5f5f3] lg:h-[420px] lg:flex-1"
+              className="relative h-[380px] w-full overflow-hidden rounded-lg bg-[#f5f5f3] lg:h-[420px] lg:flex-1"
             >
               <div className="absolute top-6 right-6 left-6 z-10">
-                <h3 className="mb-2 text-2xl font-medium leading-7 text-[#111111]">
+                <h3 className="mb-2 text-2xl font-medium leading-7 text-[#1C1917]">
                   Language Models
                 </h3>
                 <p className="mb-4 text-base text-black/60">
@@ -92,7 +92,7 @@ export function CapabilityCards() {
                   {LANGUAGE_MODEL_BADGES.map((badge) => (
                     <span
                       key={badge.label}
-                      className={`flex items-center gap-2 rounded-xs bg-white px-2.5 py-1 font-mono text-sm font-medium ${badge.tone}`}
+                      className={`flex items-center gap-2 rounded-lg bg-white px-2.5 py-1 text-sm font-medium ${badge.tone}`}
                     >
                       <span className="size-3.5 rounded-full bg-black/10" />
                       {badge.label}
@@ -108,7 +108,7 @@ export function CapabilityCards() {
 
           <FadeIn
             delay={0.15}
-            className="relative h-[420px] w-full overflow-hidden rounded-xs bg-[#f5f5f3] lg:h-[480px]"
+            className="relative h-[420px] w-full overflow-hidden rounded-lg bg-[#f5f5f3] lg:h-[480px]"
           >
             <div className="absolute top-0 right-8 h-full w-72 lg:w-96">
               <Image
@@ -120,7 +120,7 @@ export function CapabilityCards() {
               />
             </div>
             <div className="absolute top-6 right-6 left-6 z-10 lg:w-[600px]">
-              <h3 className="mb-2 text-2xl font-medium leading-7 text-[#111111]">
+              <h3 className="mb-2 text-2xl font-medium leading-7 text-[#1C1917]">
                 Serverless GPU Infrastructure
               </h3>
               <p className="max-w-md text-base text-black/60">
@@ -134,7 +134,7 @@ export function CapabilityCards() {
                 {GPU_FEATURES.map((feature) => (
                   <span
                     key={feature}
-                    className="rounded-xs bg-black/[0.05] px-3 py-1.5 font-mono text-xs text-black/60"
+                    className="rounded-lg bg-black/[0.05] px-3 py-1.5 text-xs text-black/60"
                   >
                     {feature}
                   </span>

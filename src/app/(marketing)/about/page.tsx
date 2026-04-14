@@ -15,7 +15,7 @@ export const metadata = {
 
 export default function AboutPage() {
   return (
-    <div className="flex-1 bg-white">
+    <div className="flex-1 bg-[#FAFAF8]">
       <Script
         id="about-ld+json"
         type="application/ld+json"

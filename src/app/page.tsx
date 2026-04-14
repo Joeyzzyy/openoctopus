@@ -18,7 +18,7 @@ export default async function Home() {
   } = await supabase.auth.getUser();
 
   return (
-    <div className="flex min-h-screen flex-col bg-white font-mono text-[#111111]" style={{ paddingTop: "var(--banner-h, 36px)" }}>
+    <div className="flex min-h-screen flex-col bg-[#FAFAF8] text-[#1C1917]" style={{ paddingTop: "var(--banner-h, 36px)" }}>
       <Banner />
       <Header isLoggedIn={!!user} />
 

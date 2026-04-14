@@ -40,9 +40,9 @@ export function EnterpriseHero() {
               </p>
               <Link
                 href="#contact-us"
-                className="mt-2 flex items-center gap-2.5 rounded-xs border border-transparent bg-white px-6 py-3 text-black transition-colors duration-150 hover:bg-white/90"
+                className="mt-2 flex items-center gap-2.5 rounded-lg border border-transparent bg-white px-6 py-3 text-black transition-colors duration-150 hover:bg-white/90"
               >
-                <span className="font-mono text-sm font-bold uppercase leading-4 tracking-[1.2px]">
+                <span className="text-sm font-bold uppercase leading-4 tracking-[1.2px]">
                   Talk to us
                 </span>
                 <ArrowRight className="size-4" />

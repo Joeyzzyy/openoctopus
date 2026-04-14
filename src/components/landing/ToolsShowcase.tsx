@@ -73,7 +73,7 @@ function ProviderCard({ provider, imageKey }: { provider: Provider; imageKey: "i
   return (
     <Link
       href={`/collections/${provider.slug}`}
-      className={`${w} h-[240px] md:h-[320px] flex-shrink-0 rounded-xs relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-xl`}
+      className={`${w} h-[240px] md:h-[320px] flex-shrink-0 rounded-xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-black/20`}
     >
       <Image
         src={`${IMG_BASE}${provider[imageKey]}`}
@@ -83,9 +83,9 @@ function ProviderCard({ provider, imageKey }: { provider: Provider; imageKey: "i
         sizes="(max-width: 768px) 320px, 540px"
         unoptimized
       />
-      <div className="absolute inset-x-0 bottom-0 h-[160px] bg-gradient-to-t from-black to-transparent" />
-      <div className="absolute inset-0 p-4 flex flex-col justify-between">
-        <h3 className="font-display font-bold text-white text-lg">{provider.title}</h3>
+      <div className="absolute inset-x-0 bottom-0 h-[160px] bg-gradient-to-t from-black/80 to-transparent" />
+      <div className="absolute inset-0 p-5 flex flex-col justify-between">
+        <h3 className="font-display text-lg font-semibold text-white">{provider.title}</h3>
         <div className="space-y-0.5">
           {provider.models.map((m) => (
             <p key={m} className="font-mono text-sm text-white/80 truncate">{m}</p>
@@ -99,7 +99,7 @@ function ProviderCard({ provider, imageKey }: { provider: Provider; imageKey: "i
 function CategoryCard({ category, size }: { category: Category; size: "large" | "small" }) {
   const sizeClasses = size === "large" ? "w-[260px] md:w-[400px]" : "w-50 md:w-80";
   return (
-    <div className={`${sizeClasses} h-[80px] md:h-[131px] flex-shrink-0 rounded-xs relative overflow-hidden cursor-pointer`}>
+    <div className={`${sizeClasses} h-[80px] md:h-[131px] flex-shrink-0 rounded-xl relative overflow-hidden cursor-pointer shadow-sm`}>
       <Image
         src={`${IMG_BASE}${category.image}`}
         alt={category.name}
@@ -108,9 +108,9 @@ function CategoryCard({ category, size }: { category: Category; size: "large" | 
         sizes="400px"
         unoptimized
       />
-      <div className="absolute inset-0 bg-white/70 p-3 md:p-4 flex flex-col justify-center">
-        <h3 className="font-display font-medium text-black text-sm md:text-base leading-tight">{category.name}</h3>
-        <p className="font-mono text-sm text-black/64">{category.count} models</p>
+      <div className="absolute inset-0 bg-[#FAFAF8]/85 p-3 md:p-4 flex flex-col justify-center">
+        <h3 className="font-display font-medium text-[#1C1917] text-sm md:text-base leading-tight">{category.name}</h3>
+        <p className="font-mono text-sm text-[#1C1917]/55">{category.count} models</p>
       </div>
     </div>
   );
@@ -151,13 +151,13 @@ export function ToolsShowcase() {
   const dragRow4 = useDrag();
 
   return (
-    <section className="py-16 md:py-24 overflow-hidden">
+    <section className="bg-[#F2F0EB] py-16 md:py-24 overflow-hidden">
       <div className="text-center mb-12 px-4">
-        <h2 className="font-display text-3xl md:text-5xl font-bold text-black mb-4">
-          Get Any Tool You Want
+        <h2 className="font-display text-3xl md:text-5xl font-semibold text-[#1C1917] mb-4">
+          The complete creative stack
         </h2>
-        <p className="text-black/60 text-sm md:text-base max-w-2xl mx-auto">
-          Access hundreds of AI models from top providers, all in one place.
+        <p className="text-[#1C1917]/55 text-sm md:text-base max-w-2xl mx-auto">
+          Hundreds of AI models from the best providers — curated, optimized, and ready to run.
         </p>
       </div>
 

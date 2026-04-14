@@ -6,7 +6,7 @@ export function AboutHero() {
       <div className="absolute inset-0 bg-gradient-to-b from-black via-black/95 to-black/80" />
       <div className="relative mx-auto max-w-5xl px-6 pb-24 pt-40 text-center">
         <FadeIn>
-          <p className="mb-4 font-mono text-sm uppercase tracking-[0.28em] text-white/40">
+          <p className="mb-4 text-sm uppercase tracking-[0.28em] text-white/40">
             About OpenOctopus
           </p>
           <h1 className="mb-6 text-4xl font-bold leading-tight tracking-tight text-white md:text-6xl">

@@ -8,10 +8,10 @@ export function MetricsRow() {
         {aboutMetrics.map((metric, i) => (
           <FadeIn key={metric.label} delay={i * 0.1}>
             <div>
-              <p className="text-3xl font-bold text-[#111111] md:text-4xl">
+              <p className="text-3xl font-bold text-[#1C1917] md:text-4xl">
                 {metric.value}
               </p>
-              <p className="mt-1 font-mono text-sm uppercase tracking-[0.18em] text-black/45">
+              <p className="mt-1 text-sm uppercase tracking-[0.18em] text-black/45">
                 {metric.label}
               </p>
             </div>

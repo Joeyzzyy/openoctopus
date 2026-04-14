@@ -49,10 +49,10 @@ const BENEFITS = [
 
 export function BenefitsGrid() {
   return (
-    <section className="bg-white px-6 pt-16 md:px-12 md:pt-20 lg:px-20">
+    <section className="bg-[#FAFAF8] px-6 pt-16 md:px-12 md:pt-20 lg:px-20">
       <div className="mx-auto max-w-7xl">
         <FadeIn className="mb-12 flex max-w-xl flex-col gap-4">
-          <h2 className="text-2xl font-bold leading-none tracking-tight text-[#111111] md:text-4xl">
+          <h2 className="text-2xl font-bold leading-none tracking-tight text-[#1C1917] md:text-4xl">
             There is plenty more...
           </h2>
         </FadeIn>
@@ -65,7 +65,7 @@ export function BenefitsGrid() {
               <FadeIn
                 key={benefit.title}
                 delay={i * 0.05}
-                className="flex flex-col gap-4 rounded-xs bg-[#f5f5f3] p-6"
+                className="flex flex-col gap-4 rounded-lg bg-[#f5f5f3] p-6"
               >
                 <Icon
                   className="size-6 text-black/40"
@@ -73,7 +73,7 @@ export function BenefitsGrid() {
                   aria-hidden="true"
                 />
                 <div className="flex flex-col gap-2">
-                  <h3 className="text-base font-medium text-[#111111]">
+                  <h3 className="text-base font-medium text-[#1C1917]">
                     {benefit.title}
                   </h3>
                   <p className="text-sm leading-relaxed text-black/60">

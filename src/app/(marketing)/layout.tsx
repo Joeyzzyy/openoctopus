@@ -15,7 +15,7 @@ export default async function MarketingLayout({
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-white font-mono text-[#111111]"
+      className="flex min-h-screen flex-col bg-[#FAFAF8] text-[#1C1917]"
       style={{ paddingTop: "var(--banner-h, 36px)" }}
     >
       <Banner />

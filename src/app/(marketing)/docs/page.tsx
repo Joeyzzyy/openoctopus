@@ -133,7 +133,7 @@ export const metadata = {
 
 function CodeBlock({ code }: { code: string }) {
   return (
-    <pre className="mt-4 overflow-x-auto rounded-sm border border-black/8 bg-[#111111] p-4 text-xs leading-6 text-[#f4f1ea]">
+    <pre className="mt-4 overflow-x-auto rounded-lg border border-black/8 bg-[#1C1917] p-4 text-xs leading-6 text-[#f4f1ea]">
       <code>{code}</code>
     </pre>
   );
@@ -155,9 +155,9 @@ function DocsSection({
   return (
     <section
       id={id}
-      className="scroll-mt-28 rounded-sm border border-black/10 bg-white p-5 md:p-6"
+      className="scroll-mt-28 rounded-lg border border-black/10 bg-white p-5 md:p-6"
     >
-      <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/42">
+      <p className="text-[10px] uppercase tracking-[1px] text-black/42">
         {eyebrow}
       </p>
       <h2 className="mt-2 text-2xl font-semibold tracking-tight text-black">
@@ -173,10 +173,10 @@ function DocsSection({
 
 export default function DocsPage() {
   return (
-    <div className="bg-[#f7f6f1] px-6 py-12 md:px-10 lg:px-16 xl:px-20">
+    <div className="bg-[#FAFAF8] px-6 py-12 md:px-10 lg:px-16 xl:px-20">
       <div className="mx-auto max-w-7xl">
         <div className="max-w-4xl">
-          <p className="font-mono text-[11px] uppercase tracking-[1.1px] text-black/45">
+          <p className="text-[11px] uppercase tracking-[1.1px] text-black/45">
             API Documentation
           </p>
           <h1 className="mt-3 font-display text-4xl font-bold tracking-tight text-black md:text-5xl">
@@ -191,8 +191,8 @@ export default function DocsPage() {
 
         <div className="mt-10 grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
           <aside className="xl:sticky xl:top-28 xl:self-start">
-            <div className="rounded-sm border border-black/10 bg-white p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+            <div className="rounded-lg border border-black/10 bg-white p-4">
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">
                 On This Page
               </p>
               <nav className="mt-4 space-y-1">
@@ -200,14 +200,14 @@ export default function DocsPage() {
                   <a
                     key={section.id}
                     href={`#${section.id}`}
-                    className="block rounded-sm px-3 py-2 text-sm text-black/62 transition-colors hover:bg-black/[0.03] hover:text-black"
+                    className="block rounded-lg px-3 py-2 text-sm text-black/62 transition-colors hover:bg-black/[0.03] hover:text-black"
                   >
                     {section.label}
                   </a>
                 ))}
               </nav>
-              <div className="mt-5 rounded-sm border border-black/8 bg-[#faf9f6] p-3">
-                <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+              <div className="mt-5 rounded-lg border border-black/8 bg-[#faf9f6] p-3">
+                <p className="text-[10px] uppercase tracking-[1px] text-black/45">
                   Base URL
                 </p>
                 <code className="mt-2 block break-all text-[11px] leading-5 text-black/72">
@@ -225,20 +225,20 @@ export default function DocsPage() {
               description="Use a single OpenOctopus API key to submit image and video generation tasks through stable public model slugs."
             >
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
                   <p className="text-sm font-medium text-black">Unified auth</p>
                   <p className="mt-2 text-sm leading-6 text-black/58">
                     One bearer token works across public OpenOctopus models.
                   </p>
                 </div>
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
                   <p className="text-sm font-medium text-black">Async tasks</p>
                   <p className="mt-2 text-sm leading-6 text-black/58">
                     Generation endpoints return a task id first, then you poll
                     for the final result.
                   </p>
                 </div>
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
                   <p className="text-sm font-medium text-black">Routed models</p>
                   <p className="mt-2 text-sm leading-6 text-black/58">
                     You call public slugs while OpenOctopus handles upstream
@@ -255,16 +255,16 @@ export default function DocsPage() {
               description="All requests use the same base URL and a standard bearer token in the Authorization header."
             >
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
-                  <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
+                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">
                     Base URL
                   </p>
                   <code className="mt-2 block break-all rounded bg-white px-2 py-2 text-[12px] leading-6 text-black/75">
                     {PUBLIC_API_BASE_URL}
                   </code>
                 </div>
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
-                  <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
+                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">
                     Header
                   </p>
                   <code className="mt-2 block break-all rounded bg-white px-2 py-2 text-[12px] leading-6 text-black/75">
@@ -272,7 +272,7 @@ export default function DocsPage() {
                   </code>
                 </div>
               </div>
-              <div className="mt-4 rounded-sm border border-black/8 bg-[#faf9f6] p-4 text-sm leading-7 text-black/60">
+              <div className="mt-4 rounded-lg border border-black/8 bg-[#faf9f6] p-4 text-sm leading-7 text-black/60">
                 Create API keys from the dashboard after signing in. Save the
                 full key when it is created because the full value is only shown
                 once.
@@ -289,9 +289,9 @@ export default function DocsPage() {
                 {quickstartSteps.map((step, index) => (
                   <div
                     key={step.title}
-                    className="grid gap-3 rounded-sm border border-black/8 bg-[#faf9f6] px-4 py-4 md:grid-cols-[40px_minmax(0,1fr)]"
+                    className="grid gap-3 rounded-lg border border-black/8 bg-[#faf9f6] px-4 py-4 md:grid-cols-[40px_minmax(0,1fr)]"
                   >
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-sm bg-white text-sm font-semibold text-black">
+                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white text-sm font-semibold text-black">
                       {index + 1}
                     </div>
                     <div>
@@ -317,11 +317,11 @@ export default function DocsPage() {
                 {endpoints.map((endpoint) => (
                   <div
                     key={`${endpoint.method}-${endpoint.path}`}
-                    className="rounded-sm border border-black/8 bg-[#faf9f6] p-4"
+                    className="rounded-lg border border-black/8 bg-[#faf9f6] p-4"
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+                        <p className="text-[10px] uppercase tracking-[1px] text-black/45">
                           {endpoint.method}
                         </p>
                         <p className="mt-1 break-all text-sm font-medium text-black">
@@ -344,7 +344,7 @@ export default function DocsPage() {
               description="Start with the model list endpoint, then send generation requests, and finally poll the task status endpoint."
             >
               <div className="space-y-6">
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
                   <h3 className="text-lg font-semibold text-black">
                     List models
                   </h3>
@@ -355,7 +355,7 @@ export default function DocsPage() {
                   <CodeBlock code={modelsExample} />
                 </div>
 
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
                   <h3 className="text-lg font-semibold text-black">
                     Image generation
                   </h3>
@@ -366,7 +366,7 @@ export default function DocsPage() {
                   <CodeBlock code={imageRequestExample} />
                 </div>
 
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
                   <h3 className="text-lg font-semibold text-black">
                     Video generation
                   </h3>
@@ -377,7 +377,7 @@ export default function DocsPage() {
                   <CodeBlock code={videoRequestExample} />
                 </div>
 
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
                   <h3 className="text-lg font-semibold text-black">
                     JavaScript example
                   </h3>
@@ -397,14 +397,14 @@ export default function DocsPage() {
               description="Generation endpoints are asynchronous. Expect a queued task response first, then poll until you receive a terminal result."
             >
               <div className="grid gap-4">
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
                   <h3 className="text-lg font-semibold text-black">
                     Initial queued response
                   </h3>
                   <CodeBlock code={queuedResponseExample} />
                 </div>
 
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
                   <h3 className="text-lg font-semibold text-black">
                     Task status polling
                   </h3>
@@ -422,14 +422,14 @@ export default function DocsPage() {
                   <CodeBlock code={taskStatusExample} />
                 </div>
 
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
                   <h3 className="text-lg font-semibold text-black">
                     Example completed response
                   </h3>
                   <CodeBlock code={completedTaskExample} />
                 </div>
 
-                <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
                   <h3 className="text-lg font-semibold text-black">
                     Request body fields
                   </h3>
@@ -465,7 +465,7 @@ export default function DocsPage() {
               title="Structured error responses"
               description="Authentication failures and request validation failures use a simple error envelope with a machine-readable code."
             >
-              <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+              <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
                 <CodeBlock code={errorExample} />
               </div>
             </DocsSection>
@@ -473,13 +473,13 @@ export default function DocsPage() {
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/login"
-                className="inline-flex h-10 items-center justify-center rounded-sm bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-black/85"
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-black/85"
               >
                 Sign In
               </Link>
               <Link
                 href="/dashboard"
-                className="inline-flex h-10 items-center justify-center rounded-sm border border-black/10 bg-white px-4 text-sm font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-black/10 bg-white px-4 text-sm font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
               >
                 Open Dashboard
               </Link>

@@ -5,17 +5,17 @@ import Image from "next/image";
 
 export function TechFeatures() {
   return (
-    <section className="px-6 py-16 md:px-20 md:py-20">
+    <section className="bg-[#FAFAF8] px-6 py-16 md:px-20 md:py-20">
       <div className="mx-auto max-w-[1280px]">
         {/* Heading */}
         <FadeIn className="mb-10 flex max-w-[876px] flex-col gap-4">
-          <h2 className="font-display text-[32px] font-bold leading-none tracking-[-1px] text-balance text-[#111111] md:text-[48px]">
-            Engineered for Velocity
+          <h2 className="font-display text-[32px] font-semibold leading-none tracking-[-0.03em] text-balance text-[#1C1917] md:text-[48px]">
+            Built to move fast
           </h2>
-          <p className="font-mono text-base text-pretty text-black/55">
-            OpenOctopus is a purpose-built inference engine
+          <p className="text-base text-pretty text-[#1C1917]/55">
+            A purpose-built inference engine designed to minimize latency
             <br className="hidden md:block" />
-            designed to minimize latency and maximize throughput.
+            and maximize throughput at any scale.
           </p>
         </FadeIn>
 
@@ -24,7 +24,7 @@ export function TechFeatures() {
           {/* Row 1 */}
           <div className="flex flex-col gap-4 lg:flex-row">
             {/* Vast Model Library — 45% */}
-            <FadeIn className="relative h-[380px] w-full shrink-0 overflow-hidden rounded-xs bg-[#f3f3f3] lg:h-[420px] lg:w-[45%]">
+            <FadeIn className="relative h-[380px] w-full shrink-0 overflow-hidden rounded-2xl bg-[#F2F0EB] lg:h-[420px] lg:w-[45%]">
               <div className="absolute top-[10px] right-0 h-[220px] w-[600px] sm:h-[260px] md:h-[280px] lg:h-[287px]">
                 <Image
                   alt=""
@@ -35,10 +35,10 @@ export function TechFeatures() {
                 />
               </div>
               <div className="absolute right-6 bottom-6 left-6">
-                <h3 className="mb-2 text-2xl font-medium leading-7 text-[#111111]">
-                  Vast Model Library
+                <h3 className="mb-2 text-2xl font-medium leading-7 text-[#1C1917]">
+                  Vast model library
                 </h3>
-                <p className="w-auto font-mono text-sm text-pretty text-black/55 lg:w-[526px]">
+                <p className="w-auto text-sm text-pretty text-[#1C1917]/55 lg:w-[526px]">
                   Access the entire HuggingFace hub and top proprietary models
                   with a single unified API key.
                 </p>
@@ -48,13 +48,13 @@ export function TechFeatures() {
             {/* Blazing Fast Inference — flex-1 */}
             <FadeIn
               delay={0.1}
-              className="relative h-[380px] w-full overflow-hidden rounded-xs bg-[#f3f3f3] lg:h-[420px] lg:flex-1"
+              className="relative h-[380px] w-full overflow-hidden rounded-2xl bg-[#F2F0EB] lg:h-[420px] lg:flex-1"
             >
               <div className="absolute top-6 right-6 left-6 z-10 lg:w-[584px]">
-                <h3 className="mb-2 text-2xl font-medium leading-7 text-[#111111]">
-                  Blazing Fast Inference
+                <h3 className="mb-2 text-2xl font-medium leading-7 text-[#1C1917]">
+                  Blazing fast inference
                 </h3>
-                <p className="font-mono text-sm leading-tight text-pretty text-black/55">
+                <p className="text-sm leading-tight text-pretty text-[#1C1917]/55">
                   Optimized GPU clusters deliver up to 4x faster token
                   generation for LLMs and sub-second rendering for image models.
                 </p>
@@ -79,13 +79,13 @@ export function TechFeatures() {
             {/* Built for Scale — 55% */}
             <FadeIn
               delay={0.15}
-              className="relative h-[380px] w-full shrink-0 overflow-hidden rounded-xs bg-[#f3f3f3] lg:h-[420px] lg:w-[55%]"
+              className="relative h-[380px] w-full shrink-0 overflow-hidden rounded-2xl bg-[#F2F0EB] lg:h-[420px] lg:w-[55%]"
             >
               <div className="absolute top-6 right-6 left-6 z-10 lg:w-[642px]">
-                <h3 className="mb-2 text-2xl font-medium leading-7 text-[#111111]">
-                  Built for Scale
+                <h3 className="mb-2 text-2xl font-medium leading-7 text-[#1C1917]">
+                  Built for scale
                 </h3>
-                <p className="max-w-[400px] font-mono text-sm text-pretty text-black/55">
+                <p className="max-w-[400px] text-sm text-pretty text-[#1C1917]/55">
                   Enterprise-grade reliability with 99.99% uptime guarantees and
                   dedicated throughput for high-volume applications.
                 </p>
@@ -107,7 +107,7 @@ export function TechFeatures() {
             {/* Security — flex-1 */}
             <FadeIn
               delay={0.2}
-              className="relative h-[380px] w-full overflow-hidden rounded-xs bg-[#f3f3f3] lg:h-[420px] lg:flex-1"
+              className="relative h-[380px] w-full overflow-hidden rounded-2xl bg-[#F2F0EB] lg:h-[420px] lg:flex-1"
             >
               <div className="absolute inset-0">
                 <Image
@@ -119,10 +119,10 @@ export function TechFeatures() {
                 />
               </div>
               <div className="absolute right-6 bottom-6 left-6 z-10 lg:w-[526px]">
-                <h3 className="mb-2 text-2xl font-medium leading-7 text-[#111111]">
-                  Security
+                <h3 className="mb-2 text-2xl font-medium leading-7 text-[#1C1917]">
+                  Security first
                 </h3>
-                <p className="font-mono text-sm leading-tight text-pretty text-black/55">
+                <p className="text-sm leading-tight text-pretty text-[#1C1917]/55">
                   SOC 2 Type II compliant with end-to-end encryption and private
                   VPC deployment options.
                 </p>

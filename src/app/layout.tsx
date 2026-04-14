@@ -1,6 +1,19 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono } from "next/font/google";
+import { DM_Sans, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+
+const dmSans = DM_Sans({
+  variable: "--font-display",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["500", "600", "700"],
+});
+
+const inter = Inter({
+  variable: "--font-sans",
+  subsets: ["latin"],
+  display: "swap",
+});
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
@@ -23,8 +36,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${jetbrainsMono.variable} dark`}>
-      <body className="min-h-full bg-[#09070B] text-white font-mono">
+    <html lang="en" className={`${dmSans.variable} ${inter.variable} ${jetbrainsMono.variable} dark`}>
+      <body className="min-h-full bg-[#0C0A09] text-[#FAFAF8] font-sans">
         {children}
       </body>
     </html>
