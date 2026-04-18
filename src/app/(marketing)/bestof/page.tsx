@@ -303,7 +303,21 @@ const competitorProfiles = [
   },
 ] as const;
 
-const comparisonRows = [
+type ComparisonRow = {
+  name: string;
+  domain: string;
+  logoUrl: string;
+  score: number;
+  type: string;
+  capability: string;
+  pricing: string;
+  pricingLink: { label: string; href: string };
+  transparency: string;
+  transparencyLink: { label: string; href: string };
+  relation: string;
+};
+
+const comparisonRows = ([
   {
     name: "Kie.ai",
     domain: "kie.ai",
@@ -432,7 +446,7 @@ const comparisonRows = [
     relation:
       "3.7 / 10。它属于邻近赛道参照物，可用于比较聚合 / 路由平台形态，但不是媒体 API 中转售卖的直接竞品。",
   },
-].sort((a, b) => b.score - a.score) as const;
+] satisfies ComparisonRow[]).sort((a, b) => b.score - a.score);
 
 const sources = [
   {
