@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
 
 const NAV_ITEMS = [
+  { label: "Best Of", href: "/bestof" },
   { label: "Docs", href: "/docs" },
   { label: "Pricing", href: "/pricing" },
   { label: "Enterprise", href: "/enterprise" },

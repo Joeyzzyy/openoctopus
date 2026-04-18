@@ -24,6 +24,9 @@ export function Header() {
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-1">
+            <Link href="/bestof" className="px-3 py-2 text-sm text-slate-600 hover:text-slate-900 transition-colors rounded-md hover:bg-slate-100">
+              Best Of
+            </Link>
             <Link href="/docs" className="px-3 py-2 text-sm text-slate-600 hover:text-slate-900 transition-colors rounded-md hover:bg-slate-100">
               Docs
             </Link>
@@ -63,6 +66,7 @@ export function Header() {
         {/* Mobile menu */}
         {mobileOpen && (
           <div className="md:hidden border-t border-slate-200/60 bg-white px-4 py-4 space-y-2">
+            <Link href="/bestof" className="block px-3 py-2 text-sm text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100">Best Of</Link>
             <Link href="/docs" className="block px-3 py-2 text-sm text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100">Docs</Link>
             <Link href="/pricing" className="block px-3 py-2 text-sm text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100">Pricing</Link>
             <Link href="/enterprise" className="block px-3 py-2 text-sm text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100">Enterprise</Link>
