@@ -308,13 +308,16 @@ type ComparisonRow = {
   domain: string;
   logoUrl: string;
   score: number;
+  priority?: boolean;
   type: string;
   capability: string;
   pricing: string;
   pricingLink: { label: string; href: string };
   transparency: string;
   transparencyLink: { label: string; href: string };
-  relation: string;
+  relationScore: string;
+  relationLike: string;
+  relationUnlike: string;
 };
 
 const comparisonRows = ([
@@ -323,6 +326,7 @@ const comparisonRows = ([
     domain: "kie.ai",
     logoUrl: "https://kie.ai/favicon.ico",
     score: 9.4,
+    priority: true,
     type: "AI API 转售平台",
     capability: "多模态 API：视频、图片、音乐、chat",
     pricing:
@@ -331,14 +335,17 @@ const comparisonRows = ([
     transparency:
       "公开说明默认限流为每 10 秒最多 20 个新生成请求，并通常支持 100+ 并发运行任务。",
     transparencyLink: { label: "Getting Started", href: "https://docs.kie.ai/index" },
-    relation:
-      "9.4 / 10。与 OpenOctopus 的平台形态、热门模型转售逻辑和目标用户最接近，是当前最直接竞品。",
+    relationScore: "9.4 / 10",
+    relationLike: "同样是以热门模型 API 转售为核心，强调统一接入、快速购买和更低价格。",
+    relationUnlike:
+      "Kie.ai 在公开文档里更直接强调低价与并发，而 OpenOctopus 当前前台价格与规则表达还更克制。",
   },
   {
     name: "WaveSpeedAI",
     domain: "wavespeed.ai",
     logoUrl: "https://wavespeed.ai/favicon.ico",
     score: 8.8,
+    priority: true,
     type: "AI 模型目录平台",
     capability: "大规模多模型目录，覆盖图像、视频等生成能力",
     pricing:
@@ -347,8 +354,10 @@ const comparisonRows = ([
     transparency:
       "账户等级页明确列出 Bronze、Silver、Gold、Ultra 的图像 / 视频速率与并发上限，是几家里规则最结构化的一家。",
     transparencyLink: { label: "Account levels", href: "https://wavespeed.ai/docs/account-levels" },
-    relation:
-      "8.8 / 10。虽然目录平台属性更强，但在 API 聚合售卖、媒体模型覆盖和开发者采购路径上与 OpenOctopus 高度接近。",
+    relationScore: "8.8 / 10",
+    relationLike: "同样面向开发者售卖聚合后的模型 API，覆盖图像 / 视频等媒体能力。",
+    relationUnlike:
+      "WaveSpeedAI 更偏“大目录 + 账户等级 + 规则公开”的平台形态，而 OpenOctopus 目前更接近精选式前台。",
   },
   {
     name: "PiAPI",
@@ -363,8 +372,10 @@ const comparisonRows = ([
     transparency:
       "价格公开度较高，但平台层规则、限流与统一等级说明的结构化程度不如 WaveSpeedAI。",
     transparencyLink: { label: "PiAPI home", href: "https://piapi.ai/" },
-    relation:
-      "8.2 / 10。统一 API、多模态覆盖与前台成交路径都很接近 OpenOctopus，是值得重点持续跟踪的一类直接竞品。",
+    relationScore: "8.2 / 10",
+    relationLike: "同样是统一 API 入口，直接售卖多模态模型能力，并把热门模型单独做成前台入口。",
+    relationUnlike:
+      "PiAPI 的平台覆盖更广，包含 3D、LLM 等更杂的能力，OpenOctopus 赛道聚焦度更高。",
   },
   {
     name: "APICore.ai",
@@ -379,14 +390,17 @@ const comparisonRows = ([
     transparency:
       "营销页上的价格比较很直观，但平台层文档、限流和规则公开度目前不如 Kie.ai 或 WaveSpeedAI 完整。",
     transparencyLink: { label: "APICore home", href: "https://page2.apicore.ai/" },
-    relation:
-      "7.9 / 10。价格导向和统一入口逻辑与 OpenOctopus 相似度较高，但平台成熟度与规则公开完备度还需继续观察。",
+    relationScore: "7.9 / 10",
+    relationLike: "同样以 API 转售、统一入口、价格对比和热门模型获取为核心成交逻辑。",
+    relationUnlike:
+      "APICore.ai 当前更像强营销导向的低价聚合页，平台规则、文档与成熟度公开度还不够完整。",
   },
   {
     name: "fal.ai",
     domain: "fal.ai",
     logoUrl: "https://fal.ai/favicon.ico",
     score: 6.9,
+    priority: true,
     type: "媒体生成基础设施平台",
     capability: "多模态媒体 API：image、video、audio、multimodal",
     pricing:
@@ -395,8 +409,10 @@ const comparisonRows = ([
     transparency:
       "平台规则公开清晰，但信息组织更偏专业开发者语境，重点是基础设施规则而不是前台销售型说明。",
     transparencyLink: { label: "Model APIs", href: "https://fal.ai/docs/documentation/model-apis/overview" },
-    relation:
-      "6.9 / 10。它更适合作为媒体 API 能力深度与生产交付方式的参照样本，而不是前台转售体验的直接竞争者。",
+    relationScore: "6.9 / 10",
+    relationLike: "同样提供媒体模型 API，并覆盖图像、视频、音频等多模态能力。",
+    relationUnlike:
+      "fal.ai 更偏基础设施和生产级交付平台，不是以“转售热门模型 API”这类前台购买路径为主。",
   },
   {
     name: "Replicate",
@@ -411,8 +427,9 @@ const comparisonRows = ([
     transparency:
       "公开 rate limits 文档明确说明 predictions 创建默认可达 600 请求/分钟，其余 endpoint 可达 3,000 请求/分钟。",
     transparencyLink: { label: "Rate limits", href: "https://replicate.com/docs/topics/predictions/rate-limits/" },
-    relation:
-      "5.8 / 10。它与 OpenOctopus 的核心售卖路径不完全相同，更适合作为模型生态、自定义能力和开发者工作流的参照对象。",
+    relationScore: "5.8 / 10",
+    relationLike: "也面向开发者提供统一的模型调用与计费入口。",
+    relationUnlike: "Replicate 核心是模型运行、托管和社区生态，不是以热门闭源媒体模型 API 转售为主线。",
   },
   {
     name: "Segmind",
@@ -427,8 +444,9 @@ const comparisonRows = ([
     transparency:
       "模型级价格透明度较高，但平台整体心智更偏推理 / 部署平台，而不是媒体 API 转售门户。",
     transparencyLink: { label: "Segmind Wan pricing", href: "https://www.segmind.com/models/wan2.7-i2v/pricing" },
-    relation:
-      "5.4 / 10。与 OpenOctopus 的前台售卖逻辑并非完全一致，但在模型级 pricing 透明度方面很有比较价值。",
+    relationScore: "5.4 / 10",
+    relationLike: "也提供可直接购买和调用的热门模型能力，并且模型级定价透明。",
+    relationUnlike: "Segmind 更偏推理 / 部署平台，不是典型的 API 转售门户。",
   },
   {
     name: "OpenRouter",
@@ -443,8 +461,9 @@ const comparisonRows = ([
     transparency:
       "平台费、provider 聚合与路由逻辑表达清晰，但核心场景偏 LLM，不是媒体 API 主战场。",
     transparencyLink: { label: "Pricing", href: "https://openrouter.ai/pricing" },
-    relation:
-      "3.7 / 10。它属于邻近赛道参照物，可用于比较聚合 / 路由平台形态，但不是媒体 API 中转售卖的直接竞品。",
+    relationScore: "3.7 / 10",
+    relationLike: "同样是聚合平台，帮助用户通过统一入口访问不同模型。",
+    relationUnlike: "OpenRouter 主战场是 LLM 路由与 provider 聚合，不是图像 / 视频 API 转售赛道的直接竞争者。",
   },
 ] satisfies ComparisonRow[]).sort((a, b) => b.score - a.score);
 
@@ -669,7 +688,7 @@ export default function BestOfPage() {
           <SectionHeader
             eyebrow="Core Comparison"
             title="核心对比"
-            description="参数横向展开，产品纵向排列，先看几家平台最关键的差异。"
+            description="评分口径聚焦在 API 转售赛道相似度：是否同样通过统一入口转售热门模型 API、是否面向相似开发者客户、是否以价格 / 模型覆盖 / 调用规则影响购买决策。"
           />
 
           <div className="mt-8 overflow-x-auto">
@@ -692,7 +711,7 @@ export default function BestOfPage() {
                     规则透明度
                   </th>
                   <th className="border-b border-black/10 px-4 py-4 text-left text-[11px] uppercase tracking-[1.1px] text-black/42">
-                    与 OpenOctopus 关系
+                    API 转售相似度
                   </th>
                 </tr>
               </thead>
@@ -703,7 +722,17 @@ export default function BestOfPage() {
                       <div className="flex min-w-[180px] items-center gap-3">
                         <ProductLogo logoUrl={row.logoUrl} name={row.name} />
                         <div>
-                          <p className="text-sm font-semibold text-black">{row.name}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold text-black">
+                              {row.priority ? "★ " : ""}
+                              {row.name}
+                            </p>
+                            {row.priority ? (
+                              <span className="rounded-full bg-[#F3E7D8] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.8px] text-[#8A5A28]">
+                                重点调研
+                              </span>
+                            ) : null}
+                          </div>
                           <p className="text-xs text-black/45">{row.domain}</p>
                         </div>
                       </div>
@@ -726,7 +755,15 @@ export default function BestOfPage() {
                       />
                     </td>
                     <td className="border-b border-black/8 px-4 py-5 text-sm leading-7 text-black/62">
-                      {row.relation}
+                      <p className="mb-2 font-semibold text-black">{row.relationScore}</p>
+                      <p>
+                        <span className="font-bold text-emerald-700">像：</span>
+                        {row.relationLike}
+                      </p>
+                      <p className="mt-2">
+                        <span className="font-bold text-amber-700">不像：</span>
+                        {row.relationUnlike}
+                      </p>
                     </td>
                   </tr>
                 ))}
