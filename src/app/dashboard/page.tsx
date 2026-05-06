@@ -12,7 +12,7 @@ import { Toaster } from "sonner";
 import { getDashboardData } from "@/lib/dashboard-server";
 import { cn } from "@/lib/utils";
 import { CreateKeyButton } from "./dashboard-actions";
-import { DashboardSidebar } from "./dashboard-sidebar";
+import { DashboardMobileNav, DashboardSidebar } from "./dashboard-sidebar";
 import { ApiKeysTable } from "./api-keys-table";
 import { ApiQuickstartCard } from "./api-quickstart-card";
 import { ModelCatalogTable } from "./model-catalog-table";
@@ -440,13 +440,21 @@ export default async function DashboardPage({
       />
 
       <div className="relative mx-auto max-w-7xl px-4 pb-10 xl:px-0">
-        <div className="mt-8 grid gap-6 xl:grid-cols-[220px_minmax(0,1fr)]">
+        <div className="mt-6 grid gap-5 xl:mt-8 xl:grid-cols-[220px_minmax(0,1fr)] xl:gap-6">
           <aside className="hidden xl:block">
             <DashboardSidebar items={sidebarItems} userLabel={user.email ?? user.name} activeHref={activeHref} />
           </aside>
 
+          <aside className="xl:hidden">
+            <DashboardMobileNav
+              items={sidebarItems}
+              userLabel={user.email ?? user.name}
+              activeHref={activeHref}
+            />
+          </aside>
+
           <section className="min-h-[calc(100vh-108px)]">
-            <div className="mb-4 mt-4 flex flex-col gap-3 md:mb-6 md:mt-8 md:flex-row md:items-center md:justify-between">
+            <div className="mb-4 flex flex-col gap-3 md:mb-6 md:mt-2 md:flex-row md:items-center md:justify-between xl:mt-8">
               <div>
                 <h1 className="text-3xl font-semibold leading-none tracking-[-0.05em] text-[#111111]">
                   {view === "dashboard" ? "Dashboard" : view === "models" ? "Models" : "API Keys"}
@@ -460,12 +468,12 @@ export default async function DashboardPage({
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <CreateKeyButton />
-                <form action="/auth/sign-out" method="post">
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+                <CreateKeyButton className="w-full justify-center sm:w-auto" />
+                <form action="/auth/sign-out" method="post" className="w-full sm:w-auto">
                   <button
                     type="submit"
-                    className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
+                    className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03] sm:w-auto"
                   >
                     <LogOut className="h-4 w-4" />
                     Sign out
