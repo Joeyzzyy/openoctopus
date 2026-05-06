@@ -439,7 +439,7 @@ export default async function DashboardPage({
         }}
       />
 
-      <div className="relative mx-auto max-w-7xl px-4 pb-10 xl:px-0">
+      <div className="relative mx-auto max-w-7xl px-4 pb-10 sm:px-5 xl:px-0">
         <div className="mt-6 grid gap-5 xl:mt-8 xl:grid-cols-[220px_minmax(0,1fr)] xl:gap-6">
           <aside className="hidden xl:block">
             <DashboardSidebar items={sidebarItems} userLabel={user.email ?? user.name} activeHref={activeHref} />
@@ -453,7 +453,7 @@ export default async function DashboardPage({
             />
           </aside>
 
-          <section className="min-h-[calc(100vh-108px)]">
+          <section className="min-h-[calc(100vh-108px)] min-w-0">
             <div className="mb-4 flex flex-col gap-3 md:mb-6 md:mt-2 md:flex-row md:items-center md:justify-between xl:mt-8">
               <div>
                 <h1 className="text-3xl font-semibold leading-none tracking-[-0.05em] text-[#111111]">
@@ -468,7 +468,7 @@ export default async function DashboardPage({
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap sm:items-center">
                 <CreateKeyButton className="w-full justify-center sm:w-auto" />
                 <form action="/auth/sign-out" method="post" className="w-full sm:w-auto">
                   <button
@@ -829,12 +829,17 @@ export default async function DashboardPage({
             ) : null}
 
             {view === "models" ? (
-              <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
-                <div className="mb-4">
+              <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm sm:p-5">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <h2 className="text-xl font-semibold text-black">Model catalog</h2>
-                  <p className="mt-1 text-sm text-black/55">
-                    One compact row per routed model. Expand a row to inspect primary and fallback routing details.
-                  </p>
+                  <div className="max-w-2xl">
+                    <p className="text-sm text-black/55">
+                      One compact row per routed model. Expand a row to inspect primary and fallback routing details.
+                    </p>
+                    <p className="mt-2 text-xs text-black/40 md:hidden">
+                      Mobile view switches to stacked cards for easier scanning.
+                    </p>
+                  </div>
                 </div>
                 <ModelCatalogTable rows={modelCatalogRows} />
               </section>
@@ -842,13 +847,17 @@ export default async function DashboardPage({
 
             {view === "api-keys" ? (
               <>
-                <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
-                  <div className="mb-4 flex items-start justify-between gap-3">
+                <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm sm:p-5">
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <h2 className="text-xl font-semibold text-black">API Keys</h2>
                       <p className="mt-1 text-sm text-black/55">
                         Create keys, control budgets, and manage active environments.
                       </p>
+                    </div>
+                    <div className="inline-flex w-fit items-center gap-2 rounded-full border border-black/[0.08] bg-[#FCFCFA] px-3 py-1.5 text-xs text-black/55 md:hidden">
+                      <KeyRound className="size-4 text-black/45" />
+                      <span>{keyMetric?.value ?? apiKeys.length} active</span>
                     </div>
                     <div className="hidden items-center gap-2 md:flex">
                       <KeyRound className="size-4 text-black/45" />

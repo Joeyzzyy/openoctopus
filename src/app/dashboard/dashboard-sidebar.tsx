@@ -62,8 +62,8 @@ export function DashboardMobileNav({
         </span>
       </div>
 
-      <div className="-mx-1 overflow-x-auto pb-1">
-        <nav className="flex min-w-max gap-2 px-1">
+      <div className="px-1">
+        <nav className="grid grid-cols-3 gap-2">
           {items.map((item) => {
             const isActive = item.href === activeHref;
             return (
@@ -71,13 +71,13 @@ export function DashboardMobileNav({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "inline-flex shrink-0 items-center rounded-full border px-3.5 py-2 text-sm font-medium transition-colors",
+                  "inline-flex min-w-0 items-center justify-center rounded-xl border px-2 py-2.5 text-center text-sm font-medium transition-colors",
                   isActive
                     ? "border-[#111827] bg-[#111827] text-white"
                     : "border-black/[0.08] bg-[#FCFCFA] text-black/65 hover:bg-white hover:text-black"
                 )}
               >
-                {item.label}
+                <span className="truncate">{item.label}</span>
               </Link>
             );
           })}

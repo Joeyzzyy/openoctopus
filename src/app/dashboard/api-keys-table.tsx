@@ -194,13 +194,13 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                     <button
                       onClick={() => saveEdit(key.id)}
                       disabled={isPending}
-                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-md bg-[#111827] px-3 text-[10px] uppercase tracking-[0.5px] text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-9 flex-1 cursor-pointer items-center justify-center gap-1 rounded-md bg-[#111827] px-3 text-[10px] uppercase tracking-[0.5px] text-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Check className="h-3 w-3" /> Save
                     </button>
                     <button
                       onClick={cancelEdit}
-                      className={`${secondaryButtonClassName} h-9 px-3 text-[10px] uppercase tracking-[0.5px]`}
+                      className={`${secondaryButtonClassName} h-9 flex-1 justify-center px-3 text-[10px] uppercase tracking-[0.5px]`}
                     >
                       <X className="h-3 w-3" /> Cancel
                     </button>
@@ -209,14 +209,14 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                   <>
                     <button
                       onClick={() => startEdit(key)}
-                      className={`${secondaryButtonClassName} h-9 px-3 text-[10px] uppercase tracking-[0.5px]`}
+                      className={`${secondaryButtonClassName} h-9 flex-1 justify-center px-3 text-[10px] uppercase tracking-[0.5px]`}
                     >
                       <Pencil className="h-3 w-3" /> Edit
                     </button>
                     <button
                       onClick={() => handleToggle(key.id, key.rawStatus)}
                       disabled={isPending}
-                      className={`${secondaryButtonClassName} h-9 px-3 text-[10px] uppercase tracking-[0.5px] disabled:cursor-not-allowed disabled:opacity-50`}
+                      className={`${secondaryButtonClassName} h-9 flex-1 justify-center px-3 text-[10px] uppercase tracking-[0.5px] disabled:cursor-not-allowed disabled:opacity-50`}
                     >
                       {key.rawStatus === "paused" ? (
                         <>
@@ -231,7 +231,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                     <button
                       onClick={() => setDeleteTarget({ id: key.id, name: key.name })}
                       disabled={isPending}
-                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-md border border-[#F1D2CC] bg-white px-3 text-[10px] uppercase tracking-[0.5px] text-[#B54432] transition-colors hover:bg-[#FFF7F5] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-1 rounded-md border border-[#F1D2CC] bg-white px-3 text-[10px] uppercase tracking-[0.5px] text-[#B54432] transition-colors hover:bg-[#FFF7F5] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:flex-none"
                     >
                       <Trash2 className="h-3 w-3" /> Delete
                     </button>
