@@ -1,6 +1,4 @@
-import { Banner } from "@/components/layout/Banner";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
+import { MarketingFooter, MarketingHeader } from "@/components/marketing/site-chrome";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function MarketingLayout({
@@ -14,14 +12,10 @@ export default async function MarketingLayout({
   } = await supabase.auth.getUser();
 
   return (
-    <div
-      className="flex min-h-screen flex-col bg-[#FAFAF8] text-[#1C1917]"
-      style={{ paddingTop: "var(--banner-h, 36px)" }}
-    >
-      <Banner />
-      <Header isLoggedIn={!!user} variant="solid" />
+    <div className="flex min-h-screen flex-col bg-[#FCFCFA] text-[#111827]">
+      <MarketingHeader isLoggedIn={!!user} />
       <main className="flex-1">{children}</main>
-      <Footer />
+      <MarketingFooter />
     </div>
   );
 }

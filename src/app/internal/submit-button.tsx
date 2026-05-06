@@ -17,8 +17,8 @@ export function SubmitButton({
   const isDisabled = disabled || pending;
   const className =
     tone === "danger"
-      ? "inline-flex h-9 cursor-pointer items-center justify-center rounded-sm bg-[#b54432] px-3 text-xs font-medium text-white transition-colors hover:bg-[#993825] disabled:cursor-not-allowed disabled:bg-[#f1d6d1] disabled:text-[#8f6d67]"
-      : "inline-flex h-9 cursor-pointer items-center justify-center rounded-sm bg-[#111111] px-3 text-xs font-medium text-white transition-colors hover:bg-black/85 disabled:cursor-not-allowed disabled:bg-black/15 disabled:text-black/35";
+      ? "inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#B54432] px-3 text-xs font-medium text-white transition-colors hover:bg-[#9A3828] disabled:cursor-not-allowed disabled:bg-[#F5D9D4] disabled:text-[#8F6D67]"
+      : "inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220] disabled:cursor-not-allowed disabled:bg-black/15 disabled:text-black/35";
 
   return (
     <button

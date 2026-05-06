@@ -46,9 +46,9 @@ export function InternalShell({
   const [isPending, startTransition] = useTransition();
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="lg:sticky lg:top-6 lg:self-start">
-        <div className="rounded-sm border border-black/10 bg-white p-3">
+    <div className="grid gap-6 lg:grid-cols-[296px_minmax(0,1fr)]">
+      <aside className="lg:sticky lg:top-5 lg:self-start">
+        <div className="rounded-2xl border border-black/[0.08] bg-white p-3 shadow-sm">
           <nav className="space-y-2">
             {tabs.map((tab) => {
               const active = tab.key === activeTab;
@@ -64,10 +64,10 @@ export function InternalShell({
                       router.push(href);
                     });
                   }}
-                  className={`block rounded-sm border px-3 py-3 transition-colors ${
+                  className={`block rounded-xl border px-3 py-3 transition-colors ${
                     active
-                      ? "border-black bg-black text-white"
-                      : "border-black/10 bg-[#faf9f6] text-black/75 hover:bg-white"
+                      ? "border-[#111827] bg-[#111827] text-white"
+                      : "border-black/[0.08] bg-[#FCFCFA] text-black/75 hover:bg-white"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -79,7 +79,7 @@ export function InternalShell({
                     </div>
                     {typeof tab.count === "number" ? (
                       <span
-                        className={`inline-flex min-w-8 items-center justify-center rounded-sm px-2 py-1 text-[11px] ${
+                        className={`inline-flex min-w-8 items-center justify-center rounded-md px-2 py-1 text-[11px] ${
                           active ? "bg-white/12 text-white" : "bg-white text-black/55"
                         }`}
                       >
@@ -96,8 +96,8 @@ export function InternalShell({
 
       <div className="relative min-w-0">
         {isPending ? (
-          <div className="absolute inset-0 z-20 flex items-start justify-center rounded-sm border border-black/10 bg-[rgba(247,246,241,0.72)] px-6 py-24 backdrop-blur-[2px]">
-            <div className="rounded-sm border border-black/10 bg-white px-4 py-3 shadow-[0_18px_40px_rgba(17,17,17,0.06)]">
+          <div className="absolute inset-0 z-20 flex items-start justify-center rounded-2xl border border-black/[0.08] bg-[rgba(252,252,250,0.72)] px-6 py-24 backdrop-blur-[2px]">
+            <div className="rounded-xl border border-black/[0.08] bg-white px-4 py-3 shadow-[0_18px_40px_rgba(17,24,39,0.06)]">
               <div className="flex items-center gap-3 text-sm text-black/70">
                 <span className="inline-flex size-4 animate-spin rounded-full border-2 border-black/15 border-t-black" />
                 正在加载当前分区...

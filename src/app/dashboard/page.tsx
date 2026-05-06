@@ -236,9 +236,9 @@ function MetricCard({
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="rounded-sm border border-black/8 bg-[#f7f7f4] px-4 py-4 shadow-[0_18px_40px_rgba(17,17,17,0.03)]">
+    <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] px-4 py-4 shadow-sm">
       <div className="flex items-start gap-3">
-        <div className="inline-flex size-8 shrink-0 items-center justify-center rounded-sm bg-white text-black/55">
+        <div className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-white text-black/55">
           <Icon className="size-4" />
         </div>
         <div className="min-w-0">
@@ -266,19 +266,19 @@ function TrendChartCard({
   const height = 180;
 
   return (
-    <div className="rounded-sm border border-black/10 bg-white p-4">
+    <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-black">{title}</p>
           <p className="mt-1 text-xs text-black/45">{valueLabel}</p>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-sm border border-black/10 bg-[#faf9f6] px-2.5 py-1 text-[11px] text-black/60">
+        <div className="inline-flex items-center gap-2 rounded-full border border-black/[0.08] bg-[#FCFCFA] px-2.5 py-1 text-[11px] text-black/60">
           <LineChart className="size-3.5" />
           <span>Trend</span>
         </div>
       </div>
 
-      <div className="mt-4 rounded-sm border border-black/8 bg-[#faf9f6] p-3">
+      <div className="mt-4 rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="h-44 w-full"
@@ -323,7 +323,7 @@ function EmptyState({
   detail: string;
 }) {
   return (
-    <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-8">
+    <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-8">
       <p className="text-sm font-medium text-black">{title}</p>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">{detail}</p>
     </div>
@@ -421,9 +421,23 @@ export default async function DashboardPage({
   ];
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f7f6f1] text-[#111111]">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(202,232,207,0.52),transparent_32%),radial-gradient(circle_at_top_right,rgba(255,224,194,0.4),transparent_26%),linear-gradient(180deg,#fbfaf5_0%,#f4f3ee_46%,#efeee7_100%)]" />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 h-48 bg-[radial-gradient(circle_at_bottom,rgba(221,229,215,0.55),transparent_56%)]" />
+    <main className="relative min-h-screen overflow-hidden bg-[#FCFCFA] text-[#111111]">
+      <div
+        className="pointer-events-none fixed inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at top, rgba(243, 226, 201, 0.52), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(252,252,250,1) 46%)",
+        }}
+      />
+      <div
+        className="pointer-events-none fixed inset-x-0 top-0 h-[360px] opacity-45"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(17,24,39,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(17,24,39,0.035) 1px, transparent 1px)",
+          backgroundSize: "44px 44px",
+          maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)",
+        }}
+      />
 
       <div className="relative mx-auto max-w-7xl px-4 pb-10 xl:px-0">
         <div className="mt-8 grid gap-6 xl:grid-cols-[220px_minmax(0,1fr)]">
@@ -434,7 +448,7 @@ export default async function DashboardPage({
           <section className="min-h-[calc(100vh-108px)]">
             <div className="mb-4 mt-4 flex flex-col gap-3 md:mb-6 md:mt-8 md:flex-row md:items-center md:justify-between">
               <div>
-                <h1 className="text-3xl font-semibold leading-none text-[#111111]">
+                <h1 className="text-3xl font-semibold leading-none tracking-[-0.05em] text-[#111111]">
                   {view === "dashboard" ? "Dashboard" : view === "models" ? "Models" : "API Keys"}
                 </h1>
                 <p className="mt-2 text-sm text-black/55">
@@ -451,7 +465,7 @@ export default async function DashboardPage({
                 <form action="/auth/sign-out" method="post">
                   <button
                     type="submit"
-                    className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
+                    className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
                   >
                     <LogOut className="h-4 w-4" />
                     Sign out
@@ -476,7 +490,7 @@ export default async function DashboardPage({
                   </div>
                 </article>
 
-                <section className="rounded-sm border border-black/10 bg-white p-4">
+                <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
                   <div className="mb-4 flex flex-col gap-3">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
@@ -485,13 +499,13 @@ export default async function DashboardPage({
                           Requests and spend are combined here so you can inspect one API key at a time.
                         </p>
                       </div>
-                      <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
+                      <div className="inline-flex h-8 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/80">
                         <span>{keyMetric?.value ?? apiKeys.length} active keys</span>
                       </div>
                     </div>
 
                     <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                      <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                      <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
                         <p className="text-[11px] tracking-[0.35px] text-black/45">API key filter</p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Link
@@ -503,7 +517,7 @@ export default async function DashboardPage({
                               analyticsRange,
                             })}
                             className={cn(
-                              "inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors",
+                              "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
                               selectedApiKeyId === null
                                 ? "border-black bg-black text-white"
                                 : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
@@ -522,7 +536,7 @@ export default async function DashboardPage({
                                 analyticsRange,
                               })}
                               className={cn(
-                                "inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors",
+                                "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
                                 selectedApiKeyId === item.id
                                   ? "border-black bg-black text-white"
                                   : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
@@ -534,7 +548,7 @@ export default async function DashboardPage({
                         </div>
                       </div>
 
-                      <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                      <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
                         <p className="text-[11px] tracking-[0.35px] text-black/45">Time granularity</p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {requestIntervalOptions.map((option) => (
@@ -548,7 +562,7 @@ export default async function DashboardPage({
                                 analyticsRange: parseRequestRange(undefined, option.value),
                               })}
                               className={cn(
-                                "inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors",
+                                "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
                                 analyticsInterval === option.value
                                   ? "border-black bg-black text-white"
                                   : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
@@ -560,7 +574,7 @@ export default async function DashboardPage({
                         </div>
                       </div>
 
-                      <div className="rounded-sm border border-black/8 bg-[#faf9f6] p-4">
+                      <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
                         <p className="text-[11px] tracking-[0.35px] text-black/45">Time range</p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {getRequestRangeOptions(analyticsInterval).map((option) => (
@@ -574,7 +588,7 @@ export default async function DashboardPage({
                                 analyticsRange: option.value,
                               })}
                               className={cn(
-                                "inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors",
+                                "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
                                 analyticsRange === option.value
                                   ? "border-black bg-black text-white"
                                   : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
@@ -588,7 +602,7 @@ export default async function DashboardPage({
                     </div>
                   </div>
 
-                  <div className="mb-4 flex items-center gap-1.5 bg-amber-500/10 px-3 py-2.5">
+                  <div className="mb-4 flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
                     <CircleAlert className="size-3.5 shrink-0 text-amber-600" />
                     <p className="text-xs leading-[1.35] text-amber-900/70">
                       Your outputs are stored for 7 days only. Download anything you need to keep.
@@ -625,10 +639,10 @@ export default async function DashboardPage({
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
+                      <div className="inline-flex h-8 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/80">
                         <span>{requestPagination.total} total</span>
                       </div>
-                      <div className="inline-flex h-8 items-center gap-2 rounded-sm border border-black/10 bg-white px-2.5 text-xs text-black/80">
+                      <div className="inline-flex h-8 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/80">
                         <span>10 per page</span>
                       </div>
                     </div>
@@ -639,7 +653,7 @@ export default async function DashboardPage({
                       requestQueueRows.map((row) => (
                         <article
                           key={row.requestId}
-                          className="rounded-sm border border-black/10 bg-[#fafaf8] p-3"
+                          className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-3 shadow-sm"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
@@ -745,7 +759,7 @@ export default async function DashboardPage({
                           })}
                           aria-disabled={requestPagination.page <= 1}
                           className={cn(
-                            "inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
+                            "inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
                             requestPagination.page <= 1 && "pointer-events-none opacity-40"
                           )}
                         >
@@ -767,7 +781,7 @@ export default async function DashboardPage({
                                     analyticsRange,
                                   })}
                                   className={cn(
-                                    "inline-flex h-8 min-w-8 items-center justify-center rounded-sm border px-2 text-xs font-medium transition-colors",
+                                    "inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors",
                                     page === requestPagination.page
                                       ? "border-black bg-black text-white"
                                       : "border-black/10 bg-white text-black/70 hover:bg-black/[0.03]"
@@ -789,7 +803,7 @@ export default async function DashboardPage({
                           })}
                           aria-disabled={requestPagination.page >= requestPagination.totalPages}
                           className={cn(
-                            "inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
+                            "inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
                             requestPagination.page >= requestPagination.totalPages &&
                               "pointer-events-none opacity-40"
                           )}
@@ -807,7 +821,7 @@ export default async function DashboardPage({
             ) : null}
 
             {view === "models" ? (
-              <section className="rounded-sm border border-black/10 bg-white p-4">
+              <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
                 <div className="mb-4">
                   <h2 className="text-xl font-semibold text-black">Model catalog</h2>
                   <p className="mt-1 text-sm text-black/55">
@@ -820,7 +834,7 @@ export default async function DashboardPage({
 
             {view === "api-keys" ? (
               <>
-                <section className="rounded-sm border border-black/10 bg-white p-4">
+                <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div>
                       <h2 className="text-xl font-semibold text-black">API Keys</h2>

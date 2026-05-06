@@ -122,6 +122,15 @@ type RoutingRuleSummary = {
   runtimeDiagnostics: string[];
 };
 
+const formInputClassName =
+  "h-10 w-full rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+
+const formTextAreaClassName =
+  "w-full rounded-md border border-black/[0.08] bg-white px-3 py-2.5 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+
+const formSelectClassName =
+  "h-10 w-full rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+
 function RuntimeDiagnostics({
   diagnostics,
 }: {
@@ -132,7 +141,7 @@ function RuntimeDiagnostics({
   }
 
   return (
-    <div className="mt-4 rounded-sm border border-[#f0d5d0] bg-[#fff5f3] px-4 py-3">
+    <div className="mt-4 rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3">
       <div className="flex items-start gap-2">
         <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-[#b54432]" />
         <div className="min-w-0">
@@ -188,8 +197,8 @@ function ModalButton({
     <span
       className={
         tone === "secondary"
-          ? "inline-flex h-9 cursor-pointer items-center gap-2 rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
-          : "inline-flex h-9 cursor-pointer items-center gap-2 rounded-sm bg-black px-3 text-xs font-medium text-white transition-colors hover:bg-black/88"
+          ? "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
+          : "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
       }
     >
       {children}
@@ -213,8 +222,8 @@ function ManagementDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-sm border border-black/10 bg-[#f7f6f1] p-0 shadow-[0_30px_80px_rgba(17,17,17,0.14)] sm:max-w-3xl">
-        <DialogHeader className="border-b border-black/10 px-5 pb-4 pt-5">
+      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-3xl">
+        <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5">
           <DialogTitle className="font-medium text-black">{title}</DialogTitle>
           <DialogDescription className="text-black/55">
             {description}
@@ -306,7 +315,7 @@ function FormField({
         placeholder={placeholder}
         required={required}
         disabled={disabled}
-        className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+        className={formInputClassName}
       />
       {help ? <span className="mt-2 block text-xs leading-5 text-black/50">{help}</span> : null}
     </label>
@@ -337,7 +346,7 @@ function FormTextArea({
         placeholder={placeholder}
         rows={4}
         disabled={disabled}
-        className="w-full rounded-sm border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+        className={formTextAreaClassName}
       />
       {help ? <span className="mt-2 block text-xs leading-5 text-black/50">{help}</span> : null}
     </label>
@@ -366,7 +375,7 @@ function FormSelect({
         name={name}
         defaultValue={defaultValue}
         disabled={disabled}
-        className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+        className={formSelectClassName}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -391,7 +400,7 @@ function ActiveCheckbox({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex items-center gap-3 rounded-sm border border-black/10 bg-white px-3 py-3 text-sm text-black/72">
+    <label className="flex items-center gap-3 rounded-md border border-black/[0.08] bg-white px-3 py-3 text-sm text-black/72">
       <input
         type="checkbox"
         name={name}
@@ -459,20 +468,20 @@ export function PublicModelsPanel({
         </ManagementDialog>
       </div>
 
-      <div className="rounded-sm border border-[#d8e4f8] bg-[#f2f7ff] px-4 py-3 text-sm text-[#274a86]">
+      <div className="rounded-2xl border border-[#D8E4F8] bg-[#F3F7FF] px-4 py-3 text-sm text-[#274A86] shadow-sm">
         这里维护的是用户看到的模型型号和用户售价。不要在这里填写供应商成本。
       </div>
 
       {models.length > 0 ? (
         models.map((model) => (
-          <div key={model.id} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+          <div key={model.id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
+                  <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
                     {model.modality === "image" ? "图片" : model.modality === "video" ? "视频" : "音频"}
                   </span>
-                  <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
+                  <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
                     {model.active ? "已启用" : "未启用"}
                   </span>
                 </div>
@@ -526,20 +535,20 @@ export function PublicModelsPanel({
             </div>
 
             <div className="mt-4 grid gap-2 text-xs text-black/55 sm:grid-cols-3">
-              <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
+              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
                 提供方名称：{model.provider}
               </div>
-              <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
+              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
                 实现数量：{model.activeProviderModelCount}/{model.providerModelCount} 已启用
               </div>
-              <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
+              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
                 创建时间：{model.createdLabel}
               </div>
             </div>
           </div>
         ))
       ) : (
-        <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有可售模型</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             先创建一个可售模型，例如 `openoctopus/gemini-2.5-flash-image`。
@@ -606,14 +615,14 @@ export function ProvidersPanel({
 
       {providers.length > 0 ? (
         providers.map((provider) => (
-          <div key={provider.id} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+          <div key={provider.id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex h-6 items-center rounded-sm bg-[#eef3ea] px-2 text-[11px] text-[#335d2d]">
+                  <span className="inline-flex h-6 items-center rounded-md border border-[#D7EADB] bg-[#EDF8F0] px-2 text-[11px] text-[#335D2D]">
                     {provider.kind === "wavespeed" ? "WaveSpeed" : provider.kind === "partner" ? "合作方" : "自定义"}
                   </span>
-                  <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
+                  <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
                     {provider.status === "healthy" ? "健康" : provider.status === "degraded" ? "降级" : "离线"}
                   </span>
                 </div>
@@ -653,13 +662,13 @@ export function ProvidersPanel({
             </div>
 
             <div className="mt-4 grid gap-2 text-xs text-black/55 sm:grid-cols-3">
-              <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
+              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
                 区域：{provider.regionsLabel}
               </div>
-              <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
+              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
                 模型：{provider.activeModelCount}/{provider.modelCount} 已启用
               </div>
-              <div className="rounded-sm border border-black/8 bg-white px-3 py-2">
+              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
                 供应商密钥：{provider.credentialCount}
               </div>
             </div>
@@ -667,7 +676,7 @@ export function ProvidersPanel({
           </div>
         ))
       ) : (
-        <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有供应商</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             从这里开始录入第一个真实上游供应商。
@@ -734,18 +743,18 @@ export function CredentialsPanel({
 
       {credentials.length > 0 ? (
         credentials.map((credential) => (
-          <div key={credential.id} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+          <div key={credential.id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
+                  <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
                     {credential.environment}
                   </span>
-                  <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
+                  <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
                     {credential.secretSourceLabel}
                   </span>
                   {credential.is_active ? (
-                    <span className="inline-flex h-6 items-center gap-1 rounded-sm bg-[#eef3ea] px-2 text-[11px] text-[#335d2d]">
+                    <span className="inline-flex h-6 items-center gap-1 rounded-md border border-[#D7EADB] bg-[#EDF8F0] px-2 text-[11px] text-[#335D2D]">
                       <BadgeCheck className="size-3" />
                       已启用
                     </span>
@@ -828,7 +837,7 @@ export function CredentialsPanel({
                   {({ close }) => (
                   <ManagedDialogForm action={deleteProviderCredential} close={close}>
                     <input type="hidden" name="credentialId" value={credential.id} />
-                    <div className="rounded-sm border border-[#f0d5d0] bg-[#fff5f3] px-4 py-3 text-sm text-[#8d4336]">
+                    <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
                       这个操作会永久删除供应商密钥记录。必须先停用后才能删除。
                     </div>
                     <div className="flex justify-end">
@@ -857,7 +866,7 @@ export function CredentialsPanel({
           </div>
         ))
       ) : (
-        <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有供应商密钥</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             创建供应商后，在这里登记真实的密钥引用。
@@ -926,17 +935,17 @@ export function ModelsPanel({
         </ManagementDialog>
       </div>
 
-      <div className="rounded-sm border border-[#f1dfc6] bg-[#fff8ee] px-4 py-3 text-sm text-[#8a5b12]">
+      <div className="rounded-2xl border border-[#F1DFC6] bg-[#FFF8EE] px-4 py-3 text-sm text-[#8A5B12] shadow-sm">
         这里维护的是供应商真实成本和供应商模型，不是用户售价。用户售价请去“可售模型”里改。
       </div>
 
       {providerModels.length > 0 ? (
         providerModels.map((item) => (
-          <div key={item.id} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+          <div key={item.id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
+                  <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
                     {item.capability === "image_generation" ? "图片生成" : item.capability === "image_edit" ? "图片编辑" : "视频生成"}
                   </span>
                   <span className="text-sm font-medium text-black">{item.providerName}</span>
@@ -985,12 +994,12 @@ export function ModelsPanel({
             </div>
 
             <div className="mt-4 grid gap-3 text-xs text-black/55 xl:grid-cols-3">
-              <div className="rounded-sm border border-black/8 bg-white p-3">
+              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
                 <p className="text-[11px] tracking-[0.35px] text-black/45">成本配置</p>
                 <p className="mt-2 text-sm font-medium text-black">{item.pricingSummary}</p>
                 <pre className="mt-3 overflow-x-auto whitespace-pre-wrap">{item.pricingText}</pre>
               </div>
-              <div className="rounded-sm border border-black/8 bg-white p-3">
+              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
                 <p className="text-[11px] tracking-[0.35px] text-black/45">官方成本来源</p>
                 {item.pricingSourceUrl ? (
                   <a
@@ -1008,14 +1017,14 @@ export function ModelsPanel({
                   <p className="mt-3 text-xs leading-5 text-black/58">{item.pricingSourceNote}</p>
                 ) : null}
               </div>
-              <div className="rounded-sm border border-black/8 bg-white p-3">
+              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
                 <p className="text-[11px] tracking-[0.35px] text-black/45">价格证据</p>
                 {item.pricingSourceEvidence.length > 0 ? (
                   <div className="mt-2 grid gap-2">
                     {item.pricingSourceEvidence.map((evidence, index) => (
                       <div
                         key={`${item.id}-evidence-${index}`}
-                        className="rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-2"
+                        className="rounded-md border border-black/[0.06] bg-white px-3 py-2"
                       >
                         {evidence.signedUrl ? (
                           <a
@@ -1044,7 +1053,7 @@ export function ModelsPanel({
           </div>
         ))
       ) : (
-        <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有供应商模型</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             创建供应商后，在这里补齐真实上游模型标识和成本配置。
@@ -1117,7 +1126,7 @@ export function RoutesPanel({
 
       {routingRules.length > 0 ? (
         routingRules.map((rule) => (
-          <div key={rule.id} className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+          <div key={rule.id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-black/45">
@@ -1169,7 +1178,7 @@ export function RoutesPanel({
           </div>
         ))
       ) : (
-        <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有路由</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             至少要先有一个真实供应商模型，才能创建路由。

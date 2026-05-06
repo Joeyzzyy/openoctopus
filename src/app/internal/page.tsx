@@ -499,9 +499,9 @@ function OverviewCard({
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="rounded-sm border border-black/8 bg-[#f7f7f4] px-3 py-2.5 shadow-[0_18px_40px_rgba(17,17,17,0.03)]">
+    <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] px-3 py-2.5 shadow-sm">
       <div className="flex items-center gap-2.5">
-        <div className="inline-flex size-7 shrink-0 items-center justify-center rounded-sm bg-white text-black/55">
+        <div className="inline-flex size-7 shrink-0 items-center justify-center rounded-xl bg-white text-black/55">
           <Icon className="size-3.5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -524,14 +524,14 @@ function SetupOrderCard() {
   ];
 
   return (
-    <section className="mb-6 rounded-sm border border-black/10 bg-white p-4">
+    <section className="mb-6 rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
       <h2 className="text-xl font-semibold text-black">推荐操作顺序</h2>
       <p className="mt-1 text-sm text-black/55">
         先把供应商、售价、供应商密钥、供应商模型、路由这五层分清，再去录数据，整个后台就不会绕。
       </p>
       <div className="mt-4 grid gap-3">
         {steps.map((step) => (
-          <div key={step} className="rounded-sm border border-black/8 bg-[#faf9f6] px-4 py-3 text-sm text-black/72">
+          <div key={step} className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3 text-sm text-black/72">
             {step}
           </div>
         ))}
@@ -552,7 +552,7 @@ function SectionShell({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="rounded-sm border border-black/10 bg-white p-4">
+    <section id={id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
       <div className="mb-4">
         <h2 className="text-xl font-semibold text-black">{title}</h2>
         <p className="mt-1 text-sm text-black/55">{description}</p>
@@ -570,7 +570,7 @@ function EmptyState({
   detail: string;
 }) {
   return (
-    <div className="rounded-sm border border-dashed border-black/12 bg-[#faf9f6] px-4 py-6">
+    <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
       <p className="text-sm font-medium text-black">{title}</p>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">{detail}</p>
     </div>
@@ -585,7 +585,7 @@ function RequestMetricCard({
   value: string;
 }) {
   return (
-    <div className="rounded-sm border border-black/8 bg-white px-3 py-2.5">
+    <div className="rounded-xl border border-black/[0.06] bg-white px-3 py-2.5">
       <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">{label}</p>
       <p className="mt-1 text-sm font-medium text-black">{value}</p>
     </div>
@@ -602,14 +602,14 @@ function RequestBreakdownSection({
   emptyLabel: string;
 }) {
   return (
-    <section className="rounded-sm border border-black/8 bg-white px-3 py-3">
+    <section className="rounded-xl border border-black/[0.06] bg-white px-3 py-3">
       <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">{title}</p>
       {items.length > 0 ? (
         <div className="mt-3 grid gap-2">
           {items.map((item) => (
             <div
               key={`${title}-${item.label}`}
-              className="flex items-center justify-between gap-3 rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-2 text-xs"
+              className="flex items-center justify-between gap-3 rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-3 py-2 text-xs"
             >
               <span className="text-black/58">{item.label}</span>
               <span className="font-mono text-black">{item.value}</span>
@@ -635,10 +635,10 @@ function ReadinessItem({
   const Icon = ready ? ShieldCheck : ShieldAlert;
 
   return (
-    <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+    <div className="rounded-xl border border-black/[0.06] bg-white px-3 py-3">
       <div className="flex items-start gap-3">
         <div
-          className={`inline-flex size-7 shrink-0 items-center justify-center rounded-sm ${
+          className={`inline-flex size-7 shrink-0 items-center justify-center rounded-md ${
             ready ? "bg-[#e7f4ea] text-[#1f6b3b]" : "bg-[#fff1dc] text-[#9a5a00]"
           }`}
         >
@@ -682,7 +682,7 @@ function MonitoringChartCard({
   const maxValue = Math.max(...points, 1);
 
   return (
-    <div className="rounded-sm border border-black/10 bg-white p-4">
+    <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <p className="break-all text-sm font-medium text-black">{title}</p>
@@ -691,13 +691,13 @@ function MonitoringChartCard({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-2 rounded-sm border border-[#d7eadb] bg-[#edf8f0] px-2.5 py-1 text-[11px] text-[#1f6b3b]">
+          <div className="inline-flex items-center gap-2 rounded-md border border-[#D7EADB] bg-[#EDF8F0] px-2.5 py-1 text-[11px] text-[#1F6B3B]">
             <span>成功率 {successRate}</span>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-sm border border-[#f0d1cb] bg-[#fff1ee] px-2.5 py-1 text-[11px] text-[#b54432]">
+          <div className="inline-flex items-center gap-2 rounded-md border border-[#F0D1CB] bg-[#FFF1EE] px-2.5 py-1 text-[11px] text-[#B54432]">
             <span>失败率 {failureRate}</span>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-sm border border-black/10 bg-[#faf9f6] px-2.5 py-1 text-[11px] text-black/60">
+          <div className="inline-flex items-center gap-2 rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2.5 py-1 text-[11px] text-black/60">
             <Activity className="size-3.5" />
             <span>峰值 {maxValue}</span>
           </div>
@@ -709,7 +709,7 @@ function MonitoringChartCard({
         <span>进行中 {inflightCount}</span>
       </div>
 
-      <div className="mt-4 rounded-sm border border-black/8 bg-[#faf9f6] p-3">
+      <div className="mt-4 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="h-44 w-full"
@@ -774,22 +774,22 @@ function VideoTaskMonitoringCard({
   const elapsedLabel = inflight ? formatElapsedDuration(request.createdAt) : request.completedLabel;
 
   return (
-    <article className="rounded-sm border border-black/10 bg-white p-4">
+    <article className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className={`inline-flex h-6 items-center rounded-sm px-2 text-[11px] ${
+              className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
                 inflight
-                  ? "bg-[#fff1dc] text-[#9a5a00]"
+                  ? "border-[#F2DEC0] bg-[#FFF3E2] text-[#9A5A00]"
                   : request.status === "succeeded"
-                    ? "bg-[#edf8f0] text-[#1f6b3b]"
-                    : "bg-[#fff1ee] text-[#b54432]"
+                    ? "border-[#D7EADB] bg-[#EDF8F0] text-[#1F6B3B]"
+                    : "border-[#F0D1CB] bg-[#FFF1EE] text-[#B54432]"
               }`}
             >
               {request.status}
             </span>
-            <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
+            <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
               video_generation
             </span>
           </div>
@@ -816,7 +816,7 @@ function VideoTaskMonitoringCard({
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <section className="rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-3">
+        <section className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
           <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">上游轮询</p>
           {request.lastAttempt ? (
             <div className="mt-3 space-y-2 text-xs text-black/60">
@@ -831,7 +831,7 @@ function VideoTaskMonitoringCard({
           )}
         </section>
 
-        <section className="rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-3">
+        <section className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
           <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">错误 / 诊断</p>
           {request.errorMessage || request.lastAttempt?.errorMessage ? (
             <p className="mt-3 text-xs leading-5 text-[#b54432]">
@@ -862,14 +862,14 @@ function ImageTaskLogRow({
   };
 }) {
   return (
-    <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+    <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
+            <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
               {request.status}
             </span>
-            <span className="inline-flex h-6 items-center rounded-sm bg-[#eef3ea] px-2 text-[11px] text-[#436b39]">
+            <span className="inline-flex h-6 items-center rounded-md border border-[#D7EADB] bg-[#EDF8F0] px-2 text-[11px] text-[#436B39]">
               {request.capability}
             </span>
           </div>
@@ -915,10 +915,16 @@ export default async function InternalPage({
 
   if (!data.authorized) {
     return (
-      <main className="relative min-h-screen overflow-hidden bg-[#f7f6f1] text-[#111111]">
-        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(202,232,207,0.52),transparent_32%),radial-gradient(circle_at_top_right,rgba(255,224,194,0.4),transparent_26%),linear-gradient(180deg,#fbfaf5_0%,#f4f3ee_46%,#efeee7_100%)]" />
+      <main className="relative min-h-screen overflow-hidden bg-[#FCFCFA] text-[#111111]">
+        <div
+          className="pointer-events-none fixed inset-0"
+          style={{
+            background:
+              "radial-gradient(circle at top, rgba(243, 226, 201, 0.52), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(252,252,250,1) 46%)",
+          }}
+        />
         <div className="relative mx-auto max-w-4xl px-4 py-10">
-          <div className="rounded-sm border border-black/10 bg-white p-6">
+          <div className="rounded-2xl border border-black/[0.08] bg-white p-6 shadow-sm">
             <p className="text-[11px] tracking-[0.35px] text-black/55">内部访问</p>
             <h1 className="mt-2 text-3xl font-semibold text-black">无权访问</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-black/55">
@@ -1057,15 +1063,29 @@ export default async function InternalPage({
   const imageRecentLogs = data.globalMonitoring.recentImageRequests.slice(0, 12);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f7f6f1] text-[#111111]">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(202,232,207,0.52),transparent_32%),radial-gradient(circle_at_top_right,rgba(255,224,194,0.4),transparent_26%),linear-gradient(180deg,#fbfaf5_0%,#f4f3ee_46%,#efeee7_100%)]" />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 h-48 bg-[radial-gradient(circle_at_bottom,rgba(221,229,215,0.55),transparent_56%)]" />
+    <main className="relative min-h-screen overflow-hidden bg-[#FCFCFA] text-[#111111]">
+      <div
+        className="pointer-events-none fixed inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at top, rgba(243, 226, 201, 0.52), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(252,252,250,1) 46%)",
+        }}
+      />
+      <div
+        className="pointer-events-none fixed inset-x-0 top-0 h-[360px] opacity-45"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(17,24,39,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(17,24,39,0.035) 1px, transparent 1px)",
+          backgroundSize: "44px 44px",
+          maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)",
+        }}
+      />
 
       <div className="relative mx-auto max-w-7xl px-4 pb-10 xl:px-0">
         <section className="min-h-[calc(100vh-108px)] py-8">
           <div className="mb-6">
             <div>
-              <h1 className="mt-2 text-3xl font-semibold leading-none text-[#111111]">
+              <h1 className="mt-2 text-3xl font-semibold leading-none tracking-[-0.05em] text-[#111111]">
                 内部控制台
               </h1>
               <p className="mt-2 text-sm text-black/55">
@@ -1143,7 +1163,7 @@ export default async function InternalPage({
                   description="快速确认控制台链路是否已配置完成，能否承接真实流量。"
                 >
                   <div className="grid gap-4 lg:grid-cols-2">
-                    <div className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+                    <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm">
                       <p className="text-sm font-medium text-black">当前链路</p>
                       <div className="mt-4 grid gap-3 text-sm text-black/65">
                         <ReadinessItem
@@ -1164,16 +1184,16 @@ export default async function InternalPage({
                       </div>
                     </div>
 
-                    <div className="rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+                    <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm">
                       <p className="text-sm font-medium text-black">运行检查</p>
                       <div className="mt-4 grid gap-3 text-sm text-black/65">
-                        <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                        <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
                           Dashboard 是否可见取决于是否存在全局路由，或是否存在当前工作区级别的启用路由。
                         </div>
-                        <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                        <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
                           API 是否接收请求取决于 API Key 是否启用，以及是否存在匹配请求可售模型 slug 的路由。
                         </div>
-                        <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                        <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
                           最终执行仍然依赖 worker adapter 和真实上游密钥。
                         </div>
                       </div>
@@ -1206,7 +1226,7 @@ export default async function InternalPage({
 
           {activeTab === "providers" ? (
             <>
-              <section className="mb-6 rounded-sm border border-black/10 bg-white p-4">
+              <section className="mb-6 rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <h2 className="text-xl font-semibold text-black">快速模板</h2>
@@ -1217,19 +1237,19 @@ export default async function InternalPage({
                   <div className="flex flex-wrap gap-2">
                     <a
                       href={buildInternalHref("providers", "gemini-direct")}
-                      className="inline-flex h-9 cursor-pointer items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
+                      className="inline-flex h-9 cursor-pointer items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
                     >
                       Gemini Direct
                     </a>
                     <a
                       href={buildInternalHref("providers", "wavespeed")}
-                      className="inline-flex h-9 cursor-pointer items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
+                      className="inline-flex h-9 cursor-pointer items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
                     >
                       WaveSpeed
                     </a>
                     <a
                       href={buildInternalHref("providers")}
-                      className="inline-flex h-9 cursor-pointer items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
+                      className="inline-flex h-9 cursor-pointer items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
                     >
                       清除
                     </a>
@@ -1297,7 +1317,7 @@ export default async function InternalPage({
                 title="供应商模型（供应商成本）"
                 description="把可售模型映射到真实上游模型，并填写内部供应商成本。这里不是用户售价。"
                 >
-                <div className="mb-4 flex items-center gap-1.5 bg-[#e8f0ff] px-3 py-2.5">
+                <div className="mb-4 flex items-center gap-1.5 rounded-xl border border-[#D8E4F8] bg-[#F3F7FF] px-3 py-2.5">
                   <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
                   <p className="text-xs leading-[1.35] text-[#355fb4]">
                     这里填的是供应商真实结算成本，不是用户售价。用户售价在“可售模型”里维护；这里维护的是某个供应商对这个可售模型的一种实现和进货成本。
@@ -1322,7 +1342,7 @@ export default async function InternalPage({
                 title="可售模型路由"
                 description="在这里切换真实流量应该走哪个供应商模型。默认为空，需要你自己创建路由。"
                 >
-                <div className="mb-4 flex items-center gap-1.5 bg-[#eef3ea] px-3 py-2.5">
+                <div className="mb-4 flex items-center gap-1.5 rounded-xl border border-[#D7EADB] bg-[#EDF8F0] px-3 py-2.5">
                   <CircleAlert className="size-3.5 shrink-0 text-[#335d2d]" />
                   <p className="text-xs leading-[1.35] text-[#335d2d]">
                     操作员在这里选择每个可售模型当前上线哪个供应商模型。客户侧仍然只看到 OpenOctopus 的可售型号。
@@ -1348,7 +1368,7 @@ export default async function InternalPage({
               >
                 <MonitoringAutoRefresh enabled={activeTab === "monitoring" && selectedMonitoringView === "video"} />
 
-                <div className="mb-4 flex flex-wrap gap-2 rounded-sm border border-black/8 bg-[#faf9f6] p-3">
+                <div className="mb-4 flex flex-wrap gap-2 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
                   {monitoringViewOptions.map((option) => (
                     <a
                       key={option.value}
@@ -1358,7 +1378,7 @@ export default async function InternalPage({
                         range: selectedMonitoringRange,
                         status: selectedMonitoringStatus,
                       })}
-                      className={`inline-flex h-9 items-center rounded-sm border px-3 text-sm font-medium transition-colors ${
+                      className={`inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium transition-colors ${
                         selectedMonitoringView === option.value
                           ? "border-black bg-black text-white"
                           : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
@@ -1369,7 +1389,7 @@ export default async function InternalPage({
                   ))}
                 </div>
 
-                <div className="mb-4 rounded-sm border border-black/8 bg-[#faf9f6] p-3">
+                <div className="mb-4 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
                   <div className="grid gap-3 lg:grid-cols-3">
                     <div>
                       <p className="text-[11px] tracking-[0.35px] text-black/45">时间粒度</p>
@@ -1383,7 +1403,7 @@ export default async function InternalPage({
                               range: selectedMonitoringRange,
                               status: selectedMonitoringStatus,
                             })}
-                            className={`inline-flex h-7 items-center rounded-sm border px-2.5 text-[11px] font-medium transition-colors ${
+                            className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
                               selectedMonitoringInterval === option.value
                                 ? "border-black bg-black text-white"
                                 : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
@@ -1407,7 +1427,7 @@ export default async function InternalPage({
                               range: option.value,
                               status: selectedMonitoringStatus,
                             })}
-                            className={`inline-flex h-7 items-center rounded-sm border px-2.5 text-[11px] font-medium transition-colors ${
+                            className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
                               selectedMonitoringRange === option.value
                                 ? "border-black bg-black text-white"
                                 : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
@@ -1431,7 +1451,7 @@ export default async function InternalPage({
                               range: selectedMonitoringRange,
                               status: option.value,
                             })}
-                            className={`inline-flex h-7 items-center rounded-sm border px-2.5 text-[11px] font-medium transition-colors ${
+                            className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
                               selectedMonitoringStatus === option.value
                                 ? "border-black bg-black text-white"
                                 : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
@@ -1445,7 +1465,7 @@ export default async function InternalPage({
                   </div>
                 </div>
 
-                <div className="mb-4 grid gap-2 md:grid-cols-6">
+                <div className="mb-5 grid gap-3 md:grid-cols-6">
                   <OverviewCard
                     title="模型总数"
                     value={monitoringSummary.modelCount}
@@ -1484,7 +1504,7 @@ export default async function InternalPage({
                   />
                 </div>
 
-                <div className="mb-4 flex items-center gap-1.5 bg-[#e8f0ff] px-3 py-2.5">
+                <div className="mb-5 flex items-center gap-1.5 rounded-xl border border-[#D8E4F8] bg-[#F3F7FF] px-3 py-2.5">
                   <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
                   <p className="text-xs leading-[1.35] text-[#355fb4]">
                     当前查看的是「{selectedMonitoringViewLabel}」。所有数据都来自全系统维度的 `inference_requests`，不是单个 workspace 的局部数据。
@@ -1493,47 +1513,8 @@ export default async function InternalPage({
 
                 {selectedMonitoringView === "overview" ? (
                   <>
-                    <div className="mb-4 grid gap-2 md:grid-cols-6">
-                      <OverviewCard
-                        title="模型总数"
-                        value={monitoringSummary.modelCount}
-                        note="按可售模型逐张展示折线图"
-                        icon={Network}
-                      />
-                      <OverviewCard
-                        title="活跃模型"
-                        value={monitoringSummary.activeModelCount}
-                        note={`${selectedMonitoringRangeLabel} 内至少调用过一次`}
-                        icon={Activity}
-                      />
-                      <OverviewCard
-                        title="总调用量"
-                        value={monitoringSummary.requestCount}
-                        note={`${selectedMonitoringRangeLabel} · ${selectedMonitoringStatusLabel}`}
-                        icon={Fingerprint}
-                      />
-                      <OverviewCard
-                        title="单桶峰值"
-                        value={monitoringSummary.peakValue}
-                        note={`${selectedMonitoringIntervalLabel}`}
-                        icon={Waypoints}
-                      />
-                      <OverviewCard
-                        title="成功率"
-                        value={formatPercent(monitoringSuccessRate)}
-                        note={`已结算 ${monitoringHealthSummary.settled} 条`}
-                        icon={ShieldCheck}
-                      />
-                      <OverviewCard
-                        title="失败率"
-                        value={formatPercent(monitoringFailureRate)}
-                        note={`失败 ${monitoringHealthSummary.failed} · 取消 ${monitoringHealthSummary.cancelled}`}
-                        icon={ShieldAlert}
-                      />
-                    </div>
-
                     {monitoringSeries.length > 0 ? (
-                      <div className="grid gap-4">
+                      <div className="grid gap-5">
                         {monitoringSeries.map((series) => {
                           const health = monitoringHealthByModel.get(series.modelSlug) ?? {
                             total: 0,
@@ -1576,7 +1557,7 @@ export default async function InternalPage({
 
                 {selectedMonitoringView === "video" ? (
                   <>
-                    <div className="mb-4 grid gap-3 md:grid-cols-3">
+                    <div className="mb-5 grid gap-3 md:grid-cols-3">
                       <OverviewCard
                         title="进行中视频任务"
                         value={globalVideoInflightRequests.length}
@@ -1597,7 +1578,7 @@ export default async function InternalPage({
                       />
                     </div>
 
-                    <section className="mb-6 rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+                    <section className="mb-6 rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-5 shadow-sm">
                       <div className="mb-4 flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium text-black">全局视频任务实时监控</p>
@@ -1605,7 +1586,7 @@ export default async function InternalPage({
                             这里只盯全系统“正在发生中的”视频任务，展示 task id、workspace、最近一次 provider attempt 和上游 task id。
                           </p>
                         </div>
-                        <div className="rounded-sm border border-black/8 bg-white px-3 py-2 text-[11px] text-black/55">
+                        <div className="rounded-md border border-black/[0.08] bg-white px-3 py-2 text-[11px] text-black/55">
                           30 秒自动刷新
                         </div>
                       </div>
@@ -1624,7 +1605,7 @@ export default async function InternalPage({
                       )}
                     </section>
 
-                    <section className="mb-6 rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+                    <section className="mb-6 rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-5 shadow-sm">
                       <div className="mb-4">
                         <p className="text-sm font-medium text-black">最近完成的视频任务日志</p>
                         <p className="mt-1 text-xs leading-5 text-black/50">
@@ -1650,7 +1631,7 @@ export default async function InternalPage({
 
                 {selectedMonitoringView === "image" ? (
                   <>
-                    <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <OverviewCard
                         title="图片总量"
                         value={imageMonitoringSummary.total}
@@ -1677,7 +1658,7 @@ export default async function InternalPage({
                       />
                     </div>
 
-                    <section className="mb-6 rounded-sm border border-black/10 bg-[#faf9f6] p-4">
+                    <section className="mb-6 rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-5 shadow-sm">
                       <div className="mb-4">
                         <p className="text-sm font-medium text-black">图片任务汇总与整体日志</p>
                         <p className="mt-1 text-xs leading-5 text-black/50">
@@ -1701,47 +1682,6 @@ export default async function InternalPage({
                   </>
                 ) : null}
 
-                {selectedMonitoringView === "overview" && monitoringSeries.length > 0 ? (
-                  <div className="grid gap-4">
-                    {monitoringSeries.map((series) => {
-                      const health = monitoringHealthByModel.get(series.modelSlug) ?? {
-                        total: 0,
-                        settled: 0,
-                        succeeded: 0,
-                        failed: 0,
-                        cancelled: 0,
-                        inflight: 0,
-                      };
-                      const successRate =
-                        health.settled > 0 ? (health.succeeded / health.settled) * 100 : 0;
-                      const failureRate =
-                        health.settled > 0 ? (health.failed / health.settled) * 100 : 0;
-
-                      return (
-                        <MonitoringChartCard
-                          key={series.modelSlug}
-                          title={series.title}
-                          points={series.points}
-                          labels={series.labels}
-                          total={series.total}
-                          peak={series.peak}
-                          intervalLabel={selectedMonitoringIntervalLabel.replace("按", "")}
-                          successRate={formatPercent(successRate)}
-                          failureRate={formatPercent(failureRate)}
-                          settledCount={health.settled}
-                          inflightCount={health.inflight}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : null}
-
-                {selectedMonitoringView === "overview" && monitoringSeries.length === 0 ? (
-                  <EmptyState
-                    title="还没有模型监控数据"
-                    detail="先创建可售模型，或者等待网关产生新的 inference_requests。这里会按模型自动生成对应的调用折线图。"
-                  />
-                ) : null}
               </SectionShell>
             </section>
           ) : null}
@@ -1753,8 +1693,8 @@ export default async function InternalPage({
                 title="用户请求记录"
                 description="按客户和 API Key 筛选，查看每条用户请求的收入、成本和计费拆分。"
               >
-                <div className="mb-4 grid gap-3 rounded-sm border border-black/8 bg-[#faf9f6] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                  <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                <div className="mb-4 grid gap-3 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
                     <p className="text-[11px] tracking-[0.35px] text-black/45">客户</p>
                     <div className="mt-2 flex items-center justify-between gap-3">
                       <div>
@@ -1766,14 +1706,14 @@ export default async function InternalPage({
                           customer: data.workspace.slug,
                           key: selectedRequestKey,
                         })}
-                        className="inline-flex h-8 items-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
+                      className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
                       >
                         当前客户
                       </a>
                     </div>
                   </div>
 
-                  <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
                     <p className="text-[11px] tracking-[0.35px] text-black/45">API Key 筛选</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <a
@@ -1781,7 +1721,7 @@ export default async function InternalPage({
                           customer: selectedRequestCustomer,
                           key: "all",
                         })}
-                        className={`inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors ${
+                        className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
                           selectedRequestKey === "all"
                             ? "border-black bg-black text-white"
                             : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
@@ -1796,7 +1736,7 @@ export default async function InternalPage({
                             customer: selectedRequestCustomer,
                             key: item.id,
                           })}
-                          className={`inline-flex h-8 items-center rounded-sm border px-3 text-xs font-medium transition-colors ${
+                          className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
                             selectedRequestKey === item.id
                               ? "border-black bg-black text-white"
                               : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
@@ -1808,7 +1748,7 @@ export default async function InternalPage({
                     </div>
                   </div>
 
-                  <div className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
                     <p className="text-[11px] tracking-[0.35px] text-black/45">当前选择</p>
                     <p className="mt-2 text-sm font-medium text-black">
                       {selectedRequestKeyRecord ? selectedRequestKeyRecord.name : "全部 Key"}
@@ -1861,15 +1801,15 @@ export default async function InternalPage({
                     {filteredRequests.map((request) => (
                       <article
                         key={request.id}
-                        className="rounded-sm border border-black/10 bg-[#faf9f6] p-4"
+                        className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm"
                       >
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="inline-flex h-6 items-center rounded-sm bg-[#f1eee6] px-2 text-[11px] text-[#6f5b27]">
+                              <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
                                 {request.status}
                               </span>
-                              <span className="inline-flex h-6 items-center rounded-sm bg-[#e8f0ff] px-2 text-[11px] text-[#355fb4]">
+                              <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
                                 {request.capability}
                               </span>
                             </div>
@@ -1890,7 +1830,7 @@ export default async function InternalPage({
                         </div>
 
                         <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                          <section className="rounded-sm border border-black/8 bg-white px-3 py-3">
+                          <section className="rounded-xl border border-black/[0.06] bg-white px-3 py-3">
                             <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">请求摘要</p>
                             <div className="mt-3 grid gap-2 sm:grid-cols-2">
                               <RequestMetricCard label="创建时间" value={request.createdLabel} />
@@ -1906,7 +1846,7 @@ export default async function InternalPage({
                               />
                             </div>
                             {request.lastAttempt ? (
-                              <div className="mt-3 rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-2.5 text-xs">
+                              <div className="mt-3 rounded-xl border border-black/[0.06] bg-white px-3 py-2.5 text-xs">
                                 <div className="flex items-center justify-between gap-3">
                                   <span className="text-black/58">
                                     最后一次尝试 #{request.lastAttempt.attempt_no}
@@ -1968,7 +1908,7 @@ export default async function InternalPage({
                     {data.auditLogs.map((log) => (
                       <article
                         key={log.id}
-                        className="rounded-sm border border-black/10 bg-[#faf9f6] p-4"
+                        className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm"
                       >
                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                           <div>
@@ -1985,7 +1925,7 @@ export default async function InternalPage({
                           <div className="text-xs text-black/45">{log.createdLabel}</div>
                         </div>
 
-                        <div className="mt-4 rounded-sm border border-black/8 bg-white p-3 text-xs text-black/58">
+                        <div className="mt-4 rounded-xl border border-black/[0.06] bg-white p-3 text-xs text-black/58">
                           <pre className="overflow-x-auto whitespace-pre-wrap">{log.detailsText}</pre>
                         </div>
                       </article>

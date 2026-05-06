@@ -43,6 +43,17 @@ type BillingFormState = {
   outputCostPerMillion: string;
 };
 
+const formInputClassName =
+  "h-10 w-full rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+
+const formTextAreaClassName =
+  "w-full rounded-md border border-black/[0.08] bg-white px-3 py-2.5 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+
+const formSelectClassName =
+  "h-10 w-full rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+
+const panelSurfaceClassName = "rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm";
+
 function parseBillingFormState(initialValue?: string): BillingFormState {
   const fallback: BillingFormState = {
     currency: "USD",
@@ -187,7 +198,7 @@ function BillingNumberField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required
-        className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20"
+        className={formInputClassName}
       />
       {help ? <span className="mt-2 block text-xs leading-5 text-black/50">{help}</span> : null}
     </label>
@@ -209,7 +220,7 @@ export function BillingConfigEditor({
   const hiddenValue = buildBillingConfigValue(state);
 
   return (
-    <div className="rounded-sm border border-black/8 bg-white p-3">
+    <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
       <input type="hidden" name={name} value={hiddenValue} />
       <div className="grid gap-3 md:grid-cols-[120px_minmax(0,1fr)]">
         <label className="block">
@@ -223,11 +234,11 @@ export function BillingConfigEditor({
               }))
             }
             required
-            className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20"
+            className={formInputClassName}
           />
         </label>
 
-        <div className="rounded-sm border border-black/8 bg-[#faf9f6] px-3 py-3">
+        <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
           <p className="text-[11px] tracking-[0.35px] text-black/45">计费组件</p>
           <div className="mt-2 grid gap-2 md:grid-cols-3">
             {[
@@ -240,7 +251,7 @@ export function BillingConfigEditor({
             ].map(([key, label]) => (
               <label
                 key={key}
-                className="flex items-center gap-2 rounded-sm border border-black/8 bg-white px-3 py-2 text-sm text-black/72"
+                className="flex items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 py-2 text-sm text-black/72"
               >
                 <input
                   type="checkbox"
@@ -309,7 +320,7 @@ export function BillingConfigEditor({
         ) : null}
       </div>
 
-      <div className="mt-3 rounded-sm bg-[#faf9f6] px-3 py-2">
+      <div className="mt-3 rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
         <p className="text-[11px] tracking-[0.35px] text-black/45">{generatedLabel}</p>
         <code className="mt-1 block break-all text-xs leading-5 text-black/55">{hiddenValue}</code>
       </div>
@@ -333,7 +344,7 @@ export function CreateProviderModelForm({
   disabled,
   onSuccess,
   submitLabel = "添加供应商模型",
-  className = "rounded-sm border border-black/10 bg-[#faf9f6] p-4",
+  className = panelSurfaceClassName,
 }: {
   action?: (formData: FormData) => void | Promise<void>;
   supportedModels: SupportedModelOption[];
@@ -387,7 +398,7 @@ export function CreateProviderModelForm({
             value={supportedModelId}
             onChange={(event) => setSupportedModelId(event.target.value)}
             disabled={disabled}
-            className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+            className={formSelectClassName}
           >
             {supportedModels.length > 0 ? (
               supportedModels.map((item) => (
@@ -410,7 +421,7 @@ export function CreateProviderModelForm({
             name="providerId"
             defaultValue={defaultProviderId}
             disabled={disabled}
-            className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+            className={formSelectClassName}
           >
             {providers.length > 0 ? (
               providers.map((item) => (
@@ -430,7 +441,7 @@ export function CreateProviderModelForm({
           <input
             value={capabilityLabel(selectedSupportedModel?.capability ?? null)}
             readOnly
-            className="h-9 w-full rounded-sm border border-black/10 bg-black/[0.03] px-3 text-sm text-black/60 outline-none"
+            className="h-10 w-full rounded-md border border-black/[0.08] bg-black/[0.03] px-3 text-sm text-black/60 outline-none"
           />
           <input
             type="hidden"
@@ -448,7 +459,7 @@ export function CreateProviderModelForm({
             placeholder="gemini-2.5-flash-image"
             required
             disabled={disabled}
-            className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+            className={formInputClassName}
           />
           <FieldHint
             help="填写供应商 API 真实使用的模型标识。"
@@ -477,7 +488,7 @@ export function CreateProviderModelForm({
             defaultValue={defaultPricingSourceUrl}
             placeholder="https://ai.google.dev/gemini-api/docs/pricing"
             disabled={disabled}
-            className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+            className={formInputClassName}
           />
           <FieldHint help="填写官方价格页、模型文档或公开结算说明链接，便于后续溯源。" />
         </label>
@@ -489,7 +500,7 @@ export function CreateProviderModelForm({
             rows={3}
             defaultValue={defaultPricingSourceNote}
             disabled={disabled}
-            className="w-full rounded-sm border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+            className={formTextAreaClassName}
             placeholder="例如：Google 官方写明 image output 按 $30 / 1M output tokens，1024x1024 约等于 1290 output tokens。"
           />
         </label>
@@ -501,12 +512,12 @@ export function CreateProviderModelForm({
             name="pricingSourceEvidenceFile"
             accept="image/png,image/jpeg,image/webp"
             disabled={disabled}
-            className="block w-full rounded-sm border border-black/10 bg-white px-3 py-2 text-sm text-black file:mr-3 file:rounded-sm file:border-0 file:bg-black file:px-3 file:py-2 file:text-xs file:font-medium file:text-white"
+            className="block w-full rounded-md border border-black/[0.08] bg-white px-3 py-2 text-sm text-black file:mr-3 file:rounded-md file:border-0 file:bg-[#111827] file:px-3 file:py-2 file:text-xs file:font-medium file:text-white"
           />
           <FieldHint help="可选，上传官方价格页截图。保存后会把文件路径记录到供应商模型里。" />
         </label>
 
-        <label className="flex items-center gap-3 rounded-sm border border-black/10 bg-white px-3 py-3 text-sm text-black/72">
+        <label className="flex items-center gap-3 rounded-md border border-black/[0.08] bg-white px-3 py-3 text-sm text-black/72">
           <input
             type="checkbox"
             name="active"
@@ -542,7 +553,7 @@ export function CreateRoutingRuleForm({
   disabled,
   onSuccess,
   submitLabel = "添加路由规则",
-  className = "rounded-sm border border-black/10 bg-[#faf9f6] p-4",
+  className = panelSurfaceClassName,
 }: {
   action?: (formData: FormData) => void | Promise<void>;
   supportedModels: SupportedModelOption[];
@@ -595,7 +606,7 @@ export function CreateRoutingRuleForm({
             value={supportedModelId}
             onChange={(event) => setSupportedModelId(event.target.value)}
             disabled={disabled}
-            className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+            className={formSelectClassName}
           >
             {supportedModels.length > 0 ? (
               supportedModels.map((item) => (
@@ -615,7 +626,7 @@ export function CreateRoutingRuleForm({
           <input
             value={capabilityLabel(selectedSupportedModel?.capability ?? null)}
             readOnly
-            className="h-9 w-full rounded-sm border border-black/10 bg-black/[0.03] px-3 text-sm text-black/60 outline-none"
+            className="h-10 w-full rounded-md border border-black/[0.08] bg-black/[0.03] px-3 text-sm text-black/60 outline-none"
           />
           <input
             type="hidden"
@@ -631,7 +642,7 @@ export function CreateRoutingRuleForm({
             name="primaryProviderModelId"
             defaultValue={defaultPrimaryProviderModelId}
             disabled={disabled}
-            className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+            className={formSelectClassName}
           >
             {filteredProviderModels.length > 0 ? (
               filteredProviderModels.map((item) => (
@@ -652,7 +663,7 @@ export function CreateRoutingRuleForm({
             name="fallbackProviderModelId"
             defaultValue={defaultFallbackProviderModelId}
             disabled={disabled}
-            className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+            className={formSelectClassName}
           >
             <option value="">不设置回退</option>
             {filteredProviderModels.map((item) => (
@@ -670,7 +681,7 @@ export function CreateRoutingRuleForm({
             name="workspaceScope"
             defaultValue={defaultWorkspaceScope}
             disabled={disabled}
-            className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+            className={formSelectClassName}
           >
             <option value="workspace">当前工作区覆盖</option>
             <option value="global">全局默认路由</option>
@@ -684,7 +695,7 @@ export function CreateRoutingRuleForm({
             name="routeStrategy"
             defaultValue={defaultStrategy}
             disabled={disabled}
-            className="h-9 w-full rounded-sm border border-black/10 bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 disabled:bg-black/[0.03] disabled:text-black/35"
+            className={formSelectClassName}
           >
             <option value="primary_then_fallback">primary_then_fallback</option>
             <option value="primary_only">primary_only</option>
@@ -694,7 +705,7 @@ export function CreateRoutingRuleForm({
           <FieldHint help="只有一个实现时用 primary_only；有真实备用供应商时用 primary_then_fallback。" />
         </label>
 
-        <label className="flex items-center gap-3 rounded-sm border border-black/10 bg-white px-3 py-3 text-sm text-black/72">
+        <label className="flex items-center gap-3 rounded-md border border-black/[0.08] bg-white px-3 py-3 text-sm text-black/72">
           <input
             type="checkbox"
             name="active"

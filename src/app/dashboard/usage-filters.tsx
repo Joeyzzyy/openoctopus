@@ -47,10 +47,10 @@ export function UsageTable({ usageRows }: { usageRows: UsageRow[] }) {
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-2">
         <Select value={keyFilter} onValueChange={(v) => v && setKeyFilter(v)}>
-          <SelectTrigger className="h-8 rounded-[10px] border-black/8 bg-[#f7f5ef] px-2.5 font-mono text-[10px] uppercase tracking-[1px]">
+          <SelectTrigger className="h-8 rounded-md border-black/[0.08] bg-[#FCFCFA] px-2.5 font-mono text-[10px] uppercase tracking-[1px] shadow-sm">
             <SelectValue placeholder="All Keys" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="border border-black/[0.08] bg-white text-[#111827]">
             <SelectItem value={ALL}>All Keys</SelectItem>
             {uniqueKeys.map((k) => (
               <SelectItem key={k} value={k}>
@@ -61,10 +61,10 @@ export function UsageTable({ usageRows }: { usageRows: UsageRow[] }) {
         </Select>
 
         <Select value={modelFilter} onValueChange={(v) => v && setModelFilter(v)}>
-          <SelectTrigger className="h-8 rounded-[10px] border-black/8 bg-[#f7f5ef] px-2.5 font-mono text-[10px] uppercase tracking-[1px]">
+          <SelectTrigger className="h-8 rounded-md border-black/[0.08] bg-[#FCFCFA] px-2.5 font-mono text-[10px] uppercase tracking-[1px] shadow-sm">
             <SelectValue placeholder="All Models" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="border border-black/[0.08] bg-white text-[#111827]">
             <SelectItem value={ALL}>All Models</SelectItem>
             {uniqueModels.map((m) => (
               <SelectItem key={m} value={m}>
@@ -96,7 +96,7 @@ export function UsageTable({ usageRows }: { usageRows: UsageRow[] }) {
               {filtered.map((row, i) => (
                 <div
                   key={`${row.time}-${row.apiKey}-${i}`}
-                  className="rounded-[14px] border border-black/8 bg-[#faf9f6] p-3.5"
+                  className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3.5 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -149,7 +149,7 @@ export function UsageTable({ usageRows }: { usageRows: UsageRow[] }) {
                   {filtered.map((row, i) => (
                     <tr
                       key={`${row.time}-${row.apiKey}-${i}`}
-                      className="bg-[#faf9f6]"
+                      className="bg-white"
                     >
                       <td className="rounded-l-[16px] px-3 py-3 text-sm text-black/60">
                         {row.time}
@@ -181,7 +181,7 @@ export function UsageTable({ usageRows }: { usageRows: UsageRow[] }) {
             </div>
           </>
         ) : (
-          <div className="rounded-[14px] bg-[#faf9f6] px-3 py-6 text-center text-sm text-black/50 sm:rounded-[16px]">
+          <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-6 text-center text-sm text-black/50">
             No usage events match the current filters.
           </div>
         )}

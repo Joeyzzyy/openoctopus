@@ -28,7 +28,7 @@ export function RequestRecordsClearForm({
         id={formId}
         ref={formRef}
         action={action}
-        className="mb-4 rounded-sm border border-[#f0d5d0] bg-[#fff5f3] p-4"
+        className="mb-4 rounded-2xl border border-[#F1D2CC] bg-[#FFF7F5] p-4 shadow-sm"
       >
         <input type="hidden" name="apiKeyId" value={apiKeyId} />
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -48,7 +48,7 @@ export function RequestRecordsClearForm({
                 name="confirmText"
                 placeholder="清除"
                 required
-                className="h-9 w-full rounded-sm border border-[#f0d5d0] bg-white px-3 text-sm text-black outline-none placeholder:text-black/25 focus:border-[#d89b90]"
+                className="h-10 w-full rounded-md border border-[#E6C1BB] bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/25 focus:border-[#D89B90]"
               />
             </label>
             <button
@@ -58,7 +58,7 @@ export function RequestRecordsClearForm({
                   setOpen(true);
                 }
               }}
-              className="inline-flex h-9 items-center justify-center rounded-sm bg-[#b54432] px-3 text-xs font-medium text-white transition-colors hover:bg-[#993825]"
+              className="inline-flex h-10 items-center justify-center rounded-md bg-[#B54432] px-3 text-xs font-medium text-white transition-colors hover:bg-[#9A3828]"
             >
               清除该 Key 的请求与扣费记录
             </button>
@@ -69,9 +69,9 @@ export function RequestRecordsClearForm({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton={false}
-          className="rounded-sm border border-black/10 bg-[#f7f6f1] p-0 shadow-[0_30px_80px_rgba(17,17,17,0.14)] sm:max-w-lg"
+          className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-lg"
         >
-          <DialogHeader className="border-b border-black/10 px-5 pb-4 pt-5">
+          <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5">
             <DialogTitle className="font-medium text-black">确认清除调用与扣费记录</DialogTitle>
             <DialogDescription className="text-black/55">
               API Key「{apiKeyName}」的请求明细、usage_events 和 usage 扣费流水会被删除。此操作不可撤销。
@@ -82,11 +82,11 @@ export function RequestRecordsClearForm({
             其余非 usage 钱包流水会保留，系统会自动重算剩余账本余额。确认无误后再继续执行。
           </div>
 
-          <DialogFooter className="rounded-none border-t border-black/10 bg-transparent p-5 sm:justify-end">
+          <DialogFooter className="rounded-none border-t border-black/[0.08] bg-transparent p-5 sm:justify-end">
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="inline-flex h-9 items-center justify-center rounded-sm border border-black/10 bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
+              className="inline-flex h-10 items-center justify-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
             >
               取消
             </button>
@@ -94,7 +94,7 @@ export function RequestRecordsClearForm({
               <button
                 type="submit"
                 form={formId}
-                className="inline-flex h-9 w-full items-center justify-center rounded-sm bg-[#b54432] px-3 text-xs font-medium text-white transition-colors hover:bg-[#993825]"
+                className="inline-flex h-10 w-full items-center justify-center rounded-md bg-[#B54432] px-3 text-xs font-medium text-white transition-colors hover:bg-[#9A3828]"
               >
                 确认清除
               </button>

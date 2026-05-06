@@ -48,7 +48,7 @@ export function MonitoringAutoRefresh({
   }
 
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-black/10 bg-[#faf9f6] px-3 py-2.5 text-xs text-black/58">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/[0.08] bg-[#FCFCFA] px-3 py-2.5 text-xs text-black/58 shadow-sm">
       <div className="flex items-center gap-2">
         <span
           className={`inline-flex size-2 rounded-full ${

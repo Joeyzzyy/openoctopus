@@ -10,7 +10,6 @@ import {
   type RuntimeCredential,
   type RuntimeProvider,
   type RuntimeProviderModel,
-  type RuntimeRoutingRule,
   type RuntimeSupportedModel,
 } from "@/lib/provider-runtime-guard";
 import { createClient } from "@/lib/supabase/server";

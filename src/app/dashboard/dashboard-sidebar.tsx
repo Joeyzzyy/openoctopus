@@ -16,9 +16,9 @@ export function DashboardSidebar({
   activeHref,
 }: DashboardSidebarProps) {
   return (
-    <div className="fixed left-[max(1rem,calc(50%-40rem))] top-8 z-30 w-[220px] rounded-sm border border-black/10 bg-white/92 p-3 shadow-[0_18px_48px_rgba(17,17,17,0.05)] backdrop-blur-sm">
-      <div className="mb-3 border-b border-black/10 px-2 pb-3">
-        <div className="inline-flex items-center rounded-sm bg-[#f4f4f1] px-2.5 py-1 text-sm text-black/80">
+    <div className="fixed left-[max(1rem,calc(50%-40rem))] top-8 z-30 w-[220px] rounded-2xl border border-black/[0.08] bg-white/95 p-3 shadow-[0_18px_48px_rgba(17,24,39,0.06)] backdrop-blur-sm">
+      <div className="mb-3 border-b border-black/[0.08] px-2 pb-3">
+        <div className="inline-flex items-center rounded-full bg-[#F3F4F6] px-2.5 py-1 text-sm text-black/80">
           {userLabel}
         </div>
       </div>
@@ -31,10 +31,10 @@ export function DashboardSidebar({
               key={item.href}
               href={item.href}
               className={cn(
-                "flex w-full items-center rounded-sm px-2.5 py-2 text-left text-sm transition-colors",
+                "flex w-full items-center rounded-md px-2.5 py-2 text-left text-sm transition-colors",
                 isActive
-                  ? "bg-black text-white"
-                  : "text-black/60 hover:bg-black/[0.04] hover:text-black"
+                  ? "bg-[#111827] text-white"
+                  : "text-black/60 hover:bg-black/[0.03] hover:text-black"
               )}
             >
               {item.label}

@@ -71,13 +71,13 @@ export function CreateKeySheet({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[28px] border border-[#dde5d8] bg-[linear-gradient(180deg,#fffdf8_0%,#f5f8f0_100%)] p-0 shadow-[0_30px_80px_rgba(34,47,31,0.14)] sm:max-w-xl"
+        className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[28px] border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-xl"
       >
-        <DialogHeader className="border-b border-[#e1e8dd] px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
-          <DialogTitle className="font-mono text-sm uppercase tracking-[1px] text-[#162319]">
+        <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
+          <DialogTitle className="text-sm font-semibold uppercase tracking-[1px] text-[#111827]">
             Create API Key
           </DialogTitle>
-          <DialogDescription className="text-[#566254]">
+          <DialogDescription className="text-black/55">
             Generate a new key for your workspace. The secret is shown only
             once.
           </DialogDescription>
@@ -86,33 +86,33 @@ export function CreateKeySheet({
         {state.success && state.data?.secret ? (
           /* ---------- Success: show secret ---------- */
           <div className="space-y-5 px-5 pb-5 pt-5 sm:px-6 sm:pb-6">
-            <div className="rounded-[16px] border border-[#cfe7d7] bg-[#eef8f0] p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[1px] text-[#167a3d]">
+            <div className="rounded-2xl border border-[#D7EAD9] bg-[#F2FBF4] p-4">
+              <p className="text-[10px] uppercase tracking-[1px] text-[#167A3D]">
                 Key Created
               </p>
-              <p className="mt-1 text-sm leading-6 text-[#2d4a35]">
+              <p className="mt-1 text-sm leading-6 text-[#2D4A35]">
                 Copy the secret now. It will not be shown again after you close this window.
               </p>
-              <p className="mt-2 font-mono text-xs text-[#167a3d]">
+              <p className="mt-2 font-mono text-xs text-[#167A3D]">
                 Prefix: {state.data.keyPrefix as string}
               </p>
             </div>
 
             <div>
-              <Label className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+              <Label className="text-[10px] uppercase tracking-[1px] text-black/45">
                 Secret (copy now — it won&apos;t be shown again)
               </Label>
               <div className="mt-2 flex items-center gap-2">
-                <code className="flex-1 rounded-[14px] border border-[#dde5d8] bg-white px-3 py-2.5 font-mono text-[11px] break-all text-[#162319]">
+                <code className="flex-1 break-all rounded-2xl border border-black/[0.08] bg-white px-3 py-2.5 font-mono text-[11px] text-[#111827]">
                   {state.data.secret as string}
                 </code>
                 <button
                   type="button"
                   onClick={copySecret}
-                  className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-[12px] border border-[#dde5d8] bg-white transition-colors hover:bg-[#f4f8f1]"
+                  className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white transition-colors hover:bg-black/[0.03]"
                 >
                   {copied ? (
-                    <Check className="h-4 w-4 text-[#168a42]" />
+                    <Check className="h-4 w-4 text-[#15803D]" />
                   ) : (
                     <Copy className="h-4 w-4 text-black/50" />
                   )}
@@ -121,16 +121,16 @@ export function CreateKeySheet({
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[16px] border border-[#dde5d8] bg-white/90 p-4">
-                <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+              <div className="rounded-2xl border border-black/[0.08] bg-white p-4">
+                <p className="text-[10px] uppercase tracking-[1px] text-black/45">
                   Base URL
                 </p>
-                <code className="mt-2 block break-all font-mono text-[11px] text-[#111111]">
+                <code className="mt-2 block break-all font-mono text-[11px] text-[#111827]">
                   {PUBLIC_API_BASE_URL}
                 </code>
               </div>
-              <div className="rounded-[16px] border border-[#dde5d8] bg-white/90 p-4">
-                <p className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+              <div className="rounded-2xl border border-black/[0.08] bg-white p-4">
+                <p className="text-[10px] uppercase tracking-[1px] text-black/45">
                   Next Step
                 </p>
                 <p className="mt-2 text-sm leading-6 text-black/60">
@@ -143,14 +143,14 @@ export function CreateKeySheet({
               <Link
                 href="#quickstart"
                 onClick={() => handleClose(false)}
-                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-[14px] border border-[#dde5d8] bg-white px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#162319] transition-colors hover:bg-[#f4f8f1] sm:flex-1"
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white px-4 text-[11px] font-semibold uppercase tracking-[1px] text-[#111827] transition-colors hover:bg-black/[0.03] sm:flex-1"
               >
                 Open Quickstart
               </Link>
               <button
                 type="button"
                 onClick={() => handleClose(false)}
-                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-[14px] bg-[#1f5f39] px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#1a5130] sm:flex-1"
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-4 text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#0B1220] sm:flex-1"
               >
                 Done
               </button>
@@ -166,7 +166,7 @@ export function CreateKeySheet({
             <div className="space-y-2">
               <Label
                 htmlFor="key-name"
-                className="font-mono text-[10px] uppercase tracking-[1px] text-black/45"
+                className="text-[10px] uppercase tracking-[1px] text-black/45"
               >
                 Key Name
               </Label>
@@ -175,25 +175,25 @@ export function CreateKeySheet({
                 name="name"
                 placeholder="e.g. production-api"
                 required
-                className="rounded-[14px] border-[#dde5d8] bg-white/90 font-mono text-sm text-[#162319] placeholder:text-[#8a9385]"
+                className="rounded-2xl border-black/[0.08] bg-white text-sm text-[#111827] placeholder:text-black/35"
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="font-mono text-[10px] uppercase tracking-[1px] text-black/45">
+              <Label className="text-[10px] uppercase tracking-[1px] text-black/45">
                 Environment
               </Label>
               <input type="hidden" name="environment" value={env} />
               <Select value={env} onValueChange={(v) => v && setEnv(v)}>
-                <SelectTrigger className="w-full rounded-[14px] border-[#dde5d8] bg-white/90 font-mono text-sm text-[#162319]">
+                <SelectTrigger className="w-full rounded-2xl border-black/[0.08] bg-white text-sm text-[#111827]">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="border border-[#dde5d8] bg-white text-[#162319]">
+                <SelectContent className="border border-black/[0.08] bg-white text-[#111827]">
                   {environments.map((e) => (
                     <SelectItem
                       key={e}
                       value={e}
-                      className="cursor-pointer text-[#162319] focus:bg-[#f4f8f1] focus:text-[#162319]"
+                      className="cursor-pointer text-[#111827] focus:bg-black/[0.03] focus:text-[#111827]"
                     >
                       {e}
                     </SelectItem>
@@ -205,7 +205,7 @@ export function CreateKeySheet({
             <div className="space-y-2">
               <Label
                 htmlFor="key-budget"
-                className="font-mono text-[10px] uppercase tracking-[1px] text-black/45"
+                className="text-[10px] uppercase tracking-[1px] text-black/45"
               >
                 Monthly Budget (USD)
               </Label>
@@ -216,12 +216,12 @@ export function CreateKeySheet({
                 min={0}
                 step={0.01}
                 defaultValue={0}
-                className="rounded-[14px] border-[#dde5d8] bg-white/90 font-mono text-sm text-[#162319] placeholder:text-[#8a9385]"
+                className="rounded-2xl border-black/[0.08] bg-white text-sm text-[#111827] placeholder:text-black/35"
               />
             </div>
 
             {state.error && (
-              <p className="rounded-[14px] bg-[#fff4f1] px-3 py-2.5 font-mono text-xs text-[#c65342]">
+              <p className="rounded-2xl border border-[#F1D2CC] bg-[#FFF7F5] px-3 py-2.5 text-xs text-[#B54432]">
                 {state.error}
               </p>
             )}
@@ -229,7 +229,7 @@ export function CreateKeySheet({
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-[14px] bg-[#1f5f39] px-4 py-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#1a5130] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-[#111827] px-4 py-3 text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#0B1220] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <KeyRound className="h-4 w-4" />
               {isPending ? "Creating..." : "Create Key"}

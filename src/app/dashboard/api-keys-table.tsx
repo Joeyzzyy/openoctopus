@@ -29,10 +29,16 @@ type ApiKey = {
 };
 
 const keyToneStyles = {
-  active: "bg-[#dff6e6] text-[#167a3d]",
-  warning: "bg-[#fff2d9] text-[#9b6a00]",
-  paused: "bg-[#ececec] text-[#666666]",
+  active: "border-[#D7EADB] bg-[#EDF8F0] text-[#167A3D]",
+  warning: "border-[#F2DEC0] bg-[#FFF3E2] text-[#9B6A00]",
+  paused: "border-black/[0.08] bg-[#F3F4F6] text-[#666666]",
 };
+
+const inputClassName =
+  "h-8 rounded-md border-black/[0.08] bg-white font-mono text-sm text-[#111827]";
+
+const secondaryButtonClassName =
+  "inline-flex cursor-pointer items-center gap-1 rounded-md border border-black/[0.08] bg-white text-[#4B5563] transition-colors hover:bg-black/[0.03]";
 
 export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -95,7 +101,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
 
   if (apiKeys.length === 0) {
     return (
-      <div className="rounded-[16px] border border-[#dde5d8] bg-[#f8fbf6] px-4 py-8 text-center text-sm text-[#697567] sm:rounded-[18px]">
+      <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] px-4 py-8 text-center text-sm text-[#6B7280]">
         No API keys have been created yet.
       </div>
     );
@@ -109,7 +115,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
           return (
             <div
               key={key.id}
-              className="rounded-[18px] border border-[#dde5d8] bg-[#f9fcf7] p-4 shadow-[0_12px_30px_rgba(68,85,56,0.04)]"
+              className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -117,14 +123,14 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                     <Input
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="h-8 rounded-[10px] border-[#d7ddd4] bg-white font-mono text-[13px] font-semibold"
+                      className={`${inputClassName} text-[13px] font-semibold`}
                     />
                   ) : (
                     <p className="truncate font-mono text-[14px] font-semibold text-[#162319]">
                       {key.name}
                     </p>
                   )}
-                  <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-[#7b8778]">
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-[#6B7280]">
                     {key.prefix} · {key.environment}
                   </p>
                 </div>
@@ -139,7 +145,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div className="rounded-[14px] border border-[#e3e8de] bg-white px-3 py-2.5">
+                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
                   <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-[#7b8778]">
                     Budget
                   </p>
@@ -148,7 +154,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                       type="number"
                       value={editBudget}
                       onChange={(e) => setEditBudget(e.target.value)}
-                      className="mt-1 h-7 rounded-[8px] border-[#d7ddd4] bg-white text-center font-mono text-[11px]"
+                      className="mt-1 h-7 rounded-md border-black/[0.08] bg-white text-center font-mono text-[11px] text-[#111827]"
                     />
                   ) : (
                     <p className="mt-1 font-mono text-[12px] font-semibold text-[#162319]">
@@ -156,7 +162,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                     </p>
                   )}
                 </div>
-                <div className="rounded-[14px] border border-[#e3e8de] bg-white px-3 py-2.5">
+                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
                   <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-[#7b8778]">
                     Spent
                   </p>
@@ -164,7 +170,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                     {key.spent}
                   </p>
                 </div>
-                <div className="rounded-[14px] border border-[#e3e8de] bg-white px-3 py-2.5">
+                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
                   <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-[#7b8778]">
                     Requests
                   </p>
@@ -172,7 +178,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                     {key.requests}
                   </p>
                 </div>
-                <div className="rounded-[14px] border border-[#e3e8de] bg-white px-3 py-2.5">
+                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
                   <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-[#7b8778]">
                     Last Used
                   </p>
@@ -182,19 +188,19 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#e3e8de] pt-4">
+              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-black/[0.06] pt-4">
                 {isEditing ? (
                   <>
                     <button
                       onClick={() => saveEdit(key.id)}
                       disabled={isPending}
-                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[12px] bg-[#1f5f39] px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-md bg-[#111827] px-3 text-[10px] uppercase tracking-[0.5px] text-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Check className="h-3 w-3" /> Save
                     </button>
                     <button
                       onClick={cancelEdit}
-                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[12px] border border-[#d7ddd4] bg-white px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-[#556153]"
+                      className={`${secondaryButtonClassName} h-9 px-3 text-[10px] uppercase tracking-[0.5px]`}
                     >
                       <X className="h-3 w-3" /> Cancel
                     </button>
@@ -203,14 +209,14 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                   <>
                     <button
                       onClick={() => startEdit(key)}
-                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[12px] border border-[#d7ddd4] bg-white px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-[#556153] hover:bg-[#f4f8f1]"
+                      className={`${secondaryButtonClassName} h-9 px-3 text-[10px] uppercase tracking-[0.5px]`}
                     >
                       <Pencil className="h-3 w-3" /> Edit
                     </button>
                     <button
                       onClick={() => handleToggle(key.id, key.rawStatus)}
                       disabled={isPending}
-                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[12px] border border-[#d7ddd4] bg-white px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-[#556153] hover:bg-[#f4f8f1] disabled:cursor-not-allowed disabled:opacity-50"
+                      className={`${secondaryButtonClassName} h-9 px-3 text-[10px] uppercase tracking-[0.5px] disabled:cursor-not-allowed disabled:opacity-50`}
                     >
                       {key.rawStatus === "paused" ? (
                         <>
@@ -225,7 +231,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                     <button
                       onClick={() => setDeleteTarget({ id: key.id, name: key.name })}
                       disabled={isPending}
-                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[12px] border border-[#f2cdc7] bg-white px-3 font-mono text-[10px] uppercase tracking-[0.5px] text-[#c65342] hover:bg-[#fff5f2] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-md border border-[#F1D2CC] bg-white px-3 text-[10px] uppercase tracking-[0.5px] text-[#B54432] transition-colors hover:bg-[#FFF7F5] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Trash2 className="h-3 w-3" /> Delete
                     </button>
@@ -238,7 +244,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
       </div>
 
       <div className="hidden overflow-x-auto md:block">
-        <table className="min-w-full border-separate border-spacing-y-2">
+        <table className="min-w-full border-separate border-spacing-y-3">
           <thead>
             <tr className="text-left">
               {[
@@ -253,7 +259,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
               ].map((heading) => (
                 <th
                   key={heading}
-                  className="px-3 py-2 font-mono text-[10px] uppercase tracking-[1px] text-[#6b7868]"
+                  className="px-3 py-2.5 font-mono text-[10px] uppercase tracking-[1px] text-[#6B7280]"
                 >
                   {heading}
                 </th>
@@ -266,14 +272,14 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
               return (
                 <tr
                   key={key.id}
-                  className="rounded-[18px] bg-[#f9fcf7] shadow-[0_12px_30px_rgba(68,85,56,0.04)]"
+                  className="rounded-2xl bg-white shadow-[0_10px_24px_rgba(17,24,39,0.04)]"
                 >
-                  <td className="rounded-l-[16px] border-y border-l border-[#dde5d8] px-3 py-3">
+                  <td className="rounded-l-[16px] border-y border-l border-black/[0.08] px-3 py-3.5">
                     {isEditing ? (
                       <Input
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="h-8 w-36 rounded-[10px] border-[#d7ddd4] bg-white font-mono text-sm font-semibold"
+                        className={`${inputClassName} w-36 font-semibold`}
                       />
                     ) : (
                       <p className="font-mono text-sm font-semibold text-[#162319]">
@@ -284,55 +290,55 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                       {key.prefix}
                     </p>
                   </td>
-                  <td className="border-y border-[#dde5d8] px-3 py-3 text-sm text-[#556153]">
+                  <td className="border-y border-black/[0.08] px-3 py-3.5 text-sm text-[#4B5563]">
                     {key.environment}
                   </td>
-                  <td className="border-y border-[#dde5d8] px-3 py-3 font-mono text-sm text-[#162319]">
+                  <td className="border-y border-black/[0.08] px-3 py-3.5 font-mono text-sm text-[#111827]">
                     {isEditing ? (
                       <Input
                         type="number"
                         value={editBudget}
                         onChange={(e) => setEditBudget(e.target.value)}
-                        className="h-8 w-24 rounded-[10px] border-[#d7ddd4] bg-white font-mono text-sm"
+                        className={`${inputClassName} w-24`}
                       />
                     ) : (
                       key.budget
                     )}
                   </td>
-                  <td className="border-y border-[#dde5d8] px-3 py-3 font-mono text-sm text-[#162319]">
+                  <td className="border-y border-black/[0.08] px-3 py-3.5 font-mono text-sm text-[#111827]">
                     {key.spent}
                   </td>
-                  <td className="border-y border-[#dde5d8] px-3 py-3 text-sm text-[#556153]">
+                  <td className="border-y border-black/[0.08] px-3 py-3.5 text-sm text-[#4B5563]">
                     {key.requests}
                   </td>
-                  <td className="border-y border-[#dde5d8] px-3 py-3 text-sm text-[#556153]">
+                  <td className="border-y border-black/[0.08] px-3 py-3.5 text-sm text-[#4B5563]">
                     {key.lastUsed}
                   </td>
-                  <td className="border-y border-[#dde5d8] px-3 py-3">
+                  <td className="border-y border-black/[0.08] px-3 py-3.5">
                     <span
                       className={cn(
-                        "inline-flex rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]",
+                        "inline-flex rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[1px]",
                         keyToneStyles[key.status]
                       )}
                     >
                       {key.status}
                     </span>
                   </td>
-                  <td className="rounded-r-[16px] border-y border-r border-[#dde5d8] px-3 py-3">
+                  <td className="rounded-r-[16px] border-y border-r border-black/[0.08] px-3 py-3.5">
                     <div className="flex items-center gap-1.5">
                       {isEditing ? (
                         <>
                           <button
                             onClick={() => saveEdit(key.id)}
                             disabled={isPending}
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] bg-[#1f5f39] text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-[#111827] text-white disabled:cursor-not-allowed disabled:opacity-50"
                             title="Save"
                           >
                             <Check className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={cancelEdit}
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] border border-[#d7ddd4] bg-white text-[#556153] hover:bg-[#f4f8f1]"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white text-[#4B5563] transition-colors hover:bg-black/[0.03]"
                             title="Cancel"
                           >
                             <X className="h-3.5 w-3.5" />
@@ -342,7 +348,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                         <>
                           <button
                             onClick={() => startEdit(key)}
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] border border-[#d7ddd4] bg-white text-[#556153] hover:bg-[#f4f8f1]"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white text-[#4B5563] transition-colors hover:bg-black/[0.03]"
                             title="Edit name & budget"
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -350,7 +356,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                           <button
                             onClick={() => handleToggle(key.id, key.rawStatus)}
                             disabled={isPending}
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] border border-[#d7ddd4] bg-white text-[#556153] hover:bg-[#f4f8f1] disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white text-[#4B5563] transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50"
                             title={key.rawStatus === "paused" ? "Resume key" : "Pause key"}
                           >
                             {key.rawStatus === "paused" ? (
@@ -362,7 +368,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                           <button
                             onClick={() => setDeleteTarget({ id: key.id, name: key.name })}
                             disabled={isPending}
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] border border-[#f2cdc7] bg-white text-[#c65342] hover:bg-[#fff5f2] disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#F1D2CC] bg-white text-[#B54432] transition-colors hover:bg-[#FFF7F5] disabled:cursor-not-allowed disabled:opacity-50"
                             title="Delete key"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -381,20 +387,20 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
       <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent
           showCloseButton={false}
-          className="rounded-[24px] border border-[#dde5d8] bg-[linear-gradient(180deg,#fffdf8_0%,#f5f8f0_100%)] p-0 shadow-[0_30px_80px_rgba(34,47,31,0.14)] sm:max-w-md"
+          className="rounded-[24px] border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-md"
         >
-          <DialogHeader className="border-b border-[#e1e8dd] px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
-            <DialogTitle className="font-mono text-sm uppercase tracking-[1px] text-[#162319]">
+          <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
+            <DialogTitle className="text-sm font-semibold uppercase tracking-[1px] text-[#111827]">
               Delete API Key
             </DialogTitle>
-            <DialogDescription className="text-[#566254]">
+            <DialogDescription className="text-black/55">
               This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 px-5 pb-5 pt-5 sm:px-6 sm:pb-6">
-            <div className="rounded-[16px] border border-[#f2cdc7] bg-[#fff5f2] p-4">
-              <p className="text-sm leading-6 text-[#8f3f33]">
+            <div className="rounded-2xl border border-[#F1D2CC] bg-[#FFF7F5] p-4">
+              <p className="text-sm leading-6 text-[#8F3F33]">
                 Delete <span className="font-mono font-semibold">{deleteTarget?.name}</span>? Any apps using this key will stop working immediately.
               </p>
             </div>
@@ -403,7 +409,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
               <button
                 type="button"
                 onClick={() => setDeleteTarget(null)}
-                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-[14px] border border-[#dde5d8] bg-white px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-[#162319] transition-colors hover:bg-[#f4f8f1]"
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white px-4 text-[11px] font-semibold uppercase tracking-[1px] text-[#111827] transition-colors hover:bg-black/[0.03]"
               >
                 Cancel
               </button>
@@ -411,7 +417,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                 type="button"
                 onClick={confirmDelete}
                 disabled={isPending}
-                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-[14px] bg-[#b54432] px-4 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#9f3b2c] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md bg-[#B54432] px-4 text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#9F3B2C] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isPending ? "Deleting..." : "Delete Key"}
               </button>
