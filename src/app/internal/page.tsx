@@ -884,7 +884,7 @@ export default async function InternalPage({
                 type="submit"
                 className="inline-flex h-10 items-center justify-center rounded-md bg-[#111827] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0B1220]"
               >
-                进入 internal
+                进入后台
               </button>
             </form>
           </section>
