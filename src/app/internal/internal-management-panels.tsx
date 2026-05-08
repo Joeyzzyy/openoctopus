@@ -243,18 +243,20 @@ function ManagementDialog({
   trigger,
   title,
   description,
+  disabled = false,
   children,
 }: {
   trigger: React.ReactNode;
   title: string;
   description: string;
+  disabled?: boolean;
   children: React.ReactNode | ((controls: { close: () => void }) => React.ReactNode);
 }) {
   const [open, setOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>{trigger}</DialogTrigger>
+      <DialogTrigger disabled={disabled}>{trigger}</DialogTrigger>
       <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-3xl">
         <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5">
           <DialogTitle className="font-medium text-black">{title}</DialogTitle>
@@ -999,11 +1001,8 @@ export function CreateProviderModelMappingButton({
 
   return (
     <ManagementDialog
-      trigger={
-        <button type="button" disabled={!hasProviders || !hasSupportedModels}>
-          <ModalButton><Plus className="size-3.5" />新建供应商模型映射</ModalButton>
-        </button>
-      }
+      trigger={<ModalButton><Plus className="size-3.5" />新建供应商模型映射</ModalButton>}
+      disabled={!hasProviders || !hasSupportedModels}
       title="新建供应商模型映射"
       description="在总表内直接新增可售模型与供应商模型的映射关系。"
     >
@@ -1173,11 +1172,8 @@ export function CredentialsPanel({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有供应商密钥</div>
         <ManagementDialog
-          trigger={
-            <button type="button" disabled={!hasProviders}>
-              <ModalButton><Plus className="size-3.5" />新建供应商密钥</ModalButton>
-            </button>
-          }
+          trigger={<ModalButton><Plus className="size-3.5" />新建供应商密钥</ModalButton>}
+          disabled={!hasProviders}
           title="新建供应商密钥"
           description="在独立弹窗中创建新的供应商密钥，不直接嵌在列表里编辑。"
         >
@@ -1282,11 +1278,8 @@ export function CredentialsPanel({
                 </ManagementDialog>
 
                 <ManagementDialog
-                  trigger={
-                    <button type="button" disabled={credential.is_active}>
-                      <ModalButton tone="secondary">删除</ModalButton>
-                    </button>
-                  }
+                  trigger={<ModalButton tone="secondary">删除</ModalButton>}
+                  disabled={credential.is_active}
                   title={`删除 ${credential.label}`}
                   description="确认是否删除这个未启用的供应商密钥。"
                 >
@@ -1365,11 +1358,8 @@ export function ModelsPanel({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有供应商模型</div>
         <ManagementDialog
-          trigger={
-            <button type="button" disabled={!hasProviders || !hasSupportedModels}>
-              <ModalButton><Plus className="size-3.5" />新建供应商模型</ModalButton>
-            </button>
-          }
+          trigger={<ModalButton><Plus className="size-3.5" />新建供应商模型</ModalButton>}
+          disabled={!hasProviders || !hasSupportedModels}
           title="新建供应商模型"
           description="在独立弹窗中，把可售模型映射到某个供应商的具体模型。"
         >
@@ -1545,11 +1535,8 @@ export function RoutesPanel({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有路由</div>
         <ManagementDialog
-          trigger={
-            <button type="button" disabled={!hasProviderModels || !hasSupportedModels}>
-              <ModalButton><Plus className="size-3.5" />新建路由</ModalButton>
-            </button>
-          }
+          trigger={<ModalButton><Plus className="size-3.5" />新建路由</ModalButton>}
+          disabled={!hasProviderModels || !hasSupportedModels}
           title="新建路由规则"
           description="在弹窗中创建新路由，避免与现有线上路由记录混在一起。"
         >
