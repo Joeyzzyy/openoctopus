@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import {
   CircleAlert,
   Fingerprint,
@@ -9,12 +10,14 @@ import {
   Waypoints,
 } from "lucide-react";
 import { getInternalAdminData } from "@/lib/internal-admin-server";
-import { clearApiKeyRequestRecords } from "./actions";
+import { clearApiKeyRequestRecords, unlockInternalAccess } from "./actions";
+import { INTERNAL_ACCESS_COOKIE, INTERNAL_ACCESS_COOKIE_VALUE } from "@/lib/internal-access";
 import { InternalShell } from "./internal-shell";
 import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
 import {
-  CredentialsPanel,
-  ModelsPanel,
+  CreateSupportedModelButton,
+  CreateProviderModelMappingButton,
+  EconomicsPanel,
   ProvidersPanel,
   PublicModelsPanel,
   RoutesPanel,
@@ -25,47 +28,44 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 const tabs = [
   {
-    key: "overview",
-    label: "总览",
-    description: "控制台健康状态与配置指引。",
-  },
-  {
     key: "monitoring",
-    label: "数据监控",
+    group: "overview",
+    label: "系统用量监控",
     description: "资源调度管理监测中心。",
   },
   {
     key: "providers",
-    label: "1. 供应商",
-    description: "先登记 Google、WaveSpeed 等上游。",
-  },
-  {
-    key: "credentials",
-    label: "2. 供应商密钥管理",
-    description: "给供应商绑定真实密钥。",
+    group: "basic",
+    label: "供应商接入",
+    description: "同页管理上游厂商与供应商密钥。",
   },
   {
     key: "public-models",
-    label: "3. 可售模型",
+    group: "basic",
+    label: "可售模型配置",
     description: "定义用户看到的模型型号和售价。",
   },
   {
-    key: "models",
-    label: "4. 供应商模型",
-    description: "把供应商挂到可售模型，并填写内部成本。",
+    key: "economics",
+    group: "overview",
+    label: "模型价格总表",
+    description: "统一查看和维护售价、成本、利润。",
   },
   {
     key: "routes",
-    label: "5. 路由",
+    group: "basic",
+    label: "路由配置",
     description: "决定当前流量走哪个供应商模型。",
   },
   {
     key: "requests",
+    group: "overview",
     label: "用户请求记录",
     description: "近期调用与成本明细。",
   },
   {
     key: "audit",
+    group: "overview",
     label: "配置变更历史",
     description: "配置变更历史与追踪。",
   },
@@ -83,12 +83,6 @@ const providerStatusOptions = [
   { value: "healthy", label: "健康" },
   { value: "degraded", label: "降级" },
   { value: "offline", label: "离线" },
-] as const;
-
-const providerKindOptions = [
-  { value: "wavespeed", label: "WaveSpeed" },
-  { value: "partner", label: "合作方" },
-  { value: "custom", label: "自定义" },
 ] as const;
 
 function formatCurrency(value: number) {
@@ -112,7 +106,7 @@ function getSearchValue(
 }
 
 function getTabValue(value: string | undefined): InternalTabKey {
-  return tabs.some((item) => item.key === value) ? (value as InternalTabKey) : "overview";
+  return tabs.some((item) => item.key === value) ? (value as InternalTabKey) : "economics";
 }
 
 function buildInternalHref(tab: InternalTabKey, template?: string) {
@@ -163,7 +157,7 @@ const monitoringStatusOptions = [
 ] as const;
 
 const monitoringViewOptions = [
-  { value: "overview", label: "整体数据监控" },
+  { value: "overview", label: "系统用量总览" },
   { value: "video", label: "视频任务监控" },
   { value: "image", label: "图片任务监控" },
 ] as const;
@@ -429,7 +423,6 @@ const providerTemplates = {
     provider: {
       name: "Gemini Direct",
       slug: "gemini-direct",
-      kind: "custom",
       baseUrl: "https://generativelanguage.googleapis.com",
       status: "healthy",
       regions: "",
@@ -459,7 +452,6 @@ const providerTemplates = {
     provider: {
       name: "WaveSpeed",
       slug: "wavespeed",
-      kind: "wavespeed",
       baseUrl: "https://api.wavespeed.ai",
       status: "healthy",
       regions: "sgp1, us-west",
@@ -514,48 +506,27 @@ function OverviewCard({
   );
 }
 
-function SetupOrderCard() {
-  const steps = [
-    "1. 先建供应商：只填 Google / WaveSpeed 这类上游基础信息，例如名称、slug、base URL。",
-    "2. 再建可售模型：定义用户可见的模型型号，例如 `openoctopus/gemini-2.5-flash-image`，这里填的是用户售价。",
-    "3. 然后配供应商密钥：把真实密钥绑定到供应商。",
-    "4. 再建供应商模型：把“某个供应商的某个真实模型”挂到某个可售模型上，这里填的是供应商成本。",
-    "5. 最后配路由：决定线上默认走哪个供应商模型，是否有回退实现。",
-  ];
-
-  return (
-    <section className="mb-6 rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
-      <h2 className="text-xl font-semibold text-black">推荐操作顺序</h2>
-      <p className="mt-1 text-sm text-black/55">
-        先把供应商、售价、供应商密钥、供应商模型、路由这五层分清，再去录数据，整个后台就不会绕。
-      </p>
-      <div className="mt-4 grid gap-3">
-        {steps.map((step) => (
-          <div key={step} className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3 text-sm text-black/72">
-            {step}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function SectionShell({
   id,
   title,
   description,
+  headerRight,
   children,
 }: {
   id: string;
   title: string;
   description: string;
+  headerRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section id={id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold text-black">{title}</h2>
-        <p className="mt-1 text-sm text-black/55">{description}</p>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-black">{title}</h2>
+          <p className="mt-1 text-sm text-black/55">{description}</p>
+        </div>
+        {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
       </div>
       {children}
     </section>
@@ -892,6 +863,36 @@ export default async function InternalPage({
 }: {
   searchParams: SearchParams;
 }) {
+  const cookieStore = await cookies();
+  const hasPasswordAccess =
+    cookieStore.get(INTERNAL_ACCESS_COOKIE)?.value === INTERNAL_ACCESS_COOKIE_VALUE;
+
+  if (!hasPasswordAccess) {
+    return (
+      <main className="relative min-h-screen overflow-hidden bg-[#FCFCFA] text-[#111111]">
+        <div className="relative mx-auto flex min-h-screen w-full max-w-[520px] items-center px-4 py-10">
+          <section className="w-full rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm">
+            <form action={unlockInternalAccess} className="grid gap-3">
+              <input
+                type="password"
+                name="password"
+                required
+                className="h-10 rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none focus:border-black/20"
+                placeholder="访问密码"
+              />
+              <button
+                type="submit"
+                className="inline-flex h-10 items-center justify-center rounded-md bg-[#111827] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0B1220]"
+              >
+                进入 internal
+              </button>
+            </form>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
   const resolvedSearchParams = await searchParams;
   const selectedMonitoringInterval = parseMonitoringInterval(
     getSearchValue(resolvedSearchParams, "monitoringInterval")
@@ -907,34 +908,10 @@ export default async function InternalPage({
   );
   const data = await getInternalAdminData({
     monitoringLookbackMs: parseMonitoringRangeMs(selectedMonitoringRange),
+    bypassAuth: true,
   });
-
-  if (!data) {
-    redirect("/login");
-  }
-
-  if (!data.authorized) {
-    return (
-      <main className="relative min-h-screen overflow-hidden bg-[#FCFCFA] text-[#111111]">
-        <div
-          className="pointer-events-none fixed inset-0"
-          style={{
-            background:
-              "radial-gradient(circle at top, rgba(243, 226, 201, 0.52), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(252,252,250,1) 46%)",
-          }}
-        />
-        <div className="relative mx-auto max-w-4xl px-4 py-10">
-          <div className="rounded-2xl border border-black/[0.08] bg-white p-6 shadow-sm">
-            <p className="text-[11px] tracking-[0.35px] text-black/55">内部访问</p>
-            <h1 className="mt-2 text-3xl font-semibold text-black">无权访问</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-black/55">
-              这个内部控制台只对工作区 owner 和 admin 开放。
-            </p>
-          </div>
-        </div>
-      </main>
-    );
-  }
+  if (!data) redirect("/login");
+  if (!data.authorized) redirect("/login");
 
   const hasProviders = data.providers.length > 0;
   const hasSupportedModels = data.supportedModels.length > 0;
@@ -957,11 +934,9 @@ export default async function InternalPage({
         ? data.metrics.publicModels
         : tab.key === "providers"
           ? data.metrics.providers
-          : tab.key === "credentials"
-            ? data.metrics.credentials
-            : tab.key === "models"
-              ? data.metrics.providerModels
-              : tab.key === "routes"
+          : tab.key === "economics"
+            ? data.metrics.providerModels
+            : tab.key === "routes"
                 ? data.metrics.activeRoutes
               : undefined,
   }));
@@ -1046,9 +1021,6 @@ export default async function InternalPage({
   const selectedMonitoringStatusLabel =
     monitoringStatusOptions.find((option) => option.value === selectedMonitoringStatus)?.label ??
     "全部请求";
-  const selectedMonitoringViewLabel =
-    monitoringViewOptions.find((option) => option.value === selectedMonitoringView)?.label ??
-    "整体数据监控";
   const globalVideoInflightRequests = data.globalMonitoring.videoInflightRequests;
   const recentVideoSettledRequests = data.globalMonitoring.recentVideoRequests.filter(
     (request) => !isInflightRequestStatus(request.status)
@@ -1081,144 +1053,54 @@ export default async function InternalPage({
         }}
       />
 
-      <div className="relative mx-auto max-w-7xl px-4 pb-10 xl:px-0">
+      <div className="relative mx-auto w-full max-w-[1960px] px-3 pb-10 xl:px-4">
         <section className="min-h-[calc(100vh-108px)] py-8">
           <div className="mb-6">
             <div>
               <h1 className="mt-2 text-3xl font-semibold leading-none tracking-[-0.05em] text-[#111111]">
                 内部控制台
               </h1>
-              <p className="mt-2 text-sm text-black/55">
-                用于管理真实供应商接入、路由、供应商密钥和调用可观测性。
-              </p>
-              <p className="mt-3 text-xs text-black/42">
-                {data.workspace.name} · {data.role}
-              </p>
             </div>
           </div>
 
           <InternalShell activeTab={activeTab} selectedTemplateKey={selectedTemplateKey} tabs={sidebarTabs}>
-          {activeTab === "overview" ? (
-            <>
-              <SetupOrderCard />
-              <article className="mb-6 space-y-3 md:mb-8">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <OverviewCard
-                    title="可售模型（用户售价）"
-                    value={data.metrics.publicModels}
-                    note={
-                      hasSupportedModels
-                        ? `${data.metrics.publicModels} 个已启用的客户侧能力`
-                        : "还没有定义可售模型"
-                    }
-                    icon={Network}
-                  />
-                  <OverviewCard
-                    title="供应商"
-                    value={data.metrics.providers}
-                    note={
-                      hasProviders
-                        ? `${data.metrics.providers} 个已配置上游记录`
-                        : "还没有配置上游供应商"
-                    }
-                    icon={ShieldCheck}
-                  />
-                  <OverviewCard
-                    title="供应商模型（供应商成本）"
-                    value={data.metrics.providerModels}
-                    note={
-                      hasProviderModels
-                        ? `${data.metrics.providerModels} 条供应商模型记录`
-                        : "还没有接入供应商模型"
-                    }
-                    icon={ShieldCheck}
-                  />
-                  <OverviewCard
-                    title="供应商密钥"
-                    value={data.metrics.credentials}
-                    note={
-                      hasCredentials
-                        ? `${data.metrics.credentials} 个已启用密钥引用`
-                        : "还没有保存密钥引用"
-                    }
-                    icon={Fingerprint}
-                  />
-                  <OverviewCard
-                    title="已启用路由"
-                    value={data.metrics.activeRoutes}
-                    note={
-                      hasRoutes
-                        ? `${data.metrics.activeRoutes} 条公共路由正在启用`
-                        : "还没有启用公共路由规则"
-                    }
-                    icon={Waypoints}
-                  />
-                </div>
-              </article>
-
-              <section className="mb-6">
-                <SectionShell
-                  id="overview-panel"
-                  title="系统就绪状态"
-                  description="快速确认控制台链路是否已配置完成，能否承接真实流量。"
-                >
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm">
-                      <p className="text-sm font-medium text-black">当前链路</p>
-                      <div className="mt-4 grid gap-3 text-sm text-black/65">
-                        <ReadinessItem
-                          label="可售模型"
-                          detail={hasSupportedModels ? "已配置，可作为客户侧能力入口参与路由。" : "缺少可售模型定义。"}
-                          ready={hasSupportedModels}
-                        />
-                        <ReadinessItem
-                          label="供应商与密钥"
-                          detail={hasProviders && hasCredentials ? "上游供应商和密钥引用已就位。" : "供应商接入或密钥配置还不完整。"}
-                          ready={hasProviders && hasCredentials}
-                        />
-                        <ReadinessItem
-                          label="供应商模型与路由"
-                          detail={hasProviderModels && hasRoutes ? "供应商模型已完成映射，并可被路由。" : "供应商模型映射或路由配置还不完整。"}
-                          ready={hasProviderModels && hasRoutes}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm">
-                      <p className="text-sm font-medium text-black">运行检查</p>
-                      <div className="mt-4 grid gap-3 text-sm text-black/65">
-                        <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-                          Dashboard 是否可见取决于是否存在全局路由，或是否存在当前工作区级别的启用路由。
-                        </div>
-                        <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-                          API 是否接收请求取决于 API Key 是否启用，以及是否存在匹配请求可售模型 slug 的路由。
-                        </div>
-                        <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-                          最终执行仍然依赖 worker adapter 和真实上游密钥。
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </SectionShell>
-              </section>
-            </>
-          ) : null}
-
           {activeTab === "public-models" ? (
             <>
               <section className="mb-6">
                 <SectionShell
                 id="public-models-panel"
-                title="可售模型（用户售价）"
-                description="这里定义用户看到的模型型号，以及用户侧售价。多个供应商可以共同实现同一个可售模型。"
+                title="可售模型"
+                description=" "
+                headerRight={<CreateSupportedModelButton capabilityOptions={capabilityOptions} />}
                 >
-                <div className="mb-4 flex items-center gap-1.5 bg-[#e8f0ff] px-3 py-2.5">
-                  <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
-                  <p className="text-xs leading-[1.35] text-[#355fb4]">
-                    这里填的是用户看到的模型型号和用户售价，不是供应商成本。如果两个供应商都提供同一个对外型号，它们应该都挂到同一个可售模型，例如 <code className="rounded bg-white px-1 py-0.5">openoctopus/gemini-2.5-flash-image</code>。
-                  </p>
-                </div>
-                <PublicModelsPanel models={data.supportedModels} capabilityOptions={capabilityOptions} />
+                <PublicModelsPanel
+                  models={data.supportedModels}
+                  modelVendors={data.modelVendors}
+                  capabilityOptions={capabilityOptions}
+                />
+                </SectionShell>
+              </section>
+            </>
+          ) : null}
+
+          {activeTab === "economics" ? (
+            <>
+              <section className="mt-6">
+                <SectionShell
+                  id="economics-panel"
+                  title="模型价格总表"
+                  description=" "
+                  headerRight={
+                    <CreateProviderModelMappingButton
+                      supportedModels={data.supportedModels}
+                      providers={data.providers}
+                    />
+                  }
+                >
+                  <EconomicsPanel
+                    supportedModels={data.supportedModels}
+                    providerModels={data.providerModels}
+                  />
                 </SectionShell>
               </section>
             </>
@@ -1226,111 +1108,17 @@ export default async function InternalPage({
 
           {activeTab === "providers" ? (
             <>
-              <section className="mb-6 rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold text-black">快速模板</h2>
-                    <p className="mt-1 text-sm text-black/55">
-                      预填常见供应商接入字段，避免操作员从空表单开始。
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <a
-                      href={buildInternalHref("providers", "gemini-direct")}
-                      className="inline-flex h-9 cursor-pointer items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
-                    >
-                      Gemini Direct
-                    </a>
-                    <a
-                      href={buildInternalHref("providers", "wavespeed")}
-                      className="inline-flex h-9 cursor-pointer items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
-                    >
-                      WaveSpeed
-                    </a>
-                    <a
-                      href={buildInternalHref("providers")}
-                      className="inline-flex h-9 cursor-pointer items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03]"
-                    >
-                      清除
-                    </a>
-                  </div>
-                </div>
-                {selectedTemplate ? (
-                  <div className="mt-4 flex items-center gap-1.5 bg-[#e8f0ff] px-3 py-2.5">
-                    <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
-                    <p className="text-xs leading-[1.35] text-[#355fb4]">
-                      模板已载入。保存前请逐项检查，并替换所有占位值。
-                    </p>
-                  </div>
-                ) : null}
-              </section>
               <SectionShell
                 id="providers-panel"
-                title="供应商"
-                description="在这里登记真实上游供应商。系统不会预置示例供应商。"
+                title="供应商接入"
+                description=" "
               >
-              <div className="mb-4 flex items-center gap-1.5 bg-[#eef3ea] px-3 py-2.5">
-                <CircleAlert className="size-3.5 shrink-0 text-[#335d2d]" />
-                <p className="text-xs leading-[1.35] text-[#335d2d]">
-                  供应商是供给来源，不是客户看到的模型。多个供应商可以映射到同一个可售模型，例如 Gemini 2.5 Flash Image。
-                </p>
-              </div>
               <ProvidersPanel
                 providers={data.providers}
-                providerKindOptions={providerKindOptions}
+                credentials={data.providerCredentials}
                 providerStatusOptions={providerStatusOptions}
-                selectedTemplate={selectedTemplate}
               />
               </SectionShell>
-            </>
-          ) : null}
-
-          {activeTab === "credentials" ? (
-            <>
-              <section className="mt-6">
-                <SectionShell
-                id="credentials-panel"
-                title="供应商密钥管理"
-                description="在这里保存加密后的供应商密钥。密钥保存后会被掩码展示，不再明文显示。"
-                >
-                <div className="mb-4 flex items-center gap-1.5 bg-amber-500/10 px-3 py-2.5">
-                  <CircleAlert className="size-3.5 shrink-0 text-amber-600" />
-                  <p className="text-xs leading-[1.35] text-amber-900/70">
-                    这里输入的密钥会先在服务端加密再写入数据库。worker 在运行时解密使用。
-                  </p>
-                </div>
-                <CredentialsPanel
-                  credentials={data.providerCredentials}
-                  providers={data.providers}
-                  selectedTemplate={selectedTemplate}
-                />
-                </SectionShell>
-              </section>
-            </>
-          ) : null}
-
-          {activeTab === "models" ? (
-            <>
-              <section className="mt-6">
-                <SectionShell
-                id="models-panel"
-                title="供应商模型（供应商成本）"
-                description="把可售模型映射到真实上游模型，并填写内部供应商成本。这里不是用户售价。"
-                >
-                <div className="mb-4 flex items-center gap-1.5 rounded-xl border border-[#D8E4F8] bg-[#F3F7FF] px-3 py-2.5">
-                  <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
-                  <p className="text-xs leading-[1.35] text-[#355fb4]">
-                    这里填的是供应商真实结算成本，不是用户售价。用户售价在“可售模型”里维护；这里维护的是某个供应商对这个可售模型的一种实现和进货成本。
-                  </p>
-                </div>
-                <ModelsPanel
-                  providerModels={data.providerModels}
-                  providers={data.providers}
-                  supportedModels={data.supportedModels}
-                  selectedTemplate={selectedTemplate}
-                />
-                </SectionShell>
-              </section>
             </>
           ) : null}
 
@@ -1502,13 +1290,6 @@ export default async function InternalPage({
                     note={`失败 ${monitoringHealthSummary.failed} · 取消 ${monitoringHealthSummary.cancelled}`}
                     icon={ShieldAlert}
                   />
-                </div>
-
-                <div className="mb-5 flex items-center gap-1.5 rounded-xl border border-[#D8E4F8] bg-[#F3F7FF] px-3 py-2.5">
-                  <CircleAlert className="size-3.5 shrink-0 text-[#355fb4]" />
-                  <p className="text-xs leading-[1.35] text-[#355fb4]">
-                    当前查看的是「{selectedMonitoringViewLabel}」。所有数据都来自全系统维度的 `inference_requests`，不是单个 workspace 的局部数据。
-                  </p>
                 </div>
 
                 {selectedMonitoringView === "overview" ? (
@@ -1691,25 +1472,41 @@ export default async function InternalPage({
               <SectionShell
                 id="requests-panel"
                 title="用户请求记录"
-                description="按客户和 API Key 筛选，查看每条用户请求的收入、成本和计费拆分。"
+                description=" "
               >
                 <div className="mb-4 grid gap-3 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                   <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
                     <p className="text-[11px] tracking-[0.35px] text-black/45">客户</p>
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-black">{data.workspace.name}</p>
-                        <p className="mt-1 text-xs text-black/45">{data.workspace.slug}</p>
-                      </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
                       <a
                         href={buildRequestsFilterHref({
-                          customer: data.workspace.slug,
+                          customer: "all",
                           key: selectedRequestKey,
                         })}
-                      className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
+                        className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                          selectedRequestCustomer === "all"
+                            ? "border-black bg-black text-white"
+                            : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                        }`}
                       >
-                        当前客户
+                        全部客户
                       </a>
+                      {data.requestFilters.customers.map((customer) => (
+                        <a
+                          key={customer.slug}
+                          href={buildRequestsFilterHref({
+                            customer: customer.slug,
+                            key: selectedRequestKey,
+                          })}
+                          className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                            selectedRequestCustomer === customer.slug
+                              ? "border-black bg-black text-white"
+                              : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                          }`}
+                        >
+                          {customer.name}
+                        </a>
+                      ))}
                     </div>
                   </div>
 
@@ -1756,17 +1553,21 @@ export default async function InternalPage({
                     <p className="mt-1 text-xs text-black/45">
                       {selectedRequestKeyRecord
                         ? `${selectedRequestKeyRecord.keyPrefix} · ${selectedRequestKeyRecord.environment}`
-                        : `${data.workspace.slug} · 全部请求记录`}
+                        : selectedRequestCustomer === "all"
+                          ? "全局 · 全部请求记录"
+                          : `${selectedRequestCustomer} · 全部请求记录`}
                     </p>
                   </div>
                 </div>
 
                 {selectedRequestKeyRecord ? (
-                  <RequestRecordsClearForm
-                    action={clearApiKeyRequestRecords}
-                    apiKeyId={selectedRequestKeyRecord.id}
-                    apiKeyName={selectedRequestKeyRecord.name}
-                  />
+                  selectedRequestKeyRecord.workspaceId === data.workspace.id ? (
+                    <RequestRecordsClearForm
+                      action={clearApiKeyRequestRecords}
+                      apiKeyId={selectedRequestKeyRecord.id}
+                      apiKeyName={selectedRequestKeyRecord.name}
+                    />
+                  ) : null
                 ) : null}
 
                 <div className="mb-4 grid gap-3 md:grid-cols-4">
@@ -1803,50 +1604,62 @@ export default async function InternalPage({
                         key={request.id}
                         className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm"
                       >
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
-                                {request.status}
-                              </span>
-                              <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
-                                {request.capability}
-                              </span>
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
+                                  {request.status}
+                                </span>
+                                <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
+                                  {request.capability}
+                                </span>
+                                <span className="inline-flex h-6 items-center rounded-md border border-black/[0.08] bg-white px-2 text-[11px] text-black/55">
+                                  {request.createdLabel}
+                                </span>
+                              </div>
+                              <p className="mt-2 truncate text-sm font-medium text-black">{request.public_model_slug}</p>
+                              <p className="mt-1 text-xs text-black/50">
+                                上游：{request.providerName} / {request.upstreamModelSlug}
+                              </p>
+                              <p className="mt-1 text-xs text-black/45">
+                                调用方：{request.customerName} · {request.apiKeyName} · {request.apiKeyPrefix}
+                              </p>
                             </div>
-                            <p className="mt-3 text-sm font-medium text-black">{request.public_model_slug}</p>
-                            <p className="mt-1 text-xs text-black/50">
-                              {request.providerName} / {request.upstreamModelSlug}
-                            </p>
-                            <p className="mt-1 text-xs text-black/45">
-                              {request.customerName} · {request.apiKeyName} · {request.apiKeyPrefix}
-                            </p>
+                            <div className="rounded-xl border border-black/[0.06] bg-white px-3 py-2 text-xs text-black/55">
+                              请求 ID：{request.id}
+                            </div>
                           </div>
 
-                          <div className="grid min-w-[280px] gap-2 sm:grid-cols-3 lg:w-[360px]">
+                          <div className="grid gap-2 sm:grid-cols-3">
                             <RequestMetricCard label="客户收费" value={request.customerChargeLabel} />
                             <RequestMetricCard label="供应商成本" value={request.providerCostLabel} />
                             <RequestMetricCard label="利润" value={request.profitLabel} />
                           </div>
                         </div>
 
-                        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                          <section className="rounded-xl border border-black/[0.06] bg-white px-3 py-3">
-                            <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">请求摘要</p>
-                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                              <RequestMetricCard label="创建时间" value={request.createdLabel} />
-                              <RequestMetricCard label="完成时间" value={request.completedLabel} />
-                              <RequestMetricCard label="尝试次数" value={String(request.attemptCount)} />
-                              <RequestMetricCard
-                                label="最后延迟"
-                                value={
-                                  request.lastAttempt
-                                    ? `${request.lastAttempt.latency_ms ?? "等待中"} ms`
-                                    : "无尝试"
-                                }
-                              />
-                            </div>
+                        <details className="mt-4 group rounded-xl border border-black/[0.06] bg-white">
+                          <summary className="cursor-pointer list-none px-3 py-2.5 text-sm text-black/70">
+                            <span className="inline-flex items-center gap-2">
+                              <span className="text-black/50 group-open:hidden">展开明细</span>
+                              <span className="hidden text-black/50 group-open:inline">收起明细</span>
+                              <span className="text-black/40">·</span>
+                              <span>完成时间：{request.completedLabel}</span>
+                              <span className="text-black/40">·</span>
+                              <span>尝试次数：{request.attemptCount}</span>
+                              <span className="text-black/40">·</span>
+                              <span>
+                                最后延迟：
+                                {request.lastAttempt
+                                  ? ` ${request.lastAttempt.latency_ms ?? "等待中"} ms`
+                                  : " 无尝试"}
+                              </span>
+                            </span>
+                          </summary>
+
+                          <div className="border-t border-black/[0.06] px-3 py-3">
                             {request.lastAttempt ? (
-                              <div className="mt-3 rounded-xl border border-black/[0.06] bg-white px-3 py-2.5 text-xs">
+                              <div className="mb-3 rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 text-xs">
                                 <div className="flex items-center justify-between gap-3">
                                   <span className="text-black/58">
                                     最后一次尝试 #{request.lastAttempt.attempt_no}
@@ -1862,27 +1675,26 @@ export default async function InternalPage({
                                 ) : null}
                               </div>
                             ) : null}
-                          </section>
 
-                          <RequestBreakdownSection
-                            title="使用量指标"
-                            items={request.usageBreakdown}
-                            emptyLabel="没有记录到使用量指标"
-                          />
-
-                          <div className="grid gap-3">
-                            <RequestBreakdownSection
-                              title="客户侧计费"
-                              items={request.customerComponentBreakdown}
-                              emptyLabel="没有客户侧可计费组件"
-                            />
-                            <RequestBreakdownSection
-                              title="供应商成本"
-                              items={request.providerComponentBreakdown}
-                              emptyLabel="没有供应商侧成本拆分"
-                            />
+                            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                              <RequestBreakdownSection
+                                title="使用量指标"
+                                items={request.usageBreakdown}
+                                emptyLabel="没有记录到使用量指标"
+                              />
+                              <RequestBreakdownSection
+                                title="客户侧计费"
+                                items={request.customerComponentBreakdown}
+                                emptyLabel="没有客户侧可计费组件"
+                              />
+                              <RequestBreakdownSection
+                                title="供应商成本"
+                                items={request.providerComponentBreakdown}
+                                emptyLabel="没有供应商侧成本拆分"
+                              />
+                            </div>
                           </div>
-                        </div>
+                        </details>
                       </article>
                     ))}
                   </div>
@@ -1901,7 +1713,7 @@ export default async function InternalPage({
               <SectionShell
                 id="audit-panel"
                 title="配置变更历史"
-                description="所有真实控制台配置变更都会记录在这里，便于追踪是谁在什么时候改了什么。"
+                description=" "
               >
                 {hasAudit ? (
                   <div className="space-y-3">

@@ -6,6 +6,7 @@ import {
   getProviderRuntimeDiagnostics,
   getRoutingRuleRuntimeDiagnostics,
 } from "@/lib/provider-runtime-guard";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type AdminRole = "owner" | "admin";
@@ -14,7 +15,6 @@ type ProviderRow = {
   id: string;
   name: string;
   slug: string;
-  kind: "wavespeed" | "partner" | "custom";
   base_url: string | null;
   status: "healthy" | "degraded" | "offline";
   regions: string[] | null;
@@ -34,6 +34,14 @@ type SupportedModelRow = {
   unit_label: string;
   default_unit_cost: number;
   active: boolean;
+  created_at: string;
+};
+
+type ModelVendorRow = {
+  id: string;
+  name: string;
+  active: boolean;
+  sort_order: number | null;
   created_at: string;
 };
 
@@ -68,6 +76,7 @@ type RoutingRuleRow = {
 
 type RequestRow = {
   id: string;
+  workspace_id: string | null;
   api_key_id: string | null;
   capability: string;
   public_model_slug: string;
@@ -87,6 +96,16 @@ type RequestRow = {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
+  workspaces:
+    | {
+        name: string | null;
+        slug: string | null;
+      }
+    | Array<{
+        name: string | null;
+        slug: string | null;
+      }>
+    | null;
 };
 
 type MonitoringRequestRow = {
@@ -147,6 +166,7 @@ type MonitoringAttemptRow = {
 
 type ApiKeyRow = {
   id: string;
+  workspace_id: string;
   name: string;
   key_prefix: string;
   environment: string;
@@ -204,6 +224,7 @@ type AdminAuditLogRow = {
 
 type InternalAdminDataOptions = {
   monitoringLookbackMs?: number;
+  bypassAuth?: boolean;
 };
 
 function formatJson(value: Record<string, unknown> | null | undefined) {
@@ -523,22 +544,47 @@ async function fetchGlobalMonitoringData(
 }
 
 export async function getInternalAdminData(options: InternalAdminDataOptions = {}) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const bypassAuth = options.bypassAuth === true;
+  const supabase = bypassAuth ? createAdminClient() : await createClient();
+  const user: {
+    id: string;
+    email?: string | null;
+    user_metadata?: Record<string, unknown>;
+  } | null = bypassAuth
+    ? {
+        id: "internal-password-access",
+        email: "internal@openoctopus.local",
+        user_metadata: { name: "Internal Access" },
+      }
+    : ((await supabase.auth.getUser()).data.user as {
+        id: string;
+        email?: string | null;
+        user_metadata?: Record<string, unknown>;
+      } | null);
 
   if (!user) {
     return null;
   }
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id, role, workspaces(id, name, slug)")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const membership = bypassAuth
+    ? ({
+        workspace_id: "00000000-0000-0000-0000-000000000000",
+        role: "owner",
+        workspaces: {
+          id: "00000000-0000-0000-0000-000000000000",
+          name: "Internal Workspace",
+          slug: "internal-workspace",
+        },
+      } as const)
+    : (
+        await supabase
+          .from("workspace_members")
+          .select("workspace_id, role, workspaces(id, name, slug)")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle()
+      ).data;
 
   const role = membership?.role as string | undefined;
   const canManage = role === "owner" || role === "admin";
@@ -550,8 +596,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         id: user.id,
         email: user.email ?? null,
         name:
-          user.user_metadata?.full_name ??
-          user.user_metadata?.name ??
+          (typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : null) ??
+          (typeof user.user_metadata?.name === "string" ? user.user_metadata.name : null) ??
           user.email?.split("@")[0] ??
           "OpenOctopus Admin",
       },
@@ -571,6 +617,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const [
     providersResponse,
     supportedModelsResponse,
+    modelVendorsResponse,
     providerCredentialsResponse,
     providerModelsResponse,
     routingRulesResponse,
@@ -586,7 +633,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       supabase
         .from("providers")
         .select(
-          "id, name, slug, kind, base_url, status, regions, credentials_ref, config, created_at"
+          "id, name, slug, base_url, status, regions, credentials_ref, config, created_at"
         )
         .order("created_at", { ascending: true }),
       supabase
@@ -595,6 +642,11 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
           "id, provider, model_slug, display_name, modality, capability, billing_config, unit_label, default_unit_cost, active, created_at"
         )
         .order("created_at", { ascending: true }),
+      supabase
+        .from("model_vendors")
+        .select("id, name, active, sort_order, created_at")
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true }),
       supabase
         .from("provider_credentials")
         .select(
@@ -607,41 +659,43 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
           "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, pricing_source_url, pricing_source_note, pricing_source_evidence, input_schema, output_schema, created_at"
         )
         .order("created_at", { ascending: true }),
-      supabase
-        .from("routing_rules")
-        .select(
-          "id, workspace_id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy, active, created_at"
-        )
-        .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
-        .order("created_at", { ascending: true }),
+      bypassAuth
+        ? supabase
+            .from("routing_rules")
+            .select(
+              "id, workspace_id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy, active, created_at"
+            )
+            .order("created_at", { ascending: true })
+        : supabase
+            .from("routing_rules")
+            .select(
+              "id, workspace_id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy, active, created_at"
+            )
+            .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
+            .order("created_at", { ascending: true }),
       supabase
         .from("inference_requests")
         .select(
-          "id, api_key_id, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, created_at, started_at, completed_at"
+          "id, workspace_id, api_key_id, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, created_at, started_at, completed_at, workspaces(name, slug)"
         )
-        .eq("workspace_id", membership.workspace_id)
         .order("created_at", { ascending: false })
-        .limit(20),
+        .limit(80),
       supabase
         .from("api_keys")
-        .select("id, name, key_prefix, environment, status, created_at")
-        .eq("workspace_id", membership.workspace_id)
+        .select("id, workspace_id, name, key_prefix, environment, status, created_at")
         .order("created_at", { ascending: false }),
       supabase
         .from("v_api_key_spend_summary")
-        .select("api_key_id, workspace_id, current_month_spend, current_month_requests")
-        .eq("workspace_id", membership.workspace_id),
+        .select("api_key_id, workspace_id, current_month_spend, current_month_requests"),
       supabase
         .from("inference_requests")
         .select("api_key_id, estimated_provider_cost, actual_provider_cost")
-        .eq("workspace_id", membership.workspace_id)
         .gte("created_at", currentMonthStart.toISOString()),
       supabase
         .from("usage_events")
         .select("external_request_id, metadata")
-        .eq("workspace_id", membership.workspace_id)
         .order("created_at", { ascending: false })
-        .limit(100),
+        .limit(400),
       supabase
         .from("provider_attempts")
         .select(
@@ -649,20 +703,31 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         )
         .order("created_at", { ascending: false })
         .limit(50),
-      supabase
-        .from("admin_audit_logs")
-        .select(
-          "id, actor_user_id, workspace_id, action, target_type, target_id, summary, details, created_at"
-        )
-        .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
-        .order("created_at", { ascending: false })
-        .limit(40),
+      bypassAuth
+        ? supabase
+            .from("admin_audit_logs")
+            .select(
+              "id, actor_user_id, workspace_id, action, target_type, target_id, summary, details, created_at"
+            )
+            .order("created_at", { ascending: false })
+            .limit(40)
+        : supabase
+            .from("admin_audit_logs")
+            .select(
+              "id, actor_user_id, workspace_id, action, target_type, target_id, summary, details, created_at"
+            )
+            .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
+            .order("created_at", { ascending: false })
+            .limit(40),
     ]);
 
   const providers = (providersResponse.error ? [] : providersResponse.data ?? []) as ProviderRow[];
   const supportedModels = (supportedModelsResponse.error
     ? []
     : supportedModelsResponse.data ?? []) as SupportedModelRow[];
+  const modelVendors = (modelVendorsResponse.error
+    ? []
+    : modelVendorsResponse.data ?? []) as ModelVendorRow[];
   const providerCredentials = (providerCredentialsResponse.error
     ? []
     : providerCredentialsResponse.data ?? []) as ProviderCredentialRow[];
@@ -841,6 +906,9 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     const customerComponents = asRecord(customerBreakdown?.components);
     const providerComponents = asRecord(providerBreakdown?.components);
     const metricsRecord = asRecord(customerBreakdown?.metrics) ?? asRecord(providerBreakdown?.metrics);
+    const workspaceRow = Array.isArray(request.workspaces)
+      ? request.workspaces[0] ?? null
+      : request.workspaces;
 
     const customerCharge = Number(
       request.actual_customer_charge ?? request.actual_cost ?? request.estimated_customer_charge ?? request.estimated_cost ?? 0
@@ -897,8 +965,9 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       ...request,
       providerName: provider?.name ?? "Unknown provider",
       upstreamModelSlug: providerModel?.upstream_model_slug ?? "unknown",
-      customerName: workspaceRelation?.name ?? "Workspace",
-      workspaceSlug: workspaceRelation?.slug ?? "workspace",
+      customerName: workspaceRow?.name ?? "Workspace",
+      workspaceSlug: workspaceRow?.slug ?? "workspace",
+      workspaceId: request.workspace_id,
       apiKeyName: apiKey?.name ?? "Unknown key",
       apiKeyPrefix: apiKey?.key_prefix ?? "unknown",
       apiKeyEnvironment: apiKey?.environment ?? "unknown",
@@ -991,6 +1060,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
 
     return {
       id: apiKey.id,
+      workspaceId: apiKey.workspace_id,
       name: apiKey.name,
       keyPrefix: apiKey.key_prefix,
       environment: apiKey.environment,
@@ -1011,8 +1081,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       id: user.id,
       email: user.email ?? null,
       name:
-        user.user_metadata?.full_name ??
-        user.user_metadata?.name ??
+        (typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : null) ??
+        (typeof user.user_metadata?.name === "string" ? user.user_metadata.name : null) ??
         user.email?.split("@")[0] ??
         "OpenOctopus Admin",
     },
@@ -1033,6 +1103,10 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       ).length,
     },
     providers: providerSummaries,
+    modelVendors: modelVendors.map((vendor) => ({
+      ...vendor,
+      createdLabel: formatRelativeTimestamp(vendor.created_at),
+    })),
     supportedModels: supportedModelSummaries,
     providerCredentials: providerCredentialSummaries,
     providerModels: providerModelSummaries,
@@ -1042,15 +1116,24 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     globalMonitoring,
     auditLogs: auditLogSummaries,
     requestFilters: {
-      customers: [
-        {
-          id: workspaceRelation?.id ?? membership.workspace_id,
-          name: workspaceRelation?.name ?? "Workspace",
-          slug: workspaceRelation?.slug ?? "workspace",
-        },
-      ],
+      customers: Array.from(
+        recentRequestSummaries.reduce((map, request) => {
+          if (!request.workspaceSlug) {
+            return map;
+          }
+          map.set(request.workspaceSlug, {
+            id: request.workspaceId ?? request.workspaceSlug,
+            name: request.customerName,
+            slug: request.workspaceSlug,
+          });
+          return map;
+        }, new Map<string, { id: string; name: string; slug: string }>())
+      )
+        .map(([, value]) => value)
+        .sort((a, b) => a.name.localeCompare(b.name, "en-US")),
       apiKeys: keyEconomics.map((key) => ({
         id: key.id,
+        workspaceId: key.workspaceId,
         name: key.name,
         keyPrefix: key.keyPrefix,
         environment: key.environment,

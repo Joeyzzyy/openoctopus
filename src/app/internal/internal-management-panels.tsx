@@ -1,17 +1,23 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { BadgeCheck, CircleAlert, Pencil, Plus } from "lucide-react";
+import { deriveLegacyBillingFields, parseBillingConfig } from "@/lib/billing-config";
 import {
+  createModelVendor,
   createProvider,
   createProviderCredential,
+  createProviderModel,
   createSupportedModel,
+  deleteModelVendor,
   deleteProviderCredential,
   rotateProviderCredentialSecret,
+  updateModelEconomicsBundle,
   updateProvider,
   updateProviderCredentialDetails,
   updateProviderModelDetails,
   updateRoutingRule,
   updateSupportedModelDetails,
+  updateSupportedModelState,
 } from "./actions";
 import {
   BillingConfigEditor,
@@ -31,7 +37,6 @@ import { useFormStatus } from "react-dom";
 
 type CapabilityOption = { value: string; label: string };
 type ProviderStatusOption = { value: string; label: string };
-type ProviderKindOption = { value: string; label: string };
 
 type SupportedModelSummary = {
   id: string;
@@ -48,11 +53,18 @@ type SupportedModelSummary = {
   activeProviderModelCount: number;
 };
 
+type ModelVendorSummary = {
+  id: string;
+  name: string;
+  active: boolean;
+  sort_order: number | null;
+  createdLabel: string;
+};
+
 type ProviderSummary = {
   id: string;
   name: string;
   slug: string;
-  kind: "wavespeed" | "partner" | "custom";
   base_url: string | null;
   status: "healthy" | "degraded" | "offline";
   regionsLabel: string;
@@ -130,6 +142,27 @@ const formTextAreaClassName =
 
 const formSelectClassName =
   "h-10 w-full rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+
+function formatCurrency(value: number) {
+  const absValue = Math.abs(value);
+  const fractionDigits = absValue > 0 && absValue < 0.1 ? 6 : 2;
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: fractionDigits,
+  }).format(value);
+}
+
+function readComparableUnitCost(configText: string) {
+  try {
+    const config = parseBillingConfig(JSON.parse(configText));
+    return deriveLegacyBillingFields(config);
+  } catch {
+    return null;
+  }
+}
 
 function RuntimeDiagnostics({
   diagnostics,
@@ -388,6 +421,9 @@ function FormSelect({
   );
 }
 
+const compactFilterSelectClassName =
+  "h-8 shrink-0 rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black outline-none transition-colors focus:border-black/20 focus:bg-white";
+
 function ActiveCheckbox({
   name,
   defaultChecked,
@@ -415,138 +451,169 @@ function ActiveCheckbox({
 
 export function PublicModelsPanel({
   models,
+  modelVendors = [],
   capabilityOptions,
 }: {
   models: SupportedModelSummary[];
+  modelVendors?: ModelVendorSummary[];
   capabilityOptions: readonly CapabilityOption[];
 }) {
+  const safeModelVendors = Array.isArray(modelVendors) ? modelVendors : [];
+  const vendorSuggestions = Array.from(
+    new Set([
+      ...safeModelVendors.map((item) => item.name),
+      ...models.map((item) => item.provider),
+    ])
+  )
+    .filter((name) => name.trim().toLowerCase() !== "openoctopus")
+    .sort((a, b) => a.localeCompare(b, "en-US"));
+  const vendorOptions = vendorSuggestions.map((name) => ({ value: name, label: name }));
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-black/55">已有可售模型</div>
-        <ManagementDialog
-          trigger={
-            <button type="button">
-              <ModalButton>
-                <Plus className="size-3.5" />
-                新建可售模型
-              </ModalButton>
-            </button>
-          }
-          title="新建可售模型"
-          description="在独立弹窗中创建新的客户侧模型定义。"
-        >
-          {({ close }) => (
-          <ManagedDialogForm action={createSupportedModel} close={close}>
-            <FormField label="提供方名称" name="provider" defaultValue="OpenOctopus" required />
-            <FormField label="可售模型 Slug" name="modelSlug" defaultValue="openoctopus/gemini-2.5-flash-image" required />
-            <FormField label="显示名称" name="displayName" defaultValue="Gemini Image" required />
-            <FormSelect
-              label="模态"
-              name="modality"
-              options={[
-                { value: "image", label: "图片" },
-                { value: "video", label: "视频" },
-                { value: "audio", label: "音频" },
-              ]}
+      <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
+        <p className="text-xs font-medium text-black/75">模型厂商名称配置</p>
+        <p className="mt-1 text-xs text-black/55">用于可售模型里的“模型厂商”字段（例如 Google / OpenAI / Anthropic）。</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {vendorSuggestions.map((name) => (
+            <span
+              key={name}
+              className="inline-flex h-7 items-center rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/70"
+            >
+              {name}
+            </span>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <form action={createModelVendor} className="flex items-center gap-2">
+            <input
+              name="name"
+              required
+              pattern="^(?!\\s*openoctopus\\s*$).+"
+              placeholder="新增厂商名称"
+              className="h-8 w-[180px] rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black outline-none focus:border-black/20"
             />
-            <FormSelect
-              label="能力类型"
-              name="capability"
-              options={[...capabilityOptions]}
-              defaultValue="image_generation"
-            />
-            <BillingConfigEditor
-              initialValue={'{"billingMode":"hybrid","currency":"USD","charges":{"perImage":0.039,"inputTextTokensPerMillion":0.30}}'}
-            />
-            <ActiveCheckbox name="active" defaultChecked />
-            <div className="flex justify-end">
-              <SubmitButton label="创建可售模型" />
-            </div>
-          </ManagedDialogForm>
-          )}
-        </ManagementDialog>
-      </div>
-
-      <div className="rounded-2xl border border-[#D8E4F8] bg-[#F3F7FF] px-4 py-3 text-sm text-[#274A86] shadow-sm">
-        这里维护的是用户看到的模型型号和用户售价。不要在这里填写供应商成本。
+            <SubmitButton label="新增" pendingLabel="新增中..." />
+          </form>
+          {safeModelVendors.map((vendor) => (
+            <form key={vendor.id} action={deleteModelVendor}>
+              <input type="hidden" name="vendorId" value={vendor.id} />
+              <SubmitButton label={`删除 ${vendor.name}`} pendingLabel="删除中..." tone="danger" />
+            </form>
+          ))}
+        </div>
       </div>
 
       {models.length > 0 ? (
-        models.map((model) => (
-          <div key={model.id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
-                    {model.modality === "image" ? "图片" : model.modality === "video" ? "视频" : "音频"}
-                  </span>
-                  <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
-                    {model.active ? "已启用" : "未启用"}
-                  </span>
-                </div>
-                <p className="mt-3 text-sm font-medium text-black">{model.display_name}</p>
-                <p className="mt-1 text-xs text-black/50">{model.model_slug}</p>
-                <p className="mt-1 text-xs text-black/50">计费：{model.billingSummary}</p>
-              </div>
-
-              <ManagementDialog
-                trigger={
-                  <button type="button">
-                    <ModalButton tone="secondary">
-                      <Pencil className="size-3.5" />
-                      编辑
-                    </ModalButton>
-                  </button>
-                }
-                title={`编辑 ${model.display_name}`}
-                description="在独立弹窗中编辑这个可售模型。"
-              >
-                {({ close }) => (
-                <ManagedDialogForm action={updateSupportedModelDetails} close={close}>
-                  <input type="hidden" name="supportedModelId" value={model.id} />
-                  <FormField label="提供方名称" name="provider" defaultValue={model.provider} required />
-                  <FormField label="可售模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
-                  <FormField label="显示名称" name="displayName" defaultValue={model.display_name} required />
-                  <FormSelect
-                    label="模态"
-                    name="modality"
-                    defaultValue={model.modality}
-                    options={[
-                      { value: "image", label: "图片" },
-                      { value: "video", label: "视频" },
-                      { value: "audio", label: "音频" },
-                    ]}
-                  />
-                  <FormSelect
-                    label="能力类型"
-                    name="capability"
-                    defaultValue={model.capability ?? "image_generation"}
-                    options={[...capabilityOptions]}
-                  />
-                  <BillingConfigEditor initialValue={model.billingConfigText} />
-                  <ActiveCheckbox name="active" defaultChecked={model.active} />
-                  <div className="flex justify-end">
-                    <SubmitButton label="保存可售模型" />
-                  </div>
-                </ManagedDialogForm>
-                )}
-              </ManagementDialog>
-            </div>
-
-            <div className="mt-4 grid gap-2 text-xs text-black/55 sm:grid-cols-3">
-              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
-                提供方名称：{model.provider}
-              </div>
-              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
-                实现数量：{model.activeProviderModelCount}/{model.providerModelCount} 已启用
-              </div>
-              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
-                创建时间：{model.createdLabel}
-              </div>
-            </div>
-          </div>
-        ))
+        <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+          <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+            <thead>
+              <tr className="text-xs text-black/50">
+                <th className="border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">厂商</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">模态/能力</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">计费</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">实现数量</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">创建时间</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">是否启用</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {models.map((model) => (
+                <tr key={model.id}>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                    <p className="text-sm font-medium text-black">{model.display_name}</p>
+                    <p className="mt-1 text-xs text-black/50">{model.model_slug}</p>
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{model.provider}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
+                        {model.modality === "image" ? "图片" : model.modality === "video" ? "视频" : "音频"}
+                      </span>
+                      <span className="inline-flex h-6 items-center rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2 text-[11px] text-black/60">
+                        {model.capability ?? "未设置"}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{model.billingSummary}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                    {model.activeProviderModelCount}/{model.providerModelCount}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{model.createdLabel}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                    <form action={updateSupportedModelState}>
+                      <input type="hidden" name="supportedModelId" value={model.id} />
+                      <input type="hidden" name="active" value={model.active ? "false" : "true"} />
+                      <button
+                        type="submit"
+                        className={`inline-flex h-7 w-[86px] items-center rounded-full border px-1 transition-colors ${
+                          model.active
+                            ? "border-[#D7EADB] bg-[#EDF8F0]"
+                            : "border-black/[0.12] bg-[#F4F4F3]"
+                        }`}
+                        aria-label={model.active ? "停用模型" : "启用模型"}
+                      >
+                        <span
+                          className={`h-5 rounded-full px-2 text-[11px] leading-5 transition-all ${
+                            model.active
+                              ? "ml-auto bg-[#335D2D] text-white"
+                              : "mr-auto bg-[#6B7280] text-white"
+                          }`}
+                        >
+                          {model.active ? "ON" : "OFF"}
+                        </span>
+                      </button>
+                    </form>
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                    <ManagementDialog
+                      trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                      title={`编辑 ${model.display_name}`}
+                      description="在独立弹窗中编辑这个可售模型。"
+                    >
+                      {({ close }) => (
+                      <ManagedDialogForm action={updateSupportedModelDetails} close={close}>
+                        <input type="hidden" name="supportedModelId" value={model.id} />
+                        <input type="hidden" name="active" value={model.active ? "true" : "false"} />
+                        <FormSelect
+                          label="模型厂商（内部分类）"
+                          name="provider"
+                          defaultValue={model.provider}
+                          options={vendorOptions}
+                        />
+                        <FormField label="可售模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
+                        <FormField label="显示名称" name="displayName" defaultValue={model.display_name} required />
+                        <FormSelect
+                          label="模态"
+                          name="modality"
+                          defaultValue={model.modality}
+                          options={[
+                            { value: "image", label: "图片" },
+                            { value: "video", label: "视频" },
+                            { value: "audio", label: "音频" },
+                          ]}
+                        />
+                        <FormSelect
+                          label="能力类型"
+                          name="capability"
+                          defaultValue={model.capability ?? "image_generation"}
+                          options={[...capabilityOptions]}
+                        />
+                        <BillingConfigEditor initialValue={model.billingConfigText} />
+                        <div className="flex justify-end">
+                          <SubmitButton label="保存可售模型" />
+                        </div>
+                      </ManagedDialogForm>
+                      )}
+                    </ManagementDialog>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有可售模型</p>
@@ -559,52 +626,438 @@ export function PublicModelsPanel({
   );
 }
 
+export function CreateSupportedModelButton({
+  capabilityOptions,
+}: {
+  capabilityOptions: readonly CapabilityOption[];
+}) {
+  return (
+    <ManagementDialog
+      trigger={<ModalButton><Plus className="size-3.5" />新建</ModalButton>}
+      title="新建可售模型"
+      description="在独立弹窗中创建新的客户侧模型定义。"
+    >
+      {({ close }) => (
+      <ManagedDialogForm action={createSupportedModel} close={close}>
+        <FormField
+          label="模型厂商（内部分类）"
+          name="provider"
+          defaultValue="Google"
+          required
+          help="用于内部分类和测算分组，例如 Google、OpenAI、Anthropic。"
+        />
+        <FormField label="可售模型 Slug" name="modelSlug" defaultValue="openoctopus/gemini-2.5-flash-image" required />
+        <FormField label="显示名称" name="displayName" defaultValue="Gemini Image" required />
+        <FormSelect
+          label="模态"
+          name="modality"
+          options={[
+            { value: "image", label: "图片" },
+            { value: "video", label: "视频" },
+            { value: "audio", label: "音频" },
+          ]}
+        />
+        <FormSelect
+          label="能力类型"
+          name="capability"
+          options={[...capabilityOptions]}
+          defaultValue="image_generation"
+        />
+        <BillingConfigEditor
+          initialValue={'{"billingMode":"hybrid","currency":"USD","charges":{"perImage":0.039,"inputTextTokensPerMillion":0.30}}'}
+        />
+        <ActiveCheckbox name="active" defaultChecked />
+        <div className="flex justify-end">
+          <SubmitButton label="创建可售模型" />
+        </div>
+      </ManagedDialogForm>
+      )}
+    </ManagementDialog>
+  );
+}
+
+export function EconomicsPanel({
+  supportedModels,
+  providerModels,
+}: {
+  supportedModels: SupportedModelSummary[];
+  providerModels: ProviderModelSummary[];
+}) {
+  const supportedModelById = new Map(supportedModels.map((item) => [item.id, item]));
+
+  const rows = providerModels
+    .map((providerModel) => {
+      const supportedModel = providerModel.supported_model_id
+        ? supportedModelById.get(providerModel.supported_model_id) ?? null
+        : null;
+      if (!supportedModel) {
+        return null;
+      }
+
+      const supportedUnit = readComparableUnitCost(supportedModel.billingConfigText);
+      const providerUnit = readComparableUnitCost(providerModel.pricingText);
+      const margin =
+        supportedUnit && providerUnit && supportedUnit.unitLabel === providerUnit.unitLabel
+          ? supportedUnit.defaultUnitCost - providerUnit.defaultUnitCost
+          : null;
+
+      return {
+        providerModel,
+        supportedModel,
+        margin,
+        providerName: providerModel.providerName,
+        providerSlug: providerModel.providerSlug,
+        vendor: supportedModel.provider?.trim() || "Unspecified",
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((a, b) => {
+      const providerCompare = a.providerName.localeCompare(b.providerName, "en-US");
+      if (providerCompare !== 0) {
+        return providerCompare;
+      }
+      const vendorCompare = a.vendor.localeCompare(b.vendor, "en-US");
+      if (vendorCompare !== 0) {
+        return vendorCompare;
+      }
+      return a.supportedModel.model_slug.localeCompare(b.supportedModel.model_slug, "en-US");
+    });
+
+  const providerFilterOptions = Array.from(new Set(rows.map((row) => row.providerName))).sort((a, b) =>
+    a.localeCompare(b, "en-US")
+  );
+  const [providerFilter, setProviderFilter] = useState<string>("all");
+  const [capabilityFilter, setCapabilityFilter] = useState<string>("all");
+  const [activeFilter, setActiveFilter] = useState<string>("all");
+
+  const filteredRows = rows.filter((row) => {
+    if (providerFilter !== "all" && row.providerName !== providerFilter) {
+      return false;
+    }
+    if (capabilityFilter !== "all" && row.providerModel.capability !== capabilityFilter) {
+      return false;
+    }
+    if (activeFilter === "active" && !row.providerModel.active) {
+      return false;
+    }
+    if (activeFilter === "inactive" && row.providerModel.active) {
+      return false;
+    }
+    return true;
+  });
+
+  return (
+    <div className="space-y-4">
+      {rows.length > 0 ? (
+        <>
+          <div className="flex items-center gap-2 overflow-x-auto rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-2">
+            <select
+              value={providerFilter}
+              onChange={(event) => setProviderFilter(event.target.value)}
+              className={compactFilterSelectClassName + " w-[132px]"}
+            >
+              <option value="all">全部供应商</option>
+              {providerFilterOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={capabilityFilter}
+              onChange={(event) => setCapabilityFilter(event.target.value)}
+              className={compactFilterSelectClassName + " w-[122px]"}
+            >
+              <option value="all">全部能力</option>
+              <option value="image_generation">image_generation</option>
+              <option value="image_edit">image_edit</option>
+              <option value="video_generation">video_generation</option>
+            </select>
+
+            <select
+              value={activeFilter}
+              onChange={(event) => setActiveFilter(event.target.value)}
+              className={compactFilterSelectClassName + " w-[100px]"}
+            >
+              <option value="all">全部状态</option>
+              <option value="active">已启用</option>
+              <option value="inactive">未启用</option>
+            </select>
+
+            <span className="ml-auto shrink-0 px-2 text-xs text-black/50">结果：{filteredRows.length} 条</span>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+            <table className="min-w-[2360px] border-separate border-spacing-0 text-left text-sm">
+              <thead>
+                <tr className="text-xs text-black/50">
+                  <th className="w-[230px] border-b border-black/[0.08] px-3 py-2.5">分类</th>
+                  <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
+                  <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">上游模型</th>
+                  <th className="w-[150px] border-b border-black/[0.08] px-3 py-2.5">能力</th>
+                  <th className="w-[240px] border-b border-black/[0.08] px-3 py-2.5">售价</th>
+                  <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">成本</th>
+                  <th className="w-[140px] border-b border-black/[0.08] px-3 py-2.5">标准利润</th>
+                  <th className="w-[140px] border-b border-black/[0.08] px-3 py-2.5">来源证据</th>
+                  <th className="w-[120px] border-b border-black/[0.08] px-3 py-2.5">状态</th>
+                  <th className="sticky right-0 z-10 w-[180px] border-b border-black/[0.08] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
+                    操作
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.length > 0 ? (
+                  filteredRows.map((row, index) => {
+                    const prev = filteredRows[index - 1] ?? null;
+                    const providerChanged = !prev || prev.providerName !== row.providerName;
+                    const vendorChanged = providerChanged || prev.vendor !== row.vendor;
+
+                    return (
+                      <Fragment key={`row-group-${row.providerModel.id}`}>
+                        {providerChanged ? (
+                          <tr key={`provider-${row.providerModel.id}`}>
+                            <td colSpan={10} className="border-b border-black/[0.06] bg-[#F3F7FF] px-3 py-2.5 text-sm font-semibold text-[#355FB4]">
+                              供应商：{row.providerName} · {row.providerSlug}
+                            </td>
+                          </tr>
+                        ) : null}
+                        {vendorChanged ? (
+                          <tr key={`vendor-${row.providerModel.id}`}>
+                            <td colSpan={10} className="border-b border-black/[0.06] bg-[#FCFCFA] px-3 py-2 text-xs font-medium text-black/70">
+                              模型公司：{row.vendor}
+                            </td>
+                          </tr>
+                        ) : null}
+                        <tr key={row.providerModel.id}>
+                          <td className="w-[230px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/55">
+                            {row.providerName}
+                            <br />
+                            {row.vendor}
+                          </td>
+                          <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top">
+                            <p className="text-sm font-medium text-black">{row.supportedModel.display_name}</p>
+                            <p className="mt-1 text-xs text-black/50">{row.supportedModel.model_slug}</p>
+                          </td>
+                          <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top">
+                            <p className="text-sm text-black">{row.providerModel.upstream_model_slug}</p>
+                            <p className="mt-1 text-xs text-black/50">{row.providerModel.public_model_slug}</p>
+                          </td>
+                          <td className="w-[150px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{row.providerModel.capability}</td>
+                          <td className="w-[240px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{row.supportedModel.billingSummary}</td>
+                          <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                            <p>{row.providerModel.pricingSummary}</p>
+                            {row.providerModel.pricingSourceUrl ? (
+                              <a
+                                href={row.providerModel.pricingSourceUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-1 inline-flex text-[11px] text-[#355FB4] underline-offset-2 hover:underline"
+                              >
+                                官方价格链接
+                              </a>
+                            ) : null}
+                          </td>
+                          <td className="w-[140px] border-b border-black/[0.06] px-3 py-3 align-top">
+                            {row.margin === null ? (
+                              <p className="text-xs text-black/45">口径不一致</p>
+                            ) : (
+                              <p className={`text-sm font-medium ${row.margin >= 0 ? "text-[#335D2D]" : "text-[#b54432]"}`}>
+                                {formatCurrency(row.margin)}
+                              </p>
+                            )}
+                          </td>
+                          <td className="w-[140px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                            <p>截图：{row.providerModel.pricingSourceEvidence.length}</p>
+                            <p className="mt-1">备注：{row.providerModel.pricingSourceNote ? "有" : "无"}</p>
+                          </td>
+                          <td className="w-[120px] border-b border-black/[0.06] px-3 py-3 align-top">
+                            <span
+                              className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
+                                row.providerModel.active
+                                  ? "border-[#D7EADB] bg-[#EDF8F0] text-[#335D2D]"
+                                  : "border-black/[0.08] bg-[#FCFCFA] text-black/60"
+                              }`}
+                            >
+                              {row.providerModel.active ? "已启用" : "未启用"}
+                            </span>
+                          </td>
+                          <td className="sticky right-0 z-10 w-[180px] border-b border-black/[0.06] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
+                            <ManagementDialog
+                              trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑联动</ModalButton>}
+                              title={`编辑联动：${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
+                              description="在一个表单内同时编辑可售模型售价与供应商模型成本。"
+                            >
+                              {({ close }) => (
+                                <ManagedDialogForm action={updateModelEconomicsBundle} close={close}>
+                                  <input type="hidden" name="supportedModelId" value={row.supportedModel.id} />
+                                  <input type="hidden" name="providerModelId" value={row.providerModel.id} />
+                                  <input
+                                    type="hidden"
+                                    name="pricingSourceEvidence"
+                                    value={JSON.stringify(row.providerModel.pricingSourceEvidence)}
+                                  />
+                                  <div className="grid gap-4">
+                                    <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 text-xs text-black/55">
+                                      可售模型：{row.supportedModel.model_slug}
+                                      <br />
+                                      供应商模型：{row.providerModel.providerName} / {row.providerModel.upstream_model_slug}
+                                    </div>
+                                    <div>
+                                      <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">可售模型售价配置</span>
+                                      <BillingConfigEditor
+                                        name="supportedBillingConfig"
+                                        initialValue={row.supportedModel.billingConfigText}
+                                        componentHint="用户可见售价配置。"
+                                        generatedLabel="生成的用户售价计费配置"
+                                      />
+                                    </div>
+                                    <div>
+                                      <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">供应商成本配置</span>
+                                      <BillingConfigEditor
+                                        name="providerPricing"
+                                        initialValue={row.providerModel.pricingText}
+                                        componentHint="供应商真实成本配置。"
+                                        generatedLabel="生成的供应商成本计费配置"
+                                      />
+                                    </div>
+                                    <FormField
+                                      label="官方成本价格链接"
+                                      name="pricingSourceUrl"
+                                      type="text"
+                                      defaultValue={row.providerModel.pricingSourceUrl ?? ""}
+                                    />
+                                    <FormTextArea
+                                      label="成本说明备注"
+                                      name="pricingSourceNote"
+                                      defaultValue={row.providerModel.pricingSourceNote ?? ""}
+                                    />
+                                    <label className="block">
+                                      <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">价格证据截图</span>
+                                      <input
+                                        type="file"
+                                        name="pricingSourceEvidenceFile"
+                                        accept="image/png,image/jpeg,image/webp"
+                                        className="block w-full rounded-md border border-black/[0.08] bg-white px-3 py-2 text-sm text-black file:mr-3 file:rounded-md file:border-0 file:bg-[#111827] file:px-3 file:py-2 file:text-xs file:font-medium file:text-white"
+                                      />
+                                    </label>
+                                    <div className="flex justify-end">
+                                      <SubmitButton label="保存联动价格" />
+                                    </div>
+                                  </div>
+                                </ManagedDialogForm>
+                              )}
+                            </ManagementDialog>
+                          </td>
+                        </tr>
+                      </Fragment>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={10} className="px-3 py-8 text-center text-sm text-black/55">
+                      当前筛选条件下没有结果。
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+          <p className="text-sm font-medium text-black">还没有可售模型</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
+            先创建可售模型和供应商模型后，这里才会生成联动测算行。
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CreateProviderModelMappingButton({
+  supportedModels,
+  providers,
+}: {
+  supportedModels: SupportedModelSummary[];
+  providers: ProviderSummary[];
+}) {
+  const hasProviders = providers.length > 0;
+  const hasSupportedModels = supportedModels.length > 0;
+  const supportedModelOptions = supportedModels.map((item) => ({
+    id: item.id,
+    modelSlug: item.model_slug,
+    displayName: item.display_name,
+    capability: item.capability,
+  }));
+  const providerOptions = providers.map((item) => ({
+    id: item.id,
+    name: item.name,
+    slug: item.slug,
+  }));
+
+  return (
+    <ManagementDialog
+      trigger={<ModalButton disabled={!hasProviders || !hasSupportedModels}><Plus className="size-3.5" />新建供应商模型映射</ModalButton>}
+      title="新建供应商模型映射"
+      description="在总表内直接新增可售模型与供应商模型的映射关系。"
+    >
+      {({ close }) => (
+        <CreateProviderModelForm
+          action={createProviderModel}
+          supportedModels={supportedModelOptions}
+          providers={providerOptions}
+          disabled={!hasProviders || !hasSupportedModels}
+          className="grid gap-4"
+          onSuccess={close}
+        />
+      )}
+    </ManagementDialog>
+  );
+}
+
 export function ProvidersPanel({
   providers,
-  providerKindOptions,
+  credentials,
   providerStatusOptions,
-  selectedTemplate,
 }: {
   providers: ProviderSummary[];
-  providerKindOptions: readonly ProviderKindOption[];
+  credentials: ProviderCredentialSummary[];
   providerStatusOptions: readonly ProviderStatusOption[];
-  selectedTemplate: ProviderTemplate | null;
 }) {
+  const statusToneClassName = (status: ProviderSummary["status"]) => {
+    if (status === "healthy") {
+      return "border-[#D7EADB] bg-[#EDF8F0] text-[#335D2D]";
+    }
+    if (status === "degraded") {
+      return "border-[#F2E4BF] bg-[#FCF6E6] text-[#8B6A1A]";
+    }
+    return "border-[#F1D2CC] bg-[#FFF7F5] text-[#8D4336]";
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有供应商</div>
         <ManagementDialog
-          trigger={
-            <button type="button">
-              <ModalButton>
-                <Plus className="size-3.5" />
-                新建供应商
-              </ModalButton>
-            </button>
-          }
+          trigger={<ModalButton><Plus className="size-3.5" />新建供应商</ModalButton>}
           title="新建供应商"
           description="在独立弹窗中创建新的上游供应商。"
         >
           {({ close }) => (
           <ManagedDialogForm action={createProvider} close={close}>
-            <FormField label="名称" name="name" defaultValue={selectedTemplate?.provider.name} required />
-            <FormField label="Slug" name="slug" defaultValue={selectedTemplate?.provider.slug} required />
-            <FormSelect
-              label="类型"
-              name="kind"
-              defaultValue={selectedTemplate?.provider.kind}
-              options={[...providerKindOptions]}
-            />
-            <FormField label="基础 URL" name="baseUrl" defaultValue={selectedTemplate?.provider.baseUrl} />
+            <FormField label="名称" name="name" required />
+            <FormField label="Slug" name="slug" required />
+            <FormField label="基础 URL" name="baseUrl" />
             <FormSelect
               label="状态"
               name="status"
-              defaultValue={selectedTemplate?.provider.status ?? "healthy"}
+              defaultValue="healthy"
               options={[...providerStatusOptions]}
             />
-            <FormField label="区域" name="regions" defaultValue={selectedTemplate?.provider.regions} />
-            <FormTextArea label="配置 JSON" name="config" defaultValue={selectedTemplate?.provider.config ?? "{}"} />
+            <FormField label="区域" name="regions" />
+            <FormTextArea label="配置 JSON" name="config" defaultValue="{}" />
             <div className="flex justify-end">
               <SubmitButton label="创建供应商" />
             </div>
@@ -614,67 +1067,80 @@ export function ProvidersPanel({
       </div>
 
       {providers.length > 0 ? (
-        providers.map((provider) => (
-          <div key={provider.id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex h-6 items-center rounded-md border border-[#D7EADB] bg-[#EDF8F0] px-2 text-[11px] text-[#335D2D]">
-                    {provider.kind === "wavespeed" ? "WaveSpeed" : provider.kind === "partner" ? "合作方" : "自定义"}
-                  </span>
-                  <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
-                    {provider.status === "healthy" ? "健康" : provider.status === "degraded" ? "降级" : "离线"}
-                  </span>
-                </div>
-                <p className="mt-3 text-sm font-medium text-black">{provider.name}</p>
-                <p className="mt-1 text-xs text-black/50">{provider.slug}</p>
-                <p className="mt-1 text-xs text-black/50">{provider.base_url ?? "未填写基础 URL"}</p>
-              </div>
+        <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+          <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+            <thead>
+              <tr className="text-xs text-black/50">
+                <th className="border-b border-black/[0.08] px-3 py-2.5">供应商</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">基础 URL</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">状态</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">区域</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">模型</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">密钥数</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {providers.map((provider) => {
+                const providerCredentials = credentials.filter((item) => item.provider_id === provider.id);
 
-              <ManagementDialog
-                trigger={
-                  <button type="button">
-                    <ModalButton tone="secondary">
-                      <Pencil className="size-3.5" />
-                      编辑
-                    </ModalButton>
-                  </button>
-                }
-                title={`编辑 ${provider.name}`}
-                description="在独立弹窗中编辑这个供应商。"
-              >
-                {({ close }) => (
-                <ManagedDialogForm action={updateProvider} close={close}>
-                  <input type="hidden" name="providerId" value={provider.id} />
-                  <FormField label="名称" name="name" defaultValue={provider.name} required />
-                  <FormField label="Slug" name="slug" defaultValue={provider.slug} required />
-                  <FormSelect label="类型" name="kind" defaultValue={provider.kind} options={[...providerKindOptions]} />
-                  <FormField label="基础 URL" name="baseUrl" defaultValue={provider.base_url ?? ""} />
-                  <FormSelect label="状态" name="status" defaultValue={provider.status} options={[...providerStatusOptions]} />
-                  <FormField label="区域" name="regions" defaultValue={(provider.regions ?? []).join(", ")} />
-                  <FormTextArea label="配置 JSON" name="config" defaultValue={provider.configText} />
-                  <div className="flex justify-end">
-                    <SubmitButton label="保存供应商" />
-                  </div>
-                </ManagedDialogForm>
-                )}
-              </ManagementDialog>
-            </div>
-
-            <div className="mt-4 grid gap-2 text-xs text-black/55 sm:grid-cols-3">
-              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
-                区域：{provider.regionsLabel}
-              </div>
-              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
-                模型：{provider.activeModelCount}/{provider.modelCount} 已启用
-              </div>
-              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
-                供应商密钥：{provider.credentialCount}
-              </div>
-            </div>
-            <RuntimeDiagnostics diagnostics={provider.runtimeDiagnostics} />
-          </div>
-        ))
+                return (
+                  <tr key={provider.id}>
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                      <p className="text-sm font-medium text-black">{provider.name}</p>
+                      <p className="mt-1 text-xs text-black/50">{provider.slug}</p>
+                      <RuntimeDiagnostics diagnostics={provider.runtimeDiagnostics} />
+                    </td>
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                      <p className="max-w-[320px] break-all text-xs text-black/60">{provider.base_url ?? "未填写"}</p>
+                    </td>
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                      <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${statusToneClassName(provider.status)}`}>
+                        {provider.status === "healthy" ? "健康" : provider.status === "degraded" ? "降级" : "离线"}
+                      </span>
+                    </td>
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{provider.regionsLabel}</td>
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                      {provider.activeModelCount}/{provider.modelCount}
+                    </td>
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{provider.credentialCount}</td>
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                      <div className="flex flex-wrap gap-2">
+                        <ManagementDialog
+                          trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                          title={`编辑 ${provider.name}`}
+                          description="在独立弹窗中编辑这个供应商。"
+                        >
+                          {({ close }) => (
+                            <ManagedDialogForm action={updateProvider} close={close}>
+                              <input type="hidden" name="providerId" value={provider.id} />
+                              <FormField label="名称" name="name" defaultValue={provider.name} required />
+                              <FormField label="Slug" name="slug" defaultValue={provider.slug} required />
+                              <FormField label="基础 URL" name="baseUrl" defaultValue={provider.base_url ?? ""} />
+                              <FormSelect label="状态" name="status" defaultValue={provider.status} options={[...providerStatusOptions]} />
+                              <FormField label="区域" name="regions" defaultValue={(provider.regions ?? []).join(", ")} />
+                              <FormTextArea label="配置 JSON" name="config" defaultValue={provider.configText} />
+                              <div className="flex justify-end">
+                                <SubmitButton label="保存供应商" />
+                              </div>
+                            </ManagedDialogForm>
+                          )}
+                        </ManagementDialog>
+                        <ManagementDialog
+                          trigger={<ModalButton tone="secondary"><Plus className="size-3.5" />管理密钥</ModalButton>}
+                          title={`管理供应商密钥：${provider.name}`}
+                          description="在弹窗里新增、编辑、轮换或删除这个供应商的密钥。"
+                        >
+                          <CredentialsPanel credentials={providerCredentials} providers={[provider]} selectedTemplate={null} />
+                        </ManagementDialog>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有供应商</p>
@@ -703,14 +1169,7 @@ export function CredentialsPanel({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有供应商密钥</div>
         <ManagementDialog
-          trigger={
-            <button type="button" disabled={!hasProviders}>
-              <ModalButton>
-                <Plus className="size-3.5" />
-                新建供应商密钥
-              </ModalButton>
-            </button>
-          }
+          trigger={<ModalButton disabled={!hasProviders}><Plus className="size-3.5" />新建供应商密钥</ModalButton>}
           title="新建供应商密钥"
           description="在独立弹窗中创建新的供应商密钥，不直接嵌在列表里编辑。"
         >
@@ -777,14 +1236,7 @@ export function CredentialsPanel({
 
               <div className="flex flex-wrap gap-2">
                 <ManagementDialog
-                  trigger={
-                    <button type="button">
-                      <ModalButton tone="secondary">
-                        <Pencil className="size-3.5" />
-                        编辑
-                      </ModalButton>
-                    </button>
-                  }
+                  trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
                 title={`编辑 ${credential.label}`}
                 description="在弹窗中编辑这个已有供应商密钥。"
               >
@@ -805,11 +1257,7 @@ export function CredentialsPanel({
                 </ManagementDialog>
 
                 <ManagementDialog
-                  trigger={
-                    <button type="button">
-                      <ModalButton tone="secondary">轮换密钥</ModalButton>
-                    </button>
-                  }
+                  trigger={<ModalButton tone="secondary">轮换密钥</ModalButton>}
                   title={`轮换密钥：${credential.label}`}
                   description="将密钥轮换与元数据编辑拆开，避免操作员混淆。"
                 >
@@ -826,11 +1274,7 @@ export function CredentialsPanel({
                 </ManagementDialog>
 
                 <ManagementDialog
-                  trigger={
-                    <button type="button" disabled={credential.is_active}>
-                      <ModalButton tone="secondary">删除</ModalButton>
-                    </button>
-                  }
+                  trigger={<ModalButton tone="secondary" disabled={credential.is_active}>删除</ModalButton>}
                   title={`删除 ${credential.label}`}
                   description="确认是否删除这个未启用的供应商密钥。"
                 >
@@ -909,14 +1353,7 @@ export function ModelsPanel({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有供应商模型</div>
         <ManagementDialog
-          trigger={
-            <button type="button" disabled={!hasProviders || !hasSupportedModels}>
-              <ModalButton>
-                <Plus className="size-3.5" />
-                新建供应商模型
-              </ModalButton>
-            </button>
-          }
+          trigger={<ModalButton disabled={!hasProviders || !hasSupportedModels}><Plus className="size-3.5" />新建供应商模型</ModalButton>}
           title="新建供应商模型"
           description="在独立弹窗中，把可售模型映射到某个供应商的具体模型。"
         >
@@ -959,14 +1396,7 @@ export function ModelsPanel({
               </div>
 
               <ManagementDialog
-                trigger={
-                  <button type="button">
-                    <ModalButton tone="secondary">
-                      <Pencil className="size-3.5" />
-                      编辑
-                    </ModalButton>
-                  </button>
-                }
+                trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
                 title={`编辑 ${item.upstream_model_slug}`}
                 description="在独立弹窗中编辑这个供应商模型。"
               >
@@ -1099,14 +1529,7 @@ export function RoutesPanel({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有路由</div>
         <ManagementDialog
-          trigger={
-            <button type="button" disabled={!hasProviderModels || !hasSupportedModels}>
-              <ModalButton>
-                <Plus className="size-3.5" />
-                新建路由
-              </ModalButton>
-            </button>
-          }
+          trigger={<ModalButton disabled={!hasProviderModels || !hasSupportedModels}><Plus className="size-3.5" />新建路由</ModalButton>}
           title="新建路由规则"
           description="在弹窗中创建新路由，避免与现有线上路由记录混在一起。"
         >
@@ -1138,14 +1561,7 @@ export function RoutesPanel({
               </div>
 
               <ManagementDialog
-                trigger={
-                  <button type="button">
-                    <ModalButton tone="secondary">
-                      <Pencil className="size-3.5" />
-                      编辑
-                    </ModalButton>
-                  </button>
-                }
+                trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
                 title={`编辑路由：${rule.public_model_slug}`}
                 description="在独立弹窗中编辑这个路由。"
               >

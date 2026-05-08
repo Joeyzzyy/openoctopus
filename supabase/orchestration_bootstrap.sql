@@ -14,12 +14,6 @@ begin
   end if;
 
   if not exists (
-    select 1 from pg_type where typname = 'provider_kind'
-  ) then
-    create type public.provider_kind as enum ('wavespeed', 'partner', 'custom');
-  end if;
-
-  if not exists (
     select 1 from pg_type where typname = 'request_capability'
   ) then
     create type public.request_capability as enum ('image_generation', 'image_edit', 'video_generation');
@@ -59,7 +53,6 @@ create table if not exists public.providers (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
   slug text not null unique,
-  kind public.provider_kind not null,
   base_url text,
   status public.provider_status not null default 'healthy',
   regions text[] not null default '{}',
@@ -68,6 +61,18 @@ create table if not exists public.providers (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+create table if not exists public.model_vendors (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  active boolean not null default true,
+  sort_order integer not null default 100,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_model_vendors_active_sort
+  on public.model_vendors (active, sort_order, name);
 
 create table if not exists public.provider_credentials (
   id uuid primary key default gen_random_uuid(),

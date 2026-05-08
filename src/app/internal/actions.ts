@@ -1,8 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { z } from "zod/v4";
 import { deriveLegacyBillingFields, parseBillingConfig } from "@/lib/billing-config";
+import {
+  INTERNAL_ACCESS_COOKIE,
+  INTERNAL_ACCESS_COOKIE_VALUE,
+  INTERNAL_ACCESS_PASSWORD,
+} from "@/lib/internal-access";
 import { encryptProviderSecret } from "@/lib/provider-secret-crypto";
 import {
   getProviderModelRuntimeDiagnostics,
@@ -12,9 +19,9 @@ import {
   type RuntimeProviderModel,
   type RuntimeSupportedModel,
 } from "@/lib/provider-runtime-guard";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-const providerKindSchema = z.enum(["wavespeed", "partner", "custom"]);
 const providerStatusSchema = z.enum(["healthy", "degraded", "offline"]);
 const capabilitySchema = z.enum([
   "image_generation",
@@ -22,6 +29,7 @@ const capabilitySchema = z.enum([
   "video_generation",
 ]);
 const modalitySchema = z.enum(["image", "video", "audio"]);
+const modelVendorNameSchema = z.string().trim().min(2).max(80);
 
 function normalizeOptionalText(value: FormDataEntryValue | null) {
   if (typeof value !== "string") {
@@ -250,6 +258,18 @@ async function uploadPricingEvidenceFile(input: {
 }
 
 async function getInternalAdminContext() {
+  const cookieStore = await cookies();
+  const hasPasswordAccess =
+    cookieStore.get(INTERNAL_ACCESS_COOKIE)?.value === INTERNAL_ACCESS_COOKIE_VALUE;
+
+  if (hasPasswordAccess) {
+    return {
+      supabase: createAdminClient(),
+      userId: "internal-password-access",
+      workspaceId: "00000000-0000-0000-0000-000000000000",
+    };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -282,25 +302,68 @@ async function getInternalAdminContext() {
   };
 }
 
+export async function unlockInternalAccess(formData: FormData) {
+  const raw = formData.get("password");
+  const password = typeof raw === "string" ? raw : "";
+
+  if (password !== INTERNAL_ACCESS_PASSWORD) {
+    throw new Error("密码错误");
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(INTERNAL_ACCESS_COOKIE, INTERNAL_ACCESS_COOKIE_VALUE, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+
+  revalidatePath("/internal");
+  redirect("/internal");
+}
+
 async function logAdminAudit(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
-  workspaceId: string;
+  workspaceId: string | null;
   action: string;
   targetType: string;
   targetId?: string | null;
   summary: string;
   details?: Record<string, unknown>;
 }) {
-  const { error } = await input.supabase.from("admin_audit_logs").insert({
-    actor_user_id: input.userId,
-    workspace_id: input.workspaceId,
+  const actorUserId =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      input.userId
+    )
+      ? input.userId
+      : null;
+
+  const buildPayload = (workspaceId: string | null) => ({
+    actor_user_id: actorUserId,
+    workspace_id: workspaceId,
     action: input.action,
     target_type: input.targetType,
     target_id: input.targetId ?? null,
     summary: input.summary,
     details: input.details ?? {},
   });
+
+  const { error } = await input.supabase.from("admin_audit_logs").insert(buildPayload(input.workspaceId));
+
+  const isWorkspaceFkViolation =
+    error?.code === "23503" &&
+    typeof error.message === "string" &&
+    error.message.includes("admin_audit_logs_workspace_id_fkey");
+
+  if (isWorkspaceFkViolation) {
+    const { error: fallbackError } = await input.supabase.from("admin_audit_logs").insert(buildPayload(null));
+    if (!fallbackError) {
+      return;
+    }
+    throw new Error(fallbackError.message);
+  }
 
   if (error) {
     throw new Error(error.message);
@@ -310,7 +373,6 @@ async function logAdminAudit(input: {
 const createProviderSchema = z.object({
   name: z.string().min(2).max(80),
   slug: z.string().min(2).max(80),
-  kind: providerKindSchema,
   baseUrl: z.string().url().optional().or(z.literal("")),
   status: providerStatusSchema,
   regions: z.array(z.string()).default([]),
@@ -324,7 +386,6 @@ export async function createProvider(formData: FormData) {
   const parsed = createProviderSchema.parse({
     name: formData.get("name"),
     slug: formData.get("slug"),
-    kind: formData.get("kind"),
     baseUrl: normalizeOptionalText(formData.get("baseUrl")) ?? "",
     status: formData.get("status"),
     regions: parseStringArray(formData.get("regions")),
@@ -337,7 +398,6 @@ export async function createProvider(formData: FormData) {
     .insert({
     name: parsed.name,
     slug: parsed.slug,
-    kind: parsed.kind,
     base_url: parsed.baseUrl || null,
     status: parsed.status,
     regions: parsed.regions,
@@ -404,7 +464,6 @@ const updateProviderSchema = z.object({
   providerId: z.string().uuid(),
   name: z.string().min(2).max(80),
   slug: z.string().min(2).max(80),
-  kind: providerKindSchema,
   baseUrl: z.string().url().optional().or(z.literal("")),
   status: providerStatusSchema,
   regions: z.array(z.string()).default([]),
@@ -476,7 +535,6 @@ export async function updateProvider(formData: FormData) {
     providerId: formData.get("providerId"),
     name: formData.get("name"),
     slug: formData.get("slug"),
-    kind: formData.get("kind"),
     baseUrl: normalizeOptionalText(formData.get("baseUrl")) ?? "",
     status: formData.get("status"),
     regions: parseStringArray(formData.get("regions")),
@@ -489,7 +547,6 @@ export async function updateProvider(formData: FormData) {
     .update({
       name: parsed.name,
       slug: parsed.slug,
-      kind: parsed.kind,
       base_url: parsed.baseUrl || null,
       status: parsed.status,
       regions: parsed.regions,
@@ -853,6 +910,102 @@ export async function updateProviderCredentialDetails(formData: FormData) {
     targetType: "provider_credential",
     targetId: parsed.credentialId,
     summary: `Updated provider credential ${parsed.label}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+const createModelVendorSchema = z.object({
+  name: modelVendorNameSchema,
+});
+
+export async function createModelVendor(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = createModelVendorSchema.parse({
+    name: formData.get("name"),
+  });
+
+  const { data, error } = await supabase
+    .from("model_vendors")
+    .insert({
+      name: parsed.name,
+      active: true,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "model_vendor.create",
+    targetType: "model_vendor",
+    targetId: data?.id ?? null,
+    summary: `Created model vendor ${parsed.name}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+const deleteModelVendorSchema = z.object({
+  vendorId: z.string().uuid(),
+});
+
+export async function deleteModelVendor(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = deleteModelVendorSchema.parse({
+    vendorId: formData.get("vendorId"),
+  });
+
+  const { data: vendorRow, error: vendorError } = await supabase
+    .from("model_vendors")
+    .select("name")
+    .eq("id", parsed.vendorId)
+    .maybeSingle();
+
+  if (vendorError) {
+    throw new Error(vendorError.message);
+  }
+  if (!vendorRow) {
+    throw new Error("模型厂商不存在");
+  }
+
+  const { data: inUseRows, error: inUseError } = await supabase
+    .from("supported_models")
+    .select("id")
+    .eq("provider", vendorRow.name);
+
+  if (inUseError) {
+    throw new Error(inUseError.message);
+  }
+
+  if ((inUseRows ?? []).length > 0) {
+    throw new Error("该模型厂商仍被可售模型使用，无法删除。");
+  }
+
+  const { error } = await supabase
+    .from("model_vendors")
+    .delete()
+    .eq("id", parsed.vendorId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "model_vendor.delete",
+    targetType: "model_vendor",
+    targetId: parsed.vendorId,
+    summary: `Deleted model vendor ${vendorRow.name}`,
     details: parsed,
   });
 
@@ -1724,6 +1877,105 @@ export async function updateRoutingRule(formData: FormData) {
     targetId: parsed.routingRuleId,
     summary: `Updated routing rule ${parsed.routingRuleId}`,
     details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+const updateModelEconomicsBundleSchema = z.object({
+  supportedModelId: z.string().uuid(),
+  providerModelId: z.string().uuid(),
+  supportedBillingConfig: z.unknown(),
+  providerPricing: z.unknown(),
+  pricingSourceUrl: z.string().url().nullable(),
+  pricingSourceNote: z.string().trim().max(2000).nullable(),
+  pricingSourceEvidence: z.array(z.record(z.string(), z.unknown())).default([]),
+});
+
+export async function updateModelEconomicsBundle(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+
+  const parsed = updateModelEconomicsBundleSchema.parse({
+    supportedModelId: formData.get("supportedModelId"),
+    providerModelId: formData.get("providerModelId"),
+    supportedBillingConfig: parseBillingConfigField(formData.get("supportedBillingConfig")).config,
+    providerPricing: parseBillingConfigField(formData.get("providerPricing")).config,
+    pricingSourceUrl: normalizeOptionalUrl(formData.get("pricingSourceUrl")),
+    pricingSourceNote: normalizeOptionalText(formData.get("pricingSourceNote")),
+    pricingSourceEvidence: parseJsonArrayField(formData.get("pricingSourceEvidence")),
+  });
+
+  const supportedBillingConfig = parseBillingConfig(parsed.supportedBillingConfig);
+  const supportedLegacyFields = deriveLegacyBillingFields(supportedBillingConfig);
+  const providerPricing = parseBillingConfig(parsed.providerPricing);
+
+  const { data: providerModel, error: providerModelError } = await supabase
+    .from("provider_models")
+    .select("id, provider_id, supported_model_id, upstream_model_slug")
+    .eq("id", parsed.providerModelId)
+    .maybeSingle();
+
+  if (providerModelError) {
+    throw new Error(providerModelError.message);
+  }
+
+  if (!providerModel) {
+    throw new Error("Provider model is missing");
+  }
+
+  if (providerModel.supported_model_id !== parsed.supportedModelId) {
+    throw new Error("Provider model does not belong to the selected supported model");
+  }
+
+  const pricingEvidenceFile = formData.get("pricingSourceEvidenceFile");
+  const uploadedEvidence = await uploadPricingEvidenceFile({
+    supabase,
+    providerId: providerModel.provider_id,
+    upstreamModelSlug: providerModel.upstream_model_slug,
+    file: pricingEvidenceFile instanceof File ? pricingEvidenceFile : null,
+  });
+  const pricingSourceEvidence = uploadedEvidence
+    ? [...parsed.pricingSourceEvidence, uploadedEvidence]
+    : parsed.pricingSourceEvidence;
+
+  const { error: rpcError } = await supabase.rpc("admin_update_model_economics_bundle", {
+    p_supported_model_id: parsed.supportedModelId,
+    p_provider_model_id: parsed.providerModelId,
+    p_supported_billing_config: supportedBillingConfig,
+    p_supported_unit_label: supportedLegacyFields.unitLabel,
+    p_supported_default_unit_cost: supportedLegacyFields.defaultUnitCost,
+    p_provider_pricing: providerPricing,
+    p_pricing_source_url: parsed.pricingSourceUrl,
+    p_pricing_source_note: parsed.pricingSourceNote,
+    p_pricing_source_evidence: pricingSourceEvidence,
+  });
+
+  if (rpcError) {
+    if (rpcError.message.includes("admin_update_model_economics_bundle")) {
+      throw new Error(
+        "Missing RPC admin_update_model_economics_bundle. Run supabase/internal_model_economics_bundle.sql first."
+      );
+    }
+    throw new Error(rpcError.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "model_economics.bundle.update",
+    targetType: "provider_model",
+    targetId: parsed.providerModelId,
+    summary: `Updated model economics bundle for provider model ${parsed.providerModelId}`,
+    details: {
+      supportedModelId: parsed.supportedModelId,
+      providerModelId: parsed.providerModelId,
+      supportedBillingConfig,
+      providerPricing,
+      pricingSourceUrl: parsed.pricingSourceUrl,
+      pricingSourceNote: parsed.pricingSourceNote,
+      pricingSourceEvidence,
+    },
   });
 
   revalidatePath("/internal");

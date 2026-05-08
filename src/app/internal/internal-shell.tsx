@@ -5,11 +5,9 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 type InternalTabKey =
-  | "overview"
   | "public-models"
+  | "economics"
   | "providers"
-  | "credentials"
-  | "models"
   | "monitoring"
   | "routes"
   | "requests"
@@ -19,6 +17,7 @@ type TabItem = {
   key: InternalTabKey;
   label: string;
   description: string;
+  group: "basic" | "overview";
   count?: number;
 };
 
@@ -44,53 +43,66 @@ export function InternalShell({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const basicTabs = tabs.filter((tab) => tab.group === "basic");
+  const overviewTabs = tabs.filter((tab) => tab.group === "overview");
+
+  const renderTabs = (items: TabItem[]) => (
+    <nav className="space-y-2">
+      {items.map((tab) => {
+        const active = tab.key === activeTab;
+        const href = buildHref(tab.key, selectedTemplateKey);
+
+        return (
+          <Link
+            key={tab.key}
+            href={href}
+            onClick={(event) => {
+              event.preventDefault();
+              startTransition(() => {
+                router.push(href);
+              });
+            }}
+            className={`block rounded-xl border px-3 py-3 transition-colors ${
+              active
+                ? "border-[#111827] bg-[#111827] text-white"
+                : "border-black/[0.08] bg-[#FCFCFA] text-black/75 hover:bg-white"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{tab.label}</p>
+                <p className={`mt-1 text-xs leading-5 ${active ? "text-white/72" : "text-black/45"}`}>
+                  {tab.description}
+                </p>
+              </div>
+              {typeof tab.count === "number" ? (
+                <span
+                  className={`inline-flex min-w-8 items-center justify-center rounded-md px-2 py-1 text-[11px] ${
+                    active ? "bg-white/12 text-white" : "bg-white text-black/55"
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              ) : null}
+            </div>
+          </Link>
+        );
+      })}
+    </nav>
+  );
 
   return (
     <div className="grid gap-6 lg:grid-cols-[296px_minmax(0,1fr)]">
       <aside className="lg:sticky lg:top-5 lg:self-start">
-        <div className="rounded-2xl border border-black/[0.08] bg-white p-3 shadow-sm">
-          <nav className="space-y-2">
-            {tabs.map((tab) => {
-              const active = tab.key === activeTab;
-              const href = buildHref(tab.key, selectedTemplateKey);
-
-              return (
-                <Link
-                  key={tab.key}
-                  href={href}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    startTransition(() => {
-                      router.push(href);
-                    });
-                  }}
-                  className={`block rounded-xl border px-3 py-3 transition-colors ${
-                    active
-                      ? "border-[#111827] bg-[#111827] text-white"
-                      : "border-black/[0.08] bg-[#FCFCFA] text-black/75 hover:bg-white"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">{tab.label}</p>
-                      <p className={`mt-1 text-xs leading-5 ${active ? "text-white/72" : "text-black/45"}`}>
-                        {tab.description}
-                      </p>
-                    </div>
-                    {typeof tab.count === "number" ? (
-                      <span
-                        className={`inline-flex min-w-8 items-center justify-center rounded-md px-2 py-1 text-[11px] ${
-                          active ? "bg-white/12 text-white" : "bg-white text-black/55"
-                        }`}
-                      >
-                        {tab.count}
-                      </span>
-                    ) : null}
-                  </div>
-                </Link>
-              );
-            })}
-          </nav>
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-black/[0.08] bg-white p-3 shadow-sm">
+            <p className="mb-2 px-1 text-xs tracking-[0.35px] text-black/45">基础配置</p>
+            {renderTabs(basicTabs)}
+          </div>
+          <div className="rounded-2xl border border-black/[0.08] bg-white p-3 shadow-sm">
+            <p className="mb-2 px-1 text-xs tracking-[0.35px] text-black/45">总览数据</p>
+            {renderTabs(overviewTabs)}
+          </div>
         </div>
       </aside>
 
