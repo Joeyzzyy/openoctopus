@@ -999,7 +999,11 @@ export function CreateProviderModelMappingButton({
 
   return (
     <ManagementDialog
-      trigger={<ModalButton disabled={!hasProviders || !hasSupportedModels}><Plus className="size-3.5" />新建供应商模型映射</ModalButton>}
+      trigger={
+        <button type="button" disabled={!hasProviders || !hasSupportedModels}>
+          <ModalButton><Plus className="size-3.5" />新建供应商模型映射</ModalButton>
+        </button>
+      }
       title="新建供应商模型映射"
       description="在总表内直接新增可售模型与供应商模型的映射关系。"
     >
@@ -1169,7 +1173,11 @@ export function CredentialsPanel({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有供应商密钥</div>
         <ManagementDialog
-          trigger={<ModalButton disabled={!hasProviders}><Plus className="size-3.5" />新建供应商密钥</ModalButton>}
+          trigger={
+            <button type="button" disabled={!hasProviders}>
+              <ModalButton><Plus className="size-3.5" />新建供应商密钥</ModalButton>
+            </button>
+          }
           title="新建供应商密钥"
           description="在独立弹窗中创建新的供应商密钥，不直接嵌在列表里编辑。"
         >
@@ -1274,7 +1282,11 @@ export function CredentialsPanel({
                 </ManagementDialog>
 
                 <ManagementDialog
-                  trigger={<ModalButton tone="secondary" disabled={credential.is_active}>删除</ModalButton>}
+                  trigger={
+                    <button type="button" disabled={credential.is_active}>
+                      <ModalButton tone="secondary">删除</ModalButton>
+                    </button>
+                  }
                   title={`删除 ${credential.label}`}
                   description="确认是否删除这个未启用的供应商密钥。"
                 >
@@ -1353,7 +1365,11 @@ export function ModelsPanel({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有供应商模型</div>
         <ManagementDialog
-          trigger={<ModalButton disabled={!hasProviders || !hasSupportedModels}><Plus className="size-3.5" />新建供应商模型</ModalButton>}
+          trigger={
+            <button type="button" disabled={!hasProviders || !hasSupportedModels}>
+              <ModalButton><Plus className="size-3.5" />新建供应商模型</ModalButton>
+            </button>
+          }
           title="新建供应商模型"
           description="在独立弹窗中，把可售模型映射到某个供应商的具体模型。"
         >
@@ -1529,7 +1545,11 @@ export function RoutesPanel({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有路由</div>
         <ManagementDialog
-          trigger={<ModalButton disabled={!hasProviderModels || !hasSupportedModels}><Plus className="size-3.5" />新建路由</ModalButton>}
+          trigger={
+            <button type="button" disabled={!hasProviderModels || !hasSupportedModels}>
+              <ModalButton><Plus className="size-3.5" />新建路由</ModalButton>
+            </button>
+          }
           title="新建路由规则"
           description="在弹窗中创建新路由，避免与现有线上路由记录混在一起。"
         >
