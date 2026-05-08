@@ -88,6 +88,21 @@ function resolveRuntimeCredential(rows: ProviderCredentialRow[]) {
   );
 }
 
+async function resolveProviderAdapterSlug(slug: string) {
+  const { data, error } = await supabaseAdmin
+    .from("provider_adapter_aliases")
+    .select("adapter_slug")
+    .eq("alias_slug", slug)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.adapter_slug ?? slug;
+}
+
 export async function createQueuedRequest(input: UnifiedRequestInput) {
   const secretHash = crypto
     .createHash("sha256")
@@ -233,7 +248,9 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     );
   }
 
-  if (!isSupportedProviderAdapterSlug(providerRow.slug)) {
+  const providerSlug = await resolveProviderAdapterSlug(providerRow.slug);
+
+  if (!isSupportedProviderAdapterSlug(providerSlug)) {
     throw new RequestValidationError(
       `Provider ${providerRow.slug} is not wired to a worker adapter yet.`,
       409,
@@ -257,7 +274,6 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
   const credential = resolveRuntimeCredential((credentialRows ?? []) as ProviderCredentialRow[]);
 
   const requestId = crypto.randomUUID();
-  const providerSlug = providerRow.slug;
 
   const { error: insertError } = await supabaseAdmin.from("inference_requests").insert({
     id: requestId,

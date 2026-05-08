@@ -1,5 +1,6 @@
 export const SUPPORTED_PROVIDER_ADAPTER_SLUGS = [
   "gemini-direct",
+  "gemini-images",
   "vertex-veo",
   "wavespeed",
   "wavespeed-images",

@@ -1,5 +1,6 @@
 export const SUPPORTED_PROVIDER_ADAPTER_SLUGS = [
   "gemini-direct",
+  "gemini-images",
   "vertex-veo",
   "wavespeed",
   "wavespeed-images",
@@ -72,16 +73,22 @@ export function isSupportedProviderAdapterSlug(slug: string) {
   return supportedProviderAdapterSlugs.has(slug);
 }
 
+function resolveProviderAdapterSlug(slug: string, adapterAliases?: Map<string, string>) {
+  return adapterAliases?.get(slug) ?? slug;
+}
+
 export function getProviderRuntimeDiagnostics(input: {
   provider: RuntimeProvider;
+  adapterAliases?: Map<string, string>;
   credentials: RuntimeCredential[];
   models: RuntimeProviderModel[];
 }) {
   const diagnostics: string[] = [];
-  const { provider, credentials, models } = input;
+  const { provider, adapterAliases, credentials, models } = input;
   const activeModels = models.filter((model) => model.active);
+  const resolvedProviderSlug = resolveProviderAdapterSlug(provider.slug, adapterAliases);
 
-  if (!isSupportedProviderAdapterSlug(provider.slug)) {
+  if (!isSupportedProviderAdapterSlug(resolvedProviderSlug)) {
     diagnostics.push(`Worker 未注册 provider adapter slug "${provider.slug}"。`);
   }
 
@@ -113,17 +120,19 @@ export function getProviderModelRuntimeDiagnostics(input: {
   providerModel: RuntimeProviderModel;
   provider: RuntimeProvider | null;
   supportedModel: RuntimeSupportedModel | null;
+  adapterAliases?: Map<string, string>;
   credentials: RuntimeCredential[];
 }) {
   const diagnostics: string[] = [];
-  const { providerModel, provider, supportedModel, credentials } = input;
+  const { providerModel, provider, supportedModel, adapterAliases, credentials } = input;
 
   if (!provider) {
     diagnostics.push("关联的供应商不存在。");
     return diagnostics;
   }
 
-  if (!isSupportedProviderAdapterSlug(provider.slug)) {
+  const resolvedProviderSlug = resolveProviderAdapterSlug(provider.slug, adapterAliases);
+  if (!isSupportedProviderAdapterSlug(resolvedProviderSlug)) {
     diagnostics.push(`供应商 slug "${provider.slug}" 没有对应的 worker adapter。`);
   }
 
@@ -153,6 +162,7 @@ export function getRoutingRuleRuntimeDiagnostics(input: {
   providerModelsById: Map<string, RuntimeProviderModel>;
   providersById: Map<string, RuntimeProvider>;
   supportedModelsById: Map<string, RuntimeSupportedModel>;
+  adapterAliases?: Map<string, string>;
   credentialsByProviderId: Map<string, RuntimeCredential[]>;
 }) {
   const diagnostics: string[] = [];
@@ -193,6 +203,7 @@ export function getRoutingRuleRuntimeDiagnostics(input: {
         providerModel,
         provider,
         supportedModel,
+        adapterAliases: input.adapterAliases,
         credentials,
       }).map((message) => `${label}${message}`)
     );

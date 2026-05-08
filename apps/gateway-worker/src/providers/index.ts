@@ -13,7 +13,12 @@ const adapters: ProviderAdapter[] = [
 ];
 
 export function getProviderAdapter(slug: string) {
-  const normalizedSlug = slug === "wavespeed" ? "wavespeed-images" : slug;
+  const normalizedSlug =
+    slug === "wavespeed"
+      ? "wavespeed-images"
+      : slug === "gemini-images"
+        ? "gemini-direct"
+        : slug;
   const adapter = adapters.find((item) => item.slug === normalizedSlug);
   if (!adapter) {
     throw new Error(`Missing provider adapter for slug: ${slug}`);

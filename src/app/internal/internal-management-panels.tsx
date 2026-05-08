@@ -6,10 +6,12 @@ import {
   createModelVendor,
   createProvider,
   createProviderCredential,
+  createProviderAdapterAlias,
   createProviderModel,
   createSupportedModel,
   deleteModelVendor,
   deleteProviderCredential,
+  deleteProviderAdapterAlias,
   rotateProviderCredentialSecret,
   updateModelEconomicsBundle,
   updateProvider,
@@ -74,6 +76,14 @@ type ProviderSummary = {
   activeModelCount: number;
   configText: string;
   runtimeDiagnostics: string[];
+};
+
+type ProviderAdapterAliasSummary = {
+  id: string;
+  alias_slug: string;
+  adapter_slug: string;
+  active: boolean;
+  createdLabel: string;
 };
 
 type ProviderCredentialSummary = {
@@ -1023,12 +1033,15 @@ export function CreateProviderModelMappingButton({
 export function ProvidersPanel({
   providers,
   credentials,
+  providerAdapterAliases = [],
   providerStatusOptions,
 }: {
   providers: ProviderSummary[];
   credentials: ProviderCredentialSummary[];
+  providerAdapterAliases?: ProviderAdapterAliasSummary[];
   providerStatusOptions: readonly ProviderStatusOption[];
 }) {
+  const safeProviderAdapterAliases = Array.isArray(providerAdapterAliases) ? providerAdapterAliases : [];
   const statusToneClassName = (status: ProviderSummary["status"]) => {
     if (status === "healthy") {
       return "border-[#D7EADB] bg-[#EDF8F0] text-[#335D2D]";
@@ -1041,6 +1054,47 @@ export function ProvidersPanel({
 
   return (
     <div className="space-y-4">
+      <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
+        <p className="text-xs font-medium text-black/75">Provider Adapter Slug 映射</p>
+        <p className="mt-1 text-xs text-black/55">
+          管理员可配置 alias slug 到 worker adapter slug 的映射，例如 gemini-images -&gt; gemini-direct。
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <form action={createProviderAdapterAlias} className="flex flex-wrap items-center gap-2">
+            <input
+              name="aliasSlug"
+              required
+              pattern="^[a-z0-9-]+$"
+              placeholder="alias slug"
+              className="h-8 w-[170px] rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black outline-none focus:border-black/20"
+            />
+            <input
+              name="adapterSlug"
+              required
+              pattern="^[a-z0-9-]+$"
+              placeholder="adapter slug"
+              className="h-8 w-[170px] rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black outline-none focus:border-black/20"
+            />
+            <SubmitButton label="新增映射" pendingLabel="新增中..." />
+          </form>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {safeProviderAdapterAliases.length > 0 ? (
+            safeProviderAdapterAliases.map((alias) => (
+              <form key={alias.id} action={deleteProviderAdapterAlias} className="inline-flex items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2 py-1">
+                <input type="hidden" name="aliasId" value={alias.id} />
+                <span className="text-xs text-black/70">
+                  {alias.alias_slug} -&gt; {alias.adapter_slug}
+                </span>
+                <SubmitButton label="删除" pendingLabel="删除中..." tone="danger" />
+              </form>
+            ))
+          ) : (
+            <p className="text-xs text-black/45">暂无自定义映射</p>
+          )}
+        </div>
+      </div>
+
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有供应商</div>
         <ManagementDialog

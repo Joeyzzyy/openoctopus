@@ -920,6 +920,13 @@ const createModelVendorSchema = z.object({
   name: modelVendorNameSchema,
 });
 
+const providerAdapterSlugSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(80)
+  .regex(/^[a-z0-9-]+$/);
+
 export async function createModelVendor(formData: FormData) {
   const { supabase, userId, workspaceId } = await getInternalAdminContext();
   const parsed = createModelVendorSchema.parse({
@@ -1006,6 +1013,93 @@ export async function deleteModelVendor(formData: FormData) {
     targetType: "model_vendor",
     targetId: parsed.vendorId,
     summary: `Deleted model vendor ${vendorRow.name}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+const createProviderAdapterAliasSchema = z.object({
+  aliasSlug: providerAdapterSlugSchema,
+  adapterSlug: providerAdapterSlugSchema,
+});
+
+export async function createProviderAdapterAlias(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = createProviderAdapterAliasSchema.parse({
+    aliasSlug: formData.get("aliasSlug"),
+    adapterSlug: formData.get("adapterSlug"),
+  });
+
+  const { data, error } = await supabase
+    .from("provider_adapter_aliases")
+    .insert({
+      alias_slug: parsed.aliasSlug,
+      adapter_slug: parsed.adapterSlug,
+      active: true,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_adapter_alias.create",
+    targetType: "provider_adapter_alias",
+    targetId: data?.id ?? null,
+    summary: `Created provider adapter alias ${parsed.aliasSlug} -> ${parsed.adapterSlug}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+const deleteProviderAdapterAliasSchema = z.object({
+  aliasId: z.string().uuid(),
+});
+
+export async function deleteProviderAdapterAlias(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = deleteProviderAdapterAliasSchema.parse({
+    aliasId: formData.get("aliasId"),
+  });
+
+  const { data: aliasRow, error: aliasError } = await supabase
+    .from("provider_adapter_aliases")
+    .select("alias_slug, adapter_slug")
+    .eq("id", parsed.aliasId)
+    .maybeSingle();
+
+  if (aliasError) {
+    throw new Error(aliasError.message);
+  }
+
+  if (!aliasRow) {
+    throw new Error("Provider adapter alias 不存在");
+  }
+
+  const { error } = await supabase
+    .from("provider_adapter_aliases")
+    .delete()
+    .eq("id", parsed.aliasId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_adapter_alias.delete",
+    targetType: "provider_adapter_alias",
+    targetId: parsed.aliasId,
+    summary: `Deleted provider adapter alias ${aliasRow.alias_slug} -> ${aliasRow.adapter_slug}`,
     details: parsed,
   });
 

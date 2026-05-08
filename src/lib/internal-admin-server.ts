@@ -45,6 +45,14 @@ type ModelVendorRow = {
   created_at: string;
 };
 
+type ProviderAdapterAliasRow = {
+  id: string;
+  alias_slug: string;
+  adapter_slug: string;
+  active: boolean;
+  created_at: string;
+};
+
 type ProviderModelRow = {
   id: string;
   provider_id: string;
@@ -618,6 +626,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     providersResponse,
     supportedModelsResponse,
     modelVendorsResponse,
+    providerAdapterAliasesResponse,
     providerCredentialsResponse,
     providerModelsResponse,
     routingRulesResponse,
@@ -647,6 +656,11 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         .select("id, name, active, sort_order, created_at")
         .order("sort_order", { ascending: true })
         .order("name", { ascending: true }),
+      supabase
+        .from("provider_adapter_aliases")
+        .select("id, alias_slug, adapter_slug, active, created_at")
+        .eq("active", true)
+        .order("alias_slug", { ascending: true }),
       supabase
         .from("provider_credentials")
         .select(
@@ -728,6 +742,9 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const modelVendors = (modelVendorsResponse.error
     ? []
     : modelVendorsResponse.data ?? []) as ModelVendorRow[];
+  const providerAdapterAliases = (providerAdapterAliasesResponse.error
+    ? []
+    : providerAdapterAliasesResponse.data ?? []) as ProviderAdapterAliasRow[];
   const providerCredentials = (providerCredentialsResponse.error
     ? []
     : providerCredentialsResponse.data ?? []) as ProviderCredentialRow[];
@@ -751,6 +768,9 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const monitoringRequests = await fetchMonitoringRequests(supabase, monitoringLookbackMs);
 
   const providerById = new Map(providers.map((row) => [row.id, row]));
+  const providerAdapterAliasMap = new Map(
+    providerAdapterAliases.map((row) => [row.alias_slug, row.adapter_slug])
+  );
   const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
   const supportedModelById = new Map(supportedModels.map((row) => [row.id, row]));
   const credentialsByProviderId = providerCredentials.reduce((map, credential) => {
@@ -789,6 +809,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       configText: formatJson(provider.config),
       runtimeDiagnostics: getProviderRuntimeDiagnostics({
         provider,
+        adapterAliases: providerAdapterAliasMap,
         credentials: credentials.map((credential) => ({
           id: credential.id,
           label: credential.label,
@@ -829,6 +850,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         providerModel,
         provider: provider ?? null,
         supportedModel: supportedModel ?? null,
+        adapterAliases: providerAdapterAliasMap,
         credentials: credentials.map((credential) => ({
           id: credential.id,
           label: credential.label,
@@ -871,6 +893,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         providerModelsById: providerModelById,
         providersById: providerById,
         supportedModelsById: supportedModelById,
+        adapterAliases: providerAdapterAliasMap,
         credentialsByProviderId: new Map(
           Array.from(credentialsByProviderId.entries()).map(([providerId, credentials]) => [
             providerId,
@@ -1106,6 +1129,10 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     modelVendors: modelVendors.map((vendor) => ({
       ...vendor,
       createdLabel: formatRelativeTimestamp(vendor.created_at),
+    })),
+    providerAdapterAliases: providerAdapterAliases.map((alias) => ({
+      ...alias,
+      createdLabel: formatRelativeTimestamp(alias.created_at),
     })),
     supportedModels: supportedModelSummaries,
     providerCredentials: providerCredentialSummaries,

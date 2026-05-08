@@ -48,6 +48,21 @@ type QueueEnvelope = {
 
 type QueueName = "inference_jobs" | "inference_polling";
 
+async function resolveProviderAdapterSlug(slug: string) {
+  const { data, error } = await supabaseAdmin
+    .from("provider_adapter_aliases")
+    .select("adapter_slug")
+    .eq("alias_slug", slug)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.adapter_slug ?? slug;
+}
+
 function normalizeQueueRows(data: unknown): QueueEnvelope[] {
   if (!Array.isArray(data)) {
     return [];
@@ -302,7 +317,7 @@ export async function processNextInferenceJob() {
   }
 
   const message = row.message as QueueMessage;
-  const adapter = getProviderAdapter(message.providerSlug);
+  const adapter = getProviderAdapter(await resolveProviderAdapterSlug(message.providerSlug));
   const { data: credentialRow, error: credentialError } = await supabaseAdmin
     .from("provider_credentials")
     .select("secret_ciphertext, secret_iv, secret_auth_tag")
@@ -650,7 +665,7 @@ export async function processNextPollingJob() {
   }
 
   const message = row.message as PollingMessage;
-  const adapter = getProviderAdapter(message.providerSlug);
+  const adapter = getProviderAdapter(await resolveProviderAdapterSlug(message.providerSlug));
   const { data: requestRow, error: requestRowError } = await supabaseAdmin
     .from("inference_requests")
     .select("status")
