@@ -375,9 +375,7 @@ export async function getDashboardData({
       supabaseAdmin.from("providers").select("id, name, kind, regions, status"),
       supabaseAdmin
         .from("provider_models")
-        .select(
-          "id, provider_id, upstream_model_slug, public_model_slug, supported_model_id, capability, active, providers(name, kind)"
-        ),
+        .select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id, capability, active"),
       supabaseAdmin
         .from("supported_models")
         .select("id, model_slug, display_name, capability, active"),
@@ -437,23 +435,6 @@ export async function getDashboardData({
     const analyticsRows = analyticsRequestRows ?? [];
     const providerNameById = new Map(providers.map((row) => [row.id, row.name]));
     const providerById = new Map(providers.map((row) => [row.id, row]));
-    for (const providerModel of providerModels) {
-      const providerRelation = Array.isArray(providerModel.providers)
-        ? providerModel.providers[0] ?? null
-        : providerModel.providers ?? null;
-      if (!providerNameById.has(providerModel.provider_id) && providerRelation?.name) {
-        providerNameById.set(providerModel.provider_id, providerRelation.name);
-      }
-      if (!providerById.has(providerModel.provider_id) && providerRelation) {
-        providerById.set(providerModel.provider_id, {
-          id: providerModel.provider_id,
-          name: providerRelation.name ?? "Unknown provider",
-          kind: providerRelation.kind ?? "custom",
-          regions: null,
-          status: "healthy",
-        });
-      }
-    }
     const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
     const modelsPerProvider = providerModels.reduce((acc, row) => {
       acc.set(row.provider_id, (acc.get(row.provider_id) ?? 0) + 1);
