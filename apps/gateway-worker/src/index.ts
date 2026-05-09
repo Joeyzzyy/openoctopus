@@ -4,6 +4,7 @@ import {
   processNextInferenceJob,
   processNextPollingJob,
   queueRpcAvailable,
+  recoverStuckPollingRequests,
 } from "./queue/runner.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerFileRoutes } from "./routes/files.js";
@@ -47,6 +48,19 @@ if (queueEnabled) {
   }, 4000);
 
   statusPoller.unref();
+
+  const recoveryPoller = setInterval(async () => {
+    try {
+      const recovered = await recoverStuckPollingRequests();
+      if (recovered > 0) {
+        app.log.warn({ recovered }, "Recovered stuck polling requests");
+      }
+    } catch (error) {
+      app.log.error(error);
+    }
+  }, 15000);
+
+  recoveryPoller.unref();
 } else {
   app.log.warn(
     "Supabase queue RPC wrappers are unavailable. Run supabase/queue_rpc_wrappers.sql to enable the worker loop."

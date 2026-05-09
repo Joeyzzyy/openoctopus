@@ -48,6 +48,10 @@ type QueueEnvelope = {
 
 type QueueName = "inference_jobs" | "inference_polling";
 
+const POLLING_RECOVERY_STALE_SECONDS = 120;
+const POLLING_TIMEOUT_SECONDS = 20 * 60;
+const POLLING_RECOVERY_BATCH_SIZE = 20;
+
 async function resolveProviderAdapterSlug(slug: string) {
   const { data, error } = await supabaseAdmin
     .from("provider_adapter_aliases")
@@ -788,6 +792,22 @@ export async function processNextPollingJob() {
   }
 
   if (!result.done) {
+    await supabaseAdmin
+      .from("inference_requests")
+      .update({
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", message.requestId);
+
+    await supabaseAdmin
+      .from("provider_attempts")
+      .update({
+        status: "processing",
+        response_payload: result.raw,
+      })
+      .eq("request_id", message.requestId)
+      .eq("attempt_no", 1);
+
     // Send the next poll before deleting the current message. If the send fails,
     // the current message stays available after its visibility timeout instead
     // of leaving the request permanently stuck in "processing".
@@ -923,4 +943,239 @@ export async function processNextPollingJob() {
   });
 
   return true;
+}
+
+type RecoveryAttemptRow = {
+  request_id: string;
+  upstream_task_id: string | null;
+  status: string;
+  updated_at: string;
+  inference_requests: {
+    id: string;
+    status: string;
+    capability: "image_generation" | "video_generation";
+    public_model_slug: string;
+    provider_id: string;
+    provider_model_id: string;
+    endpoint: string;
+    workspace_id: string;
+    api_key_id: string | null;
+    input_payload: Record<string, unknown> | null;
+    created_at: string;
+    updated_at: string;
+  } | null;
+};
+
+type RecoveryProviderModelRow = {
+  id: string;
+  provider_id: string;
+  upstream_model_slug: string;
+  execution_config: Record<string, unknown> | null;
+};
+
+type RecoveryProviderRow = {
+  id: string;
+  slug: string;
+  base_url: string | null;
+  config: Record<string, unknown> | null;
+};
+
+type RecoveryCredentialRow = {
+  id: string;
+  provider_id: string;
+};
+
+async function markProcessingRequestTimeout(input: {
+  requestId: string;
+  workspaceId: string;
+  apiKeyId: string | null;
+  publicModelSlug: string;
+  endpoint: string;
+}) {
+  await supabaseAdmin
+    .from("inference_requests")
+    .update({
+      status: "failed",
+      error_code: "upstream_timeout",
+      error_message: "Upstream task timed out during polling.",
+      actual_cost: 0,
+      actual_customer_charge: 0,
+      actual_provider_cost: 0,
+      actual_profit: 0,
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", input.requestId)
+    .eq("status", "processing");
+
+  await supabaseAdmin
+    .from("provider_attempts")
+    .update({
+      status: "failed",
+      error_message: "Marked failed by timeout watchdog after prolonged polling.",
+    })
+    .eq("request_id", input.requestId)
+    .eq("attempt_no", 1)
+    .eq("status", "processing");
+
+  await recordRequestSettlement({
+    requestId: input.requestId,
+    workspaceId: input.workspaceId,
+    apiKeyId: input.apiKeyId,
+    publicModelSlug: input.publicModelSlug,
+    endpoint: input.endpoint,
+    customerCharge: 0,
+    providerCost: 0,
+    statusCode: 504,
+    breakdown: buildSettlementBreakdown({
+      customerCharge: 0,
+      providerCost: 0,
+      profit: 0,
+    }),
+  });
+}
+
+export async function recoverStuckPollingRequests() {
+  const staleBefore = new Date(Date.now() - POLLING_RECOVERY_STALE_SECONDS * 1000).toISOString();
+  const timeoutBefore = new Date(Date.now() - POLLING_TIMEOUT_SECONDS * 1000).toISOString();
+
+  const { data: attemptsData, error: attemptsError } = await supabaseAdmin
+    .from("provider_attempts")
+    .select(
+      "request_id, upstream_task_id, status, updated_at, inference_requests(id, status, capability, public_model_slug, provider_id, provider_model_id, endpoint, workspace_id, api_key_id, input_payload, created_at, updated_at)"
+    )
+    .eq("attempt_no", 1)
+    .eq("status", "processing")
+    .lt("updated_at", staleBefore)
+    .order("updated_at", { ascending: true })
+    .limit(POLLING_RECOVERY_BATCH_SIZE);
+
+  if (attemptsError) {
+    throw new Error(attemptsError.message);
+  }
+
+  const candidates = ((attemptsData ?? []) as unknown as RecoveryAttemptRow[]).filter(
+    (row) =>
+      row.inference_requests?.status === "processing" &&
+      typeof row.upstream_task_id === "string" &&
+      row.upstream_task_id.length > 0
+  );
+
+  if (candidates.length === 0) {
+    return 0;
+  }
+
+  const requestRows = candidates
+    .map((row) => row.inference_requests)
+    .filter((row): row is NonNullable<RecoveryAttemptRow["inference_requests"]> => row !== null);
+  const requestById = new Map(requestRows.map((row) => [row.id, row]));
+  const providerModelIds = Array.from(new Set(requestRows.map((row) => row.provider_model_id)));
+  const providerIds = Array.from(new Set(requestRows.map((row) => row.provider_id)));
+
+  const [{ data: providerModels, error: providerModelsError }, { data: providers, error: providersError }, { data: credentials, error: credentialsError }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("provider_models")
+        .select("id, provider_id, upstream_model_slug, execution_config")
+        .in("id", providerModelIds),
+      supabaseAdmin
+        .from("providers")
+        .select("id, slug, base_url, config")
+        .in("id", providerIds),
+      supabaseAdmin
+        .from("provider_credentials")
+        .select("id, provider_id")
+        .in("provider_id", providerIds)
+        .eq("is_active", true)
+        .order("updated_at", { ascending: false }),
+    ]);
+
+  if (providerModelsError) {
+    throw new Error(providerModelsError.message);
+  }
+  if (providersError) {
+    throw new Error(providersError.message);
+  }
+  if (credentialsError) {
+    throw new Error(credentialsError.message);
+  }
+
+  const providerModelById = new Map(
+    ((providerModels ?? []) as RecoveryProviderModelRow[]).map((row) => [row.id, row])
+  );
+  const providerById = new Map(((providers ?? []) as RecoveryProviderRow[]).map((row) => [row.id, row]));
+  const credentialByProviderId = new Map<string, RecoveryCredentialRow>();
+
+  for (const row of (credentials ?? []) as RecoveryCredentialRow[]) {
+    if (!credentialByProviderId.has(row.provider_id)) {
+      credentialByProviderId.set(row.provider_id, row);
+    }
+  }
+
+  let recoveredCount = 0;
+
+  for (const attempt of candidates) {
+    const requestRow = requestById.get(attempt.request_id);
+    if (!requestRow) {
+      continue;
+    }
+
+    const createdAtMs = Date.parse(requestRow.created_at);
+    const timeoutBeforeMs = Date.parse(timeoutBefore);
+    if (Number.isFinite(createdAtMs) && createdAtMs < timeoutBeforeMs) {
+      await markProcessingRequestTimeout({
+        requestId: requestRow.id,
+        workspaceId: requestRow.workspace_id,
+        apiKeyId: requestRow.api_key_id,
+        publicModelSlug: requestRow.public_model_slug,
+        endpoint: requestRow.endpoint,
+      });
+      recoveredCount += 1;
+      continue;
+    }
+
+    const providerModel = providerModelById.get(requestRow.provider_model_id);
+    const provider = providerById.get(requestRow.provider_id);
+    const credential = credentialByProviderId.get(requestRow.provider_id);
+
+    if (!providerModel || !provider || !credential || !attempt.upstream_task_id) {
+      continue;
+    }
+
+    await sendQueueMessage({
+      queueName: "inference_polling",
+      message: {
+        requestId: requestRow.id,
+        workspaceId: requestRow.workspace_id,
+        apiKeyId: requestRow.api_key_id,
+        providerModelId: requestRow.provider_model_id,
+        credentialId: credential.id,
+        providerSlug: provider.slug,
+        providerBaseUrl: provider.base_url,
+        providerConfig: {
+          ...(provider.config ?? {}),
+          executionConfig: {
+            ...(providerModel.execution_config ?? {}),
+          },
+        },
+        capability: requestRow.capability,
+        publicModelSlug: requestRow.public_model_slug,
+        upstreamModelSlug: providerModel.upstream_model_slug,
+        endpoint: requestRow.endpoint,
+        input: requestRow.input_payload ?? {},
+        upstreamTaskId: attempt.upstream_task_id,
+      },
+    });
+
+    await supabaseAdmin
+      .from("inference_requests")
+      .update({
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", requestRow.id)
+      .eq("status", "processing");
+
+    recoveredCount += 1;
+  }
+
+  return recoveredCount;
 }

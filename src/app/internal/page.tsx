@@ -19,6 +19,7 @@ import {
   CreateModelVendorButton,
   CreateSupportedModelButton,
   CreateProviderModelMappingButton,
+  CreateRoutingRuleButton,
   EconomicsPanel,
   ModelVendorsPanel,
   ProvidersPanel,
@@ -937,6 +938,7 @@ export default async function InternalPage({
   const hasAudit = data.auditLogs.length > 0;
   const selectedTemplateKey = getSearchValue(resolvedSearchParams, "template");
   const activeTab = getTabValue(getSearchValue(resolvedSearchParams, "tab"));
+  const uiAlertMessage = getSearchValue(resolvedSearchParams, "alert");
   const selectedRequestCustomer = getSearchValue(resolvedSearchParams, "requestCustomer") ?? "all";
   const selectedRequestKey = getSearchValue(resolvedSearchParams, "requestKey") ?? "all";
   const selectedTemplate =
@@ -1089,6 +1091,14 @@ export default async function InternalPage({
               </h1>
             </div>
           </div>
+          {uiAlertMessage ? (
+            <div className="mb-4 rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3">
+              <div className="flex items-start gap-2">
+                <CircleAlert className="mt-0.5 size-4 shrink-0 text-[#b54432]" />
+                <p className="text-sm leading-6 text-[#8d4336]">{uiAlertMessage}</p>
+              </div>
+            </div>
+          ) : null}
 
           <InternalShell activeTab={activeTab} selectedTemplateKey={selectedTemplateKey} tabs={sidebarTabs}>
           {activeTab === "public-models" ? (
@@ -1122,6 +1132,7 @@ export default async function InternalPage({
                       supportedModels={data.supportedModels}
                       providers={data.providers}
                       workerTemplates={data.workerTemplates ?? []}
+                      providerModels={data.providerModels}
                     />
                   }
                 >
@@ -1175,19 +1186,19 @@ export default async function InternalPage({
                 <SectionShell
                 id="routes-panel"
                 title="可售模型路由"
-                description="在这里切换真实流量应该走哪个供应商模型。默认为空，需要你自己创建路由。"
+                description=""
+                headerRight={
+                  <CreateRoutingRuleButton
+                    providerModels={data.providerModels}
+                    supportedModels={data.supportedModels}
+                    selectedTemplate={selectedTemplate}
+                  />
+                }
                 >
-                <div className="mb-4 flex items-center gap-1.5 rounded-xl border border-[#D7EADB] bg-[#EDF8F0] px-3 py-2.5">
-                  <CircleAlert className="size-3.5 shrink-0 text-[#335d2d]" />
-                  <p className="text-xs leading-[1.35] text-[#335d2d]">
-                    操作员在这里选择每个可售模型当前上线哪个供应商模型。客户侧仍然只看到 OpenOctopus 的可售型号。
-                  </p>
-                </div>
                 <RoutesPanel
                   routingRules={data.routingRules}
                   providerModels={data.providerModels}
                   supportedModels={data.supportedModels}
-                  selectedTemplate={selectedTemplate}
                 />
                 </SectionShell>
               </section>

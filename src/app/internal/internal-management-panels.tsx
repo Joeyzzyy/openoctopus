@@ -11,6 +11,8 @@ import {
   createSupportedModel,
   deleteModelVendor,
   deleteProviderCredential,
+  deleteProviderModel,
+  deleteRoutingRule,
   rotateProviderCredentialSecret,
   updateProvider,
   updateProviderCredentialDetails,
@@ -1111,6 +1113,12 @@ export function EconomicsPanel({
     name: item.name,
     slug: item.slug,
   }));
+  const executionConfigPresets = safeProviderModels.map((item) => ({
+    id: item.id,
+    label: `${item.supportedModelName} / ${item.providerName} / ${item.upstream_model_slug}`,
+    executionTemplate: item.executionTemplate,
+    executionConfigText: item.executionConfigText,
+  }));
 
   const rows = safeProviderModels
     .map((providerModel) => {
@@ -1251,39 +1259,59 @@ export function EconomicsPanel({
                             </span>
                           </td>
                           <td className="sticky right-0 z-10 w-[180px] border-b border-black/[0.06] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
-                            <ManagementDialog
-                              trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
-                              title={`编辑 ${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
-                              description=" "
-                            >
-                              {({ close }) => (
-                                <CreateProviderModelForm
-                                  action={updateProviderModelDetails}
-                                  providerModelId={row.providerModel.id}
-                                  supportedModels={supportedModelOptions}
-                                  providers={providerOptions}
-                                  workerTemplates={workerTemplateOptions.map((item) => ({
-                                    id: item.slug,
-                                    displayName: item.displayName,
-                                    slug: item.slug,
-                                  }))}
-                                  defaultSupportedModelSlug={row.supportedModel.model_slug}
-                                  defaultProviderId={row.providerModel.provider_id}
-                                  defaultUpstreamModelSlug={row.providerModel.upstream_model_slug}
-                                  defaultPricing={row.providerModel.pricingText}
-                                  defaultPricingSourceUrl={row.providerModel.pricingSourceUrl ?? undefined}
-                                  defaultPricingSourceNote={row.providerModel.pricingSourceNote ?? undefined}
-                                  defaultPricingSourceEvidence={JSON.stringify(row.providerModel.pricingSourceEvidence)}
-                                  defaultExecutionTemplate={row.providerModel.executionTemplate}
-                                  defaultExecutionConfig={row.providerModel.executionConfigText}
-                                  defaultActive={row.providerModel.active}
-                                  submitLabel="保存供应商模型"
-                                  className="grid gap-4"
-                                  onSuccess={close}
-                                  disabled={false}
-                                />
-                              )}
-                            </ManagementDialog>
+                            <div className="flex flex-wrap gap-2">
+                              <ManagementDialog
+                                trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                                title={`编辑 ${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
+                                description=" "
+                              >
+                                {({ close }) => (
+                                  <CreateProviderModelForm
+                                    action={updateProviderModelDetails}
+                                    providerModelId={row.providerModel.id}
+                                    supportedModels={supportedModelOptions}
+                                    providers={providerOptions}
+                                    workerTemplates={workerTemplateOptions.map((item) => ({
+                                      id: item.slug,
+                                      displayName: item.displayName,
+                                      slug: item.slug,
+                                    }))}
+                                    executionConfigPresets={executionConfigPresets.filter((preset) => preset.id !== row.providerModel.id)}
+                                    defaultSupportedModelSlug={row.supportedModel.model_slug}
+                                    defaultProviderId={row.providerModel.provider_id}
+                                    defaultUpstreamModelSlug={row.providerModel.upstream_model_slug}
+                                    defaultPricing={row.providerModel.pricingText}
+                                    defaultPricingSourceUrl={row.providerModel.pricingSourceUrl ?? undefined}
+                                    defaultPricingSourceNote={row.providerModel.pricingSourceNote ?? undefined}
+                                    defaultPricingSourceEvidence={JSON.stringify(row.providerModel.pricingSourceEvidence)}
+                                    defaultExecutionTemplate={row.providerModel.executionTemplate}
+                                    defaultExecutionConfig={row.providerModel.executionConfigText}
+                                    defaultActive={row.providerModel.active}
+                                    submitLabel="保存供应商模型"
+                                    className="grid gap-4"
+                                    onSuccess={close}
+                                    disabled={false}
+                                  />
+                                )}
+                              </ManagementDialog>
+                              <ManagementDialog
+                                trigger={<ModalButton tone="secondary">删除</ModalButton>}
+                                title={`删除 ${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
+                                description="确认删除该模型映射。删除后不可恢复。"
+                              >
+                                {({ close }) => (
+                                  <ManagedDialogForm action={deleteProviderModel} close={close}>
+                                    <input type="hidden" name="providerModelId" value={row.providerModel.id} />
+                                    <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
+                                      删除后，该可售模型到供应商模型的映射将失效。若仍被路由引用会阻止删除。
+                                    </div>
+                                    <div className="flex justify-end">
+                                      <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
+                                    </div>
+                                  </ManagedDialogForm>
+                                )}
+                              </ManagementDialog>
+                            </div>
                           </td>
                         </tr>
                       </Fragment>
@@ -2009,23 +2037,19 @@ export function RoutesPanel({
   routingRules,
   providerModels,
   supportedModels,
-  selectedTemplate,
 }: {
   routingRules: RoutingRuleSummary[];
   providerModels: ProviderModelSummary[];
   supportedModels: SupportedModelSummary[];
-  selectedTemplate: ProviderTemplate | null;
 }) {
   const hasProviderModels = providerModels.length > 0;
   const hasSupportedModels = supportedModels.length > 0;
-
   const supportedModelOptions = supportedModels.map((item) => ({
     id: item.id,
     modelSlug: item.model_slug,
     displayName: item.display_name,
     capability: item.capability,
   }));
-
   const providerModelOptions = providerModels.map((item) => ({
     id: item.id,
     supportedModelId: item.supported_model_id,
@@ -2037,74 +2061,104 @@ export function RoutesPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-black/55">已有路由</div>
-        <ManagementDialog
-          trigger={<ModalButton><Plus className="size-3.5" />新建路由</ModalButton>}
-          disabled={!hasProviderModels || !hasSupportedModels}
-          title="新建路由规则"
-          description="在弹窗中创建新路由，避免与现有线上路由记录混在一起。"
-        >
-          {({ close }) => (
-            <CreateRoutingRuleForm
-              supportedModels={supportedModelOptions}
-              providerModels={providerModelOptions}
-              defaultStrategy={selectedTemplate?.route.routeStrategy}
-              defaultWorkspaceScope={selectedTemplate?.route.workspaceScope}
-              disabled={!hasProviderModels || !hasSupportedModels}
-              className="grid gap-4"
-              onSuccess={close}
-            />
-          )}
-        </ManagementDialog>
-      </div>
-
       {routingRules.length > 0 ? (
-        routingRules.map((rule) => (
-          <div key={rule.id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-black/45">
-                  <span>{rule.scopeLabel}</span>
-                  <span>•</span>
-                  <span>{rule.capability}</span>
-                </div>
-                <p className="mt-3 text-sm font-medium text-black">{rule.public_model_slug}</p>
-              </div>
-
-              <ManagementDialog
-                trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
-                title={`编辑路由：${rule.public_model_slug}`}
-                description="在独立弹窗中编辑这个路由。"
-              >
-                {({ close }) => (
-                  <CreateRoutingRuleForm
-                    action={updateRoutingRule}
-                    routingRuleId={rule.id}
-                    supportedModels={supportedModelOptions}
-                    providerModels={providerModelOptions}
-                    defaultSupportedModelId={rule.supportedModelId ?? undefined}
-                    defaultPrimaryProviderModelId={rule.primary_provider_model_id}
-                    defaultFallbackProviderModelId={rule.fallback_provider_model_id ?? ""}
-                    defaultStrategy={rule.route_strategy}
-                    defaultWorkspaceScope={rule.scopeLabel}
-                    defaultActive={rule.active}
-                    disabled={!hasProviderModels || !hasSupportedModels}
-                    submitLabel="保存路由"
-                    className="grid gap-4"
-                    onSuccess={close}
-                  />
-                )}
-              </ManagementDialog>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-black/52">
-              <span>主路由：{rule.primaryLabel}</span>
-              <span>回退路由：{rule.fallbackLabel}</span>
-            </div>
-            <RuntimeDiagnostics diagnostics={rule.runtimeDiagnostics} />
-          </div>
-        ))
+        <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+          <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+            <thead>
+              <tr className="text-xs text-black/50">
+                <th className="border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">能力</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">范围</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">主路由</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">回退路由</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">策略</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">状态</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {routingRules.map((rule) => (
+                <tr key={rule.id}>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                    <p className="text-sm font-medium text-black">{rule.public_model_slug}</p>
+                    <RuntimeDiagnostics diagnostics={rule.runtimeDiagnostics} />
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                    {rule.capability}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                    {rule.scopeLabel}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                    {rule.primaryLabel}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                    {rule.fallbackLabel}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                    {rule.route_strategy}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                    <span
+                      className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
+                        rule.active
+                          ? "border-[#D7EADB] bg-[#EDF8F0] text-[#335D2D]"
+                          : "border-black/[0.08] bg-[#FCFCFA] text-black/60"
+                      } whitespace-nowrap`}
+                    >
+                      {rule.active ? "已启用" : "未启用"}
+                    </span>
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                    <div className="flex flex-wrap gap-2">
+                      <ManagementDialog
+                        trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                        title={`编辑路由：${rule.public_model_slug}`}
+                        description="在独立弹窗中编辑这个路由。"
+                      >
+                        {({ close }) => (
+                          <CreateRoutingRuleForm
+                            action={updateRoutingRule}
+                            routingRuleId={rule.id}
+                            supportedModels={supportedModelOptions}
+                            providerModels={providerModelOptions}
+                            defaultSupportedModelId={rule.supportedModelId ?? undefined}
+                            defaultPrimaryProviderModelId={rule.primary_provider_model_id}
+                            defaultFallbackProviderModelId={rule.fallback_provider_model_id ?? ""}
+                            defaultStrategy={rule.route_strategy}
+                            defaultWorkspaceScope={rule.scopeLabel}
+                            defaultActive={rule.active}
+                            disabled={!hasProviderModels || !hasSupportedModels}
+                            submitLabel="保存路由"
+                            className="grid gap-4"
+                            onSuccess={close}
+                          />
+                        )}
+                      </ManagementDialog>
+                      <ManagementDialog
+                        trigger={<ModalButton tone="secondary">删除</ModalButton>}
+                        title={`删除路由：${rule.public_model_slug}`}
+                        description="确认删除该路由规则。删除后不可恢复。"
+                      >
+                        {({ close }) => (
+                          <ManagedDialogForm action={deleteRoutingRule} close={close}>
+                            <input type="hidden" name="routingRuleId" value={rule.id} />
+                            <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
+                              删除后该模型将失去这条路由规则。
+                            </div>
+                            <div className="flex justify-end">
+                              <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
+                            </div>
+                          </ManagedDialogForm>
+                        )}
+                      </ManagementDialog>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有路由</p>
@@ -2114,5 +2168,53 @@ export function RoutesPanel({
         </div>
       )}
     </div>
+  );
+}
+
+export function CreateRoutingRuleButton({
+  providerModels,
+  supportedModels,
+  selectedTemplate,
+}: {
+  providerModels: ProviderModelSummary[];
+  supportedModels: SupportedModelSummary[];
+  selectedTemplate: ProviderTemplate | null;
+}) {
+  const hasProviderModels = providerModels.length > 0;
+  const hasSupportedModels = supportedModels.length > 0;
+  const supportedModelOptions = supportedModels.map((item) => ({
+    id: item.id,
+    modelSlug: item.model_slug,
+    displayName: item.display_name,
+    capability: item.capability,
+  }));
+  const providerModelOptions = providerModels.map((item) => ({
+    id: item.id,
+    supportedModelId: item.supported_model_id,
+    supportedModelName: item.supportedModelName,
+    providerName: item.providerName,
+    upstreamModelSlug: item.upstream_model_slug,
+    capability: item.capability,
+  }));
+
+  return (
+    <ManagementDialog
+      trigger={<ModalButton><Plus className="size-3.5" />新建路由</ModalButton>}
+      disabled={!hasProviderModels || !hasSupportedModels}
+      title="新建路由规则"
+      description="在弹窗中创建新路由，避免与现有线上路由记录混在一起。"
+    >
+      {({ close }) => (
+        <CreateRoutingRuleForm
+          supportedModels={supportedModelOptions}
+          providerModels={providerModelOptions}
+          defaultStrategy={selectedTemplate?.route.routeStrategy}
+          defaultWorkspaceScope={selectedTemplate?.route.workspaceScope}
+          disabled={!hasProviderModels || !hasSupportedModels}
+          className="grid gap-4"
+          onSuccess={close}
+        />
+      )}
+    </ManagementDialog>
   );
 }

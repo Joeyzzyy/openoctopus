@@ -2088,6 +2088,77 @@ export async function updateProviderModelDetails(formData: FormData) {
   revalidatePath("/internal");
 }
 
+const deleteProviderModelSchema = z.object({
+  providerModelId: z.string().uuid(),
+});
+
+export async function deleteProviderModel(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = deleteProviderModelSchema.parse({
+    providerModelId: formData.get("providerModelId"),
+  });
+
+  const { data: providerModelRow, error: providerModelError } = await supabase
+    .from("provider_models")
+    .select("id, public_model_slug, upstream_model_slug")
+    .eq("id", parsed.providerModelId)
+    .maybeSingle();
+
+  if (providerModelError) {
+    throw new Error(providerModelError.message);
+  }
+
+  if (!providerModelRow) {
+    throw new Error("Provider model is missing");
+  }
+
+  const { data: routingUsageRows, error: routingUsageError } = await supabase
+    .from("routing_rules")
+    .select("id")
+    .or(
+      `primary_provider_model_id.eq.${parsed.providerModelId},fallback_provider_model_id.eq.${parsed.providerModelId}`
+    )
+    .limit(1);
+
+  if (routingUsageError) {
+    throw new Error(routingUsageError.message);
+  }
+
+  if ((routingUsageRows ?? []).length > 0) {
+    redirect(
+      `/internal?tab=economics&alert=${encodeURIComponent(
+        "删除失败：该模型映射仍被路由规则引用，请先调整路由配置。"
+      )}`
+    );
+  }
+
+  const { error } = await supabase
+    .from("provider_models")
+    .delete()
+    .eq("id", parsed.providerModelId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_model.delete",
+    targetType: "provider_model",
+    targetId: parsed.providerModelId,
+    summary: `Deleted provider model ${providerModelRow.public_model_slug}`,
+    details: {
+      providerModelId: parsed.providerModelId,
+      publicModelSlug: providerModelRow.public_model_slug,
+      upstreamModelSlug: providerModelRow.upstream_model_slug,
+    },
+  });
+
+  revalidatePath("/internal");
+}
+
 const createRoutingRuleSchema = z.object({
   workspaceId: z.string().uuid().optional(),
   supportedModelId: z.string().uuid(),
@@ -2334,6 +2405,57 @@ export async function updateRoutingRule(formData: FormData) {
     targetId: parsed.routingRuleId,
     summary: `Updated routing rule ${parsed.routingRuleId}`,
     details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+const deleteRoutingRuleSchema = z.object({
+  routingRuleId: z.string().uuid(),
+});
+
+export async function deleteRoutingRule(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = deleteRoutingRuleSchema.parse({
+    routingRuleId: formData.get("routingRuleId"),
+  });
+
+  const { data: currentRule, error: currentRuleError } = await supabase
+    .from("routing_rules")
+    .select("id, public_model_slug, capability")
+    .eq("id", parsed.routingRuleId)
+    .maybeSingle();
+
+  if (currentRuleError) {
+    throw new Error(currentRuleError.message);
+  }
+
+  if (!currentRule) {
+    throw new Error("Routing rule is missing");
+  }
+
+  const { error } = await supabase
+    .from("routing_rules")
+    .delete()
+    .eq("id", parsed.routingRuleId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "routing_rule.delete",
+    targetType: "routing_rule",
+    targetId: parsed.routingRuleId,
+    summary: `Deleted routing rule for ${currentRule.public_model_slug}`,
+    details: {
+      routingRuleId: parsed.routingRuleId,
+      publicModelSlug: currentRule.public_model_slug,
+      capability: currentRule.capability,
+    },
   });
 
   revalidatePath("/internal");
