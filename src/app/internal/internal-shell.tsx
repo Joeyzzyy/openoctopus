@@ -12,8 +12,7 @@ type InternalTabKey =
   | "providers"
   | "monitoring"
   | "routes"
-  | "requests"
-  | "audit";
+  | "requests";
 
 type TabItem = {
   key: InternalTabKey;

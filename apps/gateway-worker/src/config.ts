@@ -20,6 +20,7 @@ const envSchema = z.object({
   WAVESPEED_IMAGE_TASK_ID_FIELD: z.string().default("id"),
   WAVESPEED_IMAGE_REQUEST_ID_FIELD: z.string().default("id"),
   GATEWAY_PUBLIC_BASE_URL: z.string().url().optional(),
+  GENERATED_ASSETS_BUCKET: z.string().min(1).default("generated-assets"),
 });
 
 export const env = envSchema.parse(process.env);

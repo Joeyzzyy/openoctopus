@@ -80,12 +80,6 @@ const tabs = [
     label: "用户请求记录",
     description: "近期调用与成本明细。",
   },
-  {
-    key: "audit",
-    group: "overview",
-    label: "配置变更历史",
-    description: "配置变更历史与追踪。",
-  },
 ] as const;
 
 type InternalTabKey = (typeof tabs)[number]["key"];
@@ -935,7 +929,6 @@ export default async function InternalPage({
   const hasProviderModels = data.providerModels.length > 0;
   const hasCredentials = data.providerCredentials.length > 0;
   const hasRoutes = data.routingRules.length > 0;
-  const hasAudit = data.auditLogs.length > 0;
   const selectedTemplateKey = getSearchValue(resolvedSearchParams, "template");
   const activeTab = getTabValue(getSearchValue(resolvedSearchParams, "tab"));
   const uiAlertMessage = getSearchValue(resolvedSearchParams, "alert");
@@ -1781,50 +1774,6 @@ export default async function InternalPage({
             </section>
           ) : null}
 
-          {activeTab === "audit" ? (
-            <section className="mt-6">
-              <SectionShell
-                id="audit-panel"
-                title="配置变更历史"
-                description=" "
-              >
-                {hasAudit ? (
-                  <div className="space-y-3">
-                    {data.auditLogs.map((log) => (
-                      <article
-                        key={log.id}
-                        className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm"
-                      >
-                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-black/45">
-                              <span>{log.action}</span>
-                              <span>•</span>
-                              <span>{log.target_type}</span>
-                            </div>
-                            <p className="mt-3 text-sm font-medium text-black">{log.summary}</p>
-                            {log.target_id ? (
-                              <p className="mt-1 text-xs text-black/50">目标：{log.target_id}</p>
-                            ) : null}
-                          </div>
-                          <div className="text-xs text-black/45">{log.createdLabel}</div>
-                        </div>
-
-                        <div className="mt-4 rounded-xl border border-black/[0.06] bg-white p-3 text-xs text-black/58">
-                          <pre className="overflow-x-auto whitespace-pre-wrap">{log.detailsText}</pre>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    title="还没有配置变更记录"
-                    detail="当你在内部后台创建或修改供应商、供应商密钥、模型、路由规则后，这里会开始沉淀完整的配置变更历史。"
-                  />
-                )}
-              </SectionShell>
-            </section>
-          ) : null}
           </InternalShell>
         </section>
       </div>

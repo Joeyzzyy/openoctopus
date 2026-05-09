@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { env } from "../config.js";
 import { decryptProviderSecret } from "../lib/provider-secret-crypto.js";
 import { getStream } from "../lib/http.js";
 import { supabaseAdmin } from "../lib/supabase.js";
@@ -54,6 +55,18 @@ function copyHeader(
   }
 }
 
+function buildAssetCachePath(requestId: string, assetIndex: number) {
+  return `${requestId}/${assetIndex}`;
+}
+
+function readHeaderValue(
+  headers: Record<string, string | string[] | undefined>,
+  name: string
+) {
+  const value = headers[name.toLowerCase()];
+  return typeof value === "string" ? value : undefined;
+}
+
 export async function registerFileRoutes(app: FastifyInstance) {
   app.get("/v1/files/:requestId/assets/:assetIndex", async (request, reply) => {
     const params = fileAssetParamsSchema.parse(request.params);
@@ -75,6 +88,18 @@ export async function registerFileRoutes(app: FastifyInstance) {
           message: "Generated file not found",
         },
       });
+    }
+
+    const cachePath = buildAssetCachePath(params.requestId, params.assetIndex);
+    const cachedDownload = await supabaseAdmin.storage
+      .from(env.GENERATED_ASSETS_BUCKET)
+      .download(cachePath);
+    if (cachedDownload.data) {
+      const buffer = Buffer.from(await cachedDownload.data.arrayBuffer());
+      const contentType = cachedDownload.data.type || "application/octet-stream";
+      reply.header("content-type", contentType);
+      reply.header("cache-control", "public, max-age=31536000, immutable");
+      return reply.code(200).send(buffer);
     }
 
     const sourceUrl = getAssetSourceUrl(requestRow.output_payload, params.assetIndex);
@@ -122,6 +147,26 @@ export async function registerFileRoutes(app: FastifyInstance) {
         ...(typeof range === "string" ? { range } : {}),
       },
     });
+
+    if (upstream.status === 200) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of upstream.stream) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const bodyBuffer = Buffer.concat(chunks);
+      const contentType = readHeaderValue(upstream.headers, "content-type");
+      await supabaseAdmin.storage
+        .from(env.GENERATED_ASSETS_BUCKET)
+        .upload(cachePath, bodyBuffer, {
+          contentType,
+          upsert: true,
+        });
+      if (contentType) {
+        reply.header("content-type", contentType);
+      }
+      reply.header("cache-control", "public, max-age=31536000, immutable");
+      return reply.code(200).send(bodyBuffer);
+    }
 
     copyHeader(reply, upstream.headers, "content-type");
     copyHeader(reply, upstream.headers, "content-length");

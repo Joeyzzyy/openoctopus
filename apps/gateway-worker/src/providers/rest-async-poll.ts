@@ -1,4 +1,5 @@
 import { getJson, postJson } from "../lib/http.js";
+import { env } from "../config.js";
 import type {
   PollRequestInput,
   PollRequestResult,
@@ -111,7 +112,8 @@ function buildAuthConfig(cfg: Record<string, unknown>, secret: string) {
 function buildAssetFromResult(
   data: Record<string, unknown>,
   resultValuePath: string,
-  cfg: Record<string, unknown>
+  cfg: Record<string, unknown>,
+  requestId?: string
 ) {
   const resultValue = readPath(data, resultValuePath);
   const resultType = readString(cfg.resultValueType, "url");
@@ -120,6 +122,29 @@ function buildAssetFromResult(
     return { url: `data:${mimeType};base64,${resultValue}` };
   }
   if (typeof resultValue === "string" && resultValue.length > 0) {
+    const isGeminiFileDownload = (() => {
+      try {
+        const parsed = new URL(resultValue);
+        return (
+          parsed.hostname === "generativelanguage.googleapis.com" &&
+          /^\/v[^/]+\/files\/[^/]+:download$/.test(parsed.pathname)
+        );
+      } catch {
+        return false;
+      }
+    })();
+
+    if (isGeminiFileDownload && requestId) {
+      const path = `/v1/files/${encodeURIComponent(requestId)}/assets/0`;
+      const proxiedUrl = env.GATEWAY_PUBLIC_BASE_URL
+        ? new URL(path, env.GATEWAY_PUBLIC_BASE_URL).toString()
+        : path;
+      return {
+        url: proxiedUrl,
+        sourceUrl: resultValue,
+      };
+    }
+
     return { url: resultValue };
   }
   return null;
@@ -190,7 +215,7 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
 
     const taskId = readPath(data, taskIdPath);
     const status = readStatusFlags(data, resolvedStatusPath);
-    const asset = buildAssetFromResult(data, resultUrlPath, cfg);
+    const asset = buildAssetFromResult(data, resultUrlPath, cfg, input.requestId);
     const isSyncMode = mode === "sync" || mode === "sync-json-v1";
     const hasPollMode = mode === "async" || mode === "async-poll" || mode === "rest-async-poll-v1" || Boolean(pollPath);
 
@@ -231,7 +256,7 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
     const statusPath = typeof cfg.statusPath === "string" ? cfg.statusPath : "status";
     const resultUrlPath = typeof cfg.resultUrlPath === "string" ? cfg.resultUrlPath : "result.url";
     const status = readStatusFlags(data, statusPath);
-    const asset = buildAssetFromResult(data, resultUrlPath, cfg);
+    const asset = buildAssetFromResult(data, resultUrlPath, cfg, input.requestId);
 
     if (status.isFailed && !asset) {
       return {
