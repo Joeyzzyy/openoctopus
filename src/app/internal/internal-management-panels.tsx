@@ -1431,10 +1431,12 @@ export function CreateProviderModelMappingButton({
   supportedModels,
   providers,
   workerTemplates,
+  providerModels = [],
 }: {
   supportedModels: SupportedModelSummary[];
   providers: ProviderSummary[];
   workerTemplates: WorkerTemplateSummary[];
+  providerModels?: ProviderModelSummary[];
 }) {
   const hasProviders = providers.length > 0;
   const hasSupportedModels = supportedModels.length > 0;
@@ -1454,6 +1456,12 @@ export function CreateProviderModelMappingButton({
     displayName: item.display_name,
     slug: item.slug,
   }));
+  const executionConfigPresets = providerModels.map((item) => ({
+    id: item.id,
+    label: `${item.supportedModelName} / ${item.providerName} / ${item.upstream_model_slug}`,
+    executionTemplate: item.executionTemplate,
+    executionConfigText: item.executionConfigText,
+  }));
 
   return (
     <ManagementDialog
@@ -1468,6 +1476,7 @@ export function CreateProviderModelMappingButton({
           supportedModels={supportedModelOptions}
           providers={providerOptions}
           workerTemplates={workerTemplateOptions}
+          executionConfigPresets={executionConfigPresets}
           disabled={!hasProviders || !hasSupportedModels}
           className="grid gap-4"
           onSuccess={close}
@@ -1836,6 +1845,12 @@ export function ModelsPanel({
     displayName: item.display_name,
     slug: item.slug,
   }));
+  const executionConfigPresets = providerModels.map((item) => ({
+    id: item.id,
+    label: `${item.supportedModelName} / ${item.providerName} / ${item.upstream_model_slug}`,
+    executionTemplate: item.executionTemplate,
+    executionConfigText: item.executionConfigText,
+  }));
 
   return (
     <div className="space-y-4">
@@ -1852,6 +1867,7 @@ export function ModelsPanel({
               supportedModels={supportedModelOptions}
               providers={providerOptions}
               workerTemplates={workerTemplateOptions}
+              executionConfigPresets={executionConfigPresets}
               defaultSupportedModelSlug="openoctopus/gemini-2.5-flash-image"
               defaultUpstreamModelSlug={selectedTemplate?.providerModel.upstreamModelSlug}
               defaultPricing={selectedTemplate?.providerModel.pricing}
@@ -1898,6 +1914,7 @@ export function ModelsPanel({
                     supportedModels={supportedModelOptions}
                     providers={providerOptions}
                     workerTemplates={workerTemplateOptions}
+                    executionConfigPresets={executionConfigPresets.filter((preset) => preset.id !== item.id)}
                     defaultSupportedModelSlug={item.public_model_slug}
                     defaultProviderId={item.provider_id}
                     defaultUpstreamModelSlug={item.upstream_model_slug}

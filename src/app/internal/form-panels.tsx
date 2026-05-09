@@ -24,6 +24,13 @@ type WorkerTemplateOption = {
   slug: string;
 };
 
+type ExecutionConfigPresetOption = {
+  id: string;
+  label: string;
+  executionTemplate: string;
+  executionConfigText: string;
+};
+
 type ProviderModelOption = {
   id: string;
   supportedModelId: string | null;
@@ -508,6 +515,7 @@ export function CreateProviderModelForm({
   supportedModels,
   providers,
   workerTemplates = [],
+  executionConfigPresets = [],
   defaultSupportedModelSlug,
   defaultProviderId,
   defaultUpstreamModelSlug,
@@ -528,6 +536,7 @@ export function CreateProviderModelForm({
   supportedModels: SupportedModelOption[];
   providers: ProviderOption[];
   workerTemplates?: WorkerTemplateOption[];
+  executionConfigPresets?: ExecutionConfigPresetOption[];
   defaultSupportedModelSlug?: string;
   defaultProviderId?: string;
   defaultUpstreamModelSlug?: string;
@@ -562,6 +571,7 @@ export function CreateProviderModelForm({
       ? workerTemplates
       : [{ id: "fallback", displayName: "任务轮询（提交后查询）", slug: defaultExecutionTemplate }];
   const [executionTemplate, setExecutionTemplate] = useState(defaultExecutionTemplate);
+  const [selectedPresetId, setSelectedPresetId] = useState("");
   const [executionConfigState, setExecutionConfigState] = useState(() =>
     parseExecutionConfigState(defaultExecutionConfig)
   );
@@ -572,6 +582,7 @@ export function CreateProviderModelForm({
 
   useEffect(() => {
     setExecutionTemplate(defaultExecutionTemplate);
+    setSelectedPresetId("");
     setExecutionConfigState(parseExecutionConfigState(defaultExecutionConfig));
   }, [defaultExecutionConfig, defaultExecutionTemplate]);
 
@@ -692,6 +703,32 @@ export function CreateProviderModelForm({
                 ))}
               </select>
             </label>
+            {executionConfigPresets.length > 0 ? (
+              <label className="block mb-3">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">快速填充（复制已有模型）</span>
+                <select
+                  value={selectedPresetId}
+                  onChange={(event) => {
+                    const nextPresetId = event.target.value;
+                    setSelectedPresetId(nextPresetId);
+                    if (!nextPresetId) return;
+                    const preset = executionConfigPresets.find((item) => item.id === nextPresetId);
+                    if (!preset) return;
+                    setExecutionTemplate(preset.executionTemplate);
+                    setExecutionConfigState(parseExecutionConfigState(preset.executionConfigText));
+                  }}
+                  disabled={disabled}
+                  className={formSelectClassName}
+                >
+                  <option value="">选择一个已配置模型并复制其调用协议</option>
+                  {executionConfigPresets.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <input type="hidden" name="executionConfig" value={executionConfigValue} />
             <div className="grid gap-3 md:grid-cols-2">
               <label className="block">
