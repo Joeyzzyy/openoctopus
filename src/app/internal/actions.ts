@@ -1807,133 +1807,138 @@ const createProviderModelSchema = z.object({
 });
 
 export async function createProviderModel(formData: FormData) {
-  const { supabase, userId, workspaceId } = await getInternalAdminContext();
-  const parsed = createProviderModelSchema.parse({
-    providerId: formData.get("providerId"),
-    supportedModelId: formData.get("supportedModelId"),
-    upstreamModelSlug: formData.get("upstreamModelSlug"),
-    capability: formData.get("capability"),
-    active: parseBooleanField(formData.get("active")),
-    pricing: parseJsonField(formData.get("pricing")),
-    pricingSourceUrl: normalizeOptionalUrl(formData.get("pricingSourceUrl")),
-    pricingSourceNote: normalizeOptionalText(formData.get("pricingSourceNote")),
-    pricingSourceEvidence: parseJsonArrayField(formData.get("pricingSourceEvidence")),
-    inputSchema: parseJsonField(formData.get("inputSchema")),
-    outputSchema: parseJsonField(formData.get("outputSchema")),
-    executionTemplate: (formData.get("executionTemplate") as string) || "rest-async-poll-v1",
-    executionConfig: parseJsonField(formData.get("executionConfig")),
-  });
-  await ensureWorkerTemplateExists({
-    supabase,
-    slug: parsed.executionTemplate,
-    displayName: parsed.executionTemplate,
-    config: parsed.executionConfig,
-  });
+  try {
+    const { supabase, userId, workspaceId } = await getInternalAdminContext();
+    const parsed = createProviderModelSchema.parse({
+      providerId: formData.get("providerId"),
+      supportedModelId: formData.get("supportedModelId"),
+      upstreamModelSlug: formData.get("upstreamModelSlug"),
+      capability: formData.get("capability"),
+      active: parseBooleanField(formData.get("active")),
+      pricing: parseJsonField(formData.get("pricing")),
+      pricingSourceUrl: normalizeOptionalUrl(formData.get("pricingSourceUrl")),
+      pricingSourceNote: normalizeOptionalText(formData.get("pricingSourceNote")),
+      pricingSourceEvidence: parseJsonArrayField(formData.get("pricingSourceEvidence")),
+      inputSchema: parseJsonField(formData.get("inputSchema")),
+      outputSchema: parseJsonField(formData.get("outputSchema")),
+      executionTemplate: (formData.get("executionTemplate") as string) || "rest-async-poll-v1",
+      executionConfig: parseJsonField(formData.get("executionConfig")),
+    });
+    await ensureWorkerTemplateExists({
+      supabase,
+      slug: parsed.executionTemplate,
+      displayName: parsed.executionTemplate,
+      config: parsed.executionConfig,
+    });
 
-  const { data: supportedModelRow, error: supportedModelError } = await supabase
-    .from("supported_models")
-    .select("model_slug, capability, billing_config")
-    .eq("id", parsed.supportedModelId)
-    .maybeSingle();
+    const { data: supportedModelRow, error: supportedModelError } = await supabase
+      .from("supported_models")
+      .select("model_slug, capability, billing_config")
+      .eq("id", parsed.supportedModelId)
+      .maybeSingle();
 
-  if (supportedModelError) {
-    throw new Error(supportedModelError.message);
+    if (supportedModelError) {
+      throw new Error(supportedModelError.message);
+    }
+
+    if (!supportedModelRow) {
+      throw new Error("Supported model is missing");
+    }
+
+    if (supportedModelRow.capability !== parsed.capability) {
+      throw new Error("Provider model capability must match the selected public model capability");
+    }
+
+    assertBillingConfig(supportedModelRow.billing_config);
+    const runtimeContext = await loadProviderRuntimeContext(supabase, {
+      providerId: parsed.providerId,
+      supportedModelIds: [parsed.supportedModelId],
+    });
+    const provider = runtimeContext.providersById.get(parsed.providerId) ?? null;
+    const supportedModel = runtimeContext.supportedModelsById.get(parsed.supportedModelId) ?? null;
+    const runtimeDiagnostics = getProviderModelRuntimeDiagnostics({
+      providerModel: {
+        id: "new",
+        provider_id: parsed.providerId,
+        supported_model_id: parsed.supportedModelId,
+        upstream_model_slug: parsed.upstreamModelSlug,
+        capability: parsed.capability,
+        active: parsed.active,
+        execution_template: parsed.executionTemplate,
+      },
+      provider,
+      supportedModel,
+      workerTemplatesBySlug: runtimeContext.workerTemplatesBySlug,
+      credentials: runtimeContext.credentialsByProviderId.get(parsed.providerId) ?? [],
+    });
+
+    if (parsed.active && runtimeDiagnostics.length > 0) {
+      throw new Error(
+        formatRuntimeDiagnosticsForError(
+          "这个供应商模型当前不能直接启用，请先修复下面的问题：",
+          runtimeDiagnostics
+        )
+      );
+    }
+
+    const pricingConfig = parseBillingConfig(parsed.pricing);
+    const pricingEvidenceFile = formData.get("pricingSourceEvidenceFile");
+    const uploadedEvidence = await uploadPricingEvidenceFile({
+      supabase,
+      providerId: parsed.providerId,
+      upstreamModelSlug: parsed.upstreamModelSlug,
+      file: pricingEvidenceFile instanceof File ? pricingEvidenceFile : null,
+    });
+    const pricingSourceEvidence = uploadedEvidence
+      ? [...parsed.pricingSourceEvidence, uploadedEvidence]
+      : parsed.pricingSourceEvidence;
+
+    const { data, error } = await supabase
+      .from("provider_models")
+      .insert({
+        provider_id: parsed.providerId,
+        supported_model_id: parsed.supportedModelId,
+        public_model_slug: supportedModelRow.model_slug,
+        upstream_model_slug: parsed.upstreamModelSlug,
+        capability: parsed.capability,
+        active: parsed.active,
+        pricing: pricingConfig,
+        pricing_source_url: parsed.pricingSourceUrl,
+        pricing_source_note: parsed.pricingSourceNote,
+        pricing_source_evidence: pricingSourceEvidence,
+        input_schema: parsed.inputSchema,
+        output_schema: parsed.outputSchema,
+        execution_template: parsed.executionTemplate,
+        execution_config: parsed.executionConfig,
+      })
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    await logAdminAudit({
+      supabase,
+      userId,
+      workspaceId,
+      action: "provider_model.create",
+      targetType: "provider_model",
+      targetId: data?.id ?? null,
+      summary: `Created provider model ${supportedModelRow.model_slug}`,
+      details: {
+        ...parsed,
+        pricing: pricingConfig,
+        pricingSourceEvidence,
+        publicModelSlug: supportedModelRow.model_slug,
+      },
+    });
+
+    revalidatePath("/internal");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "保存失败，请稍后重试。";
+    redirect(`/internal?tab=economics&alert=${encodeURIComponent(message)}`);
   }
-
-  if (!supportedModelRow) {
-    throw new Error("Supported model is missing");
-  }
-
-  if (supportedModelRow.capability !== parsed.capability) {
-    throw new Error("Provider model capability must match the selected public model capability");
-  }
-
-  assertBillingConfig(supportedModelRow.billing_config);
-  const runtimeContext = await loadProviderRuntimeContext(supabase, {
-    providerId: parsed.providerId,
-    supportedModelIds: [parsed.supportedModelId],
-  });
-  const provider = runtimeContext.providersById.get(parsed.providerId) ?? null;
-  const supportedModel = runtimeContext.supportedModelsById.get(parsed.supportedModelId) ?? null;
-  const runtimeDiagnostics = getProviderModelRuntimeDiagnostics({
-    providerModel: {
-      id: "new",
-      provider_id: parsed.providerId,
-      supported_model_id: parsed.supportedModelId,
-      upstream_model_slug: parsed.upstreamModelSlug,
-      capability: parsed.capability,
-      active: parsed.active,
-      execution_template: parsed.executionTemplate,
-    },
-    provider,
-    supportedModel,
-    workerTemplatesBySlug: runtimeContext.workerTemplatesBySlug,
-    credentials: runtimeContext.credentialsByProviderId.get(parsed.providerId) ?? [],
-  });
-
-  if (parsed.active && runtimeDiagnostics.length > 0) {
-    throw new Error(
-      formatRuntimeDiagnosticsForError(
-        "这个供应商模型当前不能直接启用，请先修复下面的问题：",
-        runtimeDiagnostics
-      )
-    );
-  }
-
-  const pricingConfig = parseBillingConfig(parsed.pricing);
-  const pricingEvidenceFile = formData.get("pricingSourceEvidenceFile");
-  const uploadedEvidence = await uploadPricingEvidenceFile({
-    supabase,
-    providerId: parsed.providerId,
-    upstreamModelSlug: parsed.upstreamModelSlug,
-    file: pricingEvidenceFile instanceof File ? pricingEvidenceFile : null,
-  });
-  const pricingSourceEvidence = uploadedEvidence
-    ? [...parsed.pricingSourceEvidence, uploadedEvidence]
-    : parsed.pricingSourceEvidence;
-
-  const { data, error } = await supabase
-    .from("provider_models")
-    .insert({
-      provider_id: parsed.providerId,
-      supported_model_id: parsed.supportedModelId,
-      public_model_slug: supportedModelRow.model_slug,
-      upstream_model_slug: parsed.upstreamModelSlug,
-      capability: parsed.capability,
-      active: parsed.active,
-      pricing: pricingConfig,
-      pricing_source_url: parsed.pricingSourceUrl,
-      pricing_source_note: parsed.pricingSourceNote,
-      pricing_source_evidence: pricingSourceEvidence,
-      input_schema: parsed.inputSchema,
-      output_schema: parsed.outputSchema,
-      execution_template: parsed.executionTemplate,
-      execution_config: parsed.executionConfig,
-    })
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  await logAdminAudit({
-    supabase,
-    userId,
-    workspaceId,
-    action: "provider_model.create",
-    targetType: "provider_model",
-    targetId: data?.id ?? null,
-    summary: `Created provider model ${supportedModelRow.model_slug}`,
-    details: {
-      ...parsed,
-      pricing: pricingConfig,
-      pricingSourceEvidence,
-      publicModelSlug: supportedModelRow.model_slug,
-    },
-  });
-
-  revalidatePath("/internal");
 }
 
 const updateProviderModelSchema = z.object({
