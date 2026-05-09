@@ -62,6 +62,7 @@ type ExecutionConfigFormState = {
   taskIdPath: string;
   statusPath: string;
   resultUrlPath: string;
+  submitBodyTemplate: string;
 };
 
 function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormState> {
@@ -77,6 +78,8 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
       resultMimeType: "image/png",
       authType: "query",
       authQueryParam: "key",
+      submitBodyTemplate:
+        '{\n  "contents": [\n    {\n      "parts": [\n        {\n          "text": "{{prompt}}"\n        }\n      ]\n    }\n  ],\n  "generationConfig": {\n    "responseModalities": ["IMAGE"]\n  }\n}',
     };
   }
   if (slug === "upload-async-poll-v1") {
@@ -225,6 +228,7 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
     taskIdPath: "name",
     statusPath: "done",
     resultUrlPath: "response.outputUrl",
+    submitBodyTemplate: "",
   };
 
   if (!initialValue) {
@@ -282,6 +286,14 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
         typeof parsed.resultUrlPath === "string" && parsed.resultUrlPath.trim().length > 0
           ? parsed.resultUrlPath
           : fallback.resultUrlPath,
+      submitBodyTemplate:
+        typeof parsed.submitBodyTemplate === "string"
+          ? parsed.submitBodyTemplate
+          : parsed.submitBodyTemplate &&
+              typeof parsed.submitBodyTemplate === "object" &&
+              !Array.isArray(parsed.submitBodyTemplate)
+            ? JSON.stringify(parsed.submitBodyTemplate, null, 2)
+            : fallback.submitBodyTemplate,
     };
   } catch {
     return fallback;
@@ -289,7 +301,7 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
 }
 
 function buildExecutionConfigValue(state: ExecutionConfigFormState) {
-  return JSON.stringify({
+  const result: Record<string, unknown> = {
     mode: state.mode.trim(),
     authType: state.authType.trim(),
     authHeaderName: state.authHeaderName.trim(),
@@ -302,7 +314,16 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
     taskIdPath: state.taskIdPath.trim(),
     statusPath: state.statusPath.trim(),
     resultUrlPath: state.resultUrlPath.trim(),
-  });
+  };
+  const submitBodyTemplateText = state.submitBodyTemplate.trim();
+  if (submitBodyTemplateText) {
+    try {
+      result.submitBodyTemplate = JSON.parse(submitBodyTemplateText);
+    } catch {
+      result.submitBodyTemplate = submitBodyTemplateText;
+    }
+  }
+  return JSON.stringify(result);
 }
 
 function FieldHint({
@@ -844,6 +865,23 @@ export function CreateProviderModelForm({
                   className={formInputClassName}
                   placeholder="response.outputUrl"
                 />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提交 Body 模板（JSON）</span>
+                <textarea
+                  value={executionConfigState.submitBodyTemplate}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      submitBodyTemplate: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={8}
+                  placeholder={'{\n  "contents": [\n    {\n      "parts": [\n        { "text": "{{prompt}}" }\n      ]\n    }\n  ]\n}'}
+                />
+                <FieldHint help="可选。用于把统一入参映射为上游真实请求体。支持变量：{{prompt}}、{{upstreamModel}}，以及 input 里的同名字段（如 {{size}}）。" />
               </label>
               <label className="block">
                 <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">结果值类型</span>

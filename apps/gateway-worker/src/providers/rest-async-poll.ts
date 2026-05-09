@@ -29,8 +29,55 @@ function fillTemplate(input: string, values: Record<string, string>) {
   return input.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, k) => values[k] ?? "");
 }
 
+function fillMustacheTemplate(input: string, values: Record<string, unknown>) {
+  return input.replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, (_, key: string) => {
+    const value = values[key];
+    if (value === null || value === undefined) {
+      return "";
+    }
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    return JSON.stringify(value);
+  });
+}
+
 function readString(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim().length > 0 ? value : fallback;
+}
+
+function renderTemplateValue(value: unknown, variables: Record<string, unknown>): unknown {
+  if (typeof value === "string") {
+    return fillMustacheTemplate(value, variables);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => renderTemplateValue(item, variables));
+  }
+  if (value && typeof value === "object") {
+    const output: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      output[key] = renderTemplateValue(child, variables);
+    }
+    return output;
+  }
+  return value;
+}
+
+function parseTemplateConfig(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 function buildAuthConfig(cfg: Record<string, unknown>, secret: string) {
@@ -96,11 +143,22 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
     const auth = buildAuthConfig(cfg, input.provider.secret);
     auth.applyQuery(submitUrl);
 
-    const body = {
-      model: input.upstreamModelSlug,
-      prompt: input.prompt,
+    const submitBodyTemplate = parseTemplateConfig(cfg.submitBodyTemplate);
+    const templateVariables: Record<string, unknown> = {
+      prompt: input.prompt ?? "",
+      upstreamModel: input.upstreamModelSlug,
+      publicModel: input.publicModelSlug,
+      capability: input.capability,
+      requestId: input.requestId,
       ...input.input,
     };
+    const body = submitBodyTemplate
+      ? (renderTemplateValue(submitBodyTemplate, templateVariables) as Record<string, unknown>)
+      : {
+          model: input.upstreamModelSlug,
+          prompt: input.prompt,
+          ...input.input,
+        };
 
     const { data } = await postJson<Record<string, unknown>>(submitUrl.toString(), {
       headers: auth.headers,
