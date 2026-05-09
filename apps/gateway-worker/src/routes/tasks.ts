@@ -17,6 +17,11 @@ const videoRequestSchema = z.object({
   model: z.string().min(1),
   prompt: z.string().min(1).optional(),
   input: z.record(z.string(), z.unknown()).default({}),
+  duration: z.union([z.number(), z.string()]).optional(),
+  duration_seconds: z.union([z.number(), z.string()]).optional(),
+  durationSeconds: z.union([z.number(), z.string()]).optional(),
+  aspect_ratio: z.string().optional(),
+  resolution: z.string().optional(),
 });
 
 export async function registerTaskRoutes(app: FastifyInstance) {
@@ -124,6 +129,30 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const parsed = videoRequestSchema.parse(request.body);
     const authHeader = request.headers.authorization;
     const apiKey = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
+    const normalizedInput: Record<string, unknown> = {
+      ...parsed.input,
+    };
+    if (parsed.duration !== undefined && normalizedInput.duration === undefined) {
+      normalizedInput.duration = parsed.duration;
+    }
+    if (
+      parsed.duration_seconds !== undefined &&
+      normalizedInput.duration_seconds === undefined
+    ) {
+      normalizedInput.duration_seconds = parsed.duration_seconds;
+    }
+    if (
+      parsed.durationSeconds !== undefined &&
+      normalizedInput.durationSeconds === undefined
+    ) {
+      normalizedInput.durationSeconds = parsed.durationSeconds;
+    }
+    if (parsed.aspect_ratio !== undefined && normalizedInput.aspect_ratio === undefined) {
+      normalizedInput.aspect_ratio = parsed.aspect_ratio;
+    }
+    if (parsed.resolution !== undefined && normalizedInput.resolution === undefined) {
+      normalizedInput.resolution = parsed.resolution;
+    }
 
     try {
       const queued = await createQueuedRequest({
@@ -132,7 +161,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         capability: "video_generation",
         model: parsed.model,
         prompt: parsed.prompt,
-        input: parsed.input,
+        input: normalizedInput,
       });
 
       await enqueueInferenceJob({
@@ -149,7 +178,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         upstreamModelSlug: queued.upstreamModelSlug,
         endpoint: queued.endpoint,
         prompt: parsed.prompt,
-        input: parsed.input,
+        input: normalizedInput,
       });
 
       return reply.code(202).send({

@@ -1261,9 +1261,20 @@ export default async function InternalPage({
                       {option.label}
                     </a>
                   ))}
+                  <a
+                    href={buildMonitoringHref({
+                      view: selectedMonitoringView,
+                      interval: selectedMonitoringInterval,
+                      range: selectedMonitoringRange,
+                      status: selectedMonitoringStatus,
+                    })}
+                    className="ml-auto inline-flex h-9 items-center rounded-md border border-black/[0.12] bg-white px-3 text-sm font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
+                  >
+                    刷新
+                  </a>
                 </div>
 
-                {selectedMonitoringView !== "requests" ? (
+                {selectedMonitoringView === "overview" ? (
                   <>
                     <div className="mb-4 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
                       <div className="grid gap-3 lg:grid-cols-3">
@@ -1646,20 +1657,7 @@ export default async function InternalPage({
                         </div>
                       </div>
 
-                      <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-                        <p className="text-[11px] tracking-[0.35px] text-black/45">当前选择</p>
-                        <p className="mt-2 text-sm font-medium text-black">
-                          {selectedRequestKeyRecord ? selectedRequestKeyRecord.name : "全部 Key"}
-                        </p>
-                        <p className="mt-1 text-xs text-black/45">
-                          {selectedRequestKeyRecord
-                            ? `${selectedRequestKeyRecord.keyPrefix} · ${selectedRequestKeyRecord.environment}`
-                            : selectedRequestCustomer === "all"
-                              ? "全局 · 全部请求记录"
-                              : `${selectedRequestCustomer} · 全部请求记录`}
-                        </p>
-                      </div>
-                    </div>
+                  </div>
 
                     {selectedRequestKeyRecord ? (
                       selectedRequestKeyRecord.workspaceId === data.workspace.id ? (
