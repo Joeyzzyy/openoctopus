@@ -27,30 +27,26 @@ export function ModelCatalogTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-[1280px] w-full text-sm">
+      <table className="min-w-[980px] w-full text-sm">
         <thead>
           <tr className="border-b border-black/10 text-left">
             <th className="h-11 px-3 align-middle text-[10px] tracking-[1px] text-black/45">MODEL</th>
-            <th className="h-11 px-3 align-middle text-[10px] tracking-[1px] text-black/45">UPSTREAM</th>
-            <th className="h-11 px-3 align-middle text-[10px] tracking-[1px] text-black/45">PROVIDER</th>
             <th className="h-11 px-3 align-middle text-[10px] tracking-[1px] text-black/45">CAPABILITY</th>
             <th className="h-11 px-3 align-middle text-[10px] tracking-[1px] text-black/45">STRATEGY</th>
-            <th className="h-11 px-3 align-middle text-[10px] tracking-[1px] text-black/45">PRIMARY ROUTE</th>
-            <th className="h-11 px-3 align-middle text-[10px] tracking-[1px] text-black/45">FALLBACK ROUTE</th>
+            <th className="h-11 px-3 align-middle text-[10px] tracking-[1px] text-black/45">PRIMARY</th>
+            <th className="h-11 px-3 align-middle text-[10px] tracking-[1px] text-black/45">FALLBACK</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.id} className="border-b border-black/10 align-middle">
               <td className="px-3 py-3 align-middle text-black">{row.publicModel}</td>
-              <td className="px-3 py-3 align-middle font-mono text-[12px] text-black/65">
-                {row.upstreamModelSlug}
-              </td>
-              <td className="px-3 py-3 align-middle text-black">{row.providerName}</td>
               <td className="px-3 py-3 align-middle text-black/75">{row.capability}</td>
               <td className="px-3 py-3 align-middle text-black/75">{row.strategy}</td>
               <td className="px-3 py-3 align-middle text-black/75">{row.primary}</td>
-              <td className="px-3 py-3 align-middle text-black/75">{row.fallback}</td>
+              <td className="px-3 py-3 align-middle text-black/75">
+                {row.fallback === "manual failover only" ? "-" : row.fallback}
+              </td>
             </tr>
           ))}
         </tbody>
