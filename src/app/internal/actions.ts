@@ -682,6 +682,7 @@ const createProviderCredentialSchema = z.object({
 
 export async function createProviderCredential(formData: FormData) {
   const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const isActiveValue = formData.get("isActive");
   const parsed = createProviderCredentialSchema.parse({
     providerId: formData.get("providerId"),
     label: formData.get("label"),
@@ -690,7 +691,7 @@ export async function createProviderCredential(formData: FormData) {
     environment: formData.get("environment"),
     notes: normalizeOptionalText(formData.get("notes")) ?? "",
     metadata: parseJsonField(formData.get("metadata")),
-    isActive: parseBooleanField(formData.get("isActive")),
+    isActive: isActiveValue === null ? true : parseBooleanField(isActiveValue),
   });
   const encryptedSecret = encryptProviderSecret(parsed.secret);
 

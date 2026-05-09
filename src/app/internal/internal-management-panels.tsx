@@ -17,6 +17,7 @@ import {
   rotateProviderCredentialSecret,
   updateProvider,
   updateProviderCredentialDetails,
+  updateProviderCredentialState,
   updateProviderModelDetails,
   updateRoutingRule,
   updateSupportedModelDetails,
@@ -1793,6 +1794,16 @@ export function CredentialsPanel({
               </div>
 
               <div className="flex flex-wrap gap-2">
+                <form action={updateProviderCredentialState}>
+                  <input type="hidden" name="credentialId" value={credential.id} />
+                  <input type="hidden" name="isActive" value={credential.is_active ? "false" : "true"} />
+                  <button
+                    type="submit"
+                    className="inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
+                  >
+                    {credential.is_active ? "停用" : "启用"}
+                  </button>
+                </form>
                 <ManagementDialog
                   trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
                 title={`编辑 ${credential.label}`}
