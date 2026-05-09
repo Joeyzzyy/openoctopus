@@ -125,6 +125,28 @@ function buildAssetFromResult(
   return null;
 }
 
+function readStatusFlags(data: Record<string, unknown>, statusPath: string) {
+  const statusValue = readPath(data, statusPath);
+  const statusText = String(statusValue ?? "processing").toLowerCase();
+  const doneBoolean = typeof statusValue === "boolean" ? statusValue : null;
+  const hasErrorObject = Boolean(readPath(data, "error"));
+
+  const isSuccessByText = statusText === "succeeded" || statusText === "completed";
+  const isFailedByText = statusText === "failed" || statusText === "error";
+  const isDone = doneBoolean === true || isSuccessByText || isFailedByText;
+  const isSuccess = doneBoolean === true ? !hasErrorObject : isSuccessByText;
+  const isFailed = hasErrorObject || isFailedByText || (isDone && !isSuccess);
+
+  return {
+    statusValue,
+    statusText,
+    isDone,
+    isSuccess,
+    isFailed,
+    hasErrorObject,
+  };
+}
+
 export class RestAsyncPollAdapter implements ProviderAdapter {
   slug = "rest-async-poll-v1";
 
@@ -133,6 +155,7 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
     const mode = readString(cfg.mode, "auto");
     const submitPath = readString(cfg.submitPath, "/v1/tasks");
     const statusPath = typeof cfg.statusPath === "string" ? cfg.statusPath : undefined;
+    const resolvedStatusPath = statusPath ?? "status";
     const taskIdPath = typeof cfg.taskIdPath === "string" ? cfg.taskIdPath : "id";
     const resultUrlPath = typeof cfg.resultUrlPath === "string" ? cfg.resultUrlPath : "result.url";
     const pollPath = typeof cfg.pollPath === "string" ? cfg.pollPath : undefined;
@@ -166,14 +189,14 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
     });
 
     const taskId = readPath(data, taskIdPath);
-    const status = String(readPath(data, statusPath) ?? "processing");
+    const status = readStatusFlags(data, resolvedStatusPath);
     const asset = buildAssetFromResult(data, resultUrlPath, cfg);
     const isSyncMode = mode === "sync" || mode === "sync-json-v1";
     const hasPollMode = mode === "async" || mode === "async-poll" || mode === "rest-async-poll-v1" || Boolean(pollPath);
 
     if (
       asset &&
-      (isSyncMode || status === "succeeded" || status === "completed" || !hasPollMode)
+      (isSyncMode || status.isSuccess || !hasPollMode)
     ) {
       return {
         mode: "sync",
@@ -207,10 +230,10 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
     });
     const statusPath = typeof cfg.statusPath === "string" ? cfg.statusPath : "status";
     const resultUrlPath = typeof cfg.resultUrlPath === "string" ? cfg.resultUrlPath : "result.url";
-    const status = String(readPath(data, statusPath) ?? "processing");
+    const status = readStatusFlags(data, statusPath);
     const asset = buildAssetFromResult(data, resultUrlPath, cfg);
 
-    if (status === "failed" || status === "error") {
+    if (status.isFailed && !asset) {
       return {
         done: true,
         success: false,
@@ -219,12 +242,21 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
         raw: data,
       };
     }
-    if ((status === "succeeded" || status === "completed") && asset) {
+    if (status.isSuccess && asset) {
       return {
         done: true,
         success: true,
         output: { raw: data, assets: [asset] },
         actualCost: 0,
+        raw: data,
+      };
+    }
+    if (status.isDone && !asset) {
+      return {
+        done: true,
+        success: false,
+        errorCode: "upstream_result_missing",
+        errorMessage: "Upstream operation completed but no result asset URL was found.",
         raw: data,
       };
     }
