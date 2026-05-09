@@ -308,8 +308,10 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
 }
 
 function buildExecutionConfigValue(state: ExecutionConfigFormState) {
+  const normalizedMode = state.mode.trim();
+  const shouldPersistAsyncFields = normalizedMode === "async";
   const result: Record<string, unknown> = {
-    mode: state.mode.trim(),
+    mode: normalizedMode,
     authType: state.authType.trim(),
     authHeaderName: state.authHeaderName.trim(),
     authHeaderPrefix: state.authHeaderPrefix.trim(),
@@ -317,11 +319,13 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
     resultValueType: state.resultValueType.trim(),
     resultMimeType: state.resultMimeType.trim(),
     submitPath: state.submitPath.trim(),
-    pollPath: state.pollPath.trim(),
     taskIdPath: state.taskIdPath.trim(),
-    statusPath: state.statusPath.trim(),
     resultUrlPath: state.resultUrlPath.trim(),
   };
+  if (shouldPersistAsyncFields) {
+    result.pollPath = state.pollPath.trim();
+    result.statusPath = state.statusPath.trim();
+  }
   const submitBodyTemplateText = state.submitBodyTemplate.trim();
   if (submitBodyTemplateText) {
     try {
@@ -736,10 +740,21 @@ export function CreateProviderModelForm({
                 <select
                   value={executionConfigState.mode}
                   onChange={(event) =>
-                    setExecutionConfigState((current) => ({
-                      ...current,
-                      mode: event.target.value,
-                    }))
+                    setExecutionConfigState((current) => {
+                      const nextMode = event.target.value;
+                      if (nextMode === "sync") {
+                        return {
+                          ...current,
+                          mode: nextMode,
+                          pollPath: "",
+                          statusPath: "",
+                        };
+                      }
+                      return {
+                        ...current,
+                        mode: nextMode,
+                      };
+                    })
                   }
                   disabled={disabled}
                   className={formSelectClassName}
