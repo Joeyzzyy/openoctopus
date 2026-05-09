@@ -829,6 +829,9 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     providerAdapterAliases.map((row) => [row.alias_slug, row.adapter_slug])
   );
   const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
+  const workerTemplatesBySlug = new Map(
+    derivedWorkerTemplates.map((item) => [item.slug, item] as const)
+  );
   const supportedModelById = new Map(supportedModels.map((row) => [row.id, row]));
   const credentialsByProviderId = providerCredentials.reduce((map, credential) => {
     const list = map.get(credential.provider_id) ?? [];
@@ -910,6 +913,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         provider: provider ?? null,
         supportedModel: supportedModel ?? null,
         adapterAliases: providerAdapterAliasMap,
+        workerTemplatesBySlug,
         credentials: credentials.map((credential) => ({
           id: credential.id,
           label: credential.label,
@@ -953,6 +957,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         providersById: providerById,
         supportedModelsById: supportedModelById,
         adapterAliases: providerAdapterAliasMap,
+        workerTemplatesBySlug,
         credentialsByProviderId: new Map(
           Array.from(credentialsByProviderId.entries()).map(([providerId, credentials]) => [
             providerId,

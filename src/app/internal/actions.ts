@@ -138,7 +138,7 @@ async function loadProviderRuntimeContext(
   const providerModels = input.providerModelIds && input.providerModelIds.length > 0
     ? await supabase
         .from("provider_models")
-        .select("id, provider_id, supported_model_id, upstream_model_slug, capability, active")
+        .select("id, provider_id, supported_model_id, upstream_model_slug, capability, active, execution_template, execution_config")
         .in("id", input.providerModelIds)
     : { data: [], error: null };
 
@@ -157,7 +157,7 @@ async function loadProviderRuntimeContext(
     }
   }
 
-  const [providersResponse, credentialsResponse, supportedModelsResponse] = await Promise.all([
+  const [providersResponse, credentialsResponse, supportedModelsResponse, workerTemplatesResponse] = await Promise.all([
     providerIds.size > 0
       ? supabase
           .from("providers")
@@ -176,6 +176,10 @@ async function loadProviderRuntimeContext(
           .select("id, model_slug, capability")
           .in("id", Array.from(supportedModelIds))
       : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from("worker_templates")
+      .select("slug, config")
+      .eq("active", true),
   ]);
 
   if (providersResponse.error) {
@@ -186,6 +190,9 @@ async function loadProviderRuntimeContext(
   }
   if (supportedModelsResponse.error) {
     throw new Error(supportedModelsResponse.error.message);
+  }
+  if (workerTemplatesResponse.error) {
+    throw new Error(workerTemplatesResponse.error.message);
   }
 
   return {
@@ -226,6 +233,10 @@ async function loadProviderRuntimeContext(
       map.set(credential.provider_id, list);
       return map;
     }, new Map<string, RuntimeCredential[]>()),
+    workerTemplatesBySlug: new Map(
+      ((workerTemplatesResponse.data ?? []) as Array<{ slug: string; config: Record<string, unknown> | null }>)
+        .map((worker) => [worker.slug, worker] as const)
+    ),
   };
 }
 
@@ -1778,6 +1789,7 @@ export async function createProviderModel(formData: FormData) {
     },
     provider,
     supportedModel,
+    workerTemplatesBySlug: runtimeContext.workerTemplatesBySlug,
     credentials: runtimeContext.credentialsByProviderId.get(parsed.providerId) ?? [],
   });
 
@@ -1891,6 +1903,7 @@ export async function updateProviderModelState(formData: FormData) {
       supportedModel: providerModel.supported_model_id
         ? runtimeContext.supportedModelsById.get(providerModel.supported_model_id) ?? null
         : null,
+      workerTemplatesBySlug: runtimeContext.workerTemplatesBySlug,
       credentials: runtimeContext.credentialsByProviderId.get(providerModel.provider_id) ?? [],
     });
 
@@ -2006,6 +2019,7 @@ export async function updateProviderModelDetails(formData: FormData) {
     },
     provider,
     supportedModel,
+    workerTemplatesBySlug: runtimeContext.workerTemplatesBySlug,
     credentials: runtimeContext.credentialsByProviderId.get(parsed.providerId) ?? [],
   });
 
@@ -2161,6 +2175,7 @@ export async function createRoutingRule(formData: FormData) {
     providersById: runtimeContext.providersById,
     supportedModelsById: runtimeContext.supportedModelsById,
     credentialsByProviderId: runtimeContext.credentialsByProviderId,
+    workerTemplatesBySlug: runtimeContext.workerTemplatesBySlug,
   });
 
   if (parsed.active && runtimeDiagnostics.length > 0) {
@@ -2283,6 +2298,7 @@ export async function updateRoutingRule(formData: FormData) {
     providersById: runtimeContext.providersById,
     supportedModelsById: runtimeContext.supportedModelsById,
     credentialsByProviderId: runtimeContext.credentialsByProviderId,
+    workerTemplatesBySlug: runtimeContext.workerTemplatesBySlug,
   });
 
   if (parsed.active && runtimeDiagnostics.length > 0) {

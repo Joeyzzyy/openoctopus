@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import { parseBillingConfig } from "../lib/billing-config.js";
 import {
-  isSupportedProviderAdapterSlug,
   pickRuntimeCredential,
   type RuntimeProviderCredential,
 } from "../lib/provider-runtime-guard.js";
@@ -251,14 +250,6 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
   const providerSlug = providerModelRow.execution_template
     ? providerModelRow.execution_template
     : await resolveProviderAdapterSlug(providerRow.slug);
-
-  if (!isSupportedProviderAdapterSlug(providerSlug)) {
-    throw new RequestValidationError(
-      `Provider ${providerRow.slug} is not wired to a worker adapter yet.`,
-      409,
-      "provider_adapter_missing"
-    );
-  }
 
   const { data: credentialRows, error: credentialError } = await supabaseAdmin
     .from("provider_credentials")

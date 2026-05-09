@@ -179,6 +179,183 @@ function readComparableUnitCost(configText: string) {
   }
 }
 
+function readTemplateMode(config: Record<string, unknown> | null) {
+  const mode = typeof config?.mode === "string" ? config.mode.trim() : "";
+  if (mode === "sync" || mode === "sync-json-v1") {
+    return "同步返回";
+  }
+  if (mode === "async" || mode === "async-poll" || mode === "rest-async-poll-v1") {
+    return "任务轮询";
+  }
+  const hasPollPath = typeof config?.pollPath === "string" && config.pollPath.trim().length > 0;
+  return hasPollPath ? "任务轮询" : "同步返回";
+}
+
+function readTemplateConfigDiagnostics(config: Record<string, unknown> | null) {
+  const diagnostics: string[] = [];
+  const submitPath = typeof config?.submitPath === "string" ? config.submitPath.trim() : "";
+  const pollPath = typeof config?.pollPath === "string" ? config.pollPath.trim() : "";
+  const taskIdPath = typeof config?.taskIdPath === "string" ? config.taskIdPath.trim() : "";
+  const resultUrlPath = typeof config?.resultUrlPath === "string" ? config.resultUrlPath.trim() : "";
+  const statusPath = typeof config?.statusPath === "string" ? config.statusPath.trim() : "";
+  if (!submitPath) diagnostics.push("缺少 submitPath");
+  if (!taskIdPath) diagnostics.push("缺少 taskIdPath");
+  if (!resultUrlPath) diagnostics.push("缺少 resultUrlPath");
+  if (pollPath && !statusPath) diagnostics.push("已配置 pollPath 但缺少 statusPath");
+  return diagnostics;
+}
+
+type WorkerTemplateConfigState = {
+  mode: string;
+  submitPath: string;
+  pollPath: string;
+  taskIdPath: string;
+  statusPath: string;
+  resultUrlPath: string;
+};
+
+function buildWorkerTemplateConfigState(config: Record<string, unknown> | null): WorkerTemplateConfigState {
+  return {
+    mode: typeof config?.mode === "string" ? config.mode : "auto",
+    submitPath: typeof config?.submitPath === "string" ? config.submitPath : "",
+    pollPath: typeof config?.pollPath === "string" ? config.pollPath : "",
+    taskIdPath: typeof config?.taskIdPath === "string" ? config.taskIdPath : "id",
+    statusPath: typeof config?.statusPath === "string" ? config.statusPath : "",
+    resultUrlPath: typeof config?.resultUrlPath === "string" ? config.resultUrlPath : "result.url",
+  };
+}
+
+function buildWorkerTemplateConfigValue(state: WorkerTemplateConfigState) {
+  const result: Record<string, string> = {};
+  if (state.mode.trim()) result.mode = state.mode.trim();
+  if (state.submitPath.trim()) result.submitPath = state.submitPath.trim();
+  if (state.pollPath.trim()) result.pollPath = state.pollPath.trim();
+  if (state.taskIdPath.trim()) result.taskIdPath = state.taskIdPath.trim();
+  if (state.statusPath.trim()) result.statusPath = state.statusPath.trim();
+  if (state.resultUrlPath.trim()) result.resultUrlPath = state.resultUrlPath.trim();
+  return JSON.stringify(result);
+}
+
+function WorkerTemplateConfigEditor({
+  initialConfig,
+}: {
+  initialConfig: Record<string, unknown> | null;
+}) {
+  const [state, setState] = useState<WorkerTemplateConfigState>(() =>
+    buildWorkerTemplateConfigState(initialConfig)
+  );
+  useEffect(() => {
+    setState(buildWorkerTemplateConfigState(initialConfig));
+  }, [initialConfig]);
+  const configValue = buildWorkerTemplateConfigValue(state);
+  const isAsyncMode =
+    state.mode === "async" ||
+    state.mode === "async-poll" ||
+    state.mode === "rest-async-poll-v1" ||
+    state.mode === "auto";
+
+  return (
+    <div className="grid gap-3">
+      <input type="hidden" name="config" value={configValue} />
+      <label className="block">
+        <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">调用模式</span>
+        <select
+          name="templateMode"
+          value={state.mode}
+          onChange={(event) =>
+            setState((current) => ({ ...current, mode: event.target.value }))
+          }
+          className={formSelectClassName}
+        >
+          <option value="auto">自动判断（推荐）</option>
+          <option value="sync">同步返回</option>
+          <option value="async">任务轮询</option>
+        </select>
+      </label>
+      <label className="block">
+        <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
+          提交路径 submitPath
+        </span>
+        <input
+          name="templateSubmitPath"
+          value={state.submitPath}
+          onChange={(event) =>
+            setState((current) => ({ ...current, submitPath: event.target.value }))
+          }
+          placeholder="/v1/tasks"
+          className={formInputClassName}
+        />
+      </label>
+      <label className="block">
+        <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
+          任务 ID 路径 taskIdPath
+        </span>
+        <input
+          name="templateTaskIdPath"
+          value={state.taskIdPath}
+          onChange={(event) =>
+            setState((current) => ({ ...current, taskIdPath: event.target.value }))
+          }
+          placeholder="id"
+          className={formInputClassName}
+        />
+      </label>
+      {isAsyncMode ? (
+        <>
+          <label className="block">
+            <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
+              轮询路径 pollPath
+            </span>
+            <input
+              name="templatePollPath"
+              value={state.pollPath}
+              onChange={(event) =>
+                setState((current) => ({ ...current, pollPath: event.target.value }))
+              }
+              placeholder="/v1/tasks/{taskId}"
+              className={formInputClassName}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
+              状态路径 statusPath
+            </span>
+            <input
+              name="templateStatusPath"
+              value={state.statusPath}
+              onChange={(event) =>
+                setState((current) => ({ ...current, statusPath: event.target.value }))
+              }
+              placeholder="status"
+              className={formInputClassName}
+            />
+          </label>
+        </>
+      ) : null}
+      <label className="block">
+        <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
+          结果 URL 路径 resultUrlPath
+        </span>
+        <input
+          name="templateResultUrlPath"
+          value={state.resultUrlPath}
+          onChange={(event) =>
+            setState((current) => ({ ...current, resultUrlPath: event.target.value }))
+          }
+          placeholder="result.url"
+          className={formInputClassName}
+        />
+      </label>
+      <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+        <p className="text-[11px] text-black/55">配置 JSON 预览（自动生成）</p>
+        <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-all text-xs text-black/65">
+          {configValue}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
 function RuntimeDiagnostics({
   diagnostics,
 }: {
@@ -1047,6 +1224,8 @@ export function WorkerTemplatesPanel({
         providerModelCount: use.providerModelCount,
         providerCount: use.providers.size,
         providersLabel: Array.from(use.providers).sort((a, b) => a.localeCompare(b, "en-US")).join(" / "),
+        modeLabel: readTemplateMode(item.config),
+        configDiagnostics: readTemplateConfigDiagnostics(item.config),
         configText: JSON.stringify(item.config ?? {}, null, 2),
         relatedModels,
       };
@@ -1060,11 +1239,14 @@ export function WorkerTemplatesPanel({
           <table className="min-w-[1400px] border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="text-xs text-black/50">
-                <th className="w-[18%] border-b border-black/[0.08] px-3 py-2.5">显示名称</th>
+                <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">显示名称</th>
+                <th className="w-[8%] border-b border-black/[0.08] px-3 py-2.5">模式</th>
+                <th className="w-[13%] border-b border-black/[0.08] px-3 py-2.5">配置校验</th>
                 <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
                 <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">上游模型</th>
-                <th className="w-[28%] border-b border-black/[0.08] px-3 py-2.5">关联供应商</th>
-                <th className="sticky right-0 z-10 w-[22%] border-b border-black/[0.08] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">操作</th>
+                <th className="w-[15%] border-b border-black/[0.08] px-3 py-2.5">关联供应商</th>
+                <th className="w-[10%] border-b border-black/[0.08] px-3 py-2.5">引用状态</th>
+                <th className="sticky right-0 z-10 w-[16%] border-b border-black/[0.08] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -1073,6 +1255,22 @@ export function WorkerTemplatesPanel({
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-sm text-black">
                     <p>{row.displayName}</p>
                     <p className="mt-1 text-xs text-black/45">{row.slug}</p>
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/65">
+                    {row.modeLabel}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs">
+                    {row.configDiagnostics.length === 0 ? (
+                      <span className="inline-flex h-6 items-center rounded-md border border-[#D7EADB] bg-[#EDF8F0] px-2 text-[11px] text-[#335D2D]">
+                        完整
+                      </span>
+                    ) : (
+                      <div className="space-y-1">
+                        {row.configDiagnostics.map((item) => (
+                          <p key={`${row.id}-${item}`} className="text-[#b54432]">{item}</p>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
                     {row.relatedModels.length > 0 ? (
@@ -1097,6 +1295,9 @@ export function WorkerTemplatesPanel({
                     )}
                   </td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{row.providersLabel}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                    {row.providerModelCount > 0 ? `${row.providerModelCount} 个模型` : "未引用"}
+                  </td>
                   <td className="sticky right-0 z-10 border-b border-black/[0.06] bg-white px-3 py-3 align-middle shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
                     <div className="flex flex-wrap gap-2">
                       <ManagementDialog
@@ -1111,14 +1312,14 @@ export function WorkerTemplatesPanel({
                       </ManagementDialog>
                       <ManagementDialog
                         trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
-                        title="编辑 Worker"
+                        title="编辑 API 调用格式模板"
                       >
                         {({ close }) => (
                           <ManagedDialogForm action={updateWorkerTemplate} close={close}>
                             <input type="hidden" name="workerId" value={row.id} />
                             <FormField label="显示名称" name="displayName" defaultValue={row.displayName} required />
-                            <FormField label="Worker Slug" name="slug" defaultValue={row.slug} required />
-                            <FormTextArea label="默认配置 JSON" name="config" defaultValue={row.configText} />
+                            <FormField label="模板 Slug" name="slug" defaultValue={row.slug} required />
+                            <WorkerTemplateConfigEditor initialConfig={row.config ?? null} />
                             <div className="flex justify-end">
                               <SubmitButton label="保存 Worker" />
                             </div>
@@ -1162,17 +1363,22 @@ export function CreateWorkerTemplateButton() {
   return (
     <ManagementDialog
       trigger={<ModalButton><Plus className="size-3.5" />新建</ModalButton>}
-      title="新建 Worker"
+      title="新建 API 调用格式模板"
       description=" "
     >
       {({ close }) => (
         <ManagedDialogForm action={createWorkerTemplate} close={close}>
           <FormField label="显示名称" name="displayName" defaultValue="任务轮询（提交后查询）" required />
-          <FormField label="Worker Slug" name="slug" required />
-          <FormTextArea
-            label="默认配置 JSON"
-            name="config"
-            defaultValue='{"submitPath":"/v1/models/{upstreamModel}:generate","pollPath":"/v1/operations/{taskId}","taskIdPath":"name","statusPath":"done","resultUrlPath":"response.outputUrl"}'
+          <FormField label="模板 Slug" name="slug" required />
+          <WorkerTemplateConfigEditor
+            initialConfig={{
+              mode: "auto",
+              submitPath: "/v1/models/{upstreamModel}:generate",
+              pollPath: "/v1/operations/{taskId}",
+              taskIdPath: "name",
+              statusPath: "done",
+              resultUrlPath: "response.outputUrl",
+            }}
           />
           <div className="flex justify-end">
             <SubmitButton label="创建 Worker" />

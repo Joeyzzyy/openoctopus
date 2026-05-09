@@ -1,16 +1,3 @@
-export const SUPPORTED_PROVIDER_ADAPTER_SLUGS = [
-  "gemini-direct",
-  "gemini-images",
-  "gemini-veo",
-  "wavespeed",
-  "wavespeed-images",
-  "wavespeed-video",
-  "partner-provider-a",
-  "rest-async-poll-v1",
-] as const;
-
-const supportedProviderAdapterSlugs = new Set<string>(SUPPORTED_PROVIDER_ADAPTER_SLUGS);
-
 export type RuntimeProvider = {
   id: string;
   name: string;
@@ -42,6 +29,7 @@ export type RuntimeProviderModel = {
   capability: "image_generation" | "image_edit" | "video_generation";
   active: boolean;
   execution_template?: string | null;
+  execution_config?: Record<string, unknown> | null;
 };
 
 export type RuntimeRoutingRule = {
@@ -71,12 +59,40 @@ function pickRunnableCredential(credentials: RuntimeCredential[]) {
   );
 }
 
-export function isSupportedProviderAdapterSlug(slug: string) {
-  return supportedProviderAdapterSlugs.has(slug);
-}
-
 function resolveProviderAdapterSlug(slug: string, adapterAliases?: Map<string, string>) {
   return adapterAliases?.get(slug) ?? slug;
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function detectTemplateMode(config: Record<string, unknown>) {
+  const mode = readString(config.mode);
+  if (mode === "sync" || mode === "sync-json-v1") {
+    return "sync";
+  }
+  if (mode === "async" || mode === "async-poll" || mode === "rest-async-poll-v1") {
+    return "async";
+  }
+  return readString(config.pollPath).length > 0 ? "async" : "sync";
+}
+
+function validateTemplateConfig(config: Record<string, unknown>) {
+  const diagnostics: string[] = [];
+  if (readString(config.submitPath).length === 0) {
+    diagnostics.push("模板配置缺少 submitPath。");
+  }
+  if (readString(config.taskIdPath).length === 0) {
+    diagnostics.push("模板配置缺少 taskIdPath。");
+  }
+  if (readString(config.resultUrlPath).length === 0) {
+    diagnostics.push("模板配置缺少 resultUrlPath。");
+  }
+  if (detectTemplateMode(config) === "async" && readString(config.pollPath).length === 0) {
+    diagnostics.push("异步模板缺少 pollPath。");
+  }
+  return diagnostics;
 }
 
 export function getProviderRuntimeDiagnostics(input: {
@@ -119,6 +135,7 @@ export function getProviderModelRuntimeDiagnostics(input: {
   supportedModel: RuntimeSupportedModel | null;
   adapterAliases?: Map<string, string>;
   credentials: RuntimeCredential[];
+  workerTemplatesBySlug?: Map<string, { slug: string; config?: Record<string, unknown> | null }>;
 }) {
   const diagnostics: string[] = [];
   const { providerModel, provider, supportedModel, adapterAliases, credentials } = input;
@@ -130,14 +147,23 @@ export function getProviderModelRuntimeDiagnostics(input: {
 
   const executionTemplate = (providerModel.execution_template ?? "").trim();
   if (executionTemplate.length > 0) {
-    if (!isSupportedProviderAdapterSlug(executionTemplate)) {
-      diagnostics.push(`执行模板 "${executionTemplate}" 未被 worker 注册。`);
+    const workerTemplate = input.workerTemplatesBySlug?.get(executionTemplate) ?? null;
+    if (!workerTemplate) {
+      diagnostics.push(`执行模板 "${executionTemplate}" 在 API 调用格式配置中不存在。`);
+    } else {
+      const mergedConfig = {
+        ...(workerTemplate.config && typeof workerTemplate.config === "object" ? workerTemplate.config : {}),
+        ...(providerModel.execution_config && typeof providerModel.execution_config === "object"
+          ? providerModel.execution_config
+          : {}),
+      };
+      diagnostics.push(...validateTemplateConfig(mergedConfig));
     }
   } else {
     const resolvedProviderSlug = resolveProviderAdapterSlug(provider.slug, adapterAliases);
-    if (!isSupportedProviderAdapterSlug(resolvedProviderSlug)) {
-      diagnostics.push(`供应商 slug "${provider.slug}" 没有对应的 worker adapter。`);
-    }
+    diagnostics.push(
+      `未设置执行模板，将回退使用供应商 slug "${resolvedProviderSlug}" 对应的模板。建议在模型映射里显式选择模板。`
+    );
   }
 
   if (!supportedModel) {
@@ -168,6 +194,7 @@ export function getRoutingRuleRuntimeDiagnostics(input: {
   supportedModelsById: Map<string, RuntimeSupportedModel>;
   adapterAliases?: Map<string, string>;
   credentialsByProviderId: Map<string, RuntimeCredential[]>;
+  workerTemplatesBySlug?: Map<string, { slug: string; config?: Record<string, unknown> | null }>;
 }) {
   const diagnostics: string[] = [];
   const {
@@ -208,6 +235,7 @@ export function getRoutingRuleRuntimeDiagnostics(input: {
         provider,
         supportedModel,
         adapterAliases: input.adapterAliases,
+        workerTemplatesBySlug: input.workerTemplatesBySlug,
         credentials,
       }).map((message) => `${label}${message}`)
     );

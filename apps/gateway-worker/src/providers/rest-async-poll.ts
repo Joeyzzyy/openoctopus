@@ -21,12 +21,21 @@ function fillTemplate(input: string, values: Record<string, string>) {
   return input.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, k) => values[k] ?? "");
 }
 
+function readString(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
+}
+
 export class RestAsyncPollAdapter implements ProviderAdapter {
   slug = "rest-async-poll-v1";
 
   async submit(input: SubmitRequestInput): Promise<SubmitRequestResult> {
     const cfg = (input.provider.config?.executionConfig ?? {}) as Record<string, unknown>;
-    const submitPath = typeof cfg.submitPath === "string" ? cfg.submitPath : "/v1/tasks";
+    const mode = readString(cfg.mode, "auto");
+    const submitPath = readString(cfg.submitPath, "/v1/tasks");
+    const statusPath = typeof cfg.statusPath === "string" ? cfg.statusPath : undefined;
+    const taskIdPath = typeof cfg.taskIdPath === "string" ? cfg.taskIdPath : "id";
+    const resultUrlPath = typeof cfg.resultUrlPath === "string" ? cfg.resultUrlPath : "result.url";
+    const pollPath = typeof cfg.pollPath === "string" ? cfg.pollPath : undefined;
     const submitUrl = new URL(
       fillTemplate(submitPath, { upstreamModel: input.upstreamModelSlug }),
       input.provider.baseUrl ?? ""
@@ -43,11 +52,16 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
       body,
     });
 
-    const taskId = readPath(data, typeof cfg.taskIdPath === "string" ? cfg.taskIdPath : "id");
-    const status = String(readPath(data, typeof cfg.statusPath === "string" ? cfg.statusPath : "status") ?? "processing");
-    const resultUrl = readPath(data, typeof cfg.resultUrlPath === "string" ? cfg.resultUrlPath : "result.url");
+    const taskId = readPath(data, taskIdPath);
+    const status = String(readPath(data, statusPath) ?? "processing");
+    const resultUrl = readPath(data, resultUrlPath);
+    const isSyncMode = mode === "sync" || mode === "sync-json-v1";
+    const hasPollMode = mode === "async" || mode === "async-poll" || mode === "rest-async-poll-v1" || Boolean(pollPath);
 
-    if ((status === "succeeded" || status === "completed") && typeof resultUrl === "string") {
+    if (
+      typeof resultUrl === "string" &&
+      (isSyncMode || status === "succeeded" || status === "completed" || !hasPollMode)
+    ) {
       return {
         mode: "sync",
         upstreamRequestId: String(taskId ?? input.requestId),
@@ -67,7 +81,7 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
 
   async poll(input: PollRequestInput): Promise<PollRequestResult> {
     const cfg = (input.provider.config?.executionConfig ?? {}) as Record<string, unknown>;
-    const pollPath = typeof cfg.pollPath === "string" ? cfg.pollPath : "/v1/tasks/{taskId}";
+    const pollPath = readString(cfg.pollPath, "/v1/tasks/{taskId}");
     const pollUrl = new URL(
       fillTemplate(pollPath, { taskId: input.upstreamTaskId }),
       input.provider.baseUrl ?? ""
@@ -76,8 +90,10 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
     const { data } = await getJson<Record<string, unknown>>(pollUrl, {
       headers: { Authorization: `Bearer ${input.provider.secret}` },
     });
-    const status = String(readPath(data, typeof cfg.statusPath === "string" ? cfg.statusPath : "status") ?? "processing");
-    const resultUrl = readPath(data, typeof cfg.resultUrlPath === "string" ? cfg.resultUrlPath : "result.url");
+    const statusPath = typeof cfg.statusPath === "string" ? cfg.statusPath : "status";
+    const resultUrlPath = typeof cfg.resultUrlPath === "string" ? cfg.resultUrlPath : "result.url";
+    const status = String(readPath(data, statusPath) ?? "processing");
+    const resultUrl = readPath(data, resultUrlPath);
 
     if (status === "failed" || status === "error") {
       return {
