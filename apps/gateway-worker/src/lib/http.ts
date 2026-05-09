@@ -6,6 +6,22 @@ const REQUEST_TIMEOUT_MS = 30000;
 const proxyConfigured = Boolean(process.env.HTTPS_PROXY || process.env.HTTP_PROXY);
 const proxyAgent = proxyConfigured ? new ProxyAgent() : null;
 
+function truncateText(input: string, maxLength = 400) {
+  if (input.length <= maxLength) {
+    return input;
+  }
+  return `${input.slice(0, maxLength)}...`;
+}
+
+function redactUrl(rawUrl: string) {
+  try {
+    const parsed = new URL(rawUrl);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return rawUrl;
+  }
+}
+
 function requestJson<TResponse>(
   url: string,
   options: {
@@ -46,18 +62,28 @@ function requestJson<TResponse>(
         res.on("end", () => {
           const text = Buffer.concat(chunks).toString("utf8");
           const status = res.statusCode ?? 500;
+          const contentType = String(res.headers["content-type"] ?? "");
+          const target = redactUrl(url);
+
+          if (status < 200 || status >= 300) {
+            reject(
+              new Error(
+                `Upstream ${options.method} failed with ${status} (${target}) content-type=${contentType || "unknown"} body=${truncateText(text)}`
+              )
+            );
+            return;
+          }
 
           try {
             const data = JSON.parse(text) as TResponse;
 
-            if (status < 200 || status >= 300) {
-              reject(new Error(`Upstream ${options.method} failed with ${status}: ${text}`));
-              return;
-            }
-
             resolve({ status, data });
           } catch {
-            reject(new Error(`Upstream ${options.method} returned non-JSON response: ${text}`));
+            reject(
+              new Error(
+                `Upstream ${options.method} returned non-JSON response (${target}) content-type=${contentType || "unknown"} body=${truncateText(text)}`
+              )
+            );
           }
         });
       }
