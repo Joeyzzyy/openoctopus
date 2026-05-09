@@ -1121,7 +1121,13 @@ export default async function InternalPage({
                 id="public-models-panel"
                 title="可售模型管理"
                 description=" "
-                headerRight={<CreateSupportedModelButton capabilityOptions={capabilityOptions} />}
+                headerRight={
+                  <CreateSupportedModelButton
+                    capabilityOptions={capabilityOptions}
+                    modelVendors={data.modelVendors}
+                    models={data.supportedModels}
+                  />
+                }
                 >
                 <PublicModelsPanel
                   models={data.supportedModels}

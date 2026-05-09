@@ -1051,9 +1051,29 @@ export function CreateModelVendorButton() {
 
 export function CreateSupportedModelButton({
   capabilityOptions,
+  modelVendors = [],
+  models = [],
 }: {
   capabilityOptions: readonly CapabilityOption[];
+  modelVendors?: ModelVendorSummary[];
+  models?: SupportedModelSummary[];
 }) {
+  const safeModelVendors = Array.isArray(modelVendors) ? modelVendors : [];
+  const safeModels = Array.isArray(models) ? models : [];
+  const vendorNames = Array.from(
+    new Set([
+      ...safeModelVendors.map((item) => item.name),
+      ...safeModels.map((item) => item.provider),
+    ])
+  )
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "en-US"));
+  const vendorOptions =
+    vendorNames.length > 0
+      ? vendorNames.map((name) => ({ value: name, label: name }))
+      : [{ value: "Google", label: "Google" }];
+
   return (
     <ManagementDialog
       trigger={<ModalButton><Plus className="size-3.5" />新建</ModalButton>}
@@ -1062,11 +1082,11 @@ export function CreateSupportedModelButton({
     >
       {({ close }) => (
       <ManagedDialogForm action={createSupportedModel} close={close}>
-        <FormField
+        <FormSelect
           label="模型厂商（内部分类）"
           name="provider"
+          options={vendorOptions}
           defaultValue="Google"
-          required
           help="用于内部分类和测算分组，例如 Google、OpenAI、Anthropic。"
         />
         <FormField label="可售模型 Slug" name="modelSlug" defaultValue="openoctopus/gemini-2.5-flash-image" required />
