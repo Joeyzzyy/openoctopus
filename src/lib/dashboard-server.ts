@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type MetricTone = "neutral" | "positive" | "warning";
@@ -184,7 +185,9 @@ function formatTimestamp(value: string) {
 }
 
 async function fetchAnalyticsRequests(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase:
+    | Awaited<ReturnType<typeof createClient>>
+    | ReturnType<typeof createAdminClient>,
   input: {
     workspaceId: string;
     apiKeyId?: string | null;
@@ -293,6 +296,7 @@ export async function getDashboardData({
   analyticsApiKeyId = null,
 }: DashboardDataOptions = {}): Promise<DashboardData | null> {
   const supabase = await createClient();
+  const supabaseAdmin = createAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -360,20 +364,20 @@ export async function getDashboardData({
       supportedModelResponse,
       routingRuleResponse,
     ] = await Promise.all([
-      supabase.from("v_api_key_spend_summary").select("*").eq("workspace_id", workspace.id),
-      supabase.from("v_model_spend_summary").select("*").eq("workspace_id", workspace.id).order("total_spend", { ascending: false }),
-      supabase.from("v_workspace_daily_spend").select("*").eq("workspace_id", workspace.id).order("usage_day", { ascending: false }).limit(7),
-      supabase.from("budget_rules").select("id, scope, monthly_limit, api_key_id, model_id").eq("workspace_id", workspace.id).order("created_at", { ascending: true }),
-      supabase.from("api_keys").select("id, name, key_prefix, environment, status, monthly_budget, last_used_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }),
-      supabase.from("usage_events").select("id, endpoint, request_count, total_cost, status_code, created_at, api_key_id, model_id").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
-      supabase.from("wallet_transactions").select("amount_delta").eq("workspace_id", workspace.id),
-      supabase.from("wallet_transactions").select("id, entry_type, amount_delta, description, created_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
-      supabase.from("providers").select("id, name, kind, regions, status"),
-      supabase.from("provider_models").select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id, capability, active"),
-      supabase
+      supabaseAdmin.from("v_api_key_spend_summary").select("*").eq("workspace_id", workspace.id),
+      supabaseAdmin.from("v_model_spend_summary").select("*").eq("workspace_id", workspace.id).order("total_spend", { ascending: false }),
+      supabaseAdmin.from("v_workspace_daily_spend").select("*").eq("workspace_id", workspace.id).order("usage_day", { ascending: false }).limit(7),
+      supabaseAdmin.from("budget_rules").select("id, scope, monthly_limit, api_key_id, model_id").eq("workspace_id", workspace.id).order("created_at", { ascending: true }),
+      supabaseAdmin.from("api_keys").select("id, name, key_prefix, environment, status, monthly_budget, last_used_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }),
+      supabaseAdmin.from("usage_events").select("id, endpoint, request_count, total_cost, status_code, created_at, api_key_id, model_id").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
+      supabaseAdmin.from("wallet_transactions").select("amount_delta").eq("workspace_id", workspace.id),
+      supabaseAdmin.from("wallet_transactions").select("id, entry_type, amount_delta, description, created_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
+      supabaseAdmin.from("providers").select("id, name, kind, regions, status"),
+      supabaseAdmin.from("provider_models").select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id, capability, active"),
+      supabaseAdmin
         .from("supported_models")
         .select("id, model_slug, display_name, capability, active"),
-      supabase.from("routing_rules").select("id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy").or(`workspace_id.eq.${workspace.id},workspace_id.is.null`).eq("active", true).order("created_at", { ascending: true }),
+      supabaseAdmin.from("routing_rules").select("id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy").or(`workspace_id.eq.${workspace.id},workspace_id.is.null`).eq("active", true).order("created_at", { ascending: true }),
     ]);
 
     const keyIdSet = new Set((keyRows ?? []).map((row) => row.id));
@@ -384,7 +388,7 @@ export async function getDashboardData({
 
     const [requestResponse, analyticsRequestRows] = await Promise.all([
       (() => {
-        let query = supabase
+        let query = supabaseAdmin
           .from("inference_requests")
           .select(
             "id, api_key_id, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, created_at, queued_at, started_at, completed_at",
@@ -400,7 +404,7 @@ export async function getDashboardData({
 
         return query;
       })(),
-      fetchAnalyticsRequests(supabase, {
+      fetchAnalyticsRequests(supabaseAdmin, {
         workspaceId: workspace.id,
         apiKeyId: safeAnalyticsApiKeyId,
         lookbackMs: analyticsLookbackMs,
