@@ -1051,6 +1051,7 @@ export function CreateRoutingRuleForm({
   onSuccess,
   submitLabel = "添加路由规则",
   className = panelSurfaceClassName,
+  allowWorkspaceScope = true,
 }: {
   action?: (formData: FormData) => void | Promise<void>;
   supportedModels: SupportedModelOption[];
@@ -1066,6 +1067,7 @@ export function CreateRoutingRuleForm({
   onSuccess?: () => void;
   submitLabel?: string;
   className?: string;
+  allowWorkspaceScope?: boolean;
 }) {
   const initialSupportedModelId = defaultSupportedModelId ?? supportedModels[0]?.id ?? "";
   const [supportedModelId, setSupportedModelId] = useState(initialSupportedModelId);
@@ -1176,14 +1178,20 @@ export function CreateRoutingRuleForm({
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">生效范围</span>
           <select
             name="workspaceScope"
-            defaultValue={defaultWorkspaceScope}
-            disabled={disabled}
+            defaultValue={allowWorkspaceScope ? defaultWorkspaceScope : "global"}
+            disabled={disabled || !allowWorkspaceScope}
             className={formSelectClassName}
           >
-            <option value="workspace">当前工作区覆盖</option>
             <option value="global">全局默认路由</option>
+            {allowWorkspaceScope ? <option value="workspace">当前工作区覆盖</option> : null}
           </select>
-          <FieldHint help="全局路由影响平台默认行为；工作区覆盖只影响当前空间。" />
+          <FieldHint
+            help={
+              allowWorkspaceScope
+                ? "全局路由影响平台默认行为；工作区覆盖只影响当前空间。"
+                : "当前访问模式仅允许维护全局默认路由。"
+            }
+          />
         </label>
 
         <label className="block">

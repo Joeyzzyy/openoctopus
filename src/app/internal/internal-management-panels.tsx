@@ -2182,6 +2182,7 @@ export function RoutesPanel({
                             disabled={!hasProviderModels || !hasSupportedModels}
                             submitLabel="保存路由"
                             className="grid gap-4"
+                            allowWorkspaceScope={false}
                             onSuccess={close}
                           />
                         )}
@@ -2263,6 +2264,7 @@ export function CreateRoutingRuleButton({
           defaultWorkspaceScope={selectedTemplate?.route.workspaceScope}
           disabled={!hasProviderModels || !hasSupportedModels}
           className="grid gap-4"
+          allowWorkspaceScope={false}
           onSuccess={close}
         />
       )}

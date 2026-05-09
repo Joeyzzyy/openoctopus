@@ -286,6 +286,7 @@ async function getInternalAdminContext() {
       supabase: createAdminClient(),
       userId: "internal-password-access",
       workspaceId: "00000000-0000-0000-0000-000000000000",
+      isPasswordAccess: true,
     };
   }
 
@@ -318,6 +319,7 @@ async function getInternalAdminContext() {
     supabase,
     userId: user.id,
     workspaceId: membership.workspace_id,
+    isPasswordAccess: false,
   };
 }
 
@@ -2253,12 +2255,13 @@ const createRoutingRuleSchema = z.object({
 });
 
 export async function createRoutingRule(formData: FormData) {
-  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const { supabase, userId, workspaceId, isPasswordAccess } = await getInternalAdminContext();
   const workspaceScope = normalizeOptionalText(formData.get("workspaceScope"));
   const fallbackProviderModelId = normalizeOptionalText(formData.get("fallbackProviderModelId"));
+  const effectiveWorkspaceScope = isPasswordAccess ? "global" : workspaceScope;
 
   const parsed = createRoutingRuleSchema.parse({
-    workspaceId: workspaceScope === "global" ? undefined : workspaceId,
+    workspaceId: effectiveWorkspaceScope === "global" ? undefined : workspaceId,
     supportedModelId: formData.get("supportedModelId"),
     capability: formData.get("capability"),
     primaryProviderModelId: formData.get("primaryProviderModelId"),
