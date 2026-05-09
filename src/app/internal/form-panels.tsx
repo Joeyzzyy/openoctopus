@@ -18,6 +18,12 @@ type ProviderOption = {
   slug: string;
 };
 
+type WorkerTemplateOption = {
+  id: string;
+  displayName: string;
+  slug: string;
+};
+
 type ProviderModelOption = {
   id: string;
   supportedModelId: string | null;
@@ -41,6 +47,14 @@ type BillingFormState = {
   costPerSecond: string;
   inputCostPerMillion: string;
   outputCostPerMillion: string;
+};
+
+type ExecutionConfigFormState = {
+  submitPath: string;
+  pollPath: string;
+  taskIdPath: string;
+  statusPath: string;
+  resultUrlPath: string;
 };
 
 const formInputClassName =
@@ -148,6 +162,58 @@ function buildBillingConfigValue(state: BillingFormState) {
     billingMode: "hybrid",
     currency: state.currency.trim() || "USD",
     charges,
+  });
+}
+
+function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormState {
+  const fallback: ExecutionConfigFormState = {
+    submitPath: "/v1/models/{upstreamModel}:generate",
+    pollPath: "/v1/operations/{taskId}",
+    taskIdPath: "name",
+    statusPath: "done",
+    resultUrlPath: "response.outputUrl",
+  };
+
+  if (!initialValue) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(initialValue) as Record<string, unknown>;
+    return {
+      submitPath:
+        typeof parsed.submitPath === "string" && parsed.submitPath.trim().length > 0
+          ? parsed.submitPath
+          : fallback.submitPath,
+      pollPath:
+        typeof parsed.pollPath === "string" && parsed.pollPath.trim().length > 0
+          ? parsed.pollPath
+          : fallback.pollPath,
+      taskIdPath:
+        typeof parsed.taskIdPath === "string" && parsed.taskIdPath.trim().length > 0
+          ? parsed.taskIdPath
+          : fallback.taskIdPath,
+      statusPath:
+        typeof parsed.statusPath === "string" && parsed.statusPath.trim().length > 0
+          ? parsed.statusPath
+          : fallback.statusPath,
+      resultUrlPath:
+        typeof parsed.resultUrlPath === "string" && parsed.resultUrlPath.trim().length > 0
+          ? parsed.resultUrlPath
+          : fallback.resultUrlPath,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function buildExecutionConfigValue(state: ExecutionConfigFormState) {
+  return JSON.stringify({
+    submitPath: state.submitPath.trim(),
+    pollPath: state.pollPath.trim(),
+    taskIdPath: state.taskIdPath.trim(),
+    statusPath: state.statusPath.trim(),
+    resultUrlPath: state.resultUrlPath.trim(),
   });
 }
 
@@ -332,6 +398,7 @@ export function CreateProviderModelForm({
   action = createProviderModel,
   supportedModels,
   providers,
+  workerTemplates = [],
   defaultSupportedModelSlug,
   defaultProviderId,
   defaultUpstreamModelSlug,
@@ -339,6 +406,8 @@ export function CreateProviderModelForm({
   defaultPricingSourceUrl,
   defaultPricingSourceNote,
   defaultPricingSourceEvidence = "[]",
+  defaultExecutionTemplate = "rest-async-poll-v1",
+  defaultExecutionConfig = '{"submitPath":"/v1/models/{upstreamModel}:generate","pollPath":"/v1/operations/{taskId}","taskIdPath":"name","statusPath":"done","resultUrlPath":"response.outputUrl"}',
   defaultActive = true,
   providerModelId,
   disabled,
@@ -349,6 +418,7 @@ export function CreateProviderModelForm({
   action?: (formData: FormData) => void | Promise<void>;
   supportedModels: SupportedModelOption[];
   providers: ProviderOption[];
+  workerTemplates?: WorkerTemplateOption[];
   defaultSupportedModelSlug?: string;
   defaultProviderId?: string;
   defaultUpstreamModelSlug?: string;
@@ -356,6 +426,8 @@ export function CreateProviderModelForm({
   defaultPricingSourceUrl?: string;
   defaultPricingSourceNote?: string;
   defaultPricingSourceEvidence?: string;
+  defaultExecutionTemplate?: string;
+  defaultExecutionConfig?: string;
   defaultActive?: boolean;
   providerModelId?: string;
   disabled: boolean;
@@ -376,6 +448,18 @@ export function CreateProviderModelForm({
   const selectedSupportedModel =
     supportedModels.find((item) => item.id === supportedModelId) ?? null;
   const [submitted, setSubmitted] = useState(false);
+  const workerTemplateOptions =
+    workerTemplates.length > 0
+      ? workerTemplates
+      : [{ id: "fallback", displayName: "任务轮询（提交后查询）", slug: defaultExecutionTemplate }];
+  const [executionConfigState, setExecutionConfigState] = useState(() =>
+    parseExecutionConfigState(defaultExecutionConfig)
+  );
+  const executionConfigValue = buildExecutionConfigValue(executionConfigState);
+
+  useEffect(() => {
+    setExecutionConfigState(parseExecutionConfigState(defaultExecutionConfig));
+  }, [defaultExecutionConfig]);
 
   return (
     <form
@@ -468,6 +552,117 @@ export function CreateProviderModelForm({
         </label>
 
         <div className="block md:col-span-2">
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">调用协议配置</span>
+          <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+            <label className="block mb-3">
+              <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">API 调用格式配置</span>
+              <select
+                name="executionTemplate"
+                defaultValue={defaultExecutionTemplate}
+                disabled={disabled}
+                className={formSelectClassName}
+              >
+                {workerTemplateOptions.map((item) => (
+                  <option key={item.id} value={item.slug}>
+                    {item.displayName} ({item.slug})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <input type="hidden" name="executionConfig" value={executionConfigValue} />
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提交路径 submitPath</span>
+                <input
+                  value={executionConfigState.submitPath}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      submitPath: event.target.value,
+                    }))
+                  }
+                  required
+                  disabled={disabled}
+                  className={formInputClassName}
+                  placeholder="/v1/models/{upstreamModel}:generate"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">轮询路径 pollPath</span>
+                <input
+                  value={executionConfigState.pollPath}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      pollPath: event.target.value,
+                    }))
+                  }
+                  required
+                  disabled={disabled}
+                  className={formInputClassName}
+                  placeholder="/v1/operations/{taskId}"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">任务 ID 路径 taskIdPath</span>
+                <input
+                  value={executionConfigState.taskIdPath}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      taskIdPath: event.target.value,
+                    }))
+                  }
+                  required
+                  disabled={disabled}
+                  className={formInputClassName}
+                  placeholder="name"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">完成状态路径 statusPath</span>
+                <input
+                  value={executionConfigState.statusPath}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      statusPath: event.target.value,
+                    }))
+                  }
+                  required
+                  disabled={disabled}
+                  className={formInputClassName}
+                  placeholder="done"
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">结果 URL 路径 resultUrlPath</span>
+                <input
+                  value={executionConfigState.resultUrlPath}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      resultUrlPath: event.target.value,
+                    }))
+                  }
+                  required
+                  disabled={disabled}
+                  className={formInputClassName}
+                  placeholder="response.outputUrl"
+                />
+              </label>
+              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 md:col-span-2">
+                <p className="text-[11px] tracking-[0.35px] text-black/45">将提交的协议参数 JSON</p>
+                <code className="mt-1 block break-all text-xs leading-5 text-black/55">
+                  {executionConfigValue}
+                </code>
+              </div>
+              <FieldHint help="用表单填写后会自动组装成 JSON 入库，无需手写 JSON。这里配置的是调用协议参数，不是新增 worker 代码。" />
+            </div>
+          </div>
+        </div>
+
+        <div className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">供应商成本配置</span>
           <BillingConfigEditor
             name="pricing"
@@ -479,7 +674,6 @@ export function CreateProviderModelForm({
 
         <input type="hidden" name="inputSchema" value="{}" />
         <input type="hidden" name="outputSchema" value="{}" />
-
         <label className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">官方成本价格链接</span>
           <input

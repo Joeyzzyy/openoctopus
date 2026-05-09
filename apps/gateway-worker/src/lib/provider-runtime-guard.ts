@@ -1,11 +1,12 @@
 export const SUPPORTED_PROVIDER_ADAPTER_SLUGS = [
   "gemini-direct",
   "gemini-images",
-  "vertex-veo",
+  "gemini-veo",
   "wavespeed",
   "wavespeed-images",
   "wavespeed-video",
   "partner-provider-a",
+  "rest-async-poll-v1",
 ] as const;
 
 const supportedProviderAdapterSlugs = new Set<string>(SUPPORTED_PROVIDER_ADAPTER_SLUGS);

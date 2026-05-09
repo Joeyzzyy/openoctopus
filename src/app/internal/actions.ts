@@ -56,6 +56,14 @@ function parseStringArray(value: FormDataEntryValue | null) {
     .filter(Boolean);
 }
 
+function normalizeProviderRegions(regions: string[]) {
+  if (regions.length === 0) {
+    return ["global"];
+  }
+
+  return regions;
+}
+
 function parseJsonField(value: FormDataEntryValue | null, fallback: Record<string, unknown> = {}) {
   const raw = normalizeOptionalText(value);
   if (!raw) {
@@ -370,6 +378,32 @@ async function logAdminAudit(input: {
   }
 }
 
+async function ensureWorkerTemplateExists(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  slug: string;
+  displayName?: string;
+  config: Record<string, unknown>;
+}) {
+  const normalizedSlug = input.slug.trim();
+  if (!normalizedSlug) {
+    return;
+  }
+
+  const { error } = await input.supabase.from("worker_templates").upsert(
+    {
+      display_name: input.displayName?.trim() || normalizedSlug,
+      slug: normalizedSlug,
+      config: input.config,
+      active: true,
+    },
+    { onConflict: "slug" }
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 const createProviderSchema = z.object({
   name: z.string().min(2).max(80),
   slug: z.string().min(2).max(80),
@@ -392,6 +426,7 @@ export async function createProvider(formData: FormData) {
     credentialsRef: normalizeOptionalText(formData.get("credentialsRef")) ?? "",
     config: parseJsonField(formData.get("config")),
   });
+  const regions = normalizeProviderRegions(parsed.regions);
 
   const { data, error } = await supabase
     .from("providers")
@@ -400,7 +435,7 @@ export async function createProvider(formData: FormData) {
     slug: parsed.slug,
     base_url: parsed.baseUrl || null,
     status: parsed.status,
-    regions: parsed.regions,
+    regions,
     credentials_ref: parsed.credentialsRef || null,
     config: parsed.config,
     })
@@ -419,7 +454,10 @@ export async function createProvider(formData: FormData) {
     targetType: "provider",
     targetId: data?.id ?? null,
     summary: `Created provider ${parsed.slug}`,
-    details: parsed,
+    details: {
+      ...parsed,
+      regions,
+    },
   });
 
   revalidatePath("/internal");
@@ -463,12 +501,14 @@ export async function updateProviderStatus(formData: FormData) {
 const updateProviderSchema = z.object({
   providerId: z.string().uuid(),
   name: z.string().min(2).max(80),
-  slug: z.string().min(2).max(80),
   baseUrl: z.string().url().optional().or(z.literal("")),
   status: providerStatusSchema,
   regions: z.array(z.string()).default([]),
   credentialsRef: z.string().max(200).optional().or(z.literal("")),
-  config: z.record(z.string(), z.unknown()).default({}),
+});
+
+const deleteProviderSchema = z.object({
+  providerId: z.string().uuid(),
 });
 
 const clearApiKeyRequestRecordsSchema = z.object({
@@ -534,24 +574,21 @@ export async function updateProvider(formData: FormData) {
   const parsed = updateProviderSchema.parse({
     providerId: formData.get("providerId"),
     name: formData.get("name"),
-    slug: formData.get("slug"),
     baseUrl: normalizeOptionalText(formData.get("baseUrl")) ?? "",
     status: formData.get("status"),
     regions: parseStringArray(formData.get("regions")),
     credentialsRef: normalizeOptionalText(formData.get("credentialsRef")) ?? "",
-    config: parseJsonField(formData.get("config")),
   });
+  const regions = normalizeProviderRegions(parsed.regions);
 
   const { error } = await supabase
     .from("providers")
     .update({
       name: parsed.name,
-      slug: parsed.slug,
       base_url: parsed.baseUrl || null,
       status: parsed.status,
-      regions: parsed.regions,
+      regions,
       credentials_ref: parsed.credentialsRef || null,
-      config: parsed.config,
     })
     .eq("id", parsed.providerId);
 
@@ -566,7 +603,55 @@ export async function updateProvider(formData: FormData) {
     action: "provider.update",
     targetType: "provider",
     targetId: parsed.providerId,
-    summary: `Updated provider ${parsed.slug}`,
+    summary: `Updated provider ${parsed.providerId}`,
+    details: {
+      ...parsed,
+      regions,
+    },
+  });
+
+  revalidatePath("/internal");
+}
+
+export async function deleteProvider(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = deleteProviderSchema.parse({
+    providerId: formData.get("providerId"),
+  });
+
+  const [{ data: providerModels, error: providerModelsError }, { data: providerCredentials, error: providerCredentialsError }] =
+    await Promise.all([
+      supabase.from("provider_models").select("id").eq("provider_id", parsed.providerId).limit(1),
+      supabase.from("provider_credentials").select("id").eq("provider_id", parsed.providerId).limit(1),
+    ]);
+
+  if (providerModelsError) {
+    throw new Error(providerModelsError.message);
+  }
+  if (providerCredentialsError) {
+    throw new Error(providerCredentialsError.message);
+  }
+
+  if ((providerModels ?? []).length > 0) {
+    throw new Error("该供应商下仍有关联模型，无法删除。");
+  }
+  if ((providerCredentials ?? []).length > 0) {
+    throw new Error("该供应商下仍有关联密钥，无法删除。");
+  }
+
+  const { error } = await supabase.from("providers").delete().eq("id", parsed.providerId);
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider.delete",
+    targetType: "provider",
+    targetId: parsed.providerId,
+    summary: `Deleted provider ${parsed.providerId}`,
     details: parsed,
   });
 
@@ -927,6 +1012,13 @@ const providerAdapterSlugSchema = z
   .max(80)
   .regex(/^[a-z0-9-]+$/);
 
+const workerSlugSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(80)
+  .regex(/^[a-z0-9-]+$/);
+
 export async function createModelVendor(formData: FormData) {
   const { supabase, userId, workspaceId } = await getInternalAdminContext();
   const parsed = createModelVendorSchema.parse({
@@ -1019,9 +1111,157 @@ export async function deleteModelVendor(formData: FormData) {
   revalidatePath("/internal");
 }
 
+const createWorkerTemplateSchema = z.object({
+  displayName: z.string().trim().min(2).max(80),
+  slug: workerSlugSchema,
+  config: z.record(z.string(), z.unknown()).default({}),
+});
+
+const updateWorkerTemplateSchema = z.object({
+  workerId: z.string().uuid(),
+  displayName: z.string().trim().min(2).max(80),
+  slug: workerSlugSchema,
+  config: z.record(z.string(), z.unknown()).default({}),
+});
+
+const deleteWorkerTemplateSchema = z.object({
+  workerId: z.string().uuid(),
+});
+
+export async function createWorkerTemplate(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = createWorkerTemplateSchema.parse({
+    displayName: formData.get("displayName"),
+    slug: formData.get("slug"),
+    config: parseJsonField(formData.get("config")),
+  });
+
+  const { data, error } = await supabase
+    .from("worker_templates")
+    .insert({
+      display_name: parsed.displayName,
+      slug: parsed.slug,
+      config: parsed.config,
+      active: true,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "worker_template.create",
+    targetType: "worker_template",
+    targetId: data?.id ?? null,
+    summary: `Created worker template ${parsed.slug}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+export async function updateWorkerTemplate(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = updateWorkerTemplateSchema.parse({
+    workerId: formData.get("workerId"),
+    displayName: formData.get("displayName"),
+    slug: formData.get("slug"),
+    config: parseJsonField(formData.get("config")),
+  });
+
+  const { error } = await supabase
+    .from("worker_templates")
+    .update({
+      display_name: parsed.displayName,
+      slug: parsed.slug,
+      config: parsed.config,
+    })
+    .eq("id", parsed.workerId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "worker_template.update",
+    targetType: "worker_template",
+    targetId: parsed.workerId,
+    summary: `Updated worker template ${parsed.slug}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+export async function deleteWorkerTemplate(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = deleteWorkerTemplateSchema.parse({
+    workerId: formData.get("workerId"),
+  });
+
+  const { data: worker, error: workerError } = await supabase
+    .from("worker_templates")
+    .select("slug")
+    .eq("id", parsed.workerId)
+    .maybeSingle();
+
+  if (workerError) {
+    throw new Error(workerError.message);
+  }
+  if (!worker) {
+    throw new Error("worker 不存在");
+  }
+
+  const { data: inUse, error: inUseError } = await supabase
+    .from("provider_models")
+    .select("id")
+    .eq("execution_template", worker.slug)
+    .limit(1);
+  if (inUseError) {
+    throw new Error(inUseError.message);
+  }
+  if ((inUse ?? []).length > 0) {
+    throw new Error("该 worker 仍被供应商模型使用，无法删除。");
+  }
+
+  const { error } = await supabase
+    .from("worker_templates")
+    .delete()
+    .eq("id", parsed.workerId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "worker_template.delete",
+    targetType: "worker_template",
+    targetId: parsed.workerId,
+    summary: `Deleted worker template ${worker.slug}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
 const createProviderAdapterAliasSchema = z.object({
   aliasSlug: providerAdapterSlugSchema,
   adapterSlug: providerAdapterSlugSchema,
+});
+
+const createProviderAdapterCatalogSchema = z.object({
+  slug: providerAdapterSlugSchema,
 });
 
 export async function createProviderAdapterAlias(formData: FormData) {
@@ -1059,8 +1299,45 @@ export async function createProviderAdapterAlias(formData: FormData) {
   revalidatePath("/internal");
 }
 
+export async function createProviderAdapterCatalog(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = createProviderAdapterCatalogSchema.parse({
+    slug: formData.get("slug"),
+  });
+
+  const { data, error } = await supabase
+    .from("provider_adapter_catalog")
+    .insert({
+      slug: parsed.slug,
+      active: true,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_adapter_catalog.create",
+    targetType: "provider_adapter_catalog",
+    targetId: data?.id ?? null,
+    summary: `Created provider adapter catalog ${parsed.slug}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
 const deleteProviderAdapterAliasSchema = z.object({
   aliasId: z.string().uuid(),
+});
+
+const deleteProviderAdapterCatalogSchema = z.object({
+  adapterId: z.string().uuid(),
 });
 
 export async function deleteProviderAdapterAlias(formData: FormData) {
@@ -1100,6 +1377,48 @@ export async function deleteProviderAdapterAlias(formData: FormData) {
     targetType: "provider_adapter_alias",
     targetId: parsed.aliasId,
     summary: `Deleted provider adapter alias ${aliasRow.alias_slug} -> ${aliasRow.adapter_slug}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+export async function deleteProviderAdapterCatalog(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = deleteProviderAdapterCatalogSchema.parse({
+    adapterId: formData.get("adapterId"),
+  });
+
+  const { data: adapterRow, error: adapterError } = await supabase
+    .from("provider_adapter_catalog")
+    .select("slug")
+    .eq("id", parsed.adapterId)
+    .maybeSingle();
+
+  if (adapterError) {
+    throw new Error(adapterError.message);
+  }
+  if (!adapterRow) {
+    throw new Error("Provider adapter catalog 不存在");
+  }
+
+  const { error } = await supabase
+    .from("provider_adapter_catalog")
+    .delete()
+    .eq("id", parsed.adapterId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_adapter_catalog.delete",
+    targetType: "provider_adapter_catalog",
+    targetId: parsed.adapterId,
+    summary: `Deleted provider adapter catalog ${adapterRow.slug}`,
     details: parsed,
   });
 
@@ -1394,6 +1713,8 @@ const createProviderModelSchema = z.object({
   pricingSourceEvidence: z.array(z.record(z.string(), z.unknown())).default([]),
   inputSchema: z.record(z.string(), z.unknown()).default({}),
   outputSchema: z.record(z.string(), z.unknown()).default({}),
+  executionTemplate: z.string().trim().min(1).max(80).default("rest-async-poll-v1"),
+  executionConfig: z.record(z.string(), z.unknown()).default({}),
 });
 
 export async function createProviderModel(formData: FormData) {
@@ -1410,6 +1731,14 @@ export async function createProviderModel(formData: FormData) {
     pricingSourceEvidence: parseJsonArrayField(formData.get("pricingSourceEvidence")),
     inputSchema: parseJsonField(formData.get("inputSchema")),
     outputSchema: parseJsonField(formData.get("outputSchema")),
+    executionTemplate: (formData.get("executionTemplate") as string) || "rest-async-poll-v1",
+    executionConfig: parseJsonField(formData.get("executionConfig")),
+  });
+  await ensureWorkerTemplateExists({
+    supabase,
+    slug: parsed.executionTemplate,
+    displayName: parsed.executionTemplate,
+    config: parsed.executionConfig,
   });
 
   const { data: supportedModelRow, error: supportedModelError } = await supabase
@@ -1445,6 +1774,7 @@ export async function createProviderModel(formData: FormData) {
       upstream_model_slug: parsed.upstreamModelSlug,
       capability: parsed.capability,
       active: parsed.active,
+      execution_template: parsed.executionTemplate,
     },
     provider,
     supportedModel,
@@ -1487,6 +1817,8 @@ export async function createProviderModel(formData: FormData) {
       pricing_source_evidence: pricingSourceEvidence,
       input_schema: parsed.inputSchema,
       output_schema: parsed.outputSchema,
+      execution_template: parsed.executionTemplate,
+      execution_config: parsed.executionConfig,
     })
     .select("id")
     .maybeSingle();
@@ -1529,7 +1861,7 @@ export async function updateProviderModelState(formData: FormData) {
   if (parsed.active) {
     const { data: providerModel, error: providerModelError } = await supabase
       .from("provider_models")
-      .select("id, provider_id, supported_model_id, upstream_model_slug, capability, active")
+      .select("id, provider_id, supported_model_id, upstream_model_slug, capability, active, execution_template")
       .eq("id", parsed.providerModelId)
       .maybeSingle();
 
@@ -1553,6 +1885,7 @@ export async function updateProviderModelState(formData: FormData) {
         upstream_model_slug: providerModel.upstream_model_slug,
         capability: providerModel.capability,
         active: true,
+        execution_template: providerModel.execution_template,
       },
       provider: runtimeContext.providersById.get(providerModel.provider_id) ?? null,
       supportedModel: providerModel.supported_model_id
@@ -1607,6 +1940,8 @@ const updateProviderModelDetailsSchema = z.object({
   pricingSourceEvidence: z.array(z.record(z.string(), z.unknown())).default([]),
   inputSchema: z.record(z.string(), z.unknown()).default({}),
   outputSchema: z.record(z.string(), z.unknown()).default({}),
+  executionTemplate: z.string().trim().min(1).max(80).default("rest-async-poll-v1"),
+  executionConfig: z.record(z.string(), z.unknown()).default({}),
 });
 
 export async function updateProviderModelDetails(formData: FormData) {
@@ -1624,6 +1959,14 @@ export async function updateProviderModelDetails(formData: FormData) {
     pricingSourceEvidence: parseJsonArrayField(formData.get("pricingSourceEvidence")),
     inputSchema: parseJsonField(formData.get("inputSchema")),
     outputSchema: parseJsonField(formData.get("outputSchema")),
+    executionTemplate: (formData.get("executionTemplate") as string) || "rest-async-poll-v1",
+    executionConfig: parseJsonField(formData.get("executionConfig")),
+  });
+  await ensureWorkerTemplateExists({
+    supabase,
+    slug: parsed.executionTemplate,
+    displayName: parsed.executionTemplate,
+    config: parsed.executionConfig,
   });
 
   const { data: supportedModelRow, error: supportedModelError } = await supabase
@@ -1659,6 +2002,7 @@ export async function updateProviderModelDetails(formData: FormData) {
       upstream_model_slug: parsed.upstreamModelSlug,
       capability: parsed.capability,
       active: parsed.active,
+      execution_template: parsed.executionTemplate,
     },
     provider,
     supportedModel,
@@ -1701,6 +2045,8 @@ export async function updateProviderModelDetails(formData: FormData) {
       pricing_source_evidence: pricingSourceEvidence,
       input_schema: parsed.inputSchema,
       output_schema: parsed.outputSchema,
+      execution_template: parsed.executionTemplate,
+      execution_config: parsed.executionConfig,
     })
     .eq("id", parsed.providerModelId);
 
@@ -1979,6 +2325,7 @@ export async function updateRoutingRule(formData: FormData) {
 const updateModelEconomicsBundleSchema = z.object({
   supportedModelId: z.string().uuid(),
   providerModelId: z.string().uuid(),
+  executionTemplate: z.string().trim().min(1).max(80),
   supportedBillingConfig: z.unknown(),
   providerPricing: z.unknown(),
   pricingSourceUrl: z.string().url().nullable(),
@@ -1992,6 +2339,7 @@ export async function updateModelEconomicsBundle(formData: FormData) {
   const parsed = updateModelEconomicsBundleSchema.parse({
     supportedModelId: formData.get("supportedModelId"),
     providerModelId: formData.get("providerModelId"),
+    executionTemplate: formData.get("executionTemplate"),
     supportedBillingConfig: parseBillingConfigField(formData.get("supportedBillingConfig")).config,
     providerPricing: parseBillingConfigField(formData.get("providerPricing")).config,
     pricingSourceUrl: normalizeOptionalUrl(formData.get("pricingSourceUrl")),
@@ -2032,6 +2380,13 @@ export async function updateModelEconomicsBundle(formData: FormData) {
     ? [...parsed.pricingSourceEvidence, uploadedEvidence]
     : parsed.pricingSourceEvidence;
 
+  await ensureWorkerTemplateExists({
+    supabase,
+    slug: parsed.executionTemplate,
+    displayName: parsed.executionTemplate,
+    config: {},
+  });
+
   const { error: rpcError } = await supabase.rpc("admin_update_model_economics_bundle", {
     p_supported_model_id: parsed.supportedModelId,
     p_provider_model_id: parsed.providerModelId,
@@ -2053,6 +2408,15 @@ export async function updateModelEconomicsBundle(formData: FormData) {
     throw new Error(rpcError.message);
   }
 
+  const { error: updateTemplateError } = await supabase
+    .from("provider_models")
+    .update({ execution_template: parsed.executionTemplate })
+    .eq("id", parsed.providerModelId);
+
+  if (updateTemplateError) {
+    throw new Error(updateTemplateError.message);
+  }
+
   await logAdminAudit({
     supabase,
     userId,
@@ -2064,6 +2428,7 @@ export async function updateModelEconomicsBundle(formData: FormData) {
     details: {
       supportedModelId: parsed.supportedModelId,
       providerModelId: parsed.providerModelId,
+      executionTemplate: parsed.executionTemplate,
       supportedBillingConfig,
       providerPricing,
       pricingSourceUrl: parsed.pricingSourceUrl,

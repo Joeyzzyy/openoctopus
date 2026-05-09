@@ -45,10 +45,26 @@ type ModelVendorRow = {
   created_at: string;
 };
 
+type WorkerTemplateRow = {
+  id: string;
+  display_name: string | null;
+  slug: string;
+  config: Record<string, unknown> | null;
+  active: boolean;
+  created_at: string;
+};
+
 type ProviderAdapterAliasRow = {
   id: string;
   alias_slug: string;
   adapter_slug: string;
+  active: boolean;
+  created_at: string;
+};
+
+type ProviderAdapterCatalogRow = {
+  id: string;
+  slug: string;
   active: boolean;
   created_at: string;
 };
@@ -67,6 +83,8 @@ type ProviderModelRow = {
   pricing_source_evidence: unknown[] | null;
   input_schema: Record<string, unknown> | null;
   output_schema: Record<string, unknown> | null;
+  execution_template: string | null;
+  execution_config: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -626,6 +644,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     providersResponse,
     supportedModelsResponse,
     modelVendorsResponse,
+    workerTemplatesResponse,
+    providerAdapterCatalogResponse,
     providerAdapterAliasesResponse,
     providerCredentialsResponse,
     providerModelsResponse,
@@ -657,6 +677,16 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         .order("sort_order", { ascending: true })
         .order("name", { ascending: true }),
       supabase
+        .from("worker_templates")
+        .select("id, display_name, slug, config, active, created_at")
+        .eq("active", true)
+        .order("slug", { ascending: true }),
+      supabase
+        .from("provider_adapter_catalog")
+        .select("id, slug, active, created_at")
+        .eq("active", true)
+        .order("slug", { ascending: true }),
+      supabase
         .from("provider_adapter_aliases")
         .select("id, alias_slug, adapter_slug, active, created_at")
         .eq("active", true)
@@ -670,7 +700,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       supabase
       .from("provider_models")
       .select(
-          "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, pricing_source_url, pricing_source_note, pricing_source_evidence, input_schema, output_schema, created_at"
+          "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, pricing_source_url, pricing_source_note, pricing_source_evidence, input_schema, output_schema, execution_template, execution_config, created_at"
         )
         .order("created_at", { ascending: true }),
       bypassAuth
@@ -742,6 +772,12 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const modelVendors = (modelVendorsResponse.error
     ? []
     : modelVendorsResponse.data ?? []) as ModelVendorRow[];
+  const workerTemplates = (workerTemplatesResponse.error
+    ? []
+    : workerTemplatesResponse.data ?? []) as WorkerTemplateRow[];
+  const providerAdapterCatalog = (providerAdapterCatalogResponse.error
+    ? []
+    : providerAdapterCatalogResponse.data ?? []) as ProviderAdapterCatalogRow[];
   const providerAdapterAliases = (providerAdapterAliasesResponse.error
     ? []
     : providerAdapterAliasesResponse.data ?? []) as ProviderAdapterAliasRow[];
@@ -749,6 +785,27 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     ? []
     : providerCredentialsResponse.data ?? []) as ProviderCredentialRow[];
   const providerModels = (providerModelsResponse.error ? [] : providerModelsResponse.data ?? []) as ProviderModelRow[];
+  const derivedWorkerTemplates =
+    workerTemplates.length > 0
+      ? workerTemplates
+      : Array.from(
+          new Map(
+            providerModels
+              .map((item) => item.execution_template?.trim())
+              .filter((slug): slug is string => Boolean(slug))
+              .map((slug) => [
+                slug,
+                {
+                  id: `derived-${slug}`,
+                  display_name: slug,
+                  slug,
+                  config: {},
+                  active: true,
+                  created_at: new Date().toISOString(),
+                } satisfies WorkerTemplateRow,
+              ])
+          ).values()
+        );
   const routingRules = (routingRulesResponse.error ? [] : routingRulesResponse.data ?? []) as RoutingRuleRow[];
   const requests = (requestsResponse.error ? [] : requestsResponse.data ?? []) as RequestRow[];
   const apiKeys = (apiKeysResponse.error ? [] : apiKeysResponse.data ?? []) as ApiKeyRow[];
@@ -846,6 +903,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         supabase,
         providerModel.pricing_source_evidence
       ),
+      executionTemplate: providerModel.execution_template ?? "rest-async-poll-v1",
+      executionConfigText: formatJson(providerModel.execution_config),
       runtimeDiagnostics: getProviderModelRuntimeDiagnostics({
         providerModel,
         provider: provider ?? null,
@@ -1129,6 +1188,15 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     modelVendors: modelVendors.map((vendor) => ({
       ...vendor,
       createdLabel: formatRelativeTimestamp(vendor.created_at),
+    })),
+    workerTemplates: derivedWorkerTemplates.map((worker) => ({
+      ...worker,
+      display_name: worker.display_name ?? worker.slug,
+      createdLabel: formatRelativeTimestamp(worker.created_at),
+    })),
+    providerAdapterCatalog: providerAdapterCatalog.map((item) => ({
+      ...item,
+      createdLabel: formatRelativeTimestamp(item.created_at),
     })),
     providerAdapterAliases: providerAdapterAliases.map((alias) => ({
       ...alias,

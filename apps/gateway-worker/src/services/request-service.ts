@@ -196,7 +196,7 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
 
   const { data: providerModelRow, error: providerModelError } = await supabaseAdmin
     .from("provider_models")
-    .select("id, provider_id, upstream_model_slug, pricing, active")
+    .select("id, provider_id, upstream_model_slug, pricing, active, execution_template, execution_config")
     .eq("id", routeRow.primary_provider_model_id)
     .maybeSingle();
 
@@ -248,7 +248,9 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     );
   }
 
-  const providerSlug = await resolveProviderAdapterSlug(providerRow.slug);
+  const providerSlug = providerModelRow.execution_template
+    ? providerModelRow.execution_template
+    : await resolveProviderAdapterSlug(providerRow.slug);
 
   if (!isSupportedProviderAdapterSlug(providerSlug)) {
     throw new RequestValidationError(
@@ -313,9 +315,15 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     providerSlug,
     providerBaseUrl: providerRow.base_url ?? null,
     providerConfig:
-      providerRow.config && typeof providerRow.config === "object" && !Array.isArray(providerRow.config)
-        ? (providerRow.config as Record<string, unknown>)
-        : null,
+      {
+        ...(providerRow.config && typeof providerRow.config === "object" && !Array.isArray(providerRow.config)
+          ? (providerRow.config as Record<string, unknown>)
+          : {}),
+        executionConfig:
+          providerModelRow.execution_config && typeof providerModelRow.execution_config === "object" && !Array.isArray(providerModelRow.execution_config)
+            ? (providerModelRow.execution_config as Record<string, unknown>)
+            : {},
+      },
     upstreamModelSlug: providerModelRow.upstream_model_slug,
     endpoint: input.endpoint,
     publicModelSlug: input.model,

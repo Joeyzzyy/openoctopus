@@ -7,7 +7,7 @@ import {
 
 test("recognizes worker provider adapter aliases", () => {
   assert.equal(isSupportedProviderAdapterSlug("gemini-direct"), true);
-  assert.equal(isSupportedProviderAdapterSlug("vertex-veo"), true);
+  assert.equal(isSupportedProviderAdapterSlug("gemini-veo"), true);
   assert.equal(isSupportedProviderAdapterSlug("unknown-provider"), false);
 });
 

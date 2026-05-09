@@ -1,11 +1,12 @@
 export const SUPPORTED_PROVIDER_ADAPTER_SLUGS = [
   "gemini-direct",
   "gemini-images",
-  "vertex-veo",
+  "gemini-veo",
   "wavespeed",
   "wavespeed-images",
   "wavespeed-video",
   "partner-provider-a",
+  "rest-async-poll-v1",
 ] as const;
 
 const supportedProviderAdapterSlugs = new Set<string>(SUPPORTED_PROVIDER_ADAPTER_SLUGS);
@@ -40,6 +41,7 @@ export type RuntimeProviderModel = {
   upstream_model_slug: string;
   capability: "image_generation" | "image_edit" | "video_generation";
   active: boolean;
+  execution_template?: string | null;
 };
 
 export type RuntimeRoutingRule = {
@@ -84,13 +86,8 @@ export function getProviderRuntimeDiagnostics(input: {
   models: RuntimeProviderModel[];
 }) {
   const diagnostics: string[] = [];
-  const { provider, adapterAliases, credentials, models } = input;
+  const { provider, credentials, models } = input;
   const activeModels = models.filter((model) => model.active);
-  const resolvedProviderSlug = resolveProviderAdapterSlug(provider.slug, adapterAliases);
-
-  if (!isSupportedProviderAdapterSlug(resolvedProviderSlug)) {
-    diagnostics.push(`Worker 未注册 provider adapter slug "${provider.slug}"。`);
-  }
 
   if (provider.status === "offline" && activeModels.length > 0) {
     diagnostics.push("供应商状态为 offline，但仍有启用中的供应商模型。");
@@ -131,9 +128,16 @@ export function getProviderModelRuntimeDiagnostics(input: {
     return diagnostics;
   }
 
-  const resolvedProviderSlug = resolveProviderAdapterSlug(provider.slug, adapterAliases);
-  if (!isSupportedProviderAdapterSlug(resolvedProviderSlug)) {
-    diagnostics.push(`供应商 slug "${provider.slug}" 没有对应的 worker adapter。`);
+  const executionTemplate = (providerModel.execution_template ?? "").trim();
+  if (executionTemplate.length > 0) {
+    if (!isSupportedProviderAdapterSlug(executionTemplate)) {
+      diagnostics.push(`执行模板 "${executionTemplate}" 未被 worker 注册。`);
+    }
+  } else {
+    const resolvedProviderSlug = resolveProviderAdapterSlug(provider.slug, adapterAliases);
+    if (!isSupportedProviderAdapterSlug(resolvedProviderSlug)) {
+      diagnostics.push(`供应商 slug "${provider.slug}" 没有对应的 worker adapter。`);
+    }
   }
 
   if (!supportedModel) {

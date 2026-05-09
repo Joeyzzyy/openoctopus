@@ -15,12 +15,17 @@ import { INTERNAL_ACCESS_COOKIE, INTERNAL_ACCESS_COOKIE_VALUE } from "@/lib/inte
 import { InternalShell } from "./internal-shell";
 import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
 import {
+  CreateProviderButton,
+  CreateModelVendorButton,
   CreateSupportedModelButton,
   CreateProviderModelMappingButton,
+  CreateWorkerTemplateButton,
   EconomicsPanel,
+  ModelVendorsPanel,
   ProvidersPanel,
   PublicModelsPanel,
   RoutesPanel,
+  WorkerTemplatesPanel,
 } from "./internal-management-panels";
 import { RequestRecordsClearForm } from "./request-records-clear-form";
 
@@ -36,26 +41,38 @@ const tabs = [
   {
     key: "providers",
     group: "basic",
-    label: "供应商接入",
+    label: "供应商管理",
     description: "同页管理上游厂商与供应商密钥。",
+  },
+  {
+    key: "model-vendors",
+    group: "basic",
+    label: "模型厂商管理",
+    description: "维护可售模型里的模型厂商名称列表。",
   },
   {
     key: "public-models",
     group: "basic",
-    label: "可售模型配置",
-    description: "定义用户看到的模型型号和售价。",
+    label: "可售模型管理",
+    description: "定义用户可售模型、供应商模型映射与价格联动。",
   },
   {
     key: "economics",
-    group: "overview",
+    group: "basic",
     label: "模型价格总表",
-    description: "统一查看和维护售价、成本、利润。",
+    description: "统一查看和维护售价、成本、利润与调用协议配置。",
   },
   {
     key: "routes",
     group: "basic",
     label: "路由配置",
     description: "决定当前流量走哪个供应商模型。",
+  },
+  {
+    key: "worker-templates",
+    group: "basic",
+    label: "API 调用格式配置",
+    description: "管理供应商模型调用格式模板。",
   },
   {
     key: "requests",
@@ -106,7 +123,7 @@ function getSearchValue(
 }
 
 function getTabValue(value: string | undefined): InternalTabKey {
-  return tabs.some((item) => item.key === value) ? (value as InternalTabKey) : "economics";
+  return tabs.some((item) => item.key === value) ? (value as InternalTabKey) : "public-models";
 }
 
 function buildInternalHref(tab: InternalTabKey, template?: string) {
@@ -927,6 +944,15 @@ export default async function InternalPage({
     selectedTemplateKey && selectedTemplateKey in providerTemplates
       ? providerTemplates[selectedTemplateKey as keyof typeof providerTemplates]
       : null;
+  const modelVendorCount = new Set(
+    [
+      ...data.modelVendors.map((vendor) => vendor.name.trim().toLowerCase()),
+      ...data.supportedModels
+        .map((model) => model.provider.trim().toLowerCase())
+        .filter((name) => name.length > 0 && name !== "openoctopus"),
+    ]
+  ).size;
+  const workerTemplateCount = (data.workerTemplates ?? []).length;
   const sidebarTabs = tabs.map((tab) => ({
     ...tab,
     count:
@@ -934,8 +960,10 @@ export default async function InternalPage({
         ? data.metrics.publicModels
         : tab.key === "providers"
           ? data.metrics.providers
-          : tab.key === "economics"
-            ? data.metrics.providerModels
+          : tab.key === "model-vendors"
+            ? modelVendorCount
+            : tab.key === "worker-templates"
+              ? workerTemplateCount
             : tab.key === "routes"
                 ? data.metrics.activeRoutes
               : undefined,
@@ -1069,7 +1097,7 @@ export default async function InternalPage({
               <section className="mb-6">
                 <SectionShell
                 id="public-models-panel"
-                title="可售模型"
+                title="可售模型管理"
                 description=" "
                 headerRight={<CreateSupportedModelButton capabilityOptions={capabilityOptions} />}
                 >
@@ -1085,21 +1113,24 @@ export default async function InternalPage({
 
           {activeTab === "economics" ? (
             <>
-              <section className="mt-6">
+              <section>
                 <SectionShell
                   id="economics-panel"
-                  title="模型价格总表"
+                  title="模型总表管理"
                   description=" "
                   headerRight={
                     <CreateProviderModelMappingButton
                       supportedModels={data.supportedModels}
                       providers={data.providers}
+                      workerTemplates={data.workerTemplates ?? []}
                     />
                   }
                 >
                   <EconomicsPanel
                     supportedModels={data.supportedModels}
                     providerModels={data.providerModels}
+                    providers={data.providers}
+                    workerTemplates={data.workerTemplates ?? []}
                   />
                 </SectionShell>
               </section>
@@ -1110,15 +1141,31 @@ export default async function InternalPage({
             <>
               <SectionShell
                 id="providers-panel"
-                title="供应商接入"
+                title="供应商管理"
                 description=" "
+                headerRight={<CreateProviderButton providerStatusOptions={providerStatusOptions} />}
               >
               <ProvidersPanel
                 providers={data.providers}
                 credentials={data.providerCredentials}
-                providerAdapterAliases={data.providerAdapterAliases ?? []}
                 providerStatusOptions={providerStatusOptions}
               />
+              </SectionShell>
+            </>
+          ) : null}
+
+          {activeTab === "model-vendors" ? (
+            <>
+              <SectionShell
+                id="model-vendors-panel"
+                title="模型厂商管理"
+                description=" "
+                headerRight={<CreateModelVendorButton />}
+              >
+                <ModelVendorsPanel
+                  models={data.supportedModels}
+                  modelVendors={data.modelVendors}
+                />
               </SectionShell>
             </>
           ) : null}
@@ -1145,6 +1192,22 @@ export default async function InternalPage({
                 />
                 </SectionShell>
               </section>
+            </>
+          ) : null}
+
+          {activeTab === "worker-templates" ? (
+            <>
+              <SectionShell
+                id="worker-templates-panel"
+                title="API 调用格式配置"
+                description=" "
+                headerRight={<CreateWorkerTemplateButton />}
+              >
+                <WorkerTemplatesPanel
+                  workerTemplates={data.workerTemplates ?? []}
+                  providerModels={data.providerModels}
+                />
+              </SectionShell>
             </>
           ) : null}
 

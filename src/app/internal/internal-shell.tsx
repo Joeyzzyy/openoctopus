@@ -6,7 +6,9 @@ import { useTransition } from "react";
 
 type InternalTabKey =
   | "public-models"
+  | "model-vendors"
   | "economics"
+  | "worker-templates"
   | "providers"
   | "monitoring"
   | "routes"
@@ -16,7 +18,6 @@ type InternalTabKey =
 type TabItem = {
   key: InternalTabKey;
   label: string;
-  description: string;
   group: "basic" | "overview";
   count?: number;
 };
@@ -68,12 +69,9 @@ export function InternalShell({
                 : "border-black/[0.08] bg-[#FCFCFA] text-black/75 hover:bg-white"
             }`}
           >
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium">{tab.label}</p>
-                <p className={`mt-1 text-xs leading-5 ${active ? "text-white/72" : "text-black/45"}`}>
-                  {tab.description}
-                </p>
               </div>
               {typeof tab.count === "number" ? (
                 <span

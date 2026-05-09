@@ -5,19 +5,20 @@ import { deriveLegacyBillingFields, parseBillingConfig } from "@/lib/billing-con
 import {
   createModelVendor,
   createProvider,
+  createWorkerTemplate,
+  deleteProvider,
+  deleteWorkerTemplate,
   createProviderCredential,
-  createProviderAdapterAlias,
   createProviderModel,
   createSupportedModel,
   deleteModelVendor,
   deleteProviderCredential,
-  deleteProviderAdapterAlias,
   rotateProviderCredentialSecret,
-  updateModelEconomicsBundle,
   updateProvider,
   updateProviderCredentialDetails,
   updateProviderModelDetails,
   updateRoutingRule,
+  updateWorkerTemplate,
   updateSupportedModelDetails,
   updateSupportedModelState,
 } from "./actions";
@@ -63,6 +64,15 @@ type ModelVendorSummary = {
   createdLabel: string;
 };
 
+type WorkerTemplateSummary = {
+  id: string;
+  display_name: string;
+  slug: string;
+  config: Record<string, unknown> | null;
+  active: boolean;
+  createdLabel: string;
+};
+
 type ProviderSummary = {
   id: string;
   name: string;
@@ -78,13 +88,6 @@ type ProviderSummary = {
   runtimeDiagnostics: string[];
 };
 
-type ProviderAdapterAliasSummary = {
-  id: string;
-  alias_slug: string;
-  adapter_slug: string;
-  active: boolean;
-  createdLabel: string;
-};
 
 type ProviderCredentialSummary = {
   id: string;
@@ -126,6 +129,8 @@ type ProviderModelSummary = {
     uploadedAt?: string;
     signedUrl?: string | null;
   }>;
+  executionTemplate: string;
+  executionConfigText: string;
   runtimeDiagnostics: string[];
 };
 
@@ -240,8 +245,8 @@ function ModalButton({
     <span
       className={
         tone === "secondary"
-          ? "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
-          : "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
+          ? "inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
+          : "inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
       }
     >
       {children}
@@ -258,7 +263,7 @@ function ManagementDialog({
 }: {
   trigger: React.ReactNode;
   title: string;
-  description: string;
+  description?: string;
   disabled?: boolean;
   children: React.ReactNode | ((controls: { close: () => void }) => React.ReactNode);
 }) {
@@ -270,9 +275,11 @@ function ManagementDialog({
       <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-3xl">
         <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5">
           <DialogTitle className="font-medium text-black">{title}</DialogTitle>
-          <DialogDescription className="text-black/55">
-            {description}
-          </DialogDescription>
+          {description ? (
+            <DialogDescription className="text-black/55">
+              {description}
+            </DialogDescription>
+          ) : null}
         </DialogHeader>
         <div className="px-5 pb-5 pt-5">
           {typeof children === "function"
@@ -433,9 +440,6 @@ function FormSelect({
   );
 }
 
-const compactFilterSelectClassName =
-  "h-8 shrink-0 rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black outline-none transition-colors focus:border-black/20 focus:bg-white";
-
 function ActiveCheckbox({
   name,
   defaultChecked,
@@ -480,81 +484,48 @@ export function PublicModelsPanel({
     .filter((name) => name.trim().toLowerCase() !== "openoctopus")
     .sort((a, b) => a.localeCompare(b, "en-US"));
   const vendorOptions = vendorSuggestions.map((name) => ({ value: name, label: name }));
+  const modalityLabel = (value: SupportedModelSummary["modality"]) => {
+    if (value === "image") return "图片";
+    if (value === "video") return "视频";
+    return "音频";
+  };
+  const capabilityLabel = (value: SupportedModelSummary["capability"]) => {
+    if (value === "image_generation") return "图片生成";
+    if (value === "image_edit") return "图片编辑";
+    if (value === "video_generation") return "视频生成";
+    return "未设置";
+  };
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
-        <p className="text-xs font-medium text-black/75">模型厂商名称配置</p>
-        <p className="mt-1 text-xs text-black/55">用于可售模型里的“模型厂商”字段（例如 Google / OpenAI / Anthropic）。</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {vendorSuggestions.map((name) => (
-            <span
-              key={name}
-              className="inline-flex h-7 items-center rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/70"
-            >
-              {name}
-            </span>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <form action={createModelVendor} className="flex items-center gap-2">
-            <input
-              name="name"
-              required
-              pattern="^(?!\\s*openoctopus\\s*$).+"
-              placeholder="新增厂商名称"
-              className="h-8 w-[180px] rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black outline-none focus:border-black/20"
-            />
-            <SubmitButton label="新增" pendingLabel="新增中..." />
-          </form>
-          {safeModelVendors.map((vendor) => (
-            <form key={vendor.id} action={deleteModelVendor}>
-              <input type="hidden" name="vendorId" value={vendor.id} />
-              <SubmitButton label={`删除 ${vendor.name}`} pendingLabel="删除中..." tone="danger" />
-            </form>
-          ))}
-        </div>
-      </div>
-
       {models.length > 0 ? (
         <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
           <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="text-xs text-black/50">
-                <th className="border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">厂商</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">模态/能力</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">计费</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">实现数量</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">创建时间</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">是否启用</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">操作</th>
+                <th className="w-[30%] border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
+                <th className="w-[14%] border-b border-black/[0.08] px-3 py-2.5">厂商</th>
+                <th className="w-[20%] border-b border-black/[0.08] px-3 py-2.5">模态/能力</th>
+                <th className="w-[20%] border-b border-black/[0.08] px-3 py-2.5">计费</th>
+                <th className="w-[8%] border-b border-black/[0.08] px-3 py-2.5">启用</th>
+                <th className="w-[8%] border-b border-black/[0.08] px-3 py-2.5">操作</th>
               </tr>
             </thead>
             <tbody>
               {models.map((model) => (
                 <tr key={model.id}>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
                     <p className="text-sm font-medium text-black">{model.display_name}</p>
                     <p className="mt-1 text-xs text-black/50">{model.model_slug}</p>
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{model.provider}</td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top">
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
-                        {model.modality === "image" ? "图片" : model.modality === "video" ? "视频" : "音频"}
-                      </span>
-                      <span className="inline-flex h-6 items-center rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2 text-[11px] text-black/60">
-                        {model.capability ?? "未设置"}
-                      </span>
-                    </div>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.provider}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                    <span className="inline-flex h-6 items-center rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2 text-[11px] text-black/60">
+                      {model.capability ? capabilityLabel(model.capability) : modalityLabel(model.modality)}
+                    </span>
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{model.billingSummary}</td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
-                    {model.activeProviderModelCount}/{model.providerModelCount}
-                  </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{model.createdLabel}</td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.billingSummary}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
                     <form action={updateSupportedModelState}>
                       <input type="hidden" name="supportedModelId" value={model.id} />
                       <input type="hidden" name="active" value={model.active ? "false" : "true"} />
@@ -579,7 +550,7 @@ export function PublicModelsPanel({
                       </button>
                     </form>
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
                     <ManagementDialog
                       trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
                       title={`编辑 ${model.display_name}`}
@@ -638,6 +609,127 @@ export function PublicModelsPanel({
   );
 }
 
+export function ModelVendorsPanel({
+  models,
+  modelVendors = [],
+}: {
+  models: SupportedModelSummary[];
+  modelVendors?: ModelVendorSummary[];
+}) {
+  const safeModelVendors = Array.isArray(modelVendors) ? modelVendors : [];
+  const vendorRowMap = new Map<
+    string,
+    { id: string; name: string; createdLabel: string; deletable: boolean }
+  >();
+
+  for (const vendor of safeModelVendors) {
+    vendorRowMap.set(vendor.name.toLowerCase(), {
+      id: vendor.id,
+      name: vendor.name,
+      createdLabel: vendor.createdLabel,
+      deletable: true,
+    });
+  }
+
+  for (const model of models) {
+    const normalized = model.provider.trim();
+    if (!normalized || normalized.toLowerCase() === "openoctopus") {
+      continue;
+    }
+
+    const key = normalized.toLowerCase();
+    if (!vendorRowMap.has(key)) {
+      vendorRowMap.set(key, {
+        id: `derived-${key}`,
+        name: normalized,
+        createdLabel: "-",
+        deletable: false,
+      });
+    }
+  }
+
+  const vendorRows = Array.from(vendorRowMap.values()).sort((a, b) =>
+    a.name.localeCompare(b.name, "en-US")
+  );
+
+  return (
+    <div className="space-y-4">
+      {vendorRows.length > 0 ? (
+        <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+          <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+            <thead>
+              <tr className="text-xs text-black/50">
+                <th className="border-b border-black/[0.08] px-3 py-2.5">模型厂商</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">创建时间</th>
+                <th className="border-b border-black/[0.08] px-3 py-2.5">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vendorRows.map((vendor) => (
+                <tr key={vendor.id}>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-sm text-black">{vendor.name}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{vendor.createdLabel}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                    {!vendor.deletable ? (
+                      <span className="text-xs text-black/35">-</span>
+                    ) : (
+                      <ManagementDialog
+                        trigger={<ModalButton tone="secondary">删除</ModalButton>}
+                        title={`删除 ${vendor.name}`}
+                        description="确认删除该模型厂商名称。"
+                      >
+                        {({ close }) => (
+                          <ManagedDialogForm action={deleteModelVendor} close={close}>
+                            <input type="hidden" name="vendorId" value={vendor.id} />
+                            <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
+                              删除后无法恢复。
+                            </div>
+                            <div className="flex justify-end">
+                              <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
+                            </div>
+                          </ManagedDialogForm>
+                        )}
+                      </ManagementDialog>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+          <p className="text-sm font-medium text-black">还没有模型厂商</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CreateModelVendorButton() {
+  return (
+    <ManagementDialog
+      trigger={<ModalButton><Plus className="size-3.5" />新建</ModalButton>}
+      title="新建模型厂商"
+      description=" "
+    >
+      {({ close }) => (
+        <ManagedDialogForm action={createModelVendor} close={close}>
+          <FormField
+            label="厂商名称"
+            name="name"
+            required
+            help="例如 Google、OpenAI、Anthropic。"
+          />
+          <div className="flex justify-end">
+            <SubmitButton label="创建模型厂商" />
+          </div>
+        </ManagedDialogForm>
+      )}
+    </ManagementDialog>
+  );
+}
+
 export function CreateSupportedModelButton({
   capabilityOptions,
 }: {
@@ -689,15 +781,41 @@ export function CreateSupportedModelButton({
 }
 
 export function EconomicsPanel({
-  supportedModels,
-  providerModels,
+  supportedModels = [],
+  providerModels = [],
+  providers = [],
+  workerTemplates = [],
 }: {
-  supportedModels: SupportedModelSummary[];
-  providerModels: ProviderModelSummary[];
+  supportedModels?: SupportedModelSummary[] | null;
+  providerModels?: ProviderModelSummary[] | null;
+  providers?: ProviderSummary[] | null;
+  workerTemplates?: WorkerTemplateSummary[] | null;
 }) {
-  const supportedModelById = new Map(supportedModels.map((item) => [item.id, item]));
+  const safeSupportedModels = Array.isArray(supportedModels) ? supportedModels : [];
+  const safeProviderModels = Array.isArray(providerModels) ? providerModels : [];
+  const safeProviders = Array.isArray(providers) ? providers : [];
+  const safeWorkerTemplates = Array.isArray(workerTemplates) ? workerTemplates : [];
+  const workerTemplateOptions = (safeWorkerTemplates.length > 0
+    ? safeWorkerTemplates.map((item) => ({ slug: item.slug, displayName: item.display_name }))
+    : Array.from(new Set(safeProviderModels.map((item) => item.executionTemplate)))
+        .filter((slug): slug is string => Boolean(slug))
+        .map((slug) => ({ slug, displayName: slug }))).sort((a, b) =>
+    a.displayName.localeCompare(b.displayName, "zh-CN")
+  );
+  const supportedModelById = new Map(safeSupportedModels.map((item) => [item.id, item]));
+  const supportedModelOptions = safeSupportedModels.map((item) => ({
+    id: item.id,
+    modelSlug: item.model_slug,
+    displayName: item.display_name,
+    capability: item.capability,
+  }));
+  const providerOptions = safeProviders.map((item) => ({
+    id: item.id,
+    name: item.name,
+    slug: item.slug,
+  }));
 
-  const rows = providerModels
+  const rows = safeProviderModels
     .map((providerModel) => {
       const supportedModel = providerModel.supported_model_id
         ? supportedModelById.get(providerModel.supported_model_id) ?? null
@@ -735,71 +853,12 @@ export function EconomicsPanel({
       return a.supportedModel.model_slug.localeCompare(b.supportedModel.model_slug, "en-US");
     });
 
-  const providerFilterOptions = Array.from(new Set(rows.map((row) => row.providerName))).sort((a, b) =>
-    a.localeCompare(b, "en-US")
-  );
-  const [providerFilter, setProviderFilter] = useState<string>("all");
-  const [capabilityFilter, setCapabilityFilter] = useState<string>("all");
-  const [activeFilter, setActiveFilter] = useState<string>("all");
-
-  const filteredRows = rows.filter((row) => {
-    if (providerFilter !== "all" && row.providerName !== providerFilter) {
-      return false;
-    }
-    if (capabilityFilter !== "all" && row.providerModel.capability !== capabilityFilter) {
-      return false;
-    }
-    if (activeFilter === "active" && !row.providerModel.active) {
-      return false;
-    }
-    if (activeFilter === "inactive" && row.providerModel.active) {
-      return false;
-    }
-    return true;
-  });
+  const filteredRows = rows;
 
   return (
     <div className="space-y-4">
       {rows.length > 0 ? (
         <>
-          <div className="flex items-center gap-2 overflow-x-auto rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-2">
-            <select
-              value={providerFilter}
-              onChange={(event) => setProviderFilter(event.target.value)}
-              className={compactFilterSelectClassName + " w-[132px]"}
-            >
-              <option value="all">全部供应商</option>
-              {providerFilterOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={capabilityFilter}
-              onChange={(event) => setCapabilityFilter(event.target.value)}
-              className={compactFilterSelectClassName + " w-[122px]"}
-            >
-              <option value="all">全部能力</option>
-              <option value="image_generation">image_generation</option>
-              <option value="image_edit">image_edit</option>
-              <option value="video_generation">video_generation</option>
-            </select>
-
-            <select
-              value={activeFilter}
-              onChange={(event) => setActiveFilter(event.target.value)}
-              className={compactFilterSelectClassName + " w-[100px]"}
-            >
-              <option value="all">全部状态</option>
-              <option value="active">已启用</option>
-              <option value="inactive">未启用</option>
-            </select>
-
-            <span className="ml-auto shrink-0 px-2 text-xs text-black/50">结果：{filteredRows.length} 条</span>
-          </div>
-
           <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
             <table className="min-w-[2360px] border-separate border-spacing-0 text-left text-sm">
               <thead>
@@ -896,68 +955,36 @@ export function EconomicsPanel({
                           </td>
                           <td className="sticky right-0 z-10 w-[180px] border-b border-black/[0.06] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
                             <ManagementDialog
-                              trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑联动</ModalButton>}
-                              title={`编辑联动：${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
-                              description="在一个表单内同时编辑可售模型售价与供应商模型成本。"
+                              trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                              title={`编辑：${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
+                              description=" "
                             >
                               {({ close }) => (
-                                <ManagedDialogForm action={updateModelEconomicsBundle} close={close}>
-                                  <input type="hidden" name="supportedModelId" value={row.supportedModel.id} />
-                                  <input type="hidden" name="providerModelId" value={row.providerModel.id} />
-                                  <input
-                                    type="hidden"
-                                    name="pricingSourceEvidence"
-                                    value={JSON.stringify(row.providerModel.pricingSourceEvidence)}
-                                  />
-                                  <div className="grid gap-4">
-                                    <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 text-xs text-black/55">
-                                      可售模型：{row.supportedModel.model_slug}
-                                      <br />
-                                      供应商模型：{row.providerModel.providerName} / {row.providerModel.upstream_model_slug}
-                                    </div>
-                                    <div>
-                                      <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">可售模型售价配置</span>
-                                      <BillingConfigEditor
-                                        name="supportedBillingConfig"
-                                        initialValue={row.supportedModel.billingConfigText}
-                                        componentHint="用户可见售价配置。"
-                                        generatedLabel="生成的用户售价计费配置"
-                                      />
-                                    </div>
-                                    <div>
-                                      <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">供应商成本配置</span>
-                                      <BillingConfigEditor
-                                        name="providerPricing"
-                                        initialValue={row.providerModel.pricingText}
-                                        componentHint="供应商真实成本配置。"
-                                        generatedLabel="生成的供应商成本计费配置"
-                                      />
-                                    </div>
-                                    <FormField
-                                      label="官方成本价格链接"
-                                      name="pricingSourceUrl"
-                                      type="text"
-                                      defaultValue={row.providerModel.pricingSourceUrl ?? ""}
-                                    />
-                                    <FormTextArea
-                                      label="成本说明备注"
-                                      name="pricingSourceNote"
-                                      defaultValue={row.providerModel.pricingSourceNote ?? ""}
-                                    />
-                                    <label className="block">
-                                      <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">价格证据截图</span>
-                                      <input
-                                        type="file"
-                                        name="pricingSourceEvidenceFile"
-                                        accept="image/png,image/jpeg,image/webp"
-                                        className="block w-full rounded-md border border-black/[0.08] bg-white px-3 py-2 text-sm text-black file:mr-3 file:rounded-md file:border-0 file:bg-[#111827] file:px-3 file:py-2 file:text-xs file:font-medium file:text-white"
-                                      />
-                                    </label>
-                                    <div className="flex justify-end">
-                                      <SubmitButton label="保存联动价格" />
-                                    </div>
-                                  </div>
-                                </ManagedDialogForm>
+                                <CreateProviderModelForm
+                                  action={updateProviderModelDetails}
+                                  providerModelId={row.providerModel.id}
+                                  supportedModels={supportedModelOptions}
+                                  providers={providerOptions}
+                                  workerTemplates={workerTemplateOptions.map((item) => ({
+                                    id: item.slug,
+                                    displayName: item.displayName,
+                                    slug: item.slug,
+                                  }))}
+                                  defaultSupportedModelSlug={row.supportedModel.model_slug}
+                                  defaultProviderId={row.providerModel.provider_id}
+                                  defaultUpstreamModelSlug={row.providerModel.upstream_model_slug}
+                                  defaultPricing={row.providerModel.pricingText}
+                                  defaultPricingSourceUrl={row.providerModel.pricingSourceUrl ?? undefined}
+                                  defaultPricingSourceNote={row.providerModel.pricingSourceNote ?? undefined}
+                                  defaultPricingSourceEvidence={JSON.stringify(row.providerModel.pricingSourceEvidence)}
+                                  defaultExecutionTemplate={row.providerModel.executionTemplate}
+                                  defaultExecutionConfig={row.providerModel.executionConfigText}
+                                  defaultActive={row.providerModel.active}
+                                  submitLabel="保存供应商模型"
+                                  className="grid gap-4"
+                                  onSuccess={close}
+                                  disabled={false}
+                                />
                               )}
                             </ManagementDialog>
                           </td>
@@ -988,12 +1015,182 @@ export function EconomicsPanel({
   );
 }
 
+export function WorkerTemplatesPanel({
+  workerTemplates = [],
+  providerModels,
+}: {
+  workerTemplates?: WorkerTemplateSummary[];
+  providerModels: ProviderModelSummary[];
+}) {
+  const inUseMap = providerModels.reduce((map, item) => {
+    const key = item.executionTemplate?.trim() || "未设置";
+    const current = map.get(key) ?? { providerModelCount: 0, providers: new Set<string>() };
+    current.providerModelCount += 1;
+    current.providers.add(item.providerName);
+    map.set(key, current);
+    return map;
+  }, new Map<string, { providerModelCount: number; providers: Set<string> }>());
+
+  const rows = workerTemplates
+    .map((item) => {
+      const relatedModels = providerModels
+        .filter((model) => (model.executionTemplate?.trim() || "") === item.slug)
+        .map((model) => ({
+          publicModelSlug: model.public_model_slug,
+          upstreamModelSlug: model.upstream_model_slug,
+        }))
+        .sort((a, b) => a.publicModelSlug.localeCompare(b.publicModelSlug, "en-US"));
+      const use = inUseMap.get(item.slug) ?? { providerModelCount: 0, providers: new Set<string>() };
+      return {
+        ...item,
+        displayName: item.display_name || item.slug,
+        providerModelCount: use.providerModelCount,
+        providerCount: use.providers.size,
+        providersLabel: Array.from(use.providers).sort((a, b) => a.localeCompare(b, "en-US")).join(" / "),
+        configText: JSON.stringify(item.config ?? {}, null, 2),
+        relatedModels,
+      };
+    })
+    .sort((a, b) => a.displayName.localeCompare(b.displayName, "zh-CN"));
+
+  return (
+    <div className="space-y-4">
+      {rows.length > 0 ? (
+        <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+          <table className="min-w-[1400px] border-separate border-spacing-0 text-left text-sm">
+            <thead>
+              <tr className="text-xs text-black/50">
+                <th className="w-[18%] border-b border-black/[0.08] px-3 py-2.5">显示名称</th>
+                <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
+                <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">上游模型</th>
+                <th className="w-[28%] border-b border-black/[0.08] px-3 py-2.5">关联供应商</th>
+                <th className="sticky right-0 z-10 w-[22%] border-b border-black/[0.08] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-sm text-black">
+                    <p>{row.displayName}</p>
+                    <p className="mt-1 text-xs text-black/45">{row.slug}</p>
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                    {row.relatedModels.length > 0 ? (
+                      <div className="space-y-1">
+                        {row.relatedModels.map((item) => (
+                          <p key={`${row.id}-${item.publicModelSlug}`}>{item.publicModelSlug}</p>
+                        ))}
+                      </div>
+                    ) : (
+                      <span>-</span>
+                    )}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                    {row.relatedModels.length > 0 ? (
+                      <div className="space-y-1">
+                        {row.relatedModels.map((item) => (
+                          <p key={`${row.id}-${item.upstreamModelSlug}`}>{item.upstreamModelSlug}</p>
+                        ))}
+                      </div>
+                    ) : (
+                      <span>-</span>
+                    )}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{row.providersLabel}</td>
+                  <td className="sticky right-0 z-10 border-b border-black/[0.06] bg-white px-3 py-3 align-middle shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
+                    <div className="flex flex-wrap gap-2">
+                      <ManagementDialog
+                        trigger={<ModalButton tone="secondary">查看配置</ModalButton>}
+                        title={`默认配置：${row.displayName}`}
+                      >
+                        <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+                          <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap text-xs text-black/65">
+                            {row.configText}
+                          </pre>
+                        </div>
+                      </ManagementDialog>
+                      <ManagementDialog
+                        trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                        title="编辑 Worker"
+                      >
+                        {({ close }) => (
+                          <ManagedDialogForm action={updateWorkerTemplate} close={close}>
+                            <input type="hidden" name="workerId" value={row.id} />
+                            <FormField label="显示名称" name="displayName" defaultValue={row.displayName} required />
+                            <FormField label="Worker Slug" name="slug" defaultValue={row.slug} required />
+                            <FormTextArea label="默认配置 JSON" name="config" defaultValue={row.configText} />
+                            <div className="flex justify-end">
+                              <SubmitButton label="保存 Worker" />
+                            </div>
+                          </ManagedDialogForm>
+                        )}
+                      </ManagementDialog>
+                      <ManagementDialog
+                        trigger={<ModalButton tone="secondary">删除</ModalButton>}
+                        title={`删除 ${row.slug}`}
+                        description="如仍被供应商模型引用将阻止删除。"
+                      >
+                        {({ close }) => (
+                          <ManagedDialogForm action={deleteWorkerTemplate} close={close}>
+                            <input type="hidden" name="workerId" value={row.id} />
+                            <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
+                              删除后无法恢复。
+                            </div>
+                            <div className="flex justify-end">
+                              <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
+                            </div>
+                          </ManagedDialogForm>
+                        )}
+                      </ManagementDialog>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+          <p className="text-sm font-medium text-black">还没有可用模板</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CreateWorkerTemplateButton() {
+  return (
+    <ManagementDialog
+      trigger={<ModalButton><Plus className="size-3.5" />新建</ModalButton>}
+      title="新建 Worker"
+      description=" "
+    >
+      {({ close }) => (
+        <ManagedDialogForm action={createWorkerTemplate} close={close}>
+          <FormField label="显示名称" name="displayName" defaultValue="任务轮询（提交后查询）" required />
+          <FormField label="Worker Slug" name="slug" required />
+          <FormTextArea
+            label="默认配置 JSON"
+            name="config"
+            defaultValue='{"submitPath":"/v1/models/{upstreamModel}:generate","pollPath":"/v1/operations/{taskId}","taskIdPath":"name","statusPath":"done","resultUrlPath":"response.outputUrl"}'
+          />
+          <div className="flex justify-end">
+            <SubmitButton label="创建 Worker" />
+          </div>
+        </ManagedDialogForm>
+      )}
+    </ManagementDialog>
+  );
+}
+
 export function CreateProviderModelMappingButton({
   supportedModels,
   providers,
+  workerTemplates,
 }: {
   supportedModels: SupportedModelSummary[];
   providers: ProviderSummary[];
+  workerTemplates: WorkerTemplateSummary[];
 }) {
   const hasProviders = providers.length > 0;
   const hasSupportedModels = supportedModels.length > 0;
@@ -1008,19 +1205,25 @@ export function CreateProviderModelMappingButton({
     name: item.name,
     slug: item.slug,
   }));
+  const workerTemplateOptions = workerTemplates.map((item) => ({
+    id: item.id,
+    displayName: item.display_name,
+    slug: item.slug,
+  }));
 
   return (
     <ManagementDialog
       trigger={<ModalButton><Plus className="size-3.5" />新建供应商模型映射</ModalButton>}
       disabled={!hasProviders || !hasSupportedModels}
       title="新建供应商模型映射"
-      description="在总表内直接新增可售模型与供应商模型的映射关系。"
+      description="先选择可售模型与供应商，再填写执行协议配置和成本配置。"
     >
       {({ close }) => (
         <CreateProviderModelForm
           action={createProviderModel}
           supportedModels={supportedModelOptions}
           providers={providerOptions}
+          workerTemplates={workerTemplateOptions}
           disabled={!hasProviders || !hasSupportedModels}
           className="grid gap-4"
           onSuccess={close}
@@ -1033,15 +1236,12 @@ export function CreateProviderModelMappingButton({
 export function ProvidersPanel({
   providers,
   credentials,
-  providerAdapterAliases = [],
   providerStatusOptions,
 }: {
   providers: ProviderSummary[];
   credentials: ProviderCredentialSummary[];
-  providerAdapterAliases?: ProviderAdapterAliasSummary[];
   providerStatusOptions: readonly ProviderStatusOption[];
 }) {
-  const safeProviderAdapterAliases = Array.isArray(providerAdapterAliases) ? providerAdapterAliases : [];
   const statusToneClassName = (status: ProviderSummary["status"]) => {
     if (status === "healthy") {
       return "border-[#D7EADB] bg-[#EDF8F0] text-[#335D2D]";
@@ -1054,75 +1254,6 @@ export function ProvidersPanel({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
-        <p className="text-xs font-medium text-black/75">Provider Adapter Slug 映射</p>
-        <p className="mt-1 text-xs text-black/55">
-          管理员可配置 alias slug 到 worker adapter slug 的映射，例如 gemini-images -&gt; gemini-direct。
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <form action={createProviderAdapterAlias} className="flex flex-wrap items-center gap-2">
-            <input
-              name="aliasSlug"
-              required
-              pattern="^[a-z0-9-]+$"
-              placeholder="alias slug"
-              className="h-8 w-[170px] rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black outline-none focus:border-black/20"
-            />
-            <input
-              name="adapterSlug"
-              required
-              pattern="^[a-z0-9-]+$"
-              placeholder="adapter slug"
-              className="h-8 w-[170px] rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black outline-none focus:border-black/20"
-            />
-            <SubmitButton label="新增映射" pendingLabel="新增中..." />
-          </form>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {safeProviderAdapterAliases.length > 0 ? (
-            safeProviderAdapterAliases.map((alias) => (
-              <form key={alias.id} action={deleteProviderAdapterAlias} className="inline-flex items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2 py-1">
-                <input type="hidden" name="aliasId" value={alias.id} />
-                <span className="text-xs text-black/70">
-                  {alias.alias_slug} -&gt; {alias.adapter_slug}
-                </span>
-                <SubmitButton label="删除" pendingLabel="删除中..." tone="danger" />
-              </form>
-            ))
-          ) : (
-            <p className="text-xs text-black/45">暂无自定义映射</p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-black/55">已有供应商</div>
-        <ManagementDialog
-          trigger={<ModalButton><Plus className="size-3.5" />新建供应商</ModalButton>}
-          title="新建供应商"
-          description="在独立弹窗中创建新的上游供应商。"
-        >
-          {({ close }) => (
-          <ManagedDialogForm action={createProvider} close={close}>
-            <FormField label="名称" name="name" required />
-            <FormField label="Slug" name="slug" required />
-            <FormField label="基础 URL" name="baseUrl" />
-            <FormSelect
-              label="状态"
-              name="status"
-              defaultValue="healthy"
-              options={[...providerStatusOptions]}
-            />
-            <FormField label="区域" name="regions" />
-            <FormTextArea label="配置 JSON" name="config" defaultValue="{}" />
-            <div className="flex justify-end">
-              <SubmitButton label="创建供应商" />
-            </div>
-          </ManagedDialogForm>
-          )}
-        </ManagementDialog>
-      </div>
-
       {providers.length > 0 ? (
         <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
           <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
@@ -1142,41 +1273,38 @@ export function ProvidersPanel({
                 const providerCredentials = credentials.filter((item) => item.provider_id === provider.id);
 
                 return (
-                  <tr key={provider.id}>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                <tr key={provider.id}>
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
                       <p className="text-sm font-medium text-black">{provider.name}</p>
                       <p className="mt-1 text-xs text-black/50">{provider.slug}</p>
                       <RuntimeDiagnostics diagnostics={provider.runtimeDiagnostics} />
                     </td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
                       <p className="max-w-[320px] break-all text-xs text-black/60">{provider.base_url ?? "未填写"}</p>
                     </td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
                       <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${statusToneClassName(provider.status)}`}>
                         {provider.status === "healthy" ? "健康" : provider.status === "degraded" ? "降级" : "离线"}
                       </span>
                     </td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{provider.regionsLabel}</td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{provider.regionsLabel}</td>
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
                       {provider.activeModelCount}/{provider.modelCount}
                     </td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{provider.credentialCount}</td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{provider.credentialCount}</td>
+                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
                       <div className="flex flex-wrap gap-2">
                         <ManagementDialog
                           trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
-                          title={`编辑 ${provider.name}`}
-                          description="在独立弹窗中编辑这个供应商。"
+                          title="编辑"
                         >
                           {({ close }) => (
                             <ManagedDialogForm action={updateProvider} close={close}>
                               <input type="hidden" name="providerId" value={provider.id} />
                               <FormField label="名称" name="name" defaultValue={provider.name} required />
-                              <FormField label="Slug" name="slug" defaultValue={provider.slug} required />
                               <FormField label="基础 URL" name="baseUrl" defaultValue={provider.base_url ?? ""} />
                               <FormSelect label="状态" name="status" defaultValue={provider.status} options={[...providerStatusOptions]} />
                               <FormField label="区域" name="regions" defaultValue={(provider.regions ?? []).join(", ")} />
-                              <FormTextArea label="配置 JSON" name="config" defaultValue={provider.configText} />
                               <div className="flex justify-end">
                                 <SubmitButton label="保存供应商" />
                               </div>
@@ -1189,6 +1317,23 @@ export function ProvidersPanel({
                           description="在弹窗里新增、编辑、轮换或删除这个供应商的密钥。"
                         >
                           <CredentialsPanel credentials={providerCredentials} providers={[provider]} selectedTemplate={null} />
+                        </ManagementDialog>
+                        <ManagementDialog
+                          trigger={<ModalButton tone="secondary">删除</ModalButton>}
+                          title={`删除 ${provider.name}`}
+                          description="确认删除该供应商。若仍有关联模型或密钥将阻止删除。"
+                        >
+                          {({ close }) => (
+                            <ManagedDialogForm action={deleteProvider} close={close}>
+                              <input type="hidden" name="providerId" value={provider.id} />
+                              <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
+                                删除后无法恢复。建议先确认该供应商下没有模型和密钥。
+                              </div>
+                              <div className="flex justify-end">
+                                <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
+                              </div>
+                            </ManagedDialogForm>
+                          )}
                         </ManagementDialog>
                       </div>
                     </td>
@@ -1207,6 +1352,39 @@ export function ProvidersPanel({
         </div>
       )}
     </div>
+  );
+}
+
+export function CreateProviderButton({
+  providerStatusOptions,
+}: {
+  providerStatusOptions: readonly ProviderStatusOption[];
+}) {
+  return (
+    <ManagementDialog
+      trigger={<ModalButton><Plus className="size-3.5" />新建供应商</ModalButton>}
+      title="新建供应商"
+      description="在独立弹窗中创建新的上游供应商。"
+    >
+      {({ close }) => (
+        <ManagedDialogForm action={createProvider} close={close}>
+          <FormField label="名称" name="name" required />
+          <FormField label="Slug" name="slug" required />
+          <FormField label="基础 URL" name="baseUrl" />
+          <FormSelect
+            label="状态"
+            name="status"
+            defaultValue="healthy"
+            options={[...providerStatusOptions]}
+          />
+          <FormField label="区域" name="regions" />
+          <FormTextArea label="配置 JSON" name="config" defaultValue="{}" />
+          <div className="flex justify-end">
+            <SubmitButton label="创建供应商" />
+          </div>
+        </ManagedDialogForm>
+      )}
+    </ManagementDialog>
   );
 }
 
@@ -1384,11 +1562,13 @@ export function ModelsPanel({
   providerModels,
   providers,
   supportedModels,
+  workerTemplates,
   selectedTemplate,
 }: {
   providerModels: ProviderModelSummary[];
   providers: ProviderSummary[];
   supportedModels: SupportedModelSummary[];
+  workerTemplates: WorkerTemplateSummary[];
   selectedTemplate: ProviderTemplate | null;
 }) {
   const hasProviders = providers.length > 0;
@@ -1406,6 +1586,11 @@ export function ModelsPanel({
     name: item.name,
     slug: item.slug,
   }));
+  const workerTemplateOptions = workerTemplates.map((item) => ({
+    id: item.id,
+    displayName: item.display_name,
+    slug: item.slug,
+  }));
 
   return (
     <div className="space-y-4">
@@ -1421,6 +1606,7 @@ export function ModelsPanel({
             <CreateProviderModelForm
               supportedModels={supportedModelOptions}
               providers={providerOptions}
+              workerTemplates={workerTemplateOptions}
               defaultSupportedModelSlug="openoctopus/gemini-2.5-flash-image"
               defaultUpstreamModelSlug={selectedTemplate?.providerModel.upstreamModelSlug}
               defaultPricing={selectedTemplate?.providerModel.pricing}
@@ -1466,6 +1652,7 @@ export function ModelsPanel({
                     providerModelId={item.id}
                     supportedModels={supportedModelOptions}
                     providers={providerOptions}
+                    workerTemplates={workerTemplateOptions}
                     defaultSupportedModelSlug={item.public_model_slug}
                     defaultProviderId={item.provider_id}
                     defaultUpstreamModelSlug={item.upstream_model_slug}
@@ -1473,6 +1660,8 @@ export function ModelsPanel({
                     defaultPricingSourceUrl={item.pricingSourceUrl ?? undefined}
                     defaultPricingSourceNote={item.pricingSourceNote ?? undefined}
                     defaultPricingSourceEvidence={JSON.stringify(item.pricingSourceEvidence)}
+                    defaultExecutionTemplate={item.executionTemplate}
+                    defaultExecutionConfig={item.executionConfigText}
                     defaultActive={item.active}
                     disabled={!hasProviders || !hasSupportedModels}
                     submitLabel="保存供应商模型"
