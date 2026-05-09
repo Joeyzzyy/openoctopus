@@ -216,10 +216,18 @@ function readTemplateConfigDiagnostics(config: Record<string, unknown> | null) {
   const taskIdPath = typeof config?.taskIdPath === "string" ? config.taskIdPath.trim() : "";
   const resultUrlPath = typeof config?.resultUrlPath === "string" ? config.resultUrlPath.trim() : "";
   const statusPath = typeof config?.statusPath === "string" ? config.statusPath.trim() : "";
+  const resultValueType = typeof config?.resultValueType === "string" ? config.resultValueType.trim() : "";
+  const resultMimeType = typeof config?.resultMimeType === "string" ? config.resultMimeType.trim() : "";
   if (!submitPath) diagnostics.push("缺少 submitPath");
   if (!taskIdPath) diagnostics.push("缺少 taskIdPath");
   if (!resultUrlPath) diagnostics.push("缺少 resultUrlPath");
   if (pollPath && !statusPath) diagnostics.push("已配置 pollPath 但缺少 statusPath");
+  if (resultValueType && resultValueType !== "url" && resultValueType !== "base64") {
+    diagnostics.push("resultValueType 仅支持 url 或 base64");
+  }
+  if (resultValueType === "base64" && !resultMimeType) {
+    diagnostics.push("resultValueType=base64 时建议配置 resultMimeType");
+  }
   return diagnostics;
 }
 

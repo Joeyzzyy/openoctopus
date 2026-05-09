@@ -108,9 +108,14 @@ const completedTaskExample = `{
   "capability": "image_generation",
   "public_model_slug": "${DEFAULT_QUICKSTART_MODEL}",
   "output_payload": {
+    "raw": {
+      "...": "provider specific payload"
+    },
     "assets": [
       {
-        "url": "https://cdn.openoctopus.ai/generated/example.png"
+        "type": "image",
+        "url": "/v1/files/7c47ef1f-5e69-43d2-9f66-b4a1f2f0e7fd/assets/0",
+        "sourceUrl": "https://upstream-provider.example/result.png"
       }
     ]
   },
@@ -118,6 +123,18 @@ const completedTaskExample = `{
   "error_message": null,
   "created_at": "2026-04-12T08:00:00.000Z",
   "completed_at": "2026-04-12T08:00:09.000Z"
+}`;
+const unifiedImageOutputShapeExample = `{
+  "output_payload": {
+    "raw": { "...": "provider specific payload" },
+    "assets": [
+      {
+        "type": "image",
+        "url": "string",
+        "sourceUrl": "string (optional)"
+      }
+    ]
+  }
 }`;
 const errorExample = `{
   "error": {
@@ -429,6 +446,56 @@ export default function DocsPage() {
                     Example completed response
                   </h3>
                   <CodeBlock code={completedTaskExample} />
+                </div>
+
+                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                  <h3 className="text-lg font-semibold text-black">
+                    Unified image output contract
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-black/58">
+                    For image tasks, always read{" "}
+                    <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                      output_payload.assets
+                    </code>{" "}
+                    as the normalized result. The upstream provider response remains in{" "}
+                    <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                      output_payload.raw
+                    </code>
+                    .
+                  </p>
+                  <CodeBlock code={unifiedImageOutputShapeExample} />
+                  <div className="mt-3 space-y-2 text-sm leading-6 text-black/58">
+                    <p>
+                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                        assets[].type
+                      </code>{" "}
+                      is always{" "}
+                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                        image
+                      </code>{" "}
+                      for image generation.
+                    </p>
+                    <p>
+                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                        assets[].url
+                      </code>{" "}
+                      can be one of: a{" "}
+                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                        data:image/...;base64,...
+                      </code>{" "}
+                      URL, an OpenOctopus file proxy URL such as{" "}
+                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                        /v1/files/:requestId/assets/:assetIndex
+                      </code>
+                      , or a direct HTTPS URL.
+                    </p>
+                    <p>
+                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                        assets[].sourceUrl
+                      </code>{" "}
+                      is optional and keeps the original upstream asset URL when proxying.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">

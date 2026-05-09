@@ -80,6 +80,7 @@ function detectTemplateMode(config: Record<string, unknown>) {
 
 function validateTemplateConfig(config: Record<string, unknown>) {
   const diagnostics: string[] = [];
+  const resultValueType = readString(config.resultValueType);
   if (readString(config.submitPath).length === 0) {
     diagnostics.push("模板配置缺少 submitPath。");
   }
@@ -91,6 +92,12 @@ function validateTemplateConfig(config: Record<string, unknown>) {
   }
   if (detectTemplateMode(config) === "async" && readString(config.pollPath).length === 0) {
     diagnostics.push("异步模板缺少 pollPath。");
+  }
+  if (resultValueType && resultValueType !== "url" && resultValueType !== "base64") {
+    diagnostics.push("resultValueType 仅支持 url 或 base64。");
+  }
+  if (resultValueType === "base64" && readString(config.resultMimeType).length === 0) {
+    diagnostics.push("resultValueType=base64 时必须配置 resultMimeType。");
   }
   return diagnostics;
 }

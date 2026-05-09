@@ -114,6 +114,89 @@ function getNestedNumber(source: Record<string, unknown> | null, path: string[])
   return readNumericCandidate(current);
 }
 
+function readPath(source: unknown, path: string[]) {
+  let current: unknown = source;
+  for (const key of path) {
+    if (Array.isArray(current)) {
+      const index = Number(key);
+      if (!Number.isInteger(index) || index < 0 || index >= current.length) {
+        return null;
+      }
+      current = current[index];
+      continue;
+    }
+    const record = asRecord(current);
+    if (!record || !(key in record)) {
+      return null;
+    }
+    current = record[key];
+  }
+  return current ?? null;
+}
+
+function normalizeImageAssets(output: Record<string, unknown> | null) {
+  if (!output) {
+    return output;
+  }
+
+  const existingAssets = Array.isArray(output.assets) ? output.assets : [];
+  if (existingAssets.length > 0) {
+    return output;
+  }
+
+  const raw = asRecord(output.raw);
+  if (!raw) {
+    return output;
+  }
+
+  const azureB64 = readPath(raw, ["data", "0", "b64_json"]);
+  if (typeof azureB64 === "string" && azureB64.length > 0) {
+    return {
+      ...output,
+      assets: [{ type: "image", url: `data:image/png;base64,${azureB64}` }],
+    };
+  }
+
+  const azureUrl = readPath(raw, ["data", "0", "url"]);
+  if (typeof azureUrl === "string" && azureUrl.length > 0) {
+    return {
+      ...output,
+      assets: [{ type: "image", url: azureUrl }],
+    };
+  }
+
+  const geminiInlineData = readPath(raw, [
+    "candidates",
+    "0",
+    "content",
+    "parts",
+    "0",
+    "inlineData",
+    "data",
+  ]);
+  const geminiMimeType = readPath(raw, [
+    "candidates",
+    "0",
+    "content",
+    "parts",
+    "0",
+    "inlineData",
+    "mimeType",
+  ]);
+  if (typeof geminiInlineData === "string" && geminiInlineData.length > 0) {
+    const mimeType =
+      typeof geminiMimeType === "string" && geminiMimeType.length > 0
+        ? geminiMimeType
+        : "image/png";
+    return {
+      ...output,
+      assets: [{ type: "image", url: `data:${mimeType};base64,${geminiInlineData}` }],
+    };
+  }
+
+  return output;
+}
+
 function resolveVideoDurationSeconds(input: {
   requestInput?: Record<string, unknown> | null;
   output?: Record<string, unknown> | null;
@@ -172,6 +255,23 @@ function withNormalizedVideoDuration(input: {
       : {
           durationSeconds,
         },
+  };
+}
+
+function withNormalizedOutput(input: {
+  capability: "image_generation" | "video_generation";
+  requestInput?: Record<string, unknown> | null;
+  output?: Record<string, unknown> | null;
+  providerRaw?: Record<string, unknown> | null;
+}) {
+  const withDuration = withNormalizedVideoDuration(input);
+  if (input.capability !== "image_generation") {
+    return withDuration;
+  }
+
+  return {
+    output: normalizeImageAssets(withDuration.output),
+    providerRaw: withDuration.providerRaw,
   };
 }
 
@@ -535,7 +635,7 @@ export async function processNextInferenceJob() {
   }
 
   if (result.mode === "sync") {
-    const normalizedSyncResult = withNormalizedVideoDuration({
+    const normalizedSyncResult = withNormalizedOutput({
       capability: message.capability,
       requestInput: message.input,
       output: result.output,
@@ -863,7 +963,7 @@ export async function processNextPollingJob() {
   }
 
   if (result.success) {
-    const normalizedPollingResult = withNormalizedVideoDuration({
+    const normalizedPollingResult = withNormalizedOutput({
       capability: message.capability,
       requestInput: message.input,
       output: result.output,

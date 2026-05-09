@@ -15,7 +15,19 @@ insert into public.worker_templates (display_name, slug, config, active)
 values (
   '即时返回（无需轮询）',
   'sync-json-v1',
-  '{"resultUrlPath":"data.0.url"}'::jsonb,
+  '{"mode":"sync","resultUrlPath":"data.0.url","resultValueType":"url"}'::jsonb,
+  true
+)
+on conflict (slug) do update
+set display_name = excluded.display_name,
+    active = true;
+
+-- 1.1) Azure 图片 base64 返回（无需轮询）
+insert into public.worker_templates (display_name, slug, config, active)
+values (
+  'Azure 图片（base64 即时返回）',
+  'azure-image-base64-v1',
+  '{"mode":"sync","authType":"header","authHeaderName":"api-key","authHeaderPrefix":"","resultUrlPath":"data.0.b64_json","resultValueType":"base64","resultMimeType":"image/png"}'::jsonb,
   true
 )
 on conflict (slug) do update
