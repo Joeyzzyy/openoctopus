@@ -126,6 +126,7 @@ const completedTaskExample = `{
 }`;
 const unifiedImageOutputShapeExample = `{
   "output_payload": {
+    "format": "openoctopus.image.output.v1",
     "raw": { "...": "provider specific payload" },
     "assets": [
       {
@@ -465,6 +466,16 @@ export default function DocsPage() {
                   </p>
                   <CodeBlock code={unifiedImageOutputShapeExample} />
                   <div className="mt-3 space-y-2 text-sm leading-6 text-black/58">
+                    <p>
+                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                        output_payload.format
+                      </code>{" "}
+                      for image tasks is{" "}
+                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                        openoctopus.image.output.v1
+                      </code>
+                      .
+                    </p>
                     <p>
                       <code className="rounded bg-white px-1 py-0.5 text-[12px]">
                         assets[].type

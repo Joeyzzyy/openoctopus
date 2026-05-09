@@ -34,12 +34,36 @@ on conflict (slug) do update
 set display_name = excluded.display_name,
     active = true;
 
+-- 1.2) 图片 URL 即时返回（无需轮询）
+insert into public.worker_templates (display_name, slug, config, active)
+values (
+  '图片 URL（即时返回）',
+  'image-url-sync-v1',
+  '{"mode":"sync","resultUrlPath":"data.0.url","resultValueType":"url"}'::jsonb,
+  true
+)
+on conflict (slug) do update
+set display_name = excluded.display_name,
+    active = true;
+
 -- 2) 任务轮询（提交后查询）: map existing rest-async-poll-v1
 insert into public.worker_templates (display_name, slug, config, active)
 values (
   '任务轮询（提交后查询）',
   'rest-async-poll-v1',
   '{"submitPath":"/v1/models/{upstreamModel}:generate","pollPath":"/v1/operations/{taskId}","taskIdPath":"name","statusPath":"done","resultUrlPath":"response.outputUrl"}'::jsonb,
+  true
+)
+on conflict (slug) do update
+set display_name = excluded.display_name,
+    active = true;
+
+-- 2.1) 图片 URL 轮询返回（提交后查询）
+insert into public.worker_templates (display_name, slug, config, active)
+values (
+  '图片 URL（任务轮询）',
+  'image-url-async-v1',
+  '{"mode":"async","submitPath":"/v1/models/{upstreamModel}:generate","pollPath":"/v1/operations/{taskId}","taskIdPath":"name","statusPath":"done","resultUrlPath":"response.outputUrl","resultValueType":"url"}'::jsonb,
   true
 )
 on conflict (slug) do update

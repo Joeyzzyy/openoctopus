@@ -1350,6 +1350,7 @@ export default async function InternalPage({
   "status": "succeeded",
   "capability": "image_generation",
   "output_payload": {
+    "format": "openoctopus.image.output.v1",
     "raw": { "...": "provider specific payload" },
     "assets": [
       {
