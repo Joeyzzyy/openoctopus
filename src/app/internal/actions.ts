@@ -1713,6 +1713,83 @@ export async function updateSupportedModelDetails(formData: FormData) {
   revalidatePath("/internal");
 }
 
+const deleteSupportedModelSchema = z.object({
+  supportedModelId: z.string().uuid(),
+});
+
+export async function deleteSupportedModel(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = deleteSupportedModelSchema.parse({
+    supportedModelId: formData.get("supportedModelId"),
+  });
+
+  const { data: supportedModelRow, error: supportedModelError } = await supabase
+    .from("supported_models")
+    .select("id, model_slug, display_name")
+    .eq("id", parsed.supportedModelId)
+    .maybeSingle();
+
+  if (supportedModelError) {
+    throw new Error(supportedModelError.message);
+  }
+  if (!supportedModelRow) {
+    throw new Error("可售模型不存在");
+  }
+
+  const [{ data: providerModelRows, error: providerModelError }, { data: routingRows, error: routingError }] =
+    await Promise.all([
+      supabase
+        .from("provider_models")
+        .select("id")
+        .eq("supported_model_id", parsed.supportedModelId)
+        .limit(1),
+      supabase
+        .from("routing_rules")
+        .select("id")
+        .eq("public_model_slug", supportedModelRow.model_slug)
+        .limit(1),
+    ]);
+
+  if (providerModelError) {
+    throw new Error(providerModelError.message);
+  }
+  if (routingError) {
+    throw new Error(routingError.message);
+  }
+  if ((providerModelRows ?? []).length > 0) {
+    throw new Error("该可售模型仍有关联的供应商模型映射，无法删除。");
+  }
+  if ((routingRows ?? []).length > 0) {
+    throw new Error("该可售模型仍被路由配置使用，无法删除。");
+  }
+
+  const { error } = await supabase
+    .from("supported_models")
+    .delete()
+    .eq("id", parsed.supportedModelId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "supported_model.delete",
+    targetType: "supported_model",
+    targetId: parsed.supportedModelId,
+    summary: `Deleted supported model ${supportedModelRow.model_slug}`,
+    details: {
+      supportedModelId: parsed.supportedModelId,
+      modelSlug: supportedModelRow.model_slug,
+      displayName: supportedModelRow.display_name,
+    },
+  });
+
+  revalidatePath("/internal");
+}
+
 const createProviderModelSchema = z.object({
   providerId: z.string().uuid(),
   supportedModelId: z.string().uuid(),

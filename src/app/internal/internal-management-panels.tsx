@@ -9,6 +9,7 @@ import {
   createProviderCredential,
   createProviderModel,
   createSupportedModel,
+  deleteSupportedModel,
   deleteModelVendor,
   deleteProviderCredential,
   deleteProviderModel,
@@ -850,46 +851,65 @@ export function PublicModelsPanel({
                     </form>
                   </td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
-                    <ManagementDialog
-                      trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
-                      title={`编辑 ${model.display_name}`}
-                      description="在独立弹窗中编辑这个可售模型。"
-                    >
-                      {({ close }) => (
-                      <ManagedDialogForm action={updateSupportedModelDetails} close={close}>
-                        <input type="hidden" name="supportedModelId" value={model.id} />
-                        <input type="hidden" name="active" value={model.active ? "true" : "false"} />
-                        <FormSelect
-                          label="模型厂商（内部分类）"
-                          name="provider"
-                          defaultValue={model.provider}
-                          options={vendorOptions}
-                        />
-                        <FormField label="可售模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
-                        <FormField label="显示名称" name="displayName" defaultValue={model.display_name} required />
-                        <FormSelect
-                          label="模态"
-                          name="modality"
-                          defaultValue={model.modality}
-                          options={[
-                            { value: "image", label: "图片" },
-                            { value: "video", label: "视频" },
-                            { value: "audio", label: "音频" },
-                          ]}
-                        />
-                        <FormSelect
-                          label="能力类型"
-                          name="capability"
-                          defaultValue={model.capability ?? "image_generation"}
-                          options={[...capabilityOptions]}
-                        />
-                        <BillingConfigEditor initialValue={model.billingConfigText} />
-                        <div className="flex justify-end">
-                          <SubmitButton label="保存可售模型" />
-                        </div>
-                      </ManagedDialogForm>
-                      )}
-                    </ManagementDialog>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <ManagementDialog
+                        trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                        title={`编辑 ${model.display_name}`}
+                        description="在独立弹窗中编辑这个可售模型。"
+                      >
+                        {({ close }) => (
+                        <ManagedDialogForm action={updateSupportedModelDetails} close={close}>
+                          <input type="hidden" name="supportedModelId" value={model.id} />
+                          <input type="hidden" name="active" value={model.active ? "true" : "false"} />
+                          <FormSelect
+                            label="模型厂商（内部分类）"
+                            name="provider"
+                            defaultValue={model.provider}
+                            options={vendorOptions}
+                          />
+                          <FormField label="可售模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
+                          <FormField label="显示名称" name="displayName" defaultValue={model.display_name} required />
+                          <FormSelect
+                            label="模态"
+                            name="modality"
+                            defaultValue={model.modality}
+                            options={[
+                              { value: "image", label: "图片" },
+                              { value: "video", label: "视频" },
+                              { value: "audio", label: "音频" },
+                            ]}
+                          />
+                          <FormSelect
+                            label="能力类型"
+                            name="capability"
+                            defaultValue={model.capability ?? "image_generation"}
+                            options={[...capabilityOptions]}
+                          />
+                          <BillingConfigEditor initialValue={model.billingConfigText} />
+                          <div className="flex justify-end">
+                            <SubmitButton label="保存可售模型" />
+                          </div>
+                        </ManagedDialogForm>
+                        )}
+                      </ManagementDialog>
+                      <ManagementDialog
+                        trigger={<ModalButton tone="secondary">删除</ModalButton>}
+                        title={`删除 ${model.display_name}`}
+                        description="确认删除这个可售模型。"
+                      >
+                        {({ close }) => (
+                          <ManagedDialogForm action={deleteSupportedModel} close={close}>
+                            <input type="hidden" name="supportedModelId" value={model.id} />
+                            <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
+                              删除后不可恢复。若该模型仍有关联的供应商模型映射或路由配置，系统会阻止删除。
+                            </div>
+                            <div className="flex justify-end">
+                              <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
+                            </div>
+                          </ManagedDialogForm>
+                        )}
+                      </ManagementDialog>
+                    </div>
                   </td>
                 </tr>
               ))}
