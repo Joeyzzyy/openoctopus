@@ -141,42 +141,92 @@ export function getStream(
   headers: IncomingHttpHeaders;
   stream: IncomingMessage;
 }> {
-  return new Promise((resolve, reject) => {
-    const target = new URL(url);
-    const transport = target.protocol === "https:" ? https : http;
+  const MAX_REDIRECTS = 5;
 
-    const req = transport.request(
-      {
-        protocol: target.protocol,
-        hostname: target.hostname,
-        port: target.port || undefined,
-        path: `${target.pathname}${target.search}`,
-        method: "GET",
-        family: 4,
-        timeout: REQUEST_TIMEOUT_MS,
-        agent: proxyAgent ?? undefined,
-        headers: {
-          accept: "*/*",
-          ...(options?.headers ?? {}),
+  const requestWithRedirect = (
+    currentUrl: string,
+    headers: Record<string, string>,
+    redirectCount: number
+  ): Promise<{
+    status: number;
+    headers: IncomingHttpHeaders;
+    stream: IncomingMessage;
+  }> =>
+    new Promise((resolve, reject) => {
+      const target = new URL(currentUrl);
+      const transport = target.protocol === "https:" ? https : http;
+
+      const req = transport.request(
+        {
+          protocol: target.protocol,
+          hostname: target.hostname,
+          port: target.port || undefined,
+          path: `${target.pathname}${target.search}`,
+          method: "GET",
+          family: 4,
+          timeout: REQUEST_TIMEOUT_MS,
+          agent: proxyAgent ?? undefined,
+          headers,
         },
-      },
-      (res) => {
-        resolve({
-          status: res.statusCode ?? 500,
-          headers: res.headers,
-          stream: res,
-        });
-      }
-    );
+        (res) => {
+          const status = res.statusCode ?? 500;
+          const location = res.headers.location;
+          const shouldRedirect =
+            [301, 302, 303, 307, 308].includes(status) &&
+            typeof location === "string" &&
+            location.length > 0;
 
-    req.on("timeout", () => {
-      req.destroy(new Error(`Upstream GET timed out after ${REQUEST_TIMEOUT_MS}ms`));
+          if (shouldRedirect) {
+            if (redirectCount >= MAX_REDIRECTS) {
+              res.resume();
+              reject(new Error(`Upstream GET exceeded redirect limit (${MAX_REDIRECTS})`));
+              return;
+            }
+
+            const nextUrl = new URL(location, target).toString();
+            const nextTarget = new URL(nextUrl);
+            const sameOrigin = nextTarget.origin === target.origin;
+
+            // Avoid leaking provider keys across origins when following redirects.
+            const nextHeaders = sameOrigin
+              ? headers
+              : {
+                  accept: headers.accept ?? "*/*",
+                  ...(headers.range ? { range: headers.range } : {}),
+                };
+
+            res.resume();
+            requestWithRedirect(nextUrl, nextHeaders, redirectCount + 1)
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
+
+          resolve({
+            status,
+            headers: res.headers,
+            stream: res,
+          });
+        }
+      );
+
+      req.on("timeout", () => {
+        req.destroy(new Error(`Upstream GET timed out after ${REQUEST_TIMEOUT_MS}ms`));
+      });
+
+      req.on("error", (error) => {
+        reject(error);
+      });
+
+      req.end();
     });
 
-    req.on("error", (error) => {
-      reject(error);
-    });
-
-    req.end();
-  });
+  return requestWithRedirect(
+    url,
+    {
+      accept: "*/*",
+      ...(options?.headers ?? {}),
+    },
+    0
+  );
 }
