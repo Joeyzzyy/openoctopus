@@ -833,9 +833,6 @@ export default async function DashboardPage({
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <h2 className="text-xl font-semibold text-black">Model catalog</h2>
                   <div className="max-w-2xl">
-                    <p className="text-sm text-black/55">
-                      One compact row per routed model. Expand a row to inspect primary and fallback routing details.
-                    </p>
                     <p className="mt-2 text-xs text-black/40 md:hidden">
                       Mobile view switches to stacked cards for easier scanning.
                     </p>
