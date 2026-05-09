@@ -11,8 +11,7 @@ type InternalTabKey =
   | "worker-templates"
   | "providers"
   | "monitoring"
-  | "routes"
-  | "requests";
+  | "routes";
 
 type TabItem = {
   key: InternalTabKey;
