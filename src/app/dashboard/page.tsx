@@ -22,6 +22,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 type DashboardView = "dashboard" | "models" | "api-keys";
 type RequestInterval = "minute" | "hour" | "day";
 type RequestRange = "60m" | "6h" | "24h" | "7d" | "30d" | "90d";
+type ModelType = "all" | "image" | "video" | "text-coding";
 
 const pageNav = [
   { label: "Dashboard", view: "dashboard" },
@@ -91,6 +92,11 @@ function parseRequestRange(value: string | undefined, interval: RequestInterval)
   return validValues.includes(value as RequestRange) ? (value as RequestRange) : validValues[0];
 }
 
+function parseModelType(value: string | undefined): ModelType {
+  const allowed: ModelType[] = ["all", "image", "video", "text-coding"];
+  return allowed.includes(value as ModelType) ? (value as ModelType) : "all";
+}
+
 function parseRangeMs(value: RequestRange) {
   if (value.endsWith("m")) {
     return Number(value.replace("m", "")) * 60 * 1000;
@@ -143,12 +149,16 @@ function buildDashboardHref(input: {
   apiKeyId?: string | null;
   analyticsInterval: RequestInterval;
   analyticsRange: RequestRange;
+  modelType?: ModelType;
 }) {
   const params = new URLSearchParams();
   params.set("view", input.view);
   params.set("requestsPage", String(input.requestsPage ?? 1));
   params.set("analyticsInterval", input.analyticsInterval);
   params.set("analyticsRange", input.analyticsRange);
+  if (input.modelType && input.modelType !== "all") {
+    params.set("modelType", input.modelType);
+  }
   if (input.apiKeyId) {
     params.set("apiKey", input.apiKeyId);
   }
@@ -347,6 +357,7 @@ export default async function DashboardPage({
   const rawRequestsPage = Number(getSearchValue(resolvedSearchParams, "requestsPage") ?? "1");
   const requestsPage = Number.isFinite(rawRequestsPage) ? rawRequestsPage : 1;
   const selectedApiKeyId = getSearchValue(resolvedSearchParams, "apiKey") ?? null;
+  const selectedModelType = parseModelType(getSearchValue(resolvedSearchParams, "modelType"));
 
   const data = await getDashboardData({
     requestsPage,
@@ -367,6 +378,7 @@ export default async function DashboardPage({
       apiKeyId: selectedApiKeyId,
       analyticsInterval,
       analyticsRange,
+      modelType: selectedModelType,
     }),
   }));
   const activeHref = buildDashboardHref({
@@ -375,6 +387,7 @@ export default async function DashboardPage({
     apiKeyId: selectedApiKeyId,
     analyticsInterval,
     analyticsRange,
+    modelType: selectedModelType,
   });
 
   const { apiKeys, metrics, modelCatalogRows, requestFilters, requestPagination, requestQueueRows, analyticsRequests, user } =
@@ -392,6 +405,27 @@ export default async function DashboardPage({
   const filteredSpend = analyticsRequests.reduce((sum, row) => sum + row.costValue, 0);
   const filteredRequests = analyticsRequests.length;
   const successfulRequests = analyticsRequests.filter((row) => row.status === "succeeded").length;
+  const modelRowsByType = {
+    image: modelCatalogRows.filter((row) => row.capability.includes("image")),
+    video: modelCatalogRows.filter((row) => row.capability.includes("video")),
+    "text-coding": modelCatalogRows.filter(
+      (row) => row.capability.includes("text") || row.capability.includes("code")
+    ),
+  } as const;
+  const modelCatalogRowsFiltered =
+    selectedModelType === "all"
+      ? modelCatalogRows
+      : selectedModelType === "image"
+        ? modelRowsByType.image
+        : selectedModelType === "video"
+          ? modelRowsByType.video
+          : modelRowsByType["text-coding"];
+  const modelTypeOptions: Array<{ value: ModelType; label: string; count: number }> = [
+    { value: "all", label: "All", count: modelCatalogRows.length },
+    { value: "image", label: "Image", count: modelRowsByType.image.length },
+    { value: "video", label: "Video", count: modelRowsByType.video.length },
+    { value: "text-coding", label: "Text / Coding", count: modelRowsByType["text-coding"].length },
+  ];
 
   const overviewCards = [
     {
@@ -830,7 +864,30 @@ export default async function DashboardPage({
 
             {view === "models" ? (
               <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm sm:p-5">
-                <ModelCatalogTable rows={modelCatalogRows} />
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  {modelTypeOptions.map((item) => (
+                    <Link
+                      key={item.value}
+                      href={buildDashboardHref({
+                        view: "models",
+                        requestsPage: 1,
+                        apiKeyId: selectedApiKeyId,
+                        analyticsInterval,
+                        analyticsRange,
+                        modelType: item.value,
+                      })}
+                      className={cn(
+                        "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
+                        selectedModelType === item.value
+                          ? "border-black bg-black text-white"
+                          : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                      )}
+                    >
+                      {item.label} ({item.count})
+                    </Link>
+                  ))}
+                </div>
+                <ModelCatalogTable rows={modelCatalogRowsFiltered} />
               </section>
             ) : null}
 
