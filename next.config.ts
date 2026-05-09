@@ -36,6 +36,16 @@ const nextConfig: NextConfig = {
           destination: "https://openoctopus-tools.vercel.app/api/tools/:path*",
           basePath: false,
         },
+        {
+          source: "/ai-api-platforms",
+          destination: "https://itspmt-openoctopus-seo.vercel.app/ai-api-platforms",
+          basePath: false,
+        },
+        {
+          source: "/ai-api-platforms/:path*",
+          destination: "https://itspmt-openoctopus-seo.vercel.app/ai-api-platforms/:path*",
+          basePath: false,
+        },
       ],
     };
   },
