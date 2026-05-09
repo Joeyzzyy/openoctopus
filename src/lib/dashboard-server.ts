@@ -357,9 +357,8 @@ export async function getDashboardData({
       { data: walletLedgerRows },
       providerResponse,
       providerModelResponse,
+      supportedModelResponse,
       routingRuleResponse,
-      requestResponse,
-      analyticsRequestRows,
     ] = await Promise.all([
       supabase.from("v_api_key_spend_summary").select("*").eq("workspace_id", workspace.id),
       supabase.from("v_model_spend_summary").select("*").eq("workspace_id", workspace.id).order("total_spend", { ascending: false }),
@@ -370,8 +369,20 @@ export async function getDashboardData({
       supabase.from("wallet_transactions").select("amount_delta").eq("workspace_id", workspace.id),
       supabase.from("wallet_transactions").select("id, entry_type, amount_delta, description, created_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
       supabase.from("providers").select("id, name, kind, regions, status"),
-      supabase.from("provider_models").select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id"),
+      supabase.from("provider_models").select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id, capability, active"),
+      supabase
+        .from("supported_models")
+        .select("id, model_slug, display_name, capability, active"),
       supabase.from("routing_rules").select("id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy").or(`workspace_id.eq.${workspace.id},workspace_id.is.null`).eq("active", true).order("created_at", { ascending: true }),
+    ]);
+
+    const keyIdSet = new Set((keyRows ?? []).map((row) => row.id));
+    const safeRequestsApiKeyId =
+      requestsApiKeyId && keyIdSet.has(requestsApiKeyId) ? requestsApiKeyId : null;
+    const safeAnalyticsApiKeyId =
+      analyticsApiKeyId && keyIdSet.has(analyticsApiKeyId) ? analyticsApiKeyId : null;
+
+    const [requestResponse, analyticsRequestRows] = await Promise.all([
       (() => {
         let query = supabase
           .from("inference_requests")
@@ -383,15 +394,15 @@ export async function getDashboardData({
           .order("created_at", { ascending: false })
           .range(requestFrom, requestTo);
 
-        if (requestsApiKeyId) {
-          query = query.eq("api_key_id", requestsApiKeyId);
+        if (safeRequestsApiKeyId) {
+          query = query.eq("api_key_id", safeRequestsApiKeyId);
         }
 
         return query;
       })(),
       fetchAnalyticsRequests(supabase, {
         workspaceId: workspace.id,
-        apiKeyId: analyticsApiKeyId,
+        apiKeyId: safeAnalyticsApiKeyId,
         lookbackMs: analyticsLookbackMs,
       }),
     ]);
@@ -411,6 +422,7 @@ export async function getDashboardData({
     const totalModelSpend = modelRows.reduce((sum, row) => sum + Number(row.total_spend ?? 0), 0);
     const providers = providerResponse.error ? [] : providerResponse.data ?? [];
     const providerModels = providerModelResponse.error ? [] : providerModelResponse.data ?? [];
+    const supportedModels = supportedModelResponse.error ? [] : supportedModelResponse.data ?? [];
     const routingRuleRows = routingRuleResponse.error ? [] : routingRuleResponse.data ?? [];
     const requestRows = requestResponse.error ? [] : requestResponse.data ?? [];
     const requestTotal = requestResponse.error ? 0 : requestResponse.count ?? 0;
@@ -487,17 +499,60 @@ export async function getDashboardData({
       };
     });
 
-    const modelCatalogRows = routingRules.map((rule, index) => ({
-      id: `${rule.publicModel}-${rule.upstreamModelSlug}-${index}`,
-      publicModel: rule.publicModel,
-      providerName: rule.providerName,
-      providerKind: rule.providerKind,
-      upstreamModelSlug: rule.upstreamModelSlug,
-      capability: rule.capability,
-      strategy: rule.strategy,
-      primary: rule.primary,
-      fallback: rule.fallback,
-    }));
+    const firstRouteByPublicModel = new Map<string, (typeof routingRules)[number]>();
+    for (const route of routingRules) {
+      if (!firstRouteByPublicModel.has(route.publicModel)) {
+        firstRouteByPublicModel.set(route.publicModel, route);
+      }
+    }
+    const providerModelsByPublicModel = providerModels.reduce((map, row) => {
+      if (!row.active) {
+        return map;
+      }
+
+      const list = map.get(row.public_model_slug) ?? [];
+      list.push(row);
+      map.set(row.public_model_slug, list);
+      return map;
+    }, new Map<string, typeof providerModels>());
+
+    const modelCatalogRows = supportedModels
+      .filter((item) => item.active)
+      .map((model, index) => {
+        const route = firstRouteByPublicModel.get(model.model_slug) ?? null;
+        const linkedProviderModels = providerModelsByPublicModel.get(model.model_slug) ?? [];
+        const primaryProviderModel = linkedProviderModels[0] ?? null;
+        const primaryProvider = primaryProviderModel
+          ? providerById.get(primaryProviderModel.provider_id) ?? null
+          : null;
+
+        return {
+          id: `${model.id}-${index}`,
+          publicModel: model.model_slug,
+          providerName: route
+            ? route.providerName
+            : primaryProvider?.name ?? "Unassigned",
+          providerKind: route
+            ? route.providerKind
+            : primaryProvider?.kind ?? "custom",
+          upstreamModelSlug: route
+            ? route.upstreamModelSlug
+            : primaryProviderModel?.upstream_model_slug ?? "-",
+          capability: model.capability ? model.capability.replaceAll("_", " ") : "unknown",
+          strategy: route ? route.strategy : "not routed",
+          primary: route
+            ? route.primary
+            : linkedProviderModels.length > 0
+              ? linkedProviderModels
+                  .map((item) => {
+                    const providerName = providerNameById.get(item.provider_id) ?? "Unknown provider";
+                    return `${providerName} / ${item.upstream_model_slug}`;
+                  })
+                  .join(" | ")
+              : "unassigned",
+          fallback: route ? route.fallback : "manual failover only",
+        };
+      });
 
     const requestQueueRows = requestRows.map((row) => {
       const startedAt = row.started_at ? new Date(row.started_at).getTime() : null;
