@@ -286,8 +286,10 @@ function buildWorkerTemplateConfigValue(state: WorkerTemplateConfigState) {
 
 function WorkerTemplateConfigEditor({
   initialConfig,
+  hiddenFieldName = "config",
 }: {
   initialConfig: Record<string, unknown> | null;
+  hiddenFieldName?: string;
 }) {
   const [state, setState] = useState<WorkerTemplateConfigState>(() =>
     buildWorkerTemplateConfigState(initialConfig)
@@ -304,7 +306,7 @@ function WorkerTemplateConfigEditor({
 
   return (
     <div className="grid gap-3">
-      <input type="hidden" name="config" value={configValue} />
+      <input type="hidden" name={hiddenFieldName} value={configValue} />
       <label className="block">
         <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">调用模式</span>
         <select
@@ -1646,7 +1648,10 @@ export function ProvidersPanel({
                                                         label: `${worker.display_name || worker.slug} (${worker.slug})`,
                                                       }))}
                                                     />
-                                                    <WorkerTemplateConfigEditor initialConfig={item.execution_config} />
+                                                    <WorkerTemplateConfigEditor
+                                                      initialConfig={item.execution_config}
+                                                      hiddenFieldName="executionConfig"
+                                                    />
                                                     <div className="flex justify-end">
                                                       <SubmitButton label="保存配置" />
                                                     </div>
@@ -1700,6 +1705,7 @@ export function ProvidersPanel({
                                   }))}
                                 />
                                 <WorkerTemplateConfigEditor
+                                  hiddenFieldName="executionConfig"
                                   initialConfig={{
                                     mode: "auto",
                                     submitPath: "/v1/tasks",
@@ -1779,6 +1785,7 @@ export function ProvidersPanel({
                   }))}
                 />
                 <WorkerTemplateConfigEditor
+                  hiddenFieldName="executionConfig"
                   initialConfig={{
                     mode: "auto",
                     submitPath: "/v1/tasks",
@@ -1852,7 +1859,10 @@ export function ProvidersPanel({
                                     label: `${worker.display_name || worker.slug} (${worker.slug})`,
                                   }))}
                                 />
-                                <WorkerTemplateConfigEditor initialConfig={item.execution_config} />
+                                <WorkerTemplateConfigEditor
+                                  initialConfig={item.execution_config}
+                                  hiddenFieldName="executionConfig"
+                                />
                                 <div className="flex justify-end">
                                   <SubmitButton label="保存配置" />
                                 </div>

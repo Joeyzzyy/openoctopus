@@ -20,4 +20,4 @@ drop trigger if exists set_provider_capability_execution_configs_updated_at
   on public.provider_capability_execution_configs;
 create trigger set_provider_capability_execution_configs_updated_at
 before update on public.provider_capability_execution_configs
-for each row execute function public.set_current_timestamp_updated_at();
+for each row execute function public.set_updated_at();
