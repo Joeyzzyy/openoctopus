@@ -35,8 +35,8 @@ const tabs = [
   {
     key: "monitoring",
     group: "overview",
-    label: "系统用量监控",
-    description: "资源调度管理监测中心。",
+    label: "系统使用监控",
+    description: "系统监控与请求记录。",
   },
   {
     key: "worker-templates",
@@ -73,12 +73,6 @@ const tabs = [
     group: "basic",
     label: "路由配置",
     description: "决定当前流量走哪个供应商模型。",
-  },
-  {
-    key: "requests",
-    group: "overview",
-    label: "用户请求记录",
-    description: "近期调用与成本明细。",
   },
 ] as const;
 
@@ -132,14 +126,26 @@ function buildInternalHref(tab: InternalTabKey, template?: string) {
 function buildRequestsFilterHref(input: {
   customer?: string;
   key?: string;
+  page?: number;
+  monitoringView: MonitoringView;
+  monitoringInterval: MonitoringInterval;
+  monitoringRange: MonitoringRange;
+  monitoringStatus: MonitoringStatus;
 }) {
   const params = new URLSearchParams();
-  params.set("tab", "requests");
+  params.set("tab", "monitoring");
+  params.set("monitoringView", input.monitoringView);
+  params.set("monitoringInterval", input.monitoringInterval);
+  params.set("monitoringRange", input.monitoringRange);
+  params.set("monitoringStatus", input.monitoringStatus);
   if (input.customer && input.customer !== "all") {
     params.set("requestCustomer", input.customer);
   }
   if (input.key && input.key !== "all") {
     params.set("requestKey", input.key);
+  }
+  if ((input.page ?? 1) > 1) {
+    params.set("requestPage", String(input.page));
   }
   return `/internal?${params.toString()}`;
 }
@@ -171,6 +177,7 @@ const monitoringViewOptions = [
   { value: "overview", label: "系统用量总览" },
   { value: "video", label: "视频任务监控" },
   { value: "image", label: "图片任务监控" },
+  { value: "requests", label: "用户请求记录" },
 ] as const;
 
 type MonitoringInterval = (typeof monitoringIntervalOptions)[number]["value"];
@@ -934,6 +941,10 @@ export default async function InternalPage({
   const uiAlertMessage = getSearchValue(resolvedSearchParams, "alert");
   const selectedRequestCustomer = getSearchValue(resolvedSearchParams, "requestCustomer") ?? "all";
   const selectedRequestKey = getSearchValue(resolvedSearchParams, "requestKey") ?? "all";
+  const selectedRequestPageRaw = Number(getSearchValue(resolvedSearchParams, "requestPage") ?? "1");
+  const selectedRequestPage = Number.isFinite(selectedRequestPageRaw) && selectedRequestPageRaw >= 1
+    ? Math.floor(selectedRequestPageRaw)
+    : 1;
   const selectedTemplate =
     selectedTemplateKey && selectedTemplateKey in providerTemplates
       ? providerTemplates[selectedTemplateKey as keyof typeof providerTemplates]
@@ -979,6 +990,15 @@ export default async function InternalPage({
     requestCount: filteredRequests.length,
   };
   const hasFilteredRequests = filteredRequests.length > 0;
+  const requestPageSize = 20;
+  const requestTotalPages = Math.max(1, Math.ceil(filteredRequests.length / requestPageSize));
+  const requestCurrentPage = Math.min(selectedRequestPage, requestTotalPages);
+  const requestPageStartIndex = (requestCurrentPage - 1) * requestPageSize;
+  const pagedRequests = filteredRequests.slice(
+    requestPageStartIndex,
+    requestPageStartIndex + requestPageSize
+  );
+  const hasPagedRequests = pagedRequests.length > 0;
   const selectedRequestKeyRecord =
     selectedRequestKey === "all"
       ? null
@@ -1175,7 +1195,7 @@ export default async function InternalPage({
 
           {activeTab === "routes" ? (
             <>
-              <section className="mt-6">
+              <section>
                 <SectionShell
                 id="routes-panel"
                 title="可售模型路由"
@@ -1217,8 +1237,8 @@ export default async function InternalPage({
             <section className="mt-6">
               <SectionShell
                 id="monitoring-panel"
-                title="资源调度管理监测中心"
-                description="查看全系统所有模型的调用量走势，支持分钟、小时、天三种粒度，以及多个时间范围切换。"
+                title="系统使用监控"
+                description=" "
               >
                 <MonitoringAutoRefresh enabled={activeTab === "monitoring" && selectedMonitoringView === "video"} />
 
@@ -1243,120 +1263,124 @@ export default async function InternalPage({
                   ))}
                 </div>
 
-                <div className="mb-4 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
-                  <div className="grid gap-3 lg:grid-cols-3">
-                    <div>
-                      <p className="text-[11px] tracking-[0.35px] text-black/45">时间粒度</p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {monitoringIntervalOptions.map((option) => (
-                          <a
-                            key={option.value}
-                            href={buildMonitoringHref({
-                              view: selectedMonitoringView,
-                              interval: option.value,
-                              range: selectedMonitoringRange,
-                              status: selectedMonitoringStatus,
-                            })}
-                            className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
-                              selectedMonitoringInterval === option.value
-                                ? "border-black bg-black text-white"
-                                : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                            }`}
-                          >
-                            {option.label}
-                          </a>
-                        ))}
+                {selectedMonitoringView !== "requests" ? (
+                  <>
+                    <div className="mb-4 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
+                      <div className="grid gap-3 lg:grid-cols-3">
+                        <div>
+                          <p className="text-[11px] tracking-[0.35px] text-black/45">时间粒度</p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {monitoringIntervalOptions.map((option) => (
+                              <a
+                                key={option.value}
+                                href={buildMonitoringHref({
+                                  view: selectedMonitoringView,
+                                  interval: option.value,
+                                  range: selectedMonitoringRange,
+                                  status: selectedMonitoringStatus,
+                                })}
+                                className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
+                                  selectedMonitoringInterval === option.value
+                                    ? "border-black bg-black text-white"
+                                    : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                                }`}
+                              >
+                                {option.label}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-[11px] tracking-[0.35px] text-black/45">时间范围</p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {monitoringRangeOptions.map((option) => (
+                              <a
+                                key={option.value}
+                                href={buildMonitoringHref({
+                                  view: selectedMonitoringView,
+                                  interval: selectedMonitoringInterval,
+                                  range: option.value,
+                                  status: selectedMonitoringStatus,
+                                })}
+                                className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
+                                  selectedMonitoringRange === option.value
+                                    ? "border-black bg-black text-white"
+                                    : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                                }`}
+                              >
+                                {option.label}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-[11px] tracking-[0.35px] text-black/45">请求状态</p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {monitoringStatusOptions.map((option) => (
+                              <a
+                                key={option.value}
+                                href={buildMonitoringHref({
+                                  view: selectedMonitoringView,
+                                  interval: selectedMonitoringInterval,
+                                  range: selectedMonitoringRange,
+                                  status: option.value,
+                                })}
+                                className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
+                                  selectedMonitoringStatus === option.value
+                                    ? "border-black bg-black text-white"
+                                    : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                                }`}
+                              >
+                                {option.label}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    <div>
-                      <p className="text-[11px] tracking-[0.35px] text-black/45">时间范围</p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {monitoringRangeOptions.map((option) => (
-                          <a
-                            key={option.value}
-                            href={buildMonitoringHref({
-                              view: selectedMonitoringView,
-                              interval: selectedMonitoringInterval,
-                              range: option.value,
-                              status: selectedMonitoringStatus,
-                            })}
-                            className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
-                              selectedMonitoringRange === option.value
-                                ? "border-black bg-black text-white"
-                                : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                            }`}
-                          >
-                            {option.label}
-                          </a>
-                        ))}
-                      </div>
+                    <div className="mb-5 grid gap-3 md:grid-cols-6">
+                      <OverviewCard
+                        title="模型总数"
+                        value={monitoringSummary.modelCount}
+                        note="按可售模型逐张展示折线图"
+                        icon={Network}
+                      />
+                      <OverviewCard
+                        title="活跃模型"
+                        value={monitoringSummary.activeModelCount}
+                        note={`${selectedMonitoringRangeLabel} 内至少调用过一次`}
+                        icon={Activity}
+                      />
+                      <OverviewCard
+                        title="总调用量"
+                        value={monitoringSummary.requestCount}
+                        note={`${selectedMonitoringRangeLabel} · ${selectedMonitoringStatusLabel}`}
+                        icon={Fingerprint}
+                      />
+                      <OverviewCard
+                        title="单桶峰值"
+                        value={monitoringSummary.peakValue}
+                        note={`${selectedMonitoringIntervalLabel}`}
+                        icon={Waypoints}
+                      />
+                      <OverviewCard
+                        title="成功率"
+                        value={formatPercent(monitoringSuccessRate)}
+                        note={`已结算 ${monitoringHealthSummary.settled} 条`}
+                        icon={ShieldCheck}
+                      />
+                      <OverviewCard
+                        title="失败率"
+                        value={formatPercent(monitoringFailureRate)}
+                        note={`失败 ${monitoringHealthSummary.failed} · 取消 ${monitoringHealthSummary.cancelled}`}
+                        icon={ShieldAlert}
+                      />
                     </div>
-
-                    <div>
-                      <p className="text-[11px] tracking-[0.35px] text-black/45">请求状态</p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {monitoringStatusOptions.map((option) => (
-                          <a
-                            key={option.value}
-                            href={buildMonitoringHref({
-                              view: selectedMonitoringView,
-                              interval: selectedMonitoringInterval,
-                              range: selectedMonitoringRange,
-                              status: option.value,
-                            })}
-                            className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
-                              selectedMonitoringStatus === option.value
-                                ? "border-black bg-black text-white"
-                                : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                            }`}
-                          >
-                            {option.label}
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-5 grid gap-3 md:grid-cols-6">
-                  <OverviewCard
-                    title="模型总数"
-                    value={monitoringSummary.modelCount}
-                    note="按可售模型逐张展示折线图"
-                    icon={Network}
-                  />
-                  <OverviewCard
-                    title="活跃模型"
-                    value={monitoringSummary.activeModelCount}
-                    note={`${selectedMonitoringRangeLabel} 内至少调用过一次`}
-                    icon={Activity}
-                  />
-                  <OverviewCard
-                    title="总调用量"
-                    value={monitoringSummary.requestCount}
-                    note={`${selectedMonitoringRangeLabel} · ${selectedMonitoringStatusLabel}`}
-                    icon={Fingerprint}
-                  />
-                  <OverviewCard
-                    title="单桶峰值"
-                    value={monitoringSummary.peakValue}
-                    note={`${selectedMonitoringIntervalLabel}`}
-                    icon={Waypoints}
-                  />
-                  <OverviewCard
-                    title="成功率"
-                    value={formatPercent(monitoringSuccessRate)}
-                    note={`已结算 ${monitoringHealthSummary.settled} 条`}
-                    icon={ShieldCheck}
-                  />
-                  <OverviewCard
-                    title="失败率"
-                    value={formatPercent(monitoringFailureRate)}
-                    note={`失败 ${monitoringHealthSummary.failed} · 取消 ${monitoringHealthSummary.cancelled}`}
-                    icon={ShieldAlert}
-                  />
-                </div>
+                  </>
+                ) : null}
 
                 {selectedMonitoringView === "overview" ? (
                   <>
@@ -1529,247 +1553,308 @@ export default async function InternalPage({
                   </>
                 ) : null}
 
-              </SectionShell>
-            </section>
-          ) : null}
+                {selectedMonitoringView === "requests" ? (
+                  <>
+                    <div className="mb-4 grid gap-3 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                      <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
+                        <p className="text-[11px] tracking-[0.35px] text-black/45">客户</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <a
+                            href={buildRequestsFilterHref({
+                              customer: "all",
+                              key: selectedRequestKey,
+                              page: 1,
+                              monitoringView: selectedMonitoringView,
+                              monitoringInterval: selectedMonitoringInterval,
+                              monitoringRange: selectedMonitoringRange,
+                              monitoringStatus: selectedMonitoringStatus,
+                            })}
+                            className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                              selectedRequestCustomer === "all"
+                                ? "border-black bg-black text-white"
+                                : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                            }`}
+                          >
+                            全部客户
+                          </a>
+                          {data.requestFilters.customers.map((customer) => (
+                            <a
+                              key={customer.slug}
+                              href={buildRequestsFilterHref({
+                                customer: customer.slug,
+                                key: selectedRequestKey,
+                                page: 1,
+                                monitoringView: selectedMonitoringView,
+                                monitoringInterval: selectedMonitoringInterval,
+                                monitoringRange: selectedMonitoringRange,
+                                monitoringStatus: selectedMonitoringStatus,
+                              })}
+                              className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                                selectedRequestCustomer === customer.slug
+                                  ? "border-black bg-black text-white"
+                                  : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                              }`}
+                            >
+                              {customer.name}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
 
-          {activeTab === "requests" ? (
-            <section className="mt-6">
-              <SectionShell
-                id="requests-panel"
-                title="用户请求记录"
-                description=" "
-              >
-                <div className="mb-4 grid gap-3 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-                    <p className="text-[11px] tracking-[0.35px] text-black/45">客户</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <a
-                        href={buildRequestsFilterHref({
-                          customer: "all",
-                          key: selectedRequestKey,
-                        })}
-                        className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
-                          selectedRequestCustomer === "all"
-                            ? "border-black bg-black text-white"
-                            : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                        }`}
-                      >
-                        全部客户
-                      </a>
-                      {data.requestFilters.customers.map((customer) => (
-                        <a
-                          key={customer.slug}
-                          href={buildRequestsFilterHref({
-                            customer: customer.slug,
-                            key: selectedRequestKey,
-                          })}
-                          className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
-                            selectedRequestCustomer === customer.slug
-                              ? "border-black bg-black text-white"
-                              : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                          }`}
-                        >
-                          {customer.name}
-                        </a>
-                      ))}
+                      <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
+                        <p className="text-[11px] tracking-[0.35px] text-black/45">API Key 筛选</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <a
+                            href={buildRequestsFilterHref({
+                              customer: selectedRequestCustomer,
+                              key: "all",
+                              page: 1,
+                              monitoringView: selectedMonitoringView,
+                              monitoringInterval: selectedMonitoringInterval,
+                              monitoringRange: selectedMonitoringRange,
+                              monitoringStatus: selectedMonitoringStatus,
+                            })}
+                            className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                              selectedRequestKey === "all"
+                                ? "border-black bg-black text-white"
+                                : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                            }`}
+                          >
+                            全部 Key
+                          </a>
+                          {data.requestFilters.apiKeys.map((item) => (
+                            <a
+                              key={item.id}
+                              href={buildRequestsFilterHref({
+                                customer: selectedRequestCustomer,
+                                key: item.id,
+                                page: 1,
+                                monitoringView: selectedMonitoringView,
+                                monitoringInterval: selectedMonitoringInterval,
+                                monitoringRange: selectedMonitoringRange,
+                                monitoringStatus: selectedMonitoringStatus,
+                              })}
+                              className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                                selectedRequestKey === item.id
+                                  ? "border-black bg-black text-white"
+                                  : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                              }`}
+                            >
+                              {item.name}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
+                        <p className="text-[11px] tracking-[0.35px] text-black/45">当前选择</p>
+                        <p className="mt-2 text-sm font-medium text-black">
+                          {selectedRequestKeyRecord ? selectedRequestKeyRecord.name : "全部 Key"}
+                        </p>
+                        <p className="mt-1 text-xs text-black/45">
+                          {selectedRequestKeyRecord
+                            ? `${selectedRequestKeyRecord.keyPrefix} · ${selectedRequestKeyRecord.environment}`
+                            : selectedRequestCustomer === "all"
+                              ? "全局 · 全部请求记录"
+                              : `${selectedRequestCustomer} · 全部请求记录`}
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-                    <p className="text-[11px] tracking-[0.35px] text-black/45">API Key 筛选</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <a
-                        href={buildRequestsFilterHref({
-                          customer: selectedRequestCustomer,
-                          key: "all",
-                        })}
-                        className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
-                          selectedRequestKey === "all"
-                            ? "border-black bg-black text-white"
-                            : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                        }`}
-                      >
-                        全部 Key
-                      </a>
-                      {data.requestFilters.apiKeys.map((item) => (
-                        <a
-                          key={item.id}
-                          href={buildRequestsFilterHref({
-                            customer: selectedRequestCustomer,
-                            key: item.id,
-                          })}
-                          className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
-                            selectedRequestKey === item.id
-                              ? "border-black bg-black text-white"
-                              : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                          }`}
-                        >
-                          {item.name}
-                        </a>
-                      ))}
+                    {selectedRequestKeyRecord ? (
+                      selectedRequestKeyRecord.workspaceId === data.workspace.id ? (
+                        <RequestRecordsClearForm
+                          action={clearApiKeyRequestRecords}
+                          apiKeyId={selectedRequestKeyRecord.id}
+                          apiKeyName={selectedRequestKeyRecord.name}
+                        />
+                      ) : null
+                    ) : null}
+
+                    <div className="mb-4 grid gap-3 md:grid-cols-4">
+                      <OverviewCard
+                        title="请求数"
+                        value={requestSummary.requestCount}
+                        note="当前筛选条件下的请求行数"
+                        icon={Network}
+                      />
+                      <OverviewCard
+                        title="客户收费"
+                        value={formatCurrency(requestSummary.customerCharge)}
+                        note="来源：inference_requests 客户收费字段"
+                        icon={Fingerprint}
+                      />
+                      <OverviewCard
+                        title="供应商成本"
+                        value={formatCurrency(requestSummary.providerCost)}
+                        note="来源：inference_requests 供应商成本字段"
+                        icon={ShieldCheck}
+                      />
+                      <OverviewCard
+                        title="利润"
+                        value={formatCurrency(requestSummary.profit)}
+                        note="客户收费减去供应商成本"
+                        icon={Waypoints}
+                      />
                     </div>
-                  </div>
 
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-                    <p className="text-[11px] tracking-[0.35px] text-black/45">当前选择</p>
-                    <p className="mt-2 text-sm font-medium text-black">
-                      {selectedRequestKeyRecord ? selectedRequestKeyRecord.name : "全部 Key"}
-                    </p>
-                    <p className="mt-1 text-xs text-black/45">
-                      {selectedRequestKeyRecord
-                        ? `${selectedRequestKeyRecord.keyPrefix} · ${selectedRequestKeyRecord.environment}`
-                        : selectedRequestCustomer === "all"
-                          ? "全局 · 全部请求记录"
-                          : `${selectedRequestCustomer} · 全部请求记录`}
-                    </p>
-                  </div>
-                </div>
-
-                {selectedRequestKeyRecord ? (
-                  selectedRequestKeyRecord.workspaceId === data.workspace.id ? (
-                    <RequestRecordsClearForm
-                      action={clearApiKeyRequestRecords}
-                      apiKeyId={selectedRequestKeyRecord.id}
-                      apiKeyName={selectedRequestKeyRecord.name}
-                    />
-                  ) : null
-                ) : null}
-
-                <div className="mb-4 grid gap-3 md:grid-cols-4">
-                  <OverviewCard
-                    title="请求数"
-                    value={requestSummary.requestCount}
-                    note="当前筛选条件下的请求行数"
-                    icon={Network}
-                  />
-                  <OverviewCard
-                    title="客户收费"
-                    value={formatCurrency(requestSummary.customerCharge)}
-                    note="来源：inference_requests 客户收费字段"
-                    icon={Fingerprint}
-                  />
-                  <OverviewCard
-                    title="供应商成本"
-                    value={formatCurrency(requestSummary.providerCost)}
-                    note="来源：inference_requests 供应商成本字段"
-                    icon={ShieldCheck}
-                  />
-                  <OverviewCard
-                    title="利润"
-                    value={formatCurrency(requestSummary.profit)}
-                    note="客户收费减去供应商成本"
-                    icon={Waypoints}
-                  />
-                </div>
-
-                {hasFilteredRequests ? (
-                  <div className="space-y-3">
-                    {filteredRequests.map((request) => (
-                      <article
-                        key={request.id}
-                        className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm"
-                      >
-                        <div className="flex flex-col gap-3">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
-                                  {request.status}
-                                </span>
-                                <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
-                                  {request.capability}
-                                </span>
-                                <span className="inline-flex h-6 items-center rounded-md border border-black/[0.08] bg-white px-2 text-[11px] text-black/55">
-                                  {request.createdLabel}
-                                </span>
-                              </div>
-                              <p className="mt-2 truncate text-sm font-medium text-black">{request.public_model_slug}</p>
-                              <p className="mt-1 text-xs text-black/50">
-                                上游：{request.providerName} / {request.upstreamModelSlug}
-                              </p>
-                              <p className="mt-1 text-xs text-black/45">
-                                调用方：{request.customerName} · {request.apiKeyName} · {request.apiKeyPrefix}
-                              </p>
-                            </div>
-                            <div className="rounded-xl border border-black/[0.06] bg-white px-3 py-2 text-xs text-black/55">
-                              请求 ID：{request.id}
-                            </div>
-                          </div>
-
-                          <div className="grid gap-2 sm:grid-cols-3">
-                            <RequestMetricCard label="客户收费" value={request.customerChargeLabel} />
-                            <RequestMetricCard label="供应商成本" value={request.providerCostLabel} />
-                            <RequestMetricCard label="利润" value={request.profitLabel} />
+                    {hasFilteredRequests ? (
+                      <>
+                        <div className="mb-3 flex items-center justify-between rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 text-xs text-black/55">
+                          <span>
+                            第 {requestCurrentPage}/{requestTotalPages} 页 · 共 {filteredRequests.length} 条
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={buildRequestsFilterHref({
+                                customer: selectedRequestCustomer,
+                                key: selectedRequestKey,
+                                page: Math.max(1, requestCurrentPage - 1),
+                                monitoringView: selectedMonitoringView,
+                                monitoringInterval: selectedMonitoringInterval,
+                                monitoringRange: selectedMonitoringRange,
+                                monitoringStatus: selectedMonitoringStatus,
+                              })}
+                              className={`inline-flex h-7 items-center rounded-md border px-2.5 ${
+                                requestCurrentPage > 1
+                                  ? "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                                  : "pointer-events-none border-black/[0.06] bg-[#F3F3F2] text-black/35"
+                              }`}
+                            >
+                              上一页
+                            </a>
+                            <a
+                              href={buildRequestsFilterHref({
+                                customer: selectedRequestCustomer,
+                                key: selectedRequestKey,
+                                page: Math.min(requestTotalPages, requestCurrentPage + 1),
+                                monitoringView: selectedMonitoringView,
+                                monitoringInterval: selectedMonitoringInterval,
+                                monitoringRange: selectedMonitoringRange,
+                                monitoringStatus: selectedMonitoringStatus,
+                              })}
+                              className={`inline-flex h-7 items-center rounded-md border px-2.5 ${
+                                requestCurrentPage < requestTotalPages
+                                  ? "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                                  : "pointer-events-none border-black/[0.06] bg-[#F3F3F2] text-black/35"
+                              }`}
+                            >
+                              下一页
+                            </a>
                           </div>
                         </div>
+                        {hasPagedRequests ? (
+                          <div className="space-y-3">
+                            {pagedRequests.map((request) => (
+                              <article
+                                key={request.id}
+                                className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm"
+                              >
+                                <div className="flex flex-col gap-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
+                                          {request.status}
+                                        </span>
+                                        <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
+                                          {request.capability}
+                                        </span>
+                                        <span className="inline-flex h-6 items-center rounded-md border border-black/[0.08] bg-white px-2 text-[11px] text-black/55">
+                                          {request.createdLabel}
+                                        </span>
+                                      </div>
+                                      <p className="mt-2 truncate text-sm font-medium text-black">{request.public_model_slug}</p>
+                                      <p className="mt-1 text-xs text-black/50">
+                                        上游：{request.providerName} / {request.upstreamModelSlug}
+                                      </p>
+                                      <p className="mt-1 text-xs text-black/45">
+                                        调用方：{request.customerName} · {request.apiKeyName} · {request.apiKeyPrefix}
+                                      </p>
+                                    </div>
+                                    <div className="rounded-xl border border-black/[0.06] bg-white px-3 py-2 text-xs text-black/55">
+                                      请求 ID：{request.id}
+                                    </div>
+                                  </div>
 
-                        <details className="mt-4 group rounded-xl border border-black/[0.06] bg-white">
-                          <summary className="cursor-pointer list-none px-3 py-2.5 text-sm text-black/70">
-                            <span className="inline-flex items-center gap-2">
-                              <span className="text-black/50 group-open:hidden">展开明细</span>
-                              <span className="hidden text-black/50 group-open:inline">收起明细</span>
-                              <span className="text-black/40">·</span>
-                              <span>完成时间：{request.completedLabel}</span>
-                              <span className="text-black/40">·</span>
-                              <span>尝试次数：{request.attemptCount}</span>
-                              <span className="text-black/40">·</span>
-                              <span>
-                                最后延迟：
-                                {request.lastAttempt
-                                  ? ` ${request.lastAttempt.latency_ms ?? "等待中"} ms`
-                                  : " 无尝试"}
-                              </span>
-                            </span>
-                          </summary>
-
-                          <div className="border-t border-black/[0.06] px-3 py-3">
-                            {request.lastAttempt ? (
-                              <div className="mb-3 rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 text-xs">
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="text-black/58">
-                                    最后一次尝试 #{request.lastAttempt.attempt_no}
-                                  </span>
-                                  <span className="font-medium text-black">
-                                    {request.lastAttempt.status}
-                                  </span>
+                                  <div className="grid gap-2 sm:grid-cols-3">
+                                    <RequestMetricCard label="客户收费" value={request.customerChargeLabel} />
+                                    <RequestMetricCard label="供应商成本" value={request.providerCostLabel} />
+                                    <RequestMetricCard label="利润" value={request.profitLabel} />
+                                  </div>
                                 </div>
-                                {request.error_message || request.lastAttempt.error_message ? (
-                                  <p className="mt-2 leading-5 text-[#b54432]">
-                                    {request.error_message ?? request.lastAttempt.error_message}
-                                  </p>
-                                ) : null}
-                              </div>
-                            ) : null}
 
-                            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                              <RequestBreakdownSection
-                                title="使用量指标"
-                                items={request.usageBreakdown}
-                                emptyLabel="没有记录到使用量指标"
-                              />
-                              <RequestBreakdownSection
-                                title="客户侧计费"
-                                items={request.customerComponentBreakdown}
-                                emptyLabel="没有客户侧可计费组件"
-                              />
-                              <RequestBreakdownSection
-                                title="供应商成本"
-                                items={request.providerComponentBreakdown}
-                                emptyLabel="没有供应商侧成本拆分"
-                              />
-                            </div>
+                                <details className="mt-4 group rounded-xl border border-black/[0.06] bg-white">
+                                  <summary className="cursor-pointer list-none px-3 py-2.5 text-sm text-black/70">
+                                    <span className="inline-flex items-center gap-2">
+                                      <span className="text-black/50 group-open:hidden">展开明细</span>
+                                      <span className="hidden text-black/50 group-open:inline">收起明细</span>
+                                      <span className="text-black/40">·</span>
+                                      <span>完成时间：{request.completedLabel}</span>
+                                      <span className="text-black/40">·</span>
+                                      <span>尝试次数：{request.attemptCount}</span>
+                                      <span className="text-black/40">·</span>
+                                      <span>
+                                        最后延迟：
+                                        {request.lastAttempt
+                                          ? ` ${request.lastAttempt.latency_ms ?? "等待中"} ms`
+                                          : " 无尝试"}
+                                      </span>
+                                    </span>
+                                  </summary>
+
+                                  <div className="border-t border-black/[0.06] px-3 py-3">
+                                    {request.lastAttempt ? (
+                                      <div className="mb-3 rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 text-xs">
+                                        <div className="flex items-center justify-between gap-3">
+                                          <span className="text-black/58">
+                                            最后一次尝试 #{request.lastAttempt.attempt_no}
+                                          </span>
+                                          <span className="font-medium text-black">
+                                            {request.lastAttempt.status}
+                                          </span>
+                                        </div>
+                                        {request.error_message || request.lastAttempt.error_message ? (
+                                          <p className="mt-2 leading-5 text-[#b54432]">
+                                            {request.error_message ?? request.lastAttempt.error_message}
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
+
+                                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                                      <RequestBreakdownSection
+                                        title="使用量指标"
+                                        items={request.usageBreakdown}
+                                        emptyLabel="没有记录到使用量指标"
+                                      />
+                                      <RequestBreakdownSection
+                                        title="客户侧计费"
+                                        items={request.customerComponentBreakdown}
+                                        emptyLabel="没有客户侧可计费组件"
+                                      />
+                                      <RequestBreakdownSection
+                                        title="供应商成本"
+                                        items={request.providerComponentBreakdown}
+                                        emptyLabel="没有供应商侧成本拆分"
+                                      />
+                                    </div>
+                                  </div>
+                                </details>
+                              </article>
+                            ))}
                           </div>
-                        </details>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    title="当前筛选条件下没有请求"
-                    detail="调整客户或 API Key 筛选条件，或者通过 gateway 发送新流量。结算后这里会展示请求级经济数据。"
-                  />
-                )}
+                        ) : null}
+                      </>
+                    ) : (
+                      <EmptyState
+                        title="当前筛选条件下没有请求"
+                        detail="调整客户或 API Key 筛选条件，或者通过 gateway 发送新流量。结算后这里会展示请求级经济数据。"
+                      />
+                    )}
+                  </>
+                ) : null}
+
               </SectionShell>
             </section>
           ) : null}
