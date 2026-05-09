@@ -11,7 +11,8 @@ type InternalTabKey =
   | "worker-templates"
   | "providers"
   | "monitoring"
-  | "routes";
+  | "routes"
+  | "image-model-playbook";
 
 type TabItem = {
   key: InternalTabKey;
