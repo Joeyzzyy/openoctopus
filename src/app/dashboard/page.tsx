@@ -830,14 +830,6 @@ export default async function DashboardPage({
 
             {view === "models" ? (
               <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm sm:p-5">
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <h2 className="text-xl font-semibold text-black">Model catalog</h2>
-                  <div className="max-w-2xl">
-                    <p className="mt-2 text-xs text-black/40 md:hidden">
-                      Mobile view switches to stacked cards for easier scanning.
-                    </p>
-                  </div>
-                </div>
                 <ModelCatalogTable rows={modelCatalogRows} />
               </section>
             ) : null}

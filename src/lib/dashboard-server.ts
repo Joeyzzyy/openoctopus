@@ -372,7 +372,7 @@ export async function getDashboardData({
       supabaseAdmin.from("usage_events").select("id, endpoint, request_count, total_cost, status_code, created_at, api_key_id, model_id").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
       supabaseAdmin.from("wallet_transactions").select("amount_delta").eq("workspace_id", workspace.id),
       supabaseAdmin.from("wallet_transactions").select("id, entry_type, amount_delta, description, created_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
-      supabaseAdmin.from("providers").select("id, name, kind, regions, status"),
+      supabaseAdmin.from("providers").select("id, name, regions, status"),
       supabaseAdmin
         .from("provider_models")
         .select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id, capability, active"),
@@ -466,9 +466,9 @@ export async function getDashboardData({
     const providerSummaries = providers.map((provider) => ({
       name: provider.name,
       kind:
-        provider.kind === "wavespeed"
+        (provider as { kind?: string }).kind === "wavespeed"
           ? "Primary upstream"
-          : provider.kind === "partner"
+          : (provider as { kind?: string }).kind === "partner"
             ? "Fallback upstream"
             : "Custom upstream",
       regions: Array.isArray(provider.regions) && provider.regions.length > 0 ? provider.regions.join(" · ") : "unassigned",
@@ -492,7 +492,8 @@ export async function getDashboardData({
           ? providerNameById.get(primaryProviderModel.provider_id) ?? "Unknown provider"
           : "Unassigned",
         providerKind: primaryProviderModel
-          ? providerById.get(primaryProviderModel.provider_id)?.kind ?? "custom"
+          ? (providerById.get(primaryProviderModel.provider_id) as { kind?: string } | undefined)
+              ?.kind ?? "custom"
           : "custom",
         upstreamModelSlug: primaryProviderModel?.upstream_model_slug ?? row.public_model_slug,
         primary: primaryProviderModel
@@ -540,7 +541,7 @@ export async function getDashboardData({
             : primaryProvider?.name ?? "Unassigned",
           providerKind: route
             ? route.providerKind
-            : primaryProvider?.kind ?? "custom",
+            : (primaryProvider as { kind?: string } | null)?.kind ?? "custom",
           upstreamModelSlug: route
             ? route.upstreamModelSlug
             : primaryProviderModel?.upstream_model_slug ?? "-",
