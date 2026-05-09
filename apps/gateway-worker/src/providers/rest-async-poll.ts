@@ -11,7 +11,15 @@ function readPath(source: Record<string, unknown>, path: string | undefined) {
   if (!path) return null;
   let current: unknown = source;
   for (const key of path.split(".")) {
-    if (!current || typeof current !== "object" || Array.isArray(current)) return null;
+    if (Array.isArray(current)) {
+      const index = Number(key);
+      if (!Number.isInteger(index) || index < 0 || index >= current.length) {
+        return null;
+      }
+      current = current[index];
+      continue;
+    }
+    if (!current || typeof current !== "object") return null;
     current = (current as Record<string, unknown>)[key];
   }
   return current ?? null;
@@ -23,6 +31,51 @@ function fillTemplate(input: string, values: Record<string, string>) {
 
 function readString(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim().length > 0 ? value : fallback;
+}
+
+function buildAuthConfig(cfg: Record<string, unknown>, secret: string) {
+  const authType = readString(cfg.authType, "bearer");
+  if (authType === "query") {
+    const key = readString(cfg.authQueryParam, "key");
+    return {
+      headers: {} as Record<string, string>,
+      applyQuery: (url: URL) => {
+        url.searchParams.set(key, secret);
+      },
+    };
+  }
+  if (authType === "header") {
+    const headerName = readString(cfg.authHeaderName, "x-api-key");
+    return {
+      headers: { [headerName]: secret },
+      applyQuery: (_url: URL) => {},
+    };
+  }
+  const headerName = readString(cfg.authHeaderName, "Authorization");
+  const headerPrefix = readString(cfg.authHeaderPrefix, "Bearer");
+  return {
+    headers: {
+      [headerName]: headerPrefix ? `${headerPrefix} ${secret}` : secret,
+    },
+    applyQuery: (_url: URL) => {},
+  };
+}
+
+function buildAssetFromResult(
+  data: Record<string, unknown>,
+  resultValuePath: string,
+  cfg: Record<string, unknown>
+) {
+  const resultValue = readPath(data, resultValuePath);
+  const resultType = readString(cfg.resultValueType, "url");
+  if (resultType === "base64" && typeof resultValue === "string" && resultValue.length > 0) {
+    const mimeType = readString(cfg.resultMimeType, "image/png");
+    return { url: `data:${mimeType};base64,${resultValue}` };
+  }
+  if (typeof resultValue === "string" && resultValue.length > 0) {
+    return { url: resultValue };
+  }
+  return null;
 }
 
 export class RestAsyncPollAdapter implements ProviderAdapter {
@@ -39,7 +92,9 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
     const submitUrl = new URL(
       fillTemplate(submitPath, { upstreamModel: input.upstreamModelSlug }),
       input.provider.baseUrl ?? ""
-    ).toString();
+    );
+    const auth = buildAuthConfig(cfg, input.provider.secret);
+    auth.applyQuery(submitUrl);
 
     const body = {
       model: input.upstreamModelSlug,
@@ -47,25 +102,25 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
       ...input.input,
     };
 
-    const { data } = await postJson<Record<string, unknown>>(submitUrl, {
-      headers: { Authorization: `Bearer ${input.provider.secret}` },
+    const { data } = await postJson<Record<string, unknown>>(submitUrl.toString(), {
+      headers: auth.headers,
       body,
     });
 
     const taskId = readPath(data, taskIdPath);
     const status = String(readPath(data, statusPath) ?? "processing");
-    const resultUrl = readPath(data, resultUrlPath);
+    const asset = buildAssetFromResult(data, resultUrlPath, cfg);
     const isSyncMode = mode === "sync" || mode === "sync-json-v1";
     const hasPollMode = mode === "async" || mode === "async-poll" || mode === "rest-async-poll-v1" || Boolean(pollPath);
 
     if (
-      typeof resultUrl === "string" &&
+      asset &&
       (isSyncMode || status === "succeeded" || status === "completed" || !hasPollMode)
     ) {
       return {
         mode: "sync",
         upstreamRequestId: String(taskId ?? input.requestId),
-        output: { raw: data, assets: [{ url: resultUrl }] },
+        output: { raw: data, assets: [asset] },
         estimatedCost: 0,
       };
     }
@@ -85,15 +140,17 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
     const pollUrl = new URL(
       fillTemplate(pollPath, { taskId: input.upstreamTaskId }),
       input.provider.baseUrl ?? ""
-    ).toString();
+    );
+    const auth = buildAuthConfig(cfg, input.provider.secret);
+    auth.applyQuery(pollUrl);
 
-    const { data } = await getJson<Record<string, unknown>>(pollUrl, {
-      headers: { Authorization: `Bearer ${input.provider.secret}` },
+    const { data } = await getJson<Record<string, unknown>>(pollUrl.toString(), {
+      headers: auth.headers,
     });
     const statusPath = typeof cfg.statusPath === "string" ? cfg.statusPath : "status";
     const resultUrlPath = typeof cfg.resultUrlPath === "string" ? cfg.resultUrlPath : "result.url";
     const status = String(readPath(data, statusPath) ?? "processing");
-    const resultUrl = readPath(data, resultUrlPath);
+    const asset = buildAssetFromResult(data, resultUrlPath, cfg);
 
     if (status === "failed" || status === "error") {
       return {
@@ -104,11 +161,11 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
         raw: data,
       };
     }
-    if ((status === "succeeded" || status === "completed") && typeof resultUrl === "string") {
+    if ((status === "succeeded" || status === "completed") && asset) {
       return {
         done: true,
         success: true,
-        output: { raw: data, assets: [{ url: resultUrl }] },
+        output: { raw: data, assets: [asset] },
         actualCost: 0,
         raw: data,
       };

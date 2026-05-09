@@ -50,6 +50,13 @@ type BillingFormState = {
 };
 
 type ExecutionConfigFormState = {
+  mode: string;
+  authType: string;
+  authHeaderName: string;
+  authHeaderPrefix: string;
+  authQueryParam: string;
+  resultValueType: string;
+  resultMimeType: string;
   submitPath: string;
   pollPath: string;
   taskIdPath: string;
@@ -167,6 +174,13 @@ function buildBillingConfigValue(state: BillingFormState) {
 
 function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormState {
   const fallback: ExecutionConfigFormState = {
+    mode: "auto",
+    authType: "bearer",
+    authHeaderName: "Authorization",
+    authHeaderPrefix: "Bearer",
+    authQueryParam: "key",
+    resultValueType: "url",
+    resultMimeType: "image/png",
     submitPath: "/v1/models/{upstreamModel}:generate",
     pollPath: "/v1/operations/{taskId}",
     taskIdPath: "name",
@@ -181,6 +195,34 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
   try {
     const parsed = JSON.parse(initialValue) as Record<string, unknown>;
     return {
+      mode:
+        typeof parsed.mode === "string" && parsed.mode.trim().length > 0
+          ? parsed.mode
+          : fallback.mode,
+      authType:
+        typeof parsed.authType === "string" && parsed.authType.trim().length > 0
+          ? parsed.authType
+          : fallback.authType,
+      authHeaderName:
+        typeof parsed.authHeaderName === "string" && parsed.authHeaderName.trim().length > 0
+          ? parsed.authHeaderName
+          : fallback.authHeaderName,
+      authHeaderPrefix:
+        typeof parsed.authHeaderPrefix === "string"
+          ? parsed.authHeaderPrefix
+          : fallback.authHeaderPrefix,
+      authQueryParam:
+        typeof parsed.authQueryParam === "string" && parsed.authQueryParam.trim().length > 0
+          ? parsed.authQueryParam
+          : fallback.authQueryParam,
+      resultValueType:
+        typeof parsed.resultValueType === "string" && parsed.resultValueType.trim().length > 0
+          ? parsed.resultValueType
+          : fallback.resultValueType,
+      resultMimeType:
+        typeof parsed.resultMimeType === "string" && parsed.resultMimeType.trim().length > 0
+          ? parsed.resultMimeType
+          : fallback.resultMimeType,
       submitPath:
         typeof parsed.submitPath === "string" && parsed.submitPath.trim().length > 0
           ? parsed.submitPath
@@ -209,6 +251,13 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
 
 function buildExecutionConfigValue(state: ExecutionConfigFormState) {
   return JSON.stringify({
+    mode: state.mode.trim(),
+    authType: state.authType.trim(),
+    authHeaderName: state.authHeaderName.trim(),
+    authHeaderPrefix: state.authHeaderPrefix.trim(),
+    authQueryParam: state.authQueryParam.trim(),
+    resultValueType: state.resultValueType.trim(),
+    resultMimeType: state.resultMimeType.trim(),
     submitPath: state.submitPath.trim(),
     pollPath: state.pollPath.trim(),
     taskIdPath: state.taskIdPath.trim(),
@@ -572,6 +621,94 @@ export function CreateProviderModelForm({
             <input type="hidden" name="executionConfig" value={executionConfigValue} />
             <div className="grid gap-3 md:grid-cols-2">
               <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">调用模式</span>
+                <select
+                  value={executionConfigState.mode}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      mode: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formSelectClassName}
+                >
+                  <option value="auto">自动判断</option>
+                  <option value="sync">同步返回</option>
+                  <option value="async">任务轮询</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">鉴权方式</span>
+                <select
+                  value={executionConfigState.authType}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      authType: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formSelectClassName}
+                >
+                  <option value="bearer">Bearer Header</option>
+                  <option value="header">自定义 Header</option>
+                  <option value="query">Query 参数</option>
+                </select>
+              </label>
+              {executionConfigState.authType === "query" ? (
+                <label className="block">
+                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Query 参数名</span>
+                  <input
+                    value={executionConfigState.authQueryParam}
+                    onChange={(event) =>
+                      setExecutionConfigState((current) => ({
+                        ...current,
+                        authQueryParam: event.target.value,
+                      }))
+                    }
+                    disabled={disabled}
+                    className={formInputClassName}
+                    placeholder="key"
+                  />
+                </label>
+              ) : (
+                <>
+                  <label className="block">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Header 名</span>
+                    <input
+                      value={executionConfigState.authHeaderName}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          authHeaderName: event.target.value,
+                        }))
+                      }
+                      disabled={disabled}
+                      className={formInputClassName}
+                      placeholder={executionConfigState.authType === "bearer" ? "Authorization" : "x-api-key"}
+                    />
+                  </label>
+                  {executionConfigState.authType === "bearer" ? (
+                    <label className="block">
+                      <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Header 前缀</span>
+                      <input
+                        value={executionConfigState.authHeaderPrefix}
+                        onChange={(event) =>
+                          setExecutionConfigState((current) => ({
+                            ...current,
+                            authHeaderPrefix: event.target.value,
+                          }))
+                        }
+                        disabled={disabled}
+                        className={formInputClassName}
+                        placeholder="Bearer"
+                      />
+                    </label>
+                  ) : null}
+                </>
+              )}
+              <label className="block">
                 <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提交路径 submitPath</span>
                 <input
                   value={executionConfigState.submitPath}
@@ -651,6 +788,40 @@ export function CreateProviderModelForm({
                   placeholder="response.outputUrl"
                 />
               </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">结果值类型</span>
+                <select
+                  value={executionConfigState.resultValueType}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      resultValueType: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formSelectClassName}
+                >
+                  <option value="url">URL</option>
+                  <option value="base64">Base64</option>
+                </select>
+              </label>
+              {executionConfigState.resultValueType === "base64" ? (
+                <label className="block">
+                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Base64 MIME 类型</span>
+                  <input
+                    value={executionConfigState.resultMimeType}
+                    onChange={(event) =>
+                      setExecutionConfigState((current) => ({
+                        ...current,
+                        resultMimeType: event.target.value,
+                      }))
+                    }
+                    disabled={disabled}
+                    className={formInputClassName}
+                    placeholder="image/png"
+                  />
+                </label>
+              ) : null}
               <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 md:col-span-2">
                 <p className="text-[11px] tracking-[0.35px] text-black/45">将提交的协议参数 JSON</p>
                 <code className="mt-1 block break-all text-xs leading-5 text-black/55">

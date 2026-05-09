@@ -1139,6 +1139,25 @@ const deleteWorkerTemplateSchema = z.object({
   workerId: z.string().uuid(),
 });
 
+const createProviderCapabilityExecutionConfigSchema = z.object({
+  providerId: z.string().uuid(),
+  capability: capabilitySchema,
+  executionTemplate: z.string().trim().min(1).max(80),
+  executionConfig: z.record(z.string(), z.unknown()).default({}),
+});
+
+const updateProviderCapabilityExecutionConfigSchema = z.object({
+  configId: z.string().uuid(),
+  providerId: z.string().uuid(),
+  capability: capabilitySchema,
+  executionTemplate: z.string().trim().min(1).max(80),
+  executionConfig: z.record(z.string(), z.unknown()).default({}),
+});
+
+const deleteProviderCapabilityExecutionConfigSchema = z.object({
+  configId: z.string().uuid(),
+});
+
 export async function createWorkerTemplate(formData: FormData) {
   const { supabase, userId, workspaceId } = await getInternalAdminContext();
   const parsed = createWorkerTemplateSchema.parse({
@@ -1260,6 +1279,139 @@ export async function deleteWorkerTemplate(formData: FormData) {
     targetType: "worker_template",
     targetId: parsed.workerId,
     summary: `Deleted worker template ${worker.slug}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+export async function createProviderCapabilityExecutionConfig(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = createProviderCapabilityExecutionConfigSchema.parse({
+    providerId: formData.get("providerId"),
+    capability: formData.get("capability"),
+    executionTemplate: formData.get("executionTemplate"),
+    executionConfig: parseJsonField(formData.get("executionConfig")),
+  });
+  await ensureWorkerTemplateExists({
+    supabase,
+    slug: parsed.executionTemplate,
+    displayName: parsed.executionTemplate,
+    config: parsed.executionConfig,
+  });
+
+  const { data, error } = await supabase
+    .from("provider_capability_execution_configs")
+    .upsert(
+      {
+        provider_id: parsed.providerId,
+        capability: parsed.capability,
+        execution_template: parsed.executionTemplate,
+        execution_config: parsed.executionConfig,
+        active: true,
+      },
+      { onConflict: "provider_id,capability" }
+    )
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_capability_execution.create",
+    targetType: "provider_capability_execution",
+    targetId: data?.id ?? null,
+    summary: `Created provider capability execution config ${parsed.executionTemplate}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+export async function updateProviderCapabilityExecutionConfig(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = updateProviderCapabilityExecutionConfigSchema.parse({
+    configId: formData.get("configId"),
+    providerId: formData.get("providerId"),
+    capability: formData.get("capability"),
+    executionTemplate: formData.get("executionTemplate"),
+    executionConfig: parseJsonField(formData.get("executionConfig")),
+  });
+  await ensureWorkerTemplateExists({
+    supabase,
+    slug: parsed.executionTemplate,
+    displayName: parsed.executionTemplate,
+    config: parsed.executionConfig,
+  });
+
+  const { error } = await supabase
+    .from("provider_capability_execution_configs")
+    .update({
+      provider_id: parsed.providerId,
+      capability: parsed.capability,
+      execution_template: parsed.executionTemplate,
+      execution_config: parsed.executionConfig,
+      active: true,
+    })
+    .eq("id", parsed.configId);
+  if (error) throw new Error(error.message);
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_capability_execution.update",
+    targetType: "provider_capability_execution",
+    targetId: parsed.configId,
+    summary: `Updated provider capability execution config ${parsed.executionTemplate}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+export async function deleteProviderCapabilityExecutionConfig(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = deleteProviderCapabilityExecutionConfigSchema.parse({
+    configId: formData.get("configId"),
+  });
+
+  const { data: config, error: configError } = await supabase
+    .from("provider_capability_execution_configs")
+    .select("id, provider_id, capability, execution_template")
+    .eq("id", parsed.configId)
+    .maybeSingle();
+  if (configError) throw new Error(configError.message);
+  if (!config) throw new Error("配置不存在");
+
+  const { data: inUseRows, error: inUseError } = await supabase
+    .from("provider_models")
+    .select("id")
+    .eq("provider_id", config.provider_id)
+    .eq("capability", config.capability)
+    .is("execution_template", null)
+    .limit(1);
+  if (inUseError) throw new Error(inUseError.message);
+  if ((inUseRows ?? []).length > 0) {
+    throw new Error("该配置仍被未显式设置模板的供应商模型继承，无法删除。");
+  }
+
+  const { error } = await supabase
+    .from("provider_capability_execution_configs")
+    .delete()
+    .eq("id", parsed.configId);
+  if (error) throw new Error(error.message);
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_capability_execution.delete",
+    targetType: "provider_capability_execution",
+    targetId: parsed.configId,
+    summary: `Deleted provider capability execution config ${config.execution_template}`,
     details: parsed,
   });
 

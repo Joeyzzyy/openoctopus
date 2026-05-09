@@ -247,9 +247,37 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     );
   }
 
-  const providerSlug = providerModelRow.execution_template
+  const { data: providerCapabilityExecutionRow, error: providerCapabilityExecutionError } =
+    await supabaseAdmin
+      .from("provider_capability_execution_configs")
+      .select("execution_template, execution_config")
+      .eq("provider_id", providerModelRow.provider_id)
+      .eq("capability", input.capability)
+      .eq("active", true)
+      .maybeSingle();
+
+  if (providerCapabilityExecutionError) {
+    throw new Error(providerCapabilityExecutionError.message);
+  }
+
+  const providerSlug = providerModelRow.execution_template?.trim()
     ? providerModelRow.execution_template
-    : await resolveProviderAdapterSlug(providerRow.slug);
+    : providerCapabilityExecutionRow?.execution_template?.trim()
+      ? providerCapabilityExecutionRow.execution_template
+      : await resolveProviderAdapterSlug(providerRow.slug);
+
+  const baseExecutionConfig =
+    providerCapabilityExecutionRow?.execution_config &&
+    typeof providerCapabilityExecutionRow.execution_config === "object" &&
+    !Array.isArray(providerCapabilityExecutionRow.execution_config)
+      ? (providerCapabilityExecutionRow.execution_config as Record<string, unknown>)
+      : {};
+  const modelExecutionConfig =
+    providerModelRow.execution_config &&
+    typeof providerModelRow.execution_config === "object" &&
+    !Array.isArray(providerModelRow.execution_config)
+      ? (providerModelRow.execution_config as Record<string, unknown>)
+      : {};
 
   const { data: credentialRows, error: credentialError } = await supabaseAdmin
     .from("provider_credentials")
@@ -310,10 +338,10 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
         ...(providerRow.config && typeof providerRow.config === "object" && !Array.isArray(providerRow.config)
           ? (providerRow.config as Record<string, unknown>)
           : {}),
-        executionConfig:
-          providerModelRow.execution_config && typeof providerModelRow.execution_config === "object" && !Array.isArray(providerModelRow.execution_config)
-            ? (providerModelRow.execution_config as Record<string, unknown>)
-            : {},
+        executionConfig: {
+          ...baseExecutionConfig,
+          ...modelExecutionConfig,
+        },
       },
     upstreamModelSlug: providerModelRow.upstream_model_slug,
     endpoint: input.endpoint,

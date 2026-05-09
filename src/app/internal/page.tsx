@@ -19,7 +19,6 @@ import {
   CreateModelVendorButton,
   CreateSupportedModelButton,
   CreateProviderModelMappingButton,
-  CreateWorkerTemplateButton,
   EconomicsPanel,
   ModelVendorsPanel,
   ProvidersPanel,
@@ -37,6 +36,12 @@ const tabs = [
     group: "overview",
     label: "系统用量监控",
     description: "资源调度管理监测中心。",
+  },
+  {
+    key: "worker-templates",
+    group: "basic",
+    label: "API 调用格式配置",
+    description: "管理供应商模型调用格式模板。",
   },
   {
     key: "providers",
@@ -67,12 +72,6 @@ const tabs = [
     group: "basic",
     label: "路由配置",
     description: "决定当前流量走哪个供应商模型。",
-  },
-  {
-    key: "worker-templates",
-    group: "basic",
-    label: "API 调用格式配置",
-    description: "管理供应商模型调用格式模板。",
   },
   {
     key: "requests",
@@ -1149,6 +1148,8 @@ export default async function InternalPage({
                 providers={data.providers}
                 credentials={data.providerCredentials}
                 providerStatusOptions={providerStatusOptions}
+                workerTemplates={data.workerTemplates ?? []}
+                providerCapabilityExecutionConfigs={data.providerCapabilityExecutionConfigs ?? []}
               />
               </SectionShell>
             </>
@@ -1201,7 +1202,6 @@ export default async function InternalPage({
                 id="worker-templates-panel"
                 title="API 调用格式配置"
                 description=" "
-                headerRight={<CreateWorkerTemplateButton />}
               >
                 <WorkerTemplatesPanel
                   workerTemplates={data.workerTemplates ?? []}
