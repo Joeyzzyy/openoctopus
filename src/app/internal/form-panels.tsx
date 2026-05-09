@@ -64,6 +64,45 @@ type ExecutionConfigFormState = {
   resultUrlPath: string;
 };
 
+function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormState> {
+  if (slug === "sync-json-v1") {
+    return {
+      mode: "sync",
+      submitPath: "/v1beta/models/{upstreamModel}:generateContent",
+      pollPath: "",
+      taskIdPath: "responseId",
+      statusPath: "",
+      resultUrlPath: "candidates.0.content.parts.0.inlineData.data",
+      resultValueType: "base64",
+      resultMimeType: "image/png",
+      authType: "query",
+      authQueryParam: "key",
+    };
+  }
+  if (slug === "upload-async-poll-v1") {
+    return {
+      mode: "async",
+      submitPath: "/v1/models/{upstreamModel}:generate",
+      pollPath: "/v1/operations/{taskId}",
+      taskIdPath: "name",
+      statusPath: "done",
+      resultUrlPath: "response.outputUrl",
+      resultValueType: "url",
+      resultMimeType: "image/png",
+    };
+  }
+  return {
+    mode: "async",
+    submitPath: "/v1/models/{upstreamModel}:generate",
+    pollPath: "/v1/operations/{taskId}",
+    taskIdPath: "name",
+    statusPath: "done",
+    resultUrlPath: "response.outputUrl",
+    resultValueType: "url",
+    resultMimeType: "image/png",
+  };
+}
+
 const formInputClassName =
   "h-10 w-full rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
 
@@ -501,14 +540,19 @@ export function CreateProviderModelForm({
     workerTemplates.length > 0
       ? workerTemplates
       : [{ id: "fallback", displayName: "任务轮询（提交后查询）", slug: defaultExecutionTemplate }];
+  const [executionTemplate, setExecutionTemplate] = useState(defaultExecutionTemplate);
   const [executionConfigState, setExecutionConfigState] = useState(() =>
     parseExecutionConfigState(defaultExecutionConfig)
   );
   const executionConfigValue = buildExecutionConfigValue(executionConfigState);
+  const templateIsAsync =
+    executionTemplate === "rest-async-poll-v1" || executionTemplate === "upload-async-poll-v1";
+  const isAsyncMode = executionConfigState.mode === "async" || (executionConfigState.mode === "auto" && templateIsAsync);
 
   useEffect(() => {
+    setExecutionTemplate(defaultExecutionTemplate);
     setExecutionConfigState(parseExecutionConfigState(defaultExecutionConfig));
-  }, [defaultExecutionConfig]);
+  }, [defaultExecutionConfig, defaultExecutionTemplate]);
 
   return (
     <form
@@ -607,7 +651,16 @@ export function CreateProviderModelForm({
               <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">API 调用格式配置</span>
               <select
                 name="executionTemplate"
-                defaultValue={defaultExecutionTemplate}
+                value={executionTemplate}
+                onChange={(event) => {
+                  const nextTemplate = event.target.value;
+                  setExecutionTemplate(nextTemplate);
+                  const preset = templateExecutionPreset(nextTemplate);
+                  setExecutionConfigState((current) => ({
+                    ...current,
+                    ...preset,
+                  }));
+                }}
                 disabled={disabled}
                 className={formSelectClassName}
               >
@@ -633,7 +686,7 @@ export function CreateProviderModelForm({
                   disabled={disabled}
                   className={formSelectClassName}
                 >
-                  <option value="auto">自动判断</option>
+                  <option value="auto">自动判断（推荐）</option>
                   <option value="sync">同步返回</option>
                   <option value="async">任务轮询</option>
                 </select>
@@ -725,22 +778,6 @@ export function CreateProviderModelForm({
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">轮询路径 pollPath</span>
-                <input
-                  value={executionConfigState.pollPath}
-                  onChange={(event) =>
-                    setExecutionConfigState((current) => ({
-                      ...current,
-                      pollPath: event.target.value,
-                    }))
-                  }
-                  required
-                  disabled={disabled}
-                  className={formInputClassName}
-                  placeholder="/v1/operations/{taskId}"
-                />
-              </label>
-              <label className="block">
                 <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">任务 ID 路径 taskIdPath</span>
                 <input
                   value={executionConfigState.taskIdPath}
@@ -756,22 +793,42 @@ export function CreateProviderModelForm({
                   placeholder="name"
                 />
               </label>
-              <label className="block">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">完成状态路径 statusPath</span>
-                <input
-                  value={executionConfigState.statusPath}
-                  onChange={(event) =>
-                    setExecutionConfigState((current) => ({
-                      ...current,
-                      statusPath: event.target.value,
-                    }))
-                  }
-                  required
-                  disabled={disabled}
-                  className={formInputClassName}
-                  placeholder="done"
-                />
-              </label>
+              {isAsyncMode ? (
+                <>
+                  <label className="block">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">轮询路径 pollPath</span>
+                    <input
+                      value={executionConfigState.pollPath}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          pollPath: event.target.value,
+                        }))
+                      }
+                      required
+                      disabled={disabled}
+                      className={formInputClassName}
+                      placeholder="/v1/operations/{taskId}"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">完成状态路径 statusPath</span>
+                    <input
+                      value={executionConfigState.statusPath}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          statusPath: event.target.value,
+                        }))
+                      }
+                      required
+                      disabled={disabled}
+                      className={formInputClassName}
+                      placeholder="done"
+                    />
+                  </label>
+                </>
+              ) : null}
               <label className="block md:col-span-2">
                 <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">结果 URL 路径 resultUrlPath</span>
                 <input

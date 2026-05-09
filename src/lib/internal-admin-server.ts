@@ -54,16 +54,6 @@ type WorkerTemplateRow = {
   created_at: string;
 };
 
-type ProviderCapabilityExecutionConfigRow = {
-  id: string;
-  provider_id: string;
-  capability: "image_generation" | "image_edit" | "video_generation";
-  execution_template: string;
-  execution_config: Record<string, unknown> | null;
-  active: boolean;
-  created_at: string;
-};
-
 type ProviderAdapterAliasRow = {
   id: string;
   alias_slug: string;
@@ -655,7 +645,6 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     supportedModelsResponse,
     modelVendorsResponse,
     workerTemplatesResponse,
-    providerCapabilityExecutionConfigsResponse,
     providerAdapterCatalogResponse,
     providerAdapterAliasesResponse,
     providerCredentialsResponse,
@@ -692,11 +681,6 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         .select("id, display_name, slug, config, active, created_at")
         .eq("active", true)
         .order("slug", { ascending: true }),
-      supabase
-        .from("provider_capability_execution_configs")
-        .select("id, provider_id, capability, execution_template, execution_config, active, created_at")
-        .eq("active", true)
-        .order("created_at", { ascending: true }),
       supabase
         .from("provider_adapter_catalog")
         .select("id, slug, active, created_at")
@@ -791,9 +775,6 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const workerTemplates = (workerTemplatesResponse.error
     ? []
     : workerTemplatesResponse.data ?? []) as WorkerTemplateRow[];
-  const providerCapabilityExecutionConfigs = (providerCapabilityExecutionConfigsResponse.error
-    ? []
-    : providerCapabilityExecutionConfigsResponse.data ?? []) as ProviderCapabilityExecutionConfigRow[];
   const providerAdapterCatalog = (providerAdapterCatalogResponse.error
     ? []
     : providerAdapterCatalogResponse.data ?? []) as ProviderAdapterCatalogRow[];
@@ -1217,13 +1198,6 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       ...worker,
       display_name: worker.display_name ?? worker.slug,
       createdLabel: formatRelativeTimestamp(worker.created_at),
-    })),
-    providerCapabilityExecutionConfigs: providerCapabilityExecutionConfigs.map((row) => ({
-      ...row,
-      providerName: providerById.get(row.provider_id)?.name ?? "Unknown provider",
-      providerSlug: providerById.get(row.provider_id)?.slug ?? "unknown",
-      executionConfigText: formatJson(row.execution_config),
-      createdLabel: formatRelativeTimestamp(row.created_at),
     })),
     providerAdapterCatalog: providerAdapterCatalog.map((item) => ({
       ...item,

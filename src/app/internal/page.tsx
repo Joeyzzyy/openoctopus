@@ -1148,8 +1148,6 @@ export default async function InternalPage({
                 providers={data.providers}
                 credentials={data.providerCredentials}
                 providerStatusOptions={providerStatusOptions}
-                workerTemplates={data.workerTemplates ?? []}
-                providerCapabilityExecutionConfigs={data.providerCapabilityExecutionConfigs ?? []}
               />
               </SectionShell>
             </>

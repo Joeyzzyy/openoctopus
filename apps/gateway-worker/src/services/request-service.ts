@@ -247,31 +247,9 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     );
   }
 
-  const { data: providerCapabilityExecutionRow, error: providerCapabilityExecutionError } =
-    await supabaseAdmin
-      .from("provider_capability_execution_configs")
-      .select("execution_template, execution_config")
-      .eq("provider_id", providerModelRow.provider_id)
-      .eq("capability", input.capability)
-      .eq("active", true)
-      .maybeSingle();
-
-  if (providerCapabilityExecutionError) {
-    throw new Error(providerCapabilityExecutionError.message);
-  }
-
   const providerSlug = providerModelRow.execution_template?.trim()
     ? providerModelRow.execution_template
-    : providerCapabilityExecutionRow?.execution_template?.trim()
-      ? providerCapabilityExecutionRow.execution_template
-      : await resolveProviderAdapterSlug(providerRow.slug);
-
-  const baseExecutionConfig =
-    providerCapabilityExecutionRow?.execution_config &&
-    typeof providerCapabilityExecutionRow.execution_config === "object" &&
-    !Array.isArray(providerCapabilityExecutionRow.execution_config)
-      ? (providerCapabilityExecutionRow.execution_config as Record<string, unknown>)
-      : {};
+    : await resolveProviderAdapterSlug(providerRow.slug);
   const modelExecutionConfig =
     providerModelRow.execution_config &&
     typeof providerModelRow.execution_config === "object" &&
@@ -339,7 +317,6 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
           ? (providerRow.config as Record<string, unknown>)
           : {}),
         executionConfig: {
-          ...baseExecutionConfig,
           ...modelExecutionConfig,
         },
       },

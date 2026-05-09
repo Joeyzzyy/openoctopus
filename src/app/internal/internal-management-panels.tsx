@@ -4,9 +4,7 @@ import { BadgeCheck, CircleAlert, Pencil, Plus } from "lucide-react";
 import { deriveLegacyBillingFields, parseBillingConfig } from "@/lib/billing-config";
 import {
   createModelVendor,
-  createProviderCapabilityExecutionConfig,
   createProvider,
-  deleteProviderCapabilityExecutionConfig,
   deleteProvider,
   createProviderCredential,
   createProviderModel,
@@ -18,7 +16,6 @@ import {
   updateProviderCredentialDetails,
   updateProviderModelDetails,
   updateRoutingRule,
-  updateProviderCapabilityExecutionConfig,
   updateSupportedModelDetails,
   updateSupportedModelState,
 } from "./actions";
@@ -69,19 +66,6 @@ type WorkerTemplateSummary = {
   display_name: string;
   slug: string;
   config: Record<string, unknown> | null;
-  active: boolean;
-  createdLabel: string;
-};
-
-type ProviderCapabilityExecutionConfigSummary = {
-  id: string;
-  provider_id: string;
-  providerName: string;
-  providerSlug: string;
-  capability: "image_generation" | "image_edit" | "video_generation";
-  execution_template: string;
-  execution_config: Record<string, unknown> | null;
-  executionConfigText: string;
   active: boolean;
   createdLabel: string;
 };
@@ -1269,7 +1253,7 @@ export function EconomicsPanel({
                           <td className="sticky right-0 z-10 w-[180px] border-b border-black/[0.06] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
                             <ManagementDialog
                               trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
-                              title={`编辑：${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
+                              title={`编辑 ${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
                               description=" "
                             >
                               {({ close }) => (
@@ -1497,21 +1481,11 @@ export function ProvidersPanel({
   providers,
   credentials,
   providerStatusOptions,
-  workerTemplates = [],
-  providerCapabilityExecutionConfigs = [],
 }: {
   providers: ProviderSummary[];
   credentials: ProviderCredentialSummary[];
   providerStatusOptions: readonly ProviderStatusOption[];
-  workerTemplates?: WorkerTemplateSummary[];
-  providerCapabilityExecutionConfigs?: ProviderCapabilityExecutionConfigSummary[];
 }) {
-  const providerSelectOptions = providers.map((item) => ({
-    value: item.id,
-    label: `${item.name} (${item.slug})`,
-  }));
-  const hasProviders = providerSelectOptions.length > 0;
-
   const statusToneClassName = (status: ProviderSummary["status"]) => {
     if (status === "healthy") {
       return "border-[#D7EADB] bg-[#EDF8F0] text-[#335D2D]";
@@ -1541,9 +1515,6 @@ export function ProvidersPanel({
             <tbody>
               {providers.map((provider) => {
                 const providerCredentials = credentials.filter((item) => item.provider_id === provider.id);
-                const capabilityConfigs = providerCapabilityExecutionConfigs.filter(
-                  (item) => item.provider_id === provider.id
-                );
 
                 return (
                 <tr key={provider.id}>
@@ -1592,137 +1563,6 @@ export function ProvidersPanel({
                           <CredentialsPanel credentials={providerCredentials} providers={[provider]} selectedTemplate={null} />
                         </ManagementDialog>
                         <ManagementDialog
-                          trigger={<ModalButton tone="secondary">默认调用配置</ModalButton>}
-                          title={`默认调用配置：${provider.name}`}
-                          description="按能力配置这个供应商的默认 API 调用方式。"
-                        >
-                          <div className="space-y-4">
-                            {capabilityConfigs.length > 0 ? (
-                              <div className="overflow-x-auto rounded-xl border border-black/[0.08] bg-white">
-                                <table className="min-w-[720px] border-separate border-spacing-0 text-left text-sm">
-                                  <thead>
-                                    <tr className="text-xs text-black/50">
-                                      <th className="border-b border-black/[0.08] px-3 py-2">能力</th>
-                                      <th className="border-b border-black/[0.08] px-3 py-2">模板</th>
-                                      <th className="border-b border-black/[0.08] px-3 py-2">配置校验</th>
-                                      <th className="border-b border-black/[0.08] px-3 py-2">操作</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {capabilityConfigs.map((item) => {
-                                      const diagnostics = readTemplateConfigDiagnostics(item.execution_config);
-                                      return (
-                                        <tr key={item.id}>
-                                          <td className="border-b border-black/[0.06] px-3 py-2.5 text-xs text-black/70">
-                                            {item.capability === "image_generation" ? "图片生成" : item.capability === "image_edit" ? "图片编辑" : "视频生成"}
-                                          </td>
-                                          <td className="border-b border-black/[0.06] px-3 py-2.5 text-xs text-black/70">
-                                            {item.execution_template}
-                                          </td>
-                                          <td className="border-b border-black/[0.06] px-3 py-2.5 text-xs text-black/70">
-                                            {diagnostics.length === 0 ? "完整" : diagnostics.join("；")}
-                                          </td>
-                                          <td className="border-b border-black/[0.06] px-3 py-2.5">
-                                            <div className="flex flex-wrap gap-2">
-                                              <ManagementDialog trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>} title="编辑供应商能力配置">
-                                                {({ close }) => (
-                                                  <ManagedDialogForm action={updateProviderCapabilityExecutionConfig} close={close}>
-                                                    <input type="hidden" name="configId" value={item.id} />
-                                                    <input type="hidden" name="providerId" value={provider.id} />
-                                                    <FormSelect
-                                                      label="能力"
-                                                      name="capability"
-                                                      defaultValue={item.capability}
-                                                      options={[
-                                                        { value: "image_generation", label: "图片生成" },
-                                                        { value: "image_edit", label: "图片编辑" },
-                                                        { value: "video_generation", label: "视频生成" },
-                                                      ]}
-                                                    />
-                                                    <FormSelect
-                                                      label="API 调用格式模板"
-                                                      name="executionTemplate"
-                                                      defaultValue={item.execution_template}
-                                                      options={workerTemplates.map((worker) => ({
-                                                        value: worker.slug,
-                                                        label: `${worker.display_name || worker.slug} (${worker.slug})`,
-                                                      }))}
-                                                    />
-                                                    <WorkerTemplateConfigEditor
-                                                      initialConfig={item.execution_config}
-                                                      hiddenFieldName="executionConfig"
-                                                    />
-                                                    <div className="flex justify-end">
-                                                      <SubmitButton label="保存配置" />
-                                                    </div>
-                                                  </ManagedDialogForm>
-                                                )}
-                                              </ManagementDialog>
-                                              <ManagementDialog trigger={<ModalButton tone="secondary">删除</ModalButton>} title="删除供应商能力配置">
-                                                {({ close }) => (
-                                                  <ManagedDialogForm action={deleteProviderCapabilityExecutionConfig} close={close}>
-                                                    <input type="hidden" name="configId" value={item.id} />
-                                                    <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
-                                                      删除后，该供应商该能力将不再有默认调用配置。
-                                                    </div>
-                                                    <div className="flex justify-end">
-                                                      <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
-                                                    </div>
-                                                  </ManagedDialogForm>
-                                                )}
-                                              </ManagementDialog>
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <p className="text-sm text-black/55">这个供应商还没有能力默认调用配置。</p>
-                            )}
-
-                            <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
-                              <p className="mb-3 text-sm font-medium text-black">新增能力默认调用配置</p>
-                              <form action={createProviderCapabilityExecutionConfig} className="grid gap-4">
-                                <input type="hidden" name="providerId" value={provider.id} />
-                                <FormSelect
-                                  label="能力"
-                                  name="capability"
-                                  options={[
-                                    { value: "image_generation", label: "图片生成" },
-                                    { value: "image_edit", label: "图片编辑" },
-                                    { value: "video_generation", label: "视频生成" },
-                                  ]}
-                                />
-                                <FormSelect
-                                  label="API 调用格式模板"
-                                  name="executionTemplate"
-                                  options={workerTemplates.map((worker) => ({
-                                    value: worker.slug,
-                                    label: `${worker.display_name || worker.slug} (${worker.slug})`,
-                                  }))}
-                                />
-                                <WorkerTemplateConfigEditor
-                                  hiddenFieldName="executionConfig"
-                                  initialConfig={{
-                                    mode: "auto",
-                                    submitPath: "/v1/tasks",
-                                    pollPath: "/v1/tasks/{taskId}",
-                                    taskIdPath: "id",
-                                    statusPath: "status",
-                                    resultUrlPath: "result.url",
-                                  }}
-                                />
-                                <div className="flex justify-end">
-                                  <SubmitButton label="新增配置" />
-                                </div>
-                              </form>
-                            </div>
-                          </div>
-                        </ManagementDialog>
-                        <ManagementDialog
                           trigger={<ModalButton tone="secondary">删除</ModalButton>}
                           title={`删除 ${provider.name}`}
                           description="确认删除该供应商。若仍有关联模型或密钥将阻止删除。"
@@ -1756,144 +1596,6 @@ export function ProvidersPanel({
         </div>
       )}
 
-      <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="text-sm font-medium text-black">供应商能力默认调用配置</p>
-          <ManagementDialog
-            trigger={<ModalButton><Plus className="size-3.5" />新建</ModalButton>}
-            title="新建供应商能力配置"
-            disabled={!hasProviders}
-          >
-            {({ close }) => (
-              <ManagedDialogForm action={createProviderCapabilityExecutionConfig} close={close}>
-                <FormSelect label="供应商" name="providerId" options={providerSelectOptions} />
-                <FormSelect
-                  label="能力"
-                  name="capability"
-                  options={[
-                    { value: "image_generation", label: "图片生成" },
-                    { value: "image_edit", label: "图片编辑" },
-                    { value: "video_generation", label: "视频生成" },
-                  ]}
-                />
-                <FormSelect
-                  label="API 调用格式模板"
-                  name="executionTemplate"
-                  options={workerTemplates.map((worker) => ({
-                    value: worker.slug,
-                    label: `${worker.display_name || worker.slug} (${worker.slug})`,
-                  }))}
-                />
-                <WorkerTemplateConfigEditor
-                  hiddenFieldName="executionConfig"
-                  initialConfig={{
-                    mode: "auto",
-                    submitPath: "/v1/tasks",
-                    pollPath: "/v1/tasks/{taskId}",
-                    taskIdPath: "id",
-                    statusPath: "status",
-                    resultUrlPath: "result.url",
-                  }}
-                />
-                <div className="flex justify-end">
-                  <SubmitButton label="创建配置" />
-                </div>
-              </ManagedDialogForm>
-            )}
-          </ManagementDialog>
-        </div>
-
-        {providerCapabilityExecutionConfigs.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-[1100px] border-separate border-spacing-0 text-left text-sm">
-              <thead>
-                <tr className="text-xs text-black/50">
-                  <th className="border-b border-black/[0.08] px-3 py-2.5">供应商</th>
-                  <th className="border-b border-black/[0.08] px-3 py-2.5">能力</th>
-                  <th className="border-b border-black/[0.08] px-3 py-2.5">模板</th>
-                  <th className="border-b border-black/[0.08] px-3 py-2.5">配置校验</th>
-                  <th className="border-b border-black/[0.08] px-3 py-2.5">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {providerCapabilityExecutionConfigs.map((item) => {
-                  const diagnostics = readTemplateConfigDiagnostics(item.execution_config);
-                  return (
-                    <tr key={item.id}>
-                      <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/70">
-                        {item.providerName}
-                        <p className="mt-1 text-[11px] text-black/45">{item.providerSlug}</p>
-                      </td>
-                      <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/70">
-                        {item.capability === "image_generation" ? "图片生成" : item.capability === "image_edit" ? "图片编辑" : "视频生成"}
-                      </td>
-                      <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/70">
-                        {item.execution_template}
-                      </td>
-                      <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/70">
-                        {diagnostics.length === 0 ? "完整" : diagnostics.join("；")}
-                      </td>
-                      <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
-                        <div className="flex flex-wrap gap-2">
-                          <ManagementDialog trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>} title="编辑供应商能力配置">
-                            {({ close }) => (
-                              <ManagedDialogForm action={updateProviderCapabilityExecutionConfig} close={close}>
-                                <input type="hidden" name="configId" value={item.id} />
-                                <FormSelect label="供应商" name="providerId" defaultValue={item.provider_id} options={providerSelectOptions} />
-                                <FormSelect
-                                  label="能力"
-                                  name="capability"
-                                  defaultValue={item.capability}
-                                  options={[
-                                    { value: "image_generation", label: "图片生成" },
-                                    { value: "image_edit", label: "图片编辑" },
-                                    { value: "video_generation", label: "视频生成" },
-                                  ]}
-                                />
-                                <FormSelect
-                                  label="API 调用格式模板"
-                                  name="executionTemplate"
-                                  defaultValue={item.execution_template}
-                                  options={workerTemplates.map((worker) => ({
-                                    value: worker.slug,
-                                    label: `${worker.display_name || worker.slug} (${worker.slug})`,
-                                  }))}
-                                />
-                                <WorkerTemplateConfigEditor
-                                  initialConfig={item.execution_config}
-                                  hiddenFieldName="executionConfig"
-                                />
-                                <div className="flex justify-end">
-                                  <SubmitButton label="保存配置" />
-                                </div>
-                              </ManagedDialogForm>
-                            )}
-                          </ManagementDialog>
-                          <ManagementDialog trigger={<ModalButton tone="secondary">删除</ModalButton>} title="删除供应商能力配置">
-                            {({ close }) => (
-                              <ManagedDialogForm action={deleteProviderCapabilityExecutionConfig} close={close}>
-                                <input type="hidden" name="configId" value={item.id} />
-                                <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
-                                  删除后，该供应商该能力将不再有默认调用配置。
-                                </div>
-                                <div className="flex justify-end">
-                                  <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
-                                </div>
-                              </ManagedDialogForm>
-                            )}
-                          </ManagementDialog>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-sm text-black/55">还没有供应商能力默认配置。</p>
-        )}
-      </div>
     </div>
   );
 }
