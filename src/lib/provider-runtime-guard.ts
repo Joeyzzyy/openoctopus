@@ -102,6 +102,18 @@ function validateTemplateConfig(config: Record<string, unknown>) {
   return diagnostics;
 }
 
+function validateImageOutputContractConfig(config: Record<string, unknown>) {
+  const diagnostics: string[] = [];
+  const resultValueType = readString(config.resultValueType);
+  if (resultValueType.length === 0) {
+    diagnostics.push("图片模型必须显式配置 resultValueType（url 或 base64）。");
+  }
+  if (readString(config.resultUrlPath).length === 0) {
+    diagnostics.push("图片模型必须配置 resultUrlPath 指向图片输出字段。");
+  }
+  return diagnostics;
+}
+
 export function getProviderRuntimeDiagnostics(input: {
   provider: RuntimeProvider;
   adapterAliases?: Map<string, string>;
@@ -165,6 +177,12 @@ export function getProviderModelRuntimeDiagnostics(input: {
           : {}),
       };
       diagnostics.push(...validateTemplateConfig(mergedConfig));
+      if (
+        providerModel.capability === "image_generation" ||
+        providerModel.capability === "image_edit"
+      ) {
+        diagnostics.push(...validateImageOutputContractConfig(mergedConfig));
+      }
     }
   } else {
     const resolvedProviderSlug = resolveProviderAdapterSlug(provider.slug, adapterAliases);

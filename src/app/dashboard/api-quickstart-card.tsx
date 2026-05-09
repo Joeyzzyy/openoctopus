@@ -12,15 +12,50 @@ import {
 export function ApiQuickstartCard() {
   const createExample = buildImageGenerationCurl();
   const taskExample = buildTaskStatusCurl();
+  const imageResultShape = `{
+  "id": "task_id",
+  "status": "succeeded",
+  "capability": "image_generation",
+  "output_payload": {
+    "format": "openoctopus.image.output.v1",
+    "raw": { "...": "provider payload" },
+    "assets": [
+      {
+        "id": "0",
+        "index": 0,
+        "type": "image",
+        "url": "data:image/...;base64,... | /v1/files/:requestId/assets/:assetIndex | https://...",
+        "sourceUrl": "optional",
+        "mimeType": "image/png"
+      }
+    ]
+  }
+}`;
+  const imageResultHandlingExample = `const task = await fetch("/v1/tasks/{id}", {
+  headers: { Authorization: "Bearer " + process.env.OPENOCTOPUS_API_KEY }
+}).then((res) => res.json());
+
+if (task.status !== "succeeded") throw new Error("Task not completed");
+if (task.output_payload?.format !== "openoctopus.image.output.v1") {
+  throw new Error("Unexpected output format");
+}
+
+const imageAsset = task.output_payload?.assets?.find(
+  (asset) => asset?.type === "image" && typeof asset?.url === "string"
+);
+if (!imageAsset) throw new Error("No image asset returned");
+
+// Browser: <img src={imageAsset.url} />
+console.log("image url:", imageAsset.url);`;
   const [copiedBlock, setCopiedBlock] = useState<
-    "base" | "auth" | "request" | "task" | null
+    "base" | "auth" | "request" | "task" | "result-shape" | "result-handling" | null
   >(null);
 
   const maskedAuthHeader = "Authorization: Bearer ooq_••••••••••••••••";
 
   const copyText = async (
     value: string,
-    block: "base" | "auth" | "request" | "task"
+    block: "base" | "auth" | "request" | "task" | "result-shape" | "result-handling"
   ) => {
     await navigator.clipboard.writeText(value);
     setCopiedBlock(block);
@@ -31,7 +66,11 @@ export function ApiQuickstartCard() {
           ? "Authorization header copied"
           : block === "request"
             ? "First request copied"
-            : "Task status request copied"
+            : block === "task"
+              ? "Task status request copied"
+              : block === "result-shape"
+                ? "Result shape copied"
+                : "Result handling snippet copied"
     );
     window.setTimeout(() => setCopiedBlock(null), 1600);
   };
@@ -164,6 +203,72 @@ export function ApiQuickstartCard() {
           </div>
           <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
             <code>{taskExample}</code>
+          </pre>
+        </div>
+
+        <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                5. Image Result Contract
+              </p>
+              <p className="mt-2 text-sm leading-6 text-black/60">
+                For image tasks, always read <code>output_payload.assets</code>. Do not parse provider-specific fields from <code>output_payload.raw</code>.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => copyText(imageResultShape, "result-shape")}
+              className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-[10px] uppercase tracking-[0.8px] text-[#111827] transition-colors hover:bg-black/[0.03]"
+            >
+              {copiedBlock === "result-shape" ? (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy
+                </>
+              )}
+            </button>
+          </div>
+          <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
+            <code>{imageResultShape}</code>
+          </pre>
+        </div>
+
+        <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                6. Image Result Handling
+              </p>
+              <p className="mt-2 text-sm leading-6 text-black/60">
+                Use a single parsing path for all image providers.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => copyText(imageResultHandlingExample, "result-handling")}
+              className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-[10px] uppercase tracking-[0.8px] text-[#111827] transition-colors hover:bg-black/[0.03]"
+            >
+              {copiedBlock === "result-handling" ? (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy
+                </>
+              )}
+            </button>
+          </div>
+          <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
+            <code>{imageResultHandlingExample}</code>
           </pre>
         </div>
       </div>

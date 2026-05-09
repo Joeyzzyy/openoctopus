@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../lib/supabase.js";
 import { decryptProviderSecret } from "../lib/provider-secret-crypto.js";
+import { normalizeOutputPayloadByCapability } from "../lib/image-output-contract.js";
 import { getProviderAdapter } from "../providers/index.js";
 import { persistGeneratedAssets } from "../services/assets-service.js";
 import {
@@ -642,7 +643,10 @@ export async function processNextInferenceJob() {
       providerRaw: asRecord(result.output.raw),
     });
     const providerRaw = normalizedSyncResult.providerRaw;
-    const normalizedOutput = normalizedSyncResult.output ?? result.output;
+    const normalizedOutput = normalizeOutputPayloadByCapability({
+      capability: message.capability,
+      outputPayload: normalizedSyncResult.output ?? result.output,
+    }) as Record<string, unknown>;
     const settlement = await resolveSettlementAmounts({
       providerModelId: message.providerModelId,
       publicModelSlug: message.publicModelSlug,
@@ -969,7 +973,10 @@ export async function processNextPollingJob() {
       output: result.output,
       providerRaw: result.raw,
     });
-    const normalizedOutput = normalizedPollingResult.output ?? result.output;
+    const normalizedOutput = normalizeOutputPayloadByCapability({
+      capability: message.capability,
+      outputPayload: normalizedPollingResult.output ?? result.output,
+    }) as Record<string, unknown>;
     const normalizedProviderRaw = normalizedPollingResult.providerRaw ?? result.raw;
     const settlement = await resolveSettlementAmounts({
       providerModelId: message.providerModelId,

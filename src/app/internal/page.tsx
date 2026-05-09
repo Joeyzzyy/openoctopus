@@ -1329,6 +1329,7 @@ export default async function InternalPage({
                         ，为 public model 绑定主路由，必要时设置 fallback。
                       </p>
                       <p>启用前检查 runtime diagnostics，无红色阻断项（模板缺字段、密钥不可运行、capability 不一致）。</p>
+                      <p>图片模型启用时有强校验：必须存在 resultUrlPath，且必须显式配置 resultValueType（url 或 base64）；base64 模式还需 resultMimeType。</p>
                     </div>
                   </div>
 

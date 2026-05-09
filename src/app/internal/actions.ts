@@ -1868,6 +1868,7 @@ export async function createProviderModel(formData: FormData) {
         capability: parsed.capability,
         active: parsed.active,
         execution_template: parsed.executionTemplate,
+        execution_config: parsed.executionConfig,
       },
       provider,
       supportedModel,
@@ -1959,7 +1960,7 @@ export async function updateProviderModelState(formData: FormData) {
   if (parsed.active) {
     const { data: providerModel, error: providerModelError } = await supabase
       .from("provider_models")
-      .select("id, provider_id, supported_model_id, upstream_model_slug, capability, active, execution_template")
+      .select("id, provider_id, supported_model_id, upstream_model_slug, capability, active, execution_template, execution_config")
       .eq("id", parsed.providerModelId)
       .maybeSingle();
 
@@ -1984,6 +1985,7 @@ export async function updateProviderModelState(formData: FormData) {
         capability: providerModel.capability,
         active: true,
         execution_template: providerModel.execution_template,
+        execution_config: providerModel.execution_config ?? {},
       },
       provider: runtimeContext.providersById.get(providerModel.provider_id) ?? null,
       supportedModel: providerModel.supported_model_id
@@ -2102,6 +2104,7 @@ export async function updateProviderModelDetails(formData: FormData) {
       capability: parsed.capability,
       active: parsed.active,
       execution_template: parsed.executionTemplate,
+      execution_config: parsed.executionConfig,
     },
     provider,
     supportedModel,
