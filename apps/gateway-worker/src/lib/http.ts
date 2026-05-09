@@ -2,7 +2,18 @@ import http, { type IncomingHttpHeaders, type IncomingMessage } from "node:http"
 import https from "node:https";
 import { ProxyAgent } from "proxy-agent";
 
-const REQUEST_TIMEOUT_MS = 30000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30000;
+const REQUEST_TIMEOUT_MS = (() => {
+  const raw = process.env.UPSTREAM_REQUEST_TIMEOUT_MS;
+  if (!raw) {
+    return DEFAULT_REQUEST_TIMEOUT_MS;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 1000) {
+    return DEFAULT_REQUEST_TIMEOUT_MS;
+  }
+  return Math.floor(parsed);
+})();
 const proxyConfigured = Boolean(process.env.HTTPS_PROXY || process.env.HTTP_PROXY);
 const proxyAgent = proxyConfigured ? new ProxyAgent() : null;
 
