@@ -349,11 +349,30 @@ export async function processNextInferenceJob() {
     return true;
   }
 
-  const providerSecret = decryptProviderSecret({
-    ciphertext: credentialRow.secret_ciphertext,
-    iv: credentialRow.secret_iv,
-    authTag: credentialRow.secret_auth_tag,
-  });
+  let providerSecret: string;
+  try {
+    providerSecret = decryptProviderSecret({
+      ciphertext: credentialRow.secret_ciphertext,
+      iv: credentialRow.secret_iv,
+      authTag: credentialRow.secret_auth_tag,
+    });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown provider credential decrypt error";
+    await failRequestAndDeleteQueueMessage({
+      queueName: "inference_jobs",
+      messageId: row.msg_id,
+      requestId: message.requestId,
+      workspaceId: message.workspaceId,
+      apiKeyId: message.apiKeyId,
+      publicModelSlug: message.publicModelSlug,
+      endpoint: message.endpoint,
+      errorCode: "provider_credential_decrypt_failed",
+      errorMessage,
+      startedAt: new Date(),
+    });
+    return true;
+  }
   const attemptStartedAt = Date.now();
   const { data: requestRow, error: requestRowError } = await supabaseAdmin
     .from("inference_requests")
@@ -719,11 +738,29 @@ export async function processNextPollingJob() {
     return true;
   }
 
-  const providerSecret = decryptProviderSecret({
-    ciphertext: credentialRow.secret_ciphertext,
-    iv: credentialRow.secret_iv,
-    authTag: credentialRow.secret_auth_tag,
-  });
+  let providerSecret: string;
+  try {
+    providerSecret = decryptProviderSecret({
+      ciphertext: credentialRow.secret_ciphertext,
+      iv: credentialRow.secret_iv,
+      authTag: credentialRow.secret_auth_tag,
+    });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown provider credential decrypt error";
+    await failRequestAndDeleteQueueMessage({
+      queueName: "inference_polling",
+      messageId: row.msg_id,
+      requestId: message.requestId,
+      workspaceId: message.workspaceId,
+      apiKeyId: message.apiKeyId,
+      publicModelSlug: message.publicModelSlug,
+      endpoint: message.endpoint,
+      errorCode: "provider_credential_decrypt_failed",
+      errorMessage,
+    });
+    return true;
+  }
 
   if (!adapter.poll) {
     await deleteQueueMessage({
