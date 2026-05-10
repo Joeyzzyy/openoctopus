@@ -46,6 +46,12 @@ const tabs = [
     description: "新增图片模型的标准上线流程与验收清单。",
   },
   {
+    key: "video-model-playbook",
+    group: "overview",
+    label: "视频模型操作手册",
+    description: "新增视频模型的标准上线流程与验收清单。",
+  },
+  {
     key: "worker-templates",
     group: "basic",
     label: "API 调用格式配置",
@@ -1256,16 +1262,6 @@ export default async function InternalPage({
                 <div className="grid gap-4">
                   <ImageContractPlayground />
 
-                  <div className="rounded-xl border border-[#D8E5F5] bg-[#F4F8FF] p-4">
-                    <h3 className="text-base font-semibold text-black">视频模型统一输出策略</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>视频模型与图片模型一样，统一在 worker 入库前执行输出契约标准化。</p>
-                      <p>统一读取方式：output_payload.format + output_payload.assets[].url，不解析 raw 内部字段。</p>
-                      <p>视频契约格式版本：<code className="rounded bg-white px-1 py-0.5 text-[12px]">openoctopus.video.output.v1</code>。</p>
-                      <p>启用前强校验：视频模型必须配置 resultUrlPath 和 resultValueType（url/base64）。</p>
-                    </div>
-                  </div>
-
                   <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
                     <h3 className="text-base font-semibold text-black">0. 上线前确认</h3>
                     <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
@@ -1370,6 +1366,133 @@ export default async function InternalPage({
       {
         "type": "image",
         "url": "data:image/...;base64,... | /v1/files/:requestId/assets/:assetIndex | https://...",
+        "sourceUrl": "optional"
+      }
+    ]
+  }
+}`}
+                    </pre>
+                  </div>
+                </div>
+              </SectionShell>
+            </section>
+          ) : null}
+
+          {activeTab === "video-model-playbook" ? (
+            <section className="mt-6">
+              <SectionShell
+                id="video-model-playbook-panel"
+                title="添加视频模型操作手册"
+                description="目标：任何视频模型上线后，都能稳定返回统一格式 output_payload.assets[]，并可被客户前端直接消费。"
+              >
+                <div className="grid gap-4">
+                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                    <h3 className="text-base font-semibold text-black">0. 上线前确认</h3>
+                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
+                      <p>确认上游视频结果返回形式：直链 URL、平台代理 URL，或其他可下载地址。</p>
+                      <p>确认鉴权方式：Bearer / x-api-key / query key。</p>
+                      <p>确认 capability 为 video_generation。</p>
+                      <p>确认是否有时长字段（durationSeconds / duration_seconds），用于计费与展示。</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                    <h3 className="text-base font-semibold text-black">1. 配置 API 调用格式模板</h3>
+                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
+                      <p>
+                        进入
+                        {" "}
+                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("worker-templates")}>
+                          API 调用格式配置
+                        </a>
+                        ，优先复用模板，避免手写配置漂移。
+                      </p>
+                      <p>必须配置 resultUrlPath，指向上游视频 URL 字段。</p>
+                      <p>必须显式配置 resultValueType（通常为 url）。</p>
+                      <p>如果是异步轮询模型，必须配置 pollPath + statusPath + taskIdPath。</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                    <h3 className="text-base font-semibold text-black">2. 供应商与密钥准备</h3>
+                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
+                      <p>
+                        进入
+                        {" "}
+                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("providers")}>
+                          供应商管理
+                        </a>
+                        ，确认供应商状态为 healthy 或 degraded，且存在可运行 managed 密钥（internal_encrypted）。
+                      </p>
+                      <p>密钥环境优先 production；如无 production，确保至少一个 active 且可解密密钥。</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                    <h3 className="text-base font-semibold text-black">3. 创建可售模型与供应商模型映射</h3>
+                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
+                      <p>
+                        进入
+                        {" "}
+                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("public-models")}>
+                          可售模型管理
+                        </a>
+                        ，先创建 public model slug（例如 openoctopus/xxx-video）。
+                      </p>
+                      <p>
+                        再到
+                        {" "}
+                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("economics")}>
+                          模型价格总表
+                        </a>
+                        ，创建 provider model 映射并绑定执行模板。
+                      </p>
+                      <p>确保 capability 一致：supported model / provider model / routing rule 必须同为 video_generation。</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                    <h3 className="text-base font-semibold text-black">4. 配置路由并启用</h3>
+                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
+                      <p>
+                        进入
+                        {" "}
+                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("routes")}>
+                          路由配置
+                        </a>
+                        ，为 public model 绑定主路由，必要时设置 fallback。
+                      </p>
+                      <p>启用前检查 runtime diagnostics，无阻断项（模板字段缺失、密钥不可运行、capability 不一致）。</p>
+                      <p>视频模型启用强校验：必须配置 resultUrlPath + resultValueType（url/base64）。</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                    <h3 className="text-base font-semibold text-black">5. 验收清单（必须全部通过）</h3>
+                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
+                      <p>发起一次 /v1/videos/generations，请求返回 queued，并拿到 task id。</p>
+                      <p>轮询 /v1/tasks/:id 到 succeeded。</p>
+                      <p>返回中存在 output_payload.assets[0].url，且播放器可直接加载。</p>
+                      <p>允许保留 output_payload.raw 作为上游原始数据，但客户展示统一读取 assets。</p>
+                      <p>如返回 durationSeconds，确认值合理并与预期时长一致。</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[#D8E5F5] bg-[#F4F8FF] p-4">
+                    <h3 className="text-base font-semibold text-black">统一返回契约（视频）</h3>
+                    <pre className="mt-3 overflow-x-auto rounded-lg border border-black/8 bg-[#1C1917] p-4 text-xs leading-6 text-[#f4f1ea]">
+{`{
+  "status": "succeeded",
+  "capability": "video_generation",
+  "output_payload": {
+    "format": "openoctopus.video.output.v1",
+    "raw": { "...": "provider specific payload" },
+    "assets": [
+      {
+        "type": "video",
+        "url": "https://... | /v1/files/:requestId/assets/:assetIndex",
+        "mimeType": "video/mp4",
+        "durationSeconds": 5,
         "sourceUrl": "optional"
       }
     ]
