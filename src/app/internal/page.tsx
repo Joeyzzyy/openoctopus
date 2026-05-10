@@ -14,6 +14,7 @@ import { clearApiKeyRequestRecords, unlockInternalAccess } from "./actions";
 import { INTERNAL_ACCESS_COOKIE, INTERNAL_ACCESS_COOKIE_VALUE } from "@/lib/internal-access";
 import { InternalShell } from "./internal-shell";
 import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
+import { ImageContractPlayground } from "./image-contract-playground";
 import {
   CreateProviderButton,
   CreateModelVendorButton,
@@ -1253,6 +1254,8 @@ export default async function InternalPage({
                 description="目标：任何图片模型上线后，都能稳定返回统一格式 output_payload.assets[]，并可被客户前端直接展示。"
               >
                 <div className="grid gap-4">
+                  <ImageContractPlayground />
+
                   <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
                     <h3 className="text-base font-semibold text-black">0. 上线前确认</h3>
                     <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
