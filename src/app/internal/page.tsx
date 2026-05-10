@@ -1256,6 +1256,16 @@ export default async function InternalPage({
                 <div className="grid gap-4">
                   <ImageContractPlayground />
 
+                  <div className="rounded-xl border border-[#D8E5F5] bg-[#F4F8FF] p-4">
+                    <h3 className="text-base font-semibold text-black">视频模型统一输出策略</h3>
+                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
+                      <p>视频模型与图片模型一样，统一在 worker 入库前执行输出契约标准化。</p>
+                      <p>统一读取方式：output_payload.format + output_payload.assets[].url，不解析 raw 内部字段。</p>
+                      <p>视频契约格式版本：<code className="rounded bg-white px-1 py-0.5 text-[12px]">openoctopus.video.output.v1</code>。</p>
+                      <p>启用前强校验：视频模型必须配置 resultUrlPath 和 resultValueType（url/base64）。</p>
+                    </div>
+                  </div>
+
                   <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
                     <h3 className="text-base font-semibold text-black">0. 上线前确认</h3>
                     <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">

@@ -19,15 +19,15 @@ import { ModelCatalogTable } from "./model-catalog-table";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-type DashboardView = "dashboard" | "models" | "api-keys";
+type DashboardView = "dashboard" | "models" | "api-keys" | "api-calling-doc";
 type RequestInterval = "minute" | "hour" | "day";
 type RequestRange = "60m" | "6h" | "24h" | "7d" | "30d" | "90d";
 type ModelType = "all" | "image" | "video" | "text-coding";
-
 const pageNav = [
   { label: "Dashboard", view: "dashboard" },
   { label: "Models", view: "models" },
   { label: "API Keys", view: "api-keys" },
+  { label: "API Calling Doc", view: "api-calling-doc" },
 ] as const;
 
 const requestStatusStyles = {
@@ -37,22 +37,6 @@ const requestStatusStyles = {
   failed: "bg-[#ffe7e3] text-[#b54432]",
   cancelled: "bg-[#ececec] text-[#666666]",
 };
-
-const imageOutputContractExample = `{
-  "id": "task_id",
-  "status": "succeeded",
-  "capability": "image_generation",
-  "output_payload": {
-    "format": "openoctopus.image.output.v1",
-    "assets": [
-      {
-        "type": "image",
-        "url": "https://... | data:image/... | /v1/files/:requestId/assets/:assetIndex"
-      }
-    ],
-    "raw": { "...": "provider payload (for debugging)" }
-  }
-}`;
 
 const requestIntervalOptions = [
   { value: "minute", label: "By minute" },
@@ -507,14 +491,22 @@ export default async function DashboardPage({
             <div className="mb-4 flex flex-col gap-3 md:mb-6 md:mt-2 md:flex-row md:items-center md:justify-between xl:mt-8">
               <div>
                 <h1 className="text-3xl font-semibold leading-none tracking-[-0.05em] text-[#111111]">
-                  {view === "dashboard" ? "Dashboard" : view === "models" ? "Models" : "API Keys"}
+                  {view === "dashboard"
+                    ? "Dashboard"
+                    : view === "models"
+                      ? "Models"
+                      : view === "api-keys"
+                        ? "API Keys"
+                        : "API Calling Doc"}
                 </h1>
                 <p className="mt-2 text-sm text-black/55">
                   {view === "dashboard"
                     ? "Overview, request analytics, and filtered request history."
                     : view === "models"
                       ? "Provider models currently enabled by your routing layer."
-                      : "Create keys, control budgets, and manage active environments."}
+                      : view === "api-keys"
+                        ? "Create keys, control budgets, and manage active environments."
+                        : "Integration contract, request examples, and unified image output parsing guidance."}
                 </p>
               </div>
 
@@ -929,44 +921,15 @@ export default async function DashboardPage({
                     </div>
                   </div>
 
-                  <div className="mb-4 rounded-xl border border-[#EADFC8] bg-[#FFF9ED] p-4">
-                    <h3 className="text-base font-semibold text-black">
-                      Image Output Contract
-                    </h3>
-                    <p className="mt-2 text-sm leading-6 text-black/60">
-                      For all image models, use a single parsing path:
-                      {" "}
-                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
-                        output_payload.format = openoctopus.image.output.v1
-                      </code>
-                      {" "}
-                      and
-                      {" "}
-                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
-                        output_payload.assets[0].url
-                      </code>
-                      .
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-black/60">
-                      Do not parse provider-specific fields from
-                      {" "}
-                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
-                        output_payload.raw
-                      </code>
-                      .
-                    </p>
-                    <pre className="mt-3 overflow-x-auto rounded-xl bg-[#111827] p-3 text-[11px] leading-6 text-[#F9FAFB]">
-                      <code>{imageOutputContractExample}</code>
-                    </pre>
-                  </div>
-
                   <ApiKeysTable apiKeys={apiKeys} />
                 </section>
-
-                <section className="mt-6">
-                  <ApiQuickstartCard />
-                </section>
               </>
+            ) : null}
+
+            {view === "api-calling-doc" ? (
+              <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm sm:p-5">
+                <ApiQuickstartCard />
+              </section>
             ) : null}
           </section>
         </div>

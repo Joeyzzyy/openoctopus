@@ -114,6 +114,18 @@ function validateImageOutputContractConfig(config: Record<string, unknown>) {
   return diagnostics;
 }
 
+function validateVideoOutputContractConfig(config: Record<string, unknown>) {
+  const diagnostics: string[] = [];
+  const resultValueType = readString(config.resultValueType);
+  if (resultValueType.length === 0) {
+    diagnostics.push("视频模型必须显式配置 resultValueType（url 或 base64）。");
+  }
+  if (readString(config.resultUrlPath).length === 0) {
+    diagnostics.push("视频模型必须配置 resultUrlPath 指向视频输出字段。");
+  }
+  return diagnostics;
+}
+
 export function getProviderRuntimeDiagnostics(input: {
   provider: RuntimeProvider;
   adapterAliases?: Map<string, string>;
@@ -182,6 +194,9 @@ export function getProviderModelRuntimeDiagnostics(input: {
         providerModel.capability === "image_edit"
       ) {
         diagnostics.push(...validateImageOutputContractConfig(mergedConfig));
+      }
+      if (providerModel.capability === "video_generation") {
+        diagnostics.push(...validateVideoOutputContractConfig(mergedConfig));
       }
     }
   } else {
