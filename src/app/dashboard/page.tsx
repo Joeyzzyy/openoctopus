@@ -38,6 +38,22 @@ const requestStatusStyles = {
   cancelled: "bg-[#ececec] text-[#666666]",
 };
 
+const imageOutputContractExample = `{
+  "id": "task_id",
+  "status": "succeeded",
+  "capability": "image_generation",
+  "output_payload": {
+    "format": "openoctopus.image.output.v1",
+    "assets": [
+      {
+        "type": "image",
+        "url": "https://... | data:image/... | /v1/files/:requestId/assets/:assetIndex"
+      }
+    ],
+    "raw": { "...": "provider payload (for debugging)" }
+  }
+}`;
+
 const requestIntervalOptions = [
   { value: "minute", label: "By minute" },
   { value: "hour", label: "By hour" },
@@ -911,6 +927,37 @@ export default async function DashboardPage({
                         {keyMetric?.value ?? apiKeys.length} active
                       </span>
                     </div>
+                  </div>
+
+                  <div className="mb-4 rounded-xl border border-[#EADFC8] bg-[#FFF9ED] p-4">
+                    <h3 className="text-base font-semibold text-black">
+                      Image Output Contract
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-black/60">
+                      For all image models, use a single parsing path:
+                      {" "}
+                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                        output_payload.format = openoctopus.image.output.v1
+                      </code>
+                      {" "}
+                      and
+                      {" "}
+                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                        output_payload.assets[0].url
+                      </code>
+                      .
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-black/60">
+                      Do not parse provider-specific fields from
+                      {" "}
+                      <code className="rounded bg-white px-1 py-0.5 text-[12px]">
+                        output_payload.raw
+                      </code>
+                      .
+                    </p>
+                    <pre className="mt-3 overflow-x-auto rounded-xl bg-[#111827] p-3 text-[11px] leading-6 text-[#F9FAFB]">
+                      <code>{imageOutputContractExample}</code>
+                    </pre>
                   </div>
 
                   <ApiKeysTable apiKeys={apiKeys} />
