@@ -511,7 +511,23 @@ export default async function DashboardPage({
               </div>
 
               <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap sm:items-center">
-                <CreateKeyButton className="w-full justify-center sm:w-auto" />
+                {view === "api-keys" ? (
+                  <CreateKeyButton className="w-full justify-center sm:w-auto" />
+                ) : (
+                  <Link
+                    href={buildDashboardHref({
+                      view: "api-keys",
+                      requestsPage: 1,
+                      apiKeyId: selectedApiKeyId,
+                      analyticsInterval,
+                      analyticsRange,
+                      modelType: selectedModelType,
+                    })}
+                    className="inline-flex h-9 w-full items-center justify-center rounded-[14px] bg-[#111111] px-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#222222] sm:h-10 sm:w-auto sm:px-4"
+                  >
+                    Create Key
+                  </Link>
+                )}
                 <form action="/auth/sign-out" method="post" className="w-full sm:w-auto">
                   <button
                     type="submit"
