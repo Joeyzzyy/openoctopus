@@ -69,6 +69,7 @@ console.log("image url:", imageAsset.url);`;
   const [copiedBlock, setCopiedBlock] = useState<
     "base" | "auth" | "request" | "task" | "result-shape" | "result-handling" | "video-result-shape" | null
   >(null);
+  const [docTab, setDocTab] = useState<"image" | "video">("image");
 
   const maskedAuthHeader = "Authorization: Bearer ooq_••••••••••••••••";
 
@@ -111,6 +112,33 @@ console.log("image url:", imageAsset.url);`;
       </div>
 
       <div className="mt-5 space-y-3">
+        <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setDocTab("image")}
+              className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                docTab === "image"
+                  ? "border-black bg-black text-white"
+                  : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+              }`}
+            >
+              Image API
+            </button>
+            <button
+              type="button"
+              onClick={() => setDocTab("video")}
+              className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                docTab === "video"
+                  ? "border-black bg-black text-white"
+                  : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+              }`}
+            >
+              Video API
+            </button>
+          </div>
+        </div>
+
         <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -155,7 +183,251 @@ console.log("image url:", imageAsset.url);`;
           </div>
         </div>
 
-        <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+        {docTab === "image" ? (
+          <>
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="h-4 w-4 text-black/45" />
+                    <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                      3. First Request
+                    </p>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-black/60">
+                    Replace the prompt and API key, then submit the request.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(createExample, "request")}
+                  className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-[10px] uppercase tracking-[0.8px] text-[#111827] transition-colors hover:bg-black/[0.03]"
+                >
+                  {copiedBlock === "request" ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
+                <code>{createExample}</code>
+              </pre>
+            </div>
+
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <ArrowRight className="h-4 w-4 text-black/45" />
+                    <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                      4. Check Task Status
+                    </p>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-black/60">
+                    Poll the task endpoint with the returned task id until the result is ready.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(taskExample, "task")}
+                  className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-[10px] uppercase tracking-[0.8px] text-[#111827] transition-colors hover:bg-black/[0.03]"
+                >
+                  {copiedBlock === "task" ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
+                <code>{taskExample}</code>
+              </pre>
+            </div>
+
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                    5. Image Result Contract
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-black/60">
+                    For image tasks, always read <code>output_payload.assets</code>. Do not parse provider-specific fields from <code>output_payload.raw</code>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(imageResultShape, "result-shape")}
+                  className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-[10px] uppercase tracking-[0.8px] text-[#111827] transition-colors hover:bg-black/[0.03]"
+                >
+                  {copiedBlock === "result-shape" ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
+                <code>{imageResultShape}</code>
+              </pre>
+            </div>
+
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                    6. Image Result Handling
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-black/60">
+                    Use a single parsing path for all image providers.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(imageResultHandlingExample, "result-handling")}
+                  className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-[10px] uppercase tracking-[0.8px] text-[#111827] transition-colors hover:bg-black/[0.03]"
+                >
+                  {copiedBlock === "result-handling" ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
+                <code>{imageResultHandlingExample}</code>
+              </pre>
+            </div>
+          </>
+        ) : null}
+
+        {docTab === "video" ? (
+          <>
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="h-4 w-4 text-black/45" />
+                    <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                      3. Video Request
+                    </p>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-black/60">
+                    Submit a video generation request and poll the same task endpoint.
+                  </p>
+                </div>
+              </div>
+              <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
+                <code>{`curl -X POST ${PUBLIC_API_BASE_URL}/v1/videos/generations \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ooq_your_api_key" \\
+  -d '{
+    "model": "openoctopus/your-video-model",
+    "prompt": "cinematic aerial shot of a neon harbor at night",
+    "input": {
+      "durationSeconds": 5,
+      "aspectRatio": "16:9"
+    }
+  }'`}</code>
+              </pre>
+            </div>
+
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <ArrowRight className="h-4 w-4 text-black/45" />
+                    <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                      4. Check Task Status
+                    </p>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-black/60">
+                    Poll the task endpoint with the returned task id until the result is ready.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(taskExample, "task")}
+                  className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-[10px] uppercase tracking-[0.8px] text-[#111827] transition-colors hover:bg-black/[0.03]"
+                >
+                  {copiedBlock === "task" ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
+                <code>{taskExample}</code>
+              </pre>
+            </div>
+
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                    5. Video Result Contract
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-black/60">
+                    For video tasks, parse <code>output_payload.format</code> and <code>output_payload.assets[0].url</code> the same way.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(videoResultShape, "video-result-shape")}
+                  className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-[10px] uppercase tracking-[0.8px] text-[#111827] transition-colors hover:bg-black/[0.03]"
+                >
+                  {copiedBlock === "video-result-shape" ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
+                <code>{videoResultShape}</code>
+              </pre>
+            </div>
+          </>
+        ) : null}
+
+        <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5 hidden">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
@@ -224,105 +496,6 @@ console.log("image url:", imageAsset.url);`;
           </div>
           <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
             <code>{taskExample}</code>
-          </pre>
-        </div>
-
-        <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">
-                5. Image Result Contract
-              </p>
-              <p className="mt-2 text-sm leading-6 text-black/60">
-                For image tasks, always read <code>output_payload.assets</code>. Do not parse provider-specific fields from <code>output_payload.raw</code>.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => copyText(imageResultShape, "result-shape")}
-              className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-[10px] uppercase tracking-[0.8px] text-[#111827] transition-colors hover:bg-black/[0.03]"
-            >
-              {copiedBlock === "result-shape" ? (
-                <>
-                  <Check className="h-3.5 w-3.5" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  Copy
-                </>
-              )}
-            </button>
-          </div>
-          <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
-            <code>{imageResultShape}</code>
-          </pre>
-        </div>
-
-        <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">
-                6. Image Result Handling
-              </p>
-              <p className="mt-2 text-sm leading-6 text-black/60">
-                Use a single parsing path for all image providers.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => copyText(imageResultHandlingExample, "result-handling")}
-              className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-[10px] uppercase tracking-[0.8px] text-[#111827] transition-colors hover:bg-black/[0.03]"
-            >
-              {copiedBlock === "result-handling" ? (
-                <>
-                  <Check className="h-3.5 w-3.5" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  Copy
-                </>
-              )}
-            </button>
-          </div>
-          <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
-            <code>{imageResultHandlingExample}</code>
-          </pre>
-        </div>
-
-        <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">
-                7. Video Result Contract
-              </p>
-              <p className="mt-2 text-sm leading-6 text-black/60">
-                For video tasks, parse <code>output_payload.format</code> and <code>output_payload.assets[0].url</code> the same way.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => copyText(videoResultShape, "video-result-shape")}
-              className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-[10px] uppercase tracking-[0.8px] text-[#111827] transition-colors hover:bg-black/[0.03]"
-            >
-              {copiedBlock === "video-result-shape" ? (
-                <>
-                  <Check className="h-3.5 w-3.5" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  Copy
-                </>
-              )}
-            </button>
-          </div>
-          <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#111827] p-4 font-mono text-[11px] leading-6 text-[#F9FAFB]">
-            <code>{videoResultShape}</code>
           </pre>
         </div>
       </div>
