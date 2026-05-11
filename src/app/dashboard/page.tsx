@@ -6,8 +6,10 @@ import {
   LineChart,
   LogOut,
   ReceiptText,
+  Search,
   Wallet,
 } from "lucide-react";
+import { Logo } from "@/components/layout/Logo";
 import { getDashboardData } from "@/lib/dashboard-server";
 import { cn } from "@/lib/utils";
 import { CreateKeyButton } from "./dashboard-actions";
@@ -29,6 +31,12 @@ const pageNav = [
   { label: "Models", view: "models" },
   { label: "API Keys", view: "api-keys" },
   { label: "API Calling Doc", view: "api-calling-doc" },
+] as const;
+const marketingNavItems = [
+  { label: "Pricing", href: "/pricing" },
+  { label: "Docs", href: "/docs" },
+  { label: "Enterprise", href: "/enterprise" },
+  { label: "About", href: "/about" },
 ] as const;
 
 const requestStatusStyles = {
@@ -458,6 +466,47 @@ export default async function DashboardPage({
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#FCFCFA] text-[#111111]">
       <AutoRefreshOnReturn />
+      <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 w-full max-w-7xl items-center px-6">
+          <div className="relative flex w-full items-center text-sm md:text-base">
+            <Link
+              href="/"
+              className="-ml-2 rounded-md px-2 py-1.5 text-[#6B7280] transition-colors hover:bg-black/[0.03] hover:text-[#111827]"
+            >
+              <Logo className="text-[#111827]" />
+            </Link>
+
+            <div className="ml-4 hidden lg:block">
+              <div className="relative flex h-9 w-60 items-center gap-2 rounded-md bg-[#F2F4F7] px-3 text-[#6B7280] transition-colors hover:bg-[#ECEFF3]">
+                <Search className="h-4 w-4 shrink-0 opacity-70" />
+                <span className="text-[13px]">Search</span>
+              </div>
+            </div>
+
+            <nav className="ml-4 hidden items-center gap-1 lg:flex">
+              {marketingNavItems.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="rounded-md px-3 py-2 text-[14px] font-medium text-[#6B7280] transition-colors hover:bg-black/[0.03] hover:text-[#111827]"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+
+            <form action="/auth/sign-out" method="post" className="ml-auto">
+              <button
+                type="submit"
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[#111827] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0B1220]"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </button>
+            </form>
+          </div>
+        </div>
+      </header>
       <div
         className="pointer-events-none fixed inset-0"
         style={{
@@ -475,8 +524,8 @@ export default async function DashboardPage({
         }}
       />
 
-      <div className="relative mx-auto max-w-7xl px-4 pb-10 sm:px-5 xl:px-0">
-        <div className="mt-6 grid gap-5 xl:mt-8 xl:grid-cols-[220px_minmax(0,1fr)] xl:gap-6">
+      <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-4 sm:px-5 xl:px-0">
+        <div className="mt-4 grid gap-5 xl:mt-6 xl:grid-cols-[220px_minmax(0,1fr)] xl:gap-6">
           <aside className="hidden xl:block">
             <DashboardSidebar items={sidebarItems} userLabel={user.email ?? user.name} activeHref={activeHref} />
           </aside>
@@ -490,57 +539,11 @@ export default async function DashboardPage({
           </aside>
 
           <section className="min-h-[calc(100vh-108px)] min-w-0">
-            <div className="mb-4 flex flex-col gap-3 md:mb-6 md:mt-2 md:flex-row md:items-center md:justify-between xl:mt-8">
-              <div>
-                <h1 className="text-3xl font-semibold leading-none tracking-[-0.05em] text-[#111111]">
-                  {view === "dashboard"
-                    ? "Dashboard"
-                    : view === "models"
-                      ? "Models"
-                      : view === "api-keys"
-                        ? "API Keys"
-                        : "API Calling Doc"}
-                </h1>
-                <p className="mt-2 text-sm text-black/55">
-                  {view === "dashboard"
-                    ? "Overview, request analytics, and filtered request history."
-                    : view === "models"
-                      ? "Provider models currently enabled by your routing layer."
-                      : view === "api-keys"
-                        ? "Create keys, control budgets, and manage active environments."
-                        : "Integration contract, request examples, and unified image output parsing guidance."}
-                </p>
+            {view === "api-keys" ? (
+              <div className="mb-4 flex justify-end md:mb-6">
+                <CreateKeyButton className="w-full justify-center sm:w-auto" />
               </div>
-
-              <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap sm:items-center">
-                {view === "api-keys" ? (
-                  <CreateKeyButton className="w-full justify-center sm:w-auto" />
-                ) : (
-                  <Link
-                    href={buildDashboardHref({
-                      view: "api-keys",
-                      requestsPage: 1,
-                      apiKeyId: selectedApiKeyId,
-                      analyticsInterval,
-                      analyticsRange,
-                      modelType: selectedModelType,
-                    })}
-                    className="inline-flex h-9 w-full items-center justify-center rounded-[14px] bg-[#111111] px-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#222222] sm:h-10 sm:w-auto sm:px-4"
-                  >
-                    Create Key
-                  </Link>
-                )}
-                <form action="/auth/sign-out" method="post" className="w-full sm:w-auto">
-                  <button
-                    type="submit"
-                    className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/80 transition-colors hover:bg-black/[0.03] sm:w-auto"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Sign out
-                  </button>
-                </form>
-              </div>
-            </div>
+            ) : null}
 
             {view === "dashboard" ? (
               <>
