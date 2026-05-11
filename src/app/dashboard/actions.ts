@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod/v4";
 import crypto from "crypto";
@@ -315,6 +316,9 @@ export async function createTopUpCheckoutSession(formData: FormData) {
 
     redirect(session.url);
   } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
     redirect(
       buildDashboardAlertHref({
         message: error instanceof Error ? error.message : "Failed to start top-up checkout.",

@@ -67,6 +67,22 @@
     @apply bg-[#0C0A09] text-[#FAFAF8] antialiased;
     font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  input[type="button"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  input[type="button"]:disabled,
+  input[type="submit"]:disabled,
+  input[type="reset"]:disabled {
+    cursor: not-allowed;
+  }
   
   ::selection {
     background: rgba(194, 123, 59, 0.25);
