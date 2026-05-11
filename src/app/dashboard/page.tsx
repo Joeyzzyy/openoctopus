@@ -951,7 +951,7 @@ export default async function DashboardPage({
                   <table className="w-full min-w-[860px] text-sm">
                     <thead>
                       <tr className="border-b border-black/10 text-left">
-                        {["Time", "Type", "Amount", "Description", "Stripe Session", "Invoice / Receipt"].map(
+                        {["Time", "Type", "Amount", "Description", "Operation"].map(
                           (heading) => (
                             <th
                               key={heading}
@@ -983,9 +983,6 @@ export default async function DashboardPage({
                             <td className="max-w-[360px] whitespace-normal break-words px-2 py-3 text-sm text-black/70">
                               {row.description}
                             </td>
-                            <td className="px-2 py-3 text-xs text-black/60">
-                              {row.stripeSessionId ?? "—"}
-                            </td>
                             <td className="sticky right-0 z-10 bg-white px-2 py-3 text-right text-sm">
                               {row.receiptUrl ? (
                                 <a
@@ -994,7 +991,7 @@ export default async function DashboardPage({
                                   rel="noreferrer"
                                   className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]"
                                 >
-                                  Download
+                                  Download Invoice
                                 </a>
                               ) : (
                                 <span className="text-xs text-black/45">Pending</span>
@@ -1004,7 +1001,7 @@ export default async function DashboardPage({
                         ))
                       ) : (
                         <tr>
-                          <td className="px-2 py-20 text-center text-sm text-black/50" colSpan={6}>
+                          <td className="px-2 py-20 text-center text-sm text-black/50" colSpan={5}>
                             No {selectedBillingFlow} billing records yet
                           </td>
                         </tr>
