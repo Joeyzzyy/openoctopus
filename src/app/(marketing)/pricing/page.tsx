@@ -1,4 +1,4 @@
-import { parseBillingConfig, summarizeBillingConfig } from "@/lib/billing-config";
+import { normalizeBillingConfig, parseBillingConfig } from "@/lib/billing-config";
 import { createClient } from "@/lib/supabase/server";
 
 type SupportedModelRow = {
@@ -33,7 +33,30 @@ function modalityLabel(value: SupportedModelRow["modality"]) {
 
 function billingSummary(value: unknown) {
   try {
-    return summarizeBillingConfig(parseBillingConfig(value));
+    const normalized = normalizeBillingConfig(parseBillingConfig(value));
+    const parts: string[] = [];
+    const { charges, currency } = normalized;
+
+    if (charges.perRequest) {
+      parts.push(`per request ${charges.perRequest}`);
+    }
+    if (charges.perImage) {
+      parts.push(`per image ${charges.perImage}`);
+    }
+    if (charges.perVideo) {
+      parts.push(`per video ${charges.perVideo}`);
+    }
+    if (charges.perSecond) {
+      parts.push(`per second ${charges.perSecond}`);
+    }
+    if (charges.inputTextTokensPerMillion) {
+      parts.push(`per 1M input tokens ${charges.inputTextTokensPerMillion}`);
+    }
+    if (charges.outputTextTokensPerMillion) {
+      parts.push(`per 1M output tokens ${charges.outputTextTokensPerMillion}`);
+    }
+
+    return `${currency} ${parts.join(" + ")}`;
   } catch {
     return "Invalid pricing configuration";
   }
