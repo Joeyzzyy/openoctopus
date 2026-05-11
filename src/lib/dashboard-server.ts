@@ -98,6 +98,7 @@ export type DashboardData = {
     id: string;
     createdAtLabel: string;
     typeLabel: string;
+    amountValue: number;
     amountLabel: string;
     description: string;
     stripeSessionId: string | null;
@@ -800,6 +801,7 @@ export async function getDashboardData({
                   : Number(row.amount_delta ?? 0) < 0
                     ? "Usage Charge"
                     : "Settlement Credit",
+          amountValue: Number(row.amount_delta ?? 0),
           amountLabel: `${Number(row.amount_delta) >= 0 ? "+" : ""}${formatCurrency(Number(row.amount_delta ?? 0))}`,
           description: row.description ?? "-",
           stripeSessionId,

@@ -31,13 +31,14 @@ type DashboardView =
 type RequestInterval = "minute" | "hour" | "day";
 type RequestRange = "60m" | "6h" | "24h" | "7d" | "30d" | "90d";
 type ModelType = "all" | "image" | "video" | "text-coding";
+type BillingFlow = "incoming" | "outgoing";
 const pageNav = [
   { label: "Top-up Balance", view: "dashboard" },
-  { label: "Request Details", view: "request-details" },
-  { label: "Billing Details", view: "billing-details" },
-  { label: "Models", view: "models" },
   { label: "API Keys", view: "api-keys" },
   { label: "API Calling Doc", view: "api-calling-doc" },
+  { label: "Models", view: "models" },
+  { label: "Request Details", view: "request-details" },
+  { label: "Billing Details", view: "billing-details" },
 ] as const;
 
 const requestStatusStyles = {
@@ -107,6 +108,10 @@ function parseModelType(value: string | undefined): ModelType {
   return allowed.includes(value as ModelType) ? (value as ModelType) : "all";
 }
 
+function parseBillingFlow(value: string | undefined): BillingFlow {
+  return value === "outgoing" ? "outgoing" : "incoming";
+}
+
 function parseRangeMs(value: RequestRange) {
   if (value.endsWith("m")) {
     return Number(value.replace("m", "")) * 60 * 1000;
@@ -160,6 +165,7 @@ function buildDashboardHref(input: {
   analyticsInterval: RequestInterval;
   analyticsRange: RequestRange;
   modelType?: ModelType;
+  billingFlow?: BillingFlow;
 }) {
   const params = new URLSearchParams();
   params.set("view", input.view);
@@ -171,6 +177,9 @@ function buildDashboardHref(input: {
   }
   if (input.apiKeyId) {
     params.set("apiKey", input.apiKeyId);
+  }
+  if (input.billingFlow && input.view === "billing-details") {
+    params.set("billingFlow", input.billingFlow);
   }
   return `/dashboard?${params.toString()}`;
 }
@@ -368,6 +377,7 @@ export default async function DashboardPage({
   const requestsPage = Number.isFinite(rawRequestsPage) ? rawRequestsPage : 1;
   const selectedApiKeyId = getSearchValue(resolvedSearchParams, "apiKey") ?? null;
   const selectedModelType = parseModelType(getSearchValue(resolvedSearchParams, "modelType"));
+  const selectedBillingFlow = parseBillingFlow(getSearchValue(resolvedSearchParams, "billingFlow"));
 
   const data = await getDashboardData({
     requestsPage,
@@ -389,6 +399,7 @@ export default async function DashboardPage({
       analyticsInterval,
       analyticsRange,
       modelType: selectedModelType,
+      billingFlow: selectedBillingFlow,
     }),
   }));
   const activeHref = buildDashboardHref({
@@ -398,6 +409,7 @@ export default async function DashboardPage({
     analyticsInterval,
     analyticsRange,
     modelType: selectedModelType,
+    billingFlow: selectedBillingFlow,
   });
 
   const { apiKeys, metrics, modelCatalogRows, requestFilters, requestPagination, requestQueueRows, analyticsRequests, billingRows, user } =
@@ -436,6 +448,9 @@ export default async function DashboardPage({
     { value: "video", label: "Video", count: modelRowsByType.video.length },
     { value: "text-coding", label: "Text / Coding", count: modelRowsByType["text-coding"].length },
   ];
+  const billingRowsFiltered = billingRows.filter((row) =>
+    selectedBillingFlow === "incoming" ? row.amountValue >= 0 : row.amountValue < 0
+  );
 
   const overviewCards = [
     {
@@ -891,6 +906,46 @@ export default async function DashboardPage({
                     Top-up ledger and Stripe receipt/invoice download links for completed payments.
                   </p>
                 </div>
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <Link
+                    href={buildDashboardHref({
+                      view: "billing-details",
+                      requestsPage: 1,
+                      apiKeyId: selectedApiKeyId,
+                      analyticsInterval,
+                      analyticsRange,
+                      modelType: selectedModelType,
+                      billingFlow: "incoming",
+                    })}
+                    className={cn(
+                      "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
+                      selectedBillingFlow === "incoming"
+                        ? "border-black bg-black text-white"
+                        : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                    )}
+                  >
+                    Incoming
+                  </Link>
+                  <Link
+                    href={buildDashboardHref({
+                      view: "billing-details",
+                      requestsPage: 1,
+                      apiKeyId: selectedApiKeyId,
+                      analyticsInterval,
+                      analyticsRange,
+                      modelType: selectedModelType,
+                      billingFlow: "outgoing",
+                    })}
+                    className={cn(
+                      "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
+                      selectedBillingFlow === "outgoing"
+                        ? "border-black bg-black text-white"
+                        : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                    )}
+                  >
+                    Outgoing
+                  </Link>
+                </div>
 
                 <div className="relative w-full overflow-auto">
                   <table className="w-full min-w-[860px] text-sm">
@@ -914,8 +969,8 @@ export default async function DashboardPage({
                       </tr>
                     </thead>
                     <tbody>
-                      {billingRows.length > 0 ? (
-                        billingRows.map((row) => (
+                      {billingRowsFiltered.length > 0 ? (
+                        billingRowsFiltered.map((row) => (
                           <tr
                             key={row.id}
                             className="border-b border-black/10 transition-colors hover:bg-black/[0.02]"
@@ -950,7 +1005,7 @@ export default async function DashboardPage({
                       ) : (
                         <tr>
                           <td className="px-2 py-20 text-center text-sm text-black/50" colSpan={6}>
-                            No billing records yet
+                            No {selectedBillingFlow} billing records yet
                           </td>
                         </tr>
                       )}
