@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
-  CircleAlert,
   Fingerprint,
   Network,
   Activity,
@@ -950,7 +949,6 @@ export default async function InternalPage({
   const hasRoutes = data.routingRules.length > 0;
   const selectedTemplateKey = getSearchValue(resolvedSearchParams, "template");
   const activeTab = getTabValue(getSearchValue(resolvedSearchParams, "tab"));
-  const uiAlertMessage = getSearchValue(resolvedSearchParams, "alert");
   const selectedRequestCustomer = getSearchValue(resolvedSearchParams, "requestCustomer") ?? "all";
   const selectedRequestKey = getSearchValue(resolvedSearchParams, "requestKey") ?? "all";
   const selectedRequestPageRaw = Number(getSearchValue(resolvedSearchParams, "requestPage") ?? "1");
@@ -1116,15 +1114,6 @@ export default async function InternalPage({
               </h1>
             </div>
           </div>
-          {uiAlertMessage ? (
-            <div className="mb-4 rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3">
-              <div className="flex items-start gap-2">
-                <CircleAlert className="mt-0.5 size-4 shrink-0 text-[#b54432]" />
-                <p className="text-sm leading-6 text-[#8d4336]">{uiAlertMessage}</p>
-              </div>
-            </div>
-          ) : null}
-
           <InternalShell activeTab={activeTab} selectedTemplateKey={selectedTemplateKey} tabs={sidebarTabs}>
           {activeTab === "public-models" ? (
             <>

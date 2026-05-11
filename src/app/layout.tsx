@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, Inter, JetBrains_Mono } from "next/font/google";
+import { Suspense } from "react";
+import { GlobalAlertToaster } from "@/components/ui/global-alert-toaster";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -39,6 +41,9 @@ export default function RootLayout({
     <html lang="en" className={`${dmSans.variable} ${inter.variable} ${jetbrainsMono.variable} dark`}>
       <body className="min-h-full bg-[#0C0A09] text-[#FAFAF8] font-sans">
         {children}
+        <Suspense fallback={null}>
+          <GlobalAlertToaster />
+        </Suspense>
       </body>
     </html>
   );

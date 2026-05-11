@@ -42,7 +42,9 @@ export async function registerTaskRoutes(app: FastifyInstance) {
   app.get("/v1/models", async () => {
     const { data, error } = await supabaseAdmin
       .from("provider_models")
-      .select("id, public_model_slug, upstream_model_slug, capability, active, provider_id, providers(name, slug)")
+      .select(
+        "id, public_model_slug, upstream_model_slug, capability, active, provider_id, providers(name, slug), supported_models(active)"
+      )
       .eq("active", true)
       .order("public_model_slug", { ascending: true });
 
@@ -61,6 +63,13 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     >();
 
     for (const row of data ?? []) {
+      const supportedModel = Array.isArray(row.supported_models)
+        ? row.supported_models[0]
+        : row.supported_models;
+      if (!supportedModel?.active) {
+        continue;
+      }
+
       const key = row.public_model_slug;
       const provider = Array.isArray(row.providers) ? row.providers[0] : row.providers;
 

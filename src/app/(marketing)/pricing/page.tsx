@@ -1,124 +1,91 @@
-import Link from "next/link";
-import { PageHero, PageSection, SurfaceCard } from "@/components/marketing/page-primitives";
+import { parseBillingConfig, summarizeBillingConfig } from "@/lib/billing-config";
+import { createClient } from "@/lib/supabase/server";
 
-const pricingPrinciples = [
-  {
-    title: "Pay as you go",
-    description: "No subscriptions, no seat licenses, and no monthly minimums. You pay only for successful routed usage.",
-  },
-  {
-    title: "Unified billing",
-    description: "Image, video, and future model categories share one balance and one usage ledger across your workspace.",
-  },
-  {
-    title: "Spend visibility",
-    description: "Track usage by key, team, and workload so finance and engineering can use the same numbers.",
-  },
-];
-
-const modelBands = [
-  { category: "Image generation", typical: "$0.02 to $0.06 / image", notes: "Fast consumer and premium studio models" },
-  { category: "Image editing", typical: "$0.03 to $0.08 / edit", notes: "Inpaint, outpaint, upscale, and transform tasks" },
-  { category: "Video generation", typical: "$0.10 to $0.30 / second", notes: "Short-form text-to-video and image-to-video routes" },
-];
-
-const faq = [
-  {
-    question: "Do I need a subscription before I can test the API?",
-    answer: "No. You can sign in, create a key, add credits only when needed, and start making requests immediately.",
-  },
-  {
-    question: "Can one balance be shared across a team?",
-    answer: "Yes. Workspace billing is shared, and you can still segment usage by key, feature, or internal cost center.",
-  },
-  {
-    question: "How do I know what a model will cost before I call it?",
-    answer: "The model catalog exposes current price information and routing metadata so you can choose the right model before sending traffic.",
-  },
-];
+type SupportedModelRow = {
+  id: string;
+  provider: string;
+  model_slug: string;
+  display_name: string;
+  modality: "image" | "video" | "audio";
+  capability: "image_generation" | "image_edit" | "video_generation" | null;
+  billing_config: unknown;
+  active: boolean;
+  created_at: string;
+};
 
 export const metadata = {
   title: "Pricing — OpenOctopus",
-  description:
-    "Simple, transparent pay-as-you-go pricing for OpenOctopus image generation.",
+  description: "Live pricing table sourced from internal model configuration.",
 };
 
-export default function PricingPage() {
+function capabilityLabel(value: SupportedModelRow["capability"]) {
+  if (value === "image_generation") return "Image Generation";
+  if (value === "image_edit") return "Image Editing";
+  if (value === "video_generation") return "Video Generation";
+  return "Not Set";
+}
+
+function modalityLabel(value: SupportedModelRow["modality"]) {
+  if (value === "image") return "Image";
+  if (value === "video") return "Video";
+  return "Audio";
+}
+
+function billingSummary(value: unknown) {
+  try {
+    return summarizeBillingConfig(parseBillingConfig(value));
+  } catch {
+    return "Invalid pricing configuration";
+  }
+}
+
+export default async function PricingPage() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("supported_models")
+    .select("id, provider, model_slug, display_name, modality, capability, billing_config, active, created_at")
+    .eq("active", true)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const models = (data ?? []) as SupportedModelRow[];
+
   return (
-    <>
-      <PageHero
-        eyebrow="Pricing"
-        title="Simple pricing for routed media generation"
-        description="Use one balance across image and video models, keep billing predictable, and scale from experiments to production without subscription lock-in."
-        primaryAction={{ href: "/login", label: "Get API Key" }}
-        secondaryAction={{ href: "/docs", label: "Read docs" }}
-        stats={[
-          { label: "Subscription", value: "None" },
-          { label: "Billing model", value: "Usage-based" },
-          { label: "Workspace credits", value: "Shared" },
-          { label: "Model types", value: "Image + Video" },
-        ]}
-      />
+    <main className="mx-auto w-full max-w-7xl px-6 py-12 md:px-10 md:py-16">
+      <header className="mb-6">
+        <p className="text-xs uppercase tracking-[0.16em] text-black/45">Pricing</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[#111827]">Model Pricing</h1>
+        <p className="mt-3 text-sm text-black/60">Live pricing sourced from internal configuration (active public models only).</p>
+      </header>
 
-      <PageSection
-        title="Pricing principles"
-        description="The pricing page should read like the homepage: clear cards, tight copy, and zero noise."
-      >
-        <div className="grid gap-6 md:grid-cols-3">
-          {pricingPrinciples.map((item) => (
-            <SurfaceCard key={item.title} className="p-6">
-              <h3 className="text-[22px] font-semibold tracking-[-0.045em] text-[#111827]">{item.title}</h3>
-              <p className="mt-3 text-[15px] leading-7 text-[#6B7280]">{item.description}</p>
-            </SurfaceCard>
-          ))}
-        </div>
-      </PageSection>
-
-      <PageSection
-        title="Typical public pricing"
-        description="Representative price bands for common workloads. Exact model pricing is shown in the model catalog and routing surfaces."
-      >
-        <SurfaceCard className="overflow-hidden">
-          <div className="grid grid-cols-[1.1fr_0.8fr_1fr] gap-4 border-b border-black/[0.08] px-6 py-4 text-[11px] uppercase tracking-[0.18em] text-[#9CA3AF]">
-            <span>Category</span>
-            <span>Typical price</span>
-            <span>Notes</span>
-          </div>
-          {modelBands.map((band, index) => (
-            <div
-              key={band.category}
-              className={`grid grid-cols-[1.1fr_0.8fr_1fr] gap-4 px-6 py-5 ${
-                index !== modelBands.length - 1 ? "border-b border-black/[0.06]" : ""
-              }`}
-            >
-              <p className="font-medium text-[#111827]">{band.category}</p>
-              <p className="text-[#111827]">{band.typical}</p>
-              <p className="text-[#6B7280]">{band.notes}</p>
-            </div>
-          ))}
-        </SurfaceCard>
-        <p className="mt-4 text-sm text-[#6B7280]">
-          Need dedicated routing, private deployments, or enterprise billing terms?{" "}
-          <Link href="/enterprise" className="text-[#111827] underline decoration-black/20 underline-offset-4">
-            Talk to enterprise
-          </Link>
-          .
-        </p>
-      </PageSection>
-
-      <PageSection
-        title="Pricing FAQ"
-        description="The same light treatment, just applied to common billing questions."
-      >
-        <div className="grid gap-6 md:grid-cols-3">
-          {faq.map((item) => (
-            <SurfaceCard key={item.question} className="p-6">
-              <h3 className="text-[18px] font-semibold text-[#111827]">{item.question}</h3>
-              <p className="mt-3 text-[15px] leading-7 text-[#6B7280]">{item.answer}</p>
-            </SurfaceCard>
-          ))}
-        </div>
-      </PageSection>
-    </>
+      <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+        <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+          <thead>
+            <tr className="text-xs text-black/50">
+              <th className="min-w-[180px] border-b border-black/[0.08] px-3 py-2.5">Model</th>
+              <th className="min-w-[140px] border-b border-black/[0.08] px-3 py-2.5">Provider</th>
+              <th className="min-w-[100px] border-b border-black/[0.08] px-3 py-2.5">Modality</th>
+              <th className="min-w-[150px] border-b border-black/[0.08] px-3 py-2.5">Capability</th>
+              <th className="min-w-[320px] border-b border-black/[0.08] px-3 py-2.5">Pricing Rule</th>
+            </tr>
+          </thead>
+          <tbody>
+            {models.map((model) => (
+              <tr key={model.id}>
+                <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-sm font-medium text-black">{model.display_name}</td>
+                <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.provider}</td>
+                <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{modalityLabel(model.modality)}</td>
+                <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{capabilityLabel(model.capability)}</td>
+                <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{billingSummary(model.billing_config)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </main>
   );
 }

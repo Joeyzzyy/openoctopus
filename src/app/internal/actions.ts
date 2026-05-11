@@ -121,6 +121,14 @@ function parseJsonArrayField(value: FormDataEntryValue | null) {
   return parsed as Array<Record<string, unknown>>;
 }
 
+function buildInternalAlertHref(input: {
+  tab: "public-models" | "economics";
+  message: string;
+  level: "success" | "warning" | "error" | "info";
+}) {
+  return `/internal?tab=${input.tab}&alert=${encodeURIComponent(input.message)}&alertLevel=${input.level}`;
+}
+
 async function loadProviderRuntimeContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
   input: {
@@ -1941,7 +1949,13 @@ export async function createProviderModel(formData: FormData) {
     revalidatePath("/internal");
   } catch (error) {
     const message = error instanceof Error ? error.message : "保存失败，请稍后重试。";
-    redirect(`/internal?tab=economics&alert=${encodeURIComponent(message)}`);
+    redirect(
+      buildInternalAlertHref({
+        tab: "economics",
+        message,
+        level: "error",
+      })
+    );
   }
 }
 
@@ -2214,9 +2228,11 @@ export async function deleteProviderModel(formData: FormData) {
 
   if ((routingUsageRows ?? []).length > 0) {
     redirect(
-      `/internal?tab=economics&alert=${encodeURIComponent(
-        "删除失败：该模型映射仍被路由规则引用，请先调整路由配置。"
-      )}`
+      buildInternalAlertHref({
+        tab: "economics",
+        message: "删除失败：该模型映射仍被路由规则引用，请先调整路由配置。",
+        level: "warning",
+      })
     );
   }
 

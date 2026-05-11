@@ -8,7 +8,6 @@ import {
   ReceiptText,
   Wallet,
 } from "lucide-react";
-import { Toaster } from "sonner";
 import { getDashboardData } from "@/lib/dashboard-server";
 import { cn } from "@/lib/utils";
 import { CreateKeyButton } from "./dashboard-actions";
@@ -950,7 +949,6 @@ export default async function DashboardPage({
           </section>
         </div>
       </div>
-      <Toaster position="top-right" richColors />
     </main>
   );
 }

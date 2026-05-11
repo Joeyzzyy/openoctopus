@@ -812,53 +812,62 @@ export function PublicModelsPanel({
           <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="text-xs text-black/50">
-                <th className="w-[30%] border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
-                <th className="w-[14%] border-b border-black/[0.08] px-3 py-2.5">厂商</th>
-                <th className="w-[20%] border-b border-black/[0.08] px-3 py-2.5">模态/能力</th>
-                <th className="w-[20%] border-b border-black/[0.08] px-3 py-2.5">计费</th>
-                <th className="w-[8%] border-b border-black/[0.08] px-3 py-2.5">启用</th>
-                <th className="w-[8%] border-b border-black/[0.08] px-3 py-2.5">操作</th>
+                <th className="min-w-[220px] border-b border-black/[0.08] px-3 py-2.5">可售模型Slug</th>
+                <th className="min-w-[140px] border-b border-black/[0.08] px-3 py-2.5">显示名称</th>
+                <th className="min-w-[120px] border-b border-black/[0.08] px-3 py-2.5">厂商</th>
+                <th className="min-w-[90px] border-b border-black/[0.08] px-3 py-2.5">模态</th>
+                <th className="min-w-[120px] border-b border-black/[0.08] px-3 py-2.5">能力类型</th>
+                <th className="min-w-[80px] border-b border-black/[0.08] px-3 py-2.5">启用</th>
+                <th className="min-w-[130px] border-b border-black/[0.08] px-3 py-2.5">添加时间</th>
+                <th className="min-w-[200px] border-b border-black/[0.08] px-3 py-2.5">计费摘要</th>
+                <th className="min-w-[260px] border-b border-black/[0.08] px-3 py-2.5">计费配置(JSON)</th>
+                <th className="min-w-[120px] border-b border-black/[0.08] px-3 py-2.5">供应商模型总数</th>
+                <th className="min-w-[110px] border-b border-black/[0.08] px-3 py-2.5">启用映射数</th>
+                <th className="min-w-[150px] border-b border-black/[0.08] px-3 py-2.5">操作</th>
               </tr>
             </thead>
             <tbody>
               {models.map((model) => (
                 <tr key={model.id}>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
-                    <p className="text-sm font-medium text-black">{model.display_name}</p>
-                    <p className="mt-1 text-xs text-black/50">{model.model_slug}</p>
-                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle font-mono text-xs text-black/72">{model.model_slug}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-sm font-medium text-black">{model.display_name}</td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.provider}</td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
-                    <span className="inline-flex h-6 items-center rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2 text-[11px] text-black/60">
-                      {model.capability ? capabilityLabel(model.capability) : modalityLabel(model.modality)}
-                    </span>
-                  </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.billingSummary}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{modalityLabel(model.modality)}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.capability ? capabilityLabel(model.capability) : "-"}</td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
                     <form action={updateSupportedModelState}>
                       <input type="hidden" name="supportedModelId" value={model.id} />
                       <input type="hidden" name="active" value={model.active ? "false" : "true"} />
                       <button
                         type="submit"
-                        className={`inline-flex h-7 w-[86px] items-center rounded-full border px-1 transition-colors ${
+                        className={`inline-flex h-6 w-[58px] cursor-pointer items-center rounded-full border p-[2px] transition-all ${
                           model.active
-                            ? "border-[#D7EADB] bg-[#EDF8F0]"
-                            : "border-black/[0.12] bg-[#F4F4F3]"
+                            ? "border-[#9CC9A5] bg-[#EAF7ED]"
+                            : "border-black/[0.14] bg-[#F2F2F1]"
                         }`}
                         aria-label={model.active ? "停用模型" : "启用模型"}
                       >
                         <span
-                          className={`h-5 rounded-full px-2 text-[11px] leading-5 transition-all ${
+                          className={`inline-flex h-5 min-w-[26px] items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-5 transition-all ${
                             model.active
-                              ? "ml-auto bg-[#335D2D] text-white"
-                              : "mr-auto bg-[#6B7280] text-white"
+                              ? "ml-auto bg-[#2F7A3E] text-white shadow-[0_1px_2px_rgba(20,28,20,0.2)]"
+                              : "mr-auto bg-[#70757D] text-white shadow-[0_1px_2px_rgba(20,28,20,0.16)]"
                           }`}
                         >
-                          {model.active ? "ON" : "OFF"}
+                          {model.active ? "开" : "关"}
                         </span>
                       </button>
                     </form>
                   </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.createdLabel}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.billingSummary}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                    <p className="max-w-[420px] truncate font-mono text-[11px] text-black/60" title={model.billingConfigText}>
+                      {model.billingConfigText}
+                    </p>
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.providerModelCount}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.activeProviderModelCount}</td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
                     <div className="flex flex-wrap items-center gap-2">
                       <ManagementDialog
