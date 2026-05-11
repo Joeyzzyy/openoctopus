@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import Stripe from "stripe";
 
 type MetricTone = "neutral" | "positive" | "warning";
 type BudgetState = "healthy" | "watch" | "critical";
@@ -92,6 +93,15 @@ export type DashboardData = {
     detail: string;
     amount: string;
     tone: LedgerTone;
+  }>;
+  billingRows: Array<{
+    id: string;
+    createdAtLabel: string;
+    typeLabel: string;
+    amountLabel: string;
+    description: string;
+    stripeSessionId: string | null;
+    receiptUrl: string | null;
   }>;
   providerSummaries: Array<{
     name: string;
@@ -272,6 +282,7 @@ function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardDa
     apiKeys: [],
     usageRows: [],
     ledgerRows: [],
+    billingRows: [],
     providerSummaries: [],
     routingRules: [],
     modelCatalogRows: [],
@@ -287,6 +298,37 @@ function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardDa
     },
     requestQueueRows: [],
   };
+}
+
+async function buildStripeReceiptUrlMap(paymentIntentIds: string[]) {
+  const uniqueIds = Array.from(new Set(paymentIntentIds.filter((id) => id.length > 0)));
+  if (uniqueIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    return new Map<string, string>();
+  }
+
+  const stripe = new Stripe(stripeSecretKey);
+  const receiptByPaymentIntentId = new Map<string, string>();
+
+  for (const paymentIntentId of uniqueIds) {
+    try {
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ["latest_charge"],
+      });
+      const latestCharge = paymentIntent.latest_charge;
+      if (latestCharge && typeof latestCharge !== "string" && latestCharge.receipt_url) {
+        receiptByPaymentIntentId.set(paymentIntentId, latestCharge.receipt_url);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return receiptByPaymentIntentId;
 }
 
 export async function getDashboardData({
@@ -371,7 +413,7 @@ export async function getDashboardData({
       supabaseAdmin.from("api_keys").select("id, name, key_prefix, environment, status, monthly_budget, last_used_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }),
       supabaseAdmin.from("usage_events").select("id, endpoint, request_count, total_cost, status_code, created_at, api_key_id, model_id").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
       supabaseAdmin.from("wallet_transactions").select("amount_delta").eq("workspace_id", workspace.id),
-      supabaseAdmin.from("wallet_transactions").select("id, entry_type, amount_delta, description, created_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
+      supabaseAdmin.from("wallet_transactions").select("id, entry_type, amount_delta, description, created_at, metadata").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(20),
       supabaseAdmin.from("providers").select("id, name, regions, status"),
       supabaseAdmin
         .from("provider_models")
@@ -448,6 +490,15 @@ export async function getDashboardData({
       acc.set(row.provider_id, (acc.get(row.provider_id) ?? 0) + 1);
       return acc;
     }, new Map<string, number>());
+
+    const stripePaymentIntentIds = (walletLedgerRows ?? [])
+      .map((row) => {
+        const metadata = (row as { metadata?: Record<string, unknown> }).metadata;
+        const paymentIntentId = metadata?.stripe_payment_intent_id;
+        return typeof paymentIntentId === "string" ? paymentIntentId : "";
+      })
+      .filter((id) => id.length > 0);
+    const receiptByPaymentIntentId = await buildStripeReceiptUrlMap(stripePaymentIntentIds);
 
     const spendTrend = Array.from({ length: 7 }).map((_, index) => {
       const date = new Date();
@@ -721,8 +772,36 @@ export async function getDashboardData({
             ? "positive"
             : Number(row.amount_delta ?? 0) < 0
               ? "negative"
-              : "neutral",
+            : "neutral",
       })),
+      billingRows: (walletLedgerRows ?? []).map((row) => {
+        const metadata = (row as { metadata?: Record<string, unknown> }).metadata;
+        const stripeSessionId =
+          metadata && typeof metadata.stripe_checkout_session_id === "string"
+            ? metadata.stripe_checkout_session_id
+            : null;
+        const stripePaymentIntentId =
+          metadata && typeof metadata.stripe_payment_intent_id === "string"
+            ? metadata.stripe_payment_intent_id
+            : null;
+
+        return {
+          id: row.id,
+          createdAtLabel: formatTimestamp(row.created_at),
+          typeLabel:
+            row.entry_type === "topup"
+              ? "Top-up"
+              : row.entry_type === "refund"
+                ? "Refund"
+                : row.entry_type === "adjustment"
+                  ? "Adjustment"
+                  : "Settlement",
+          amountLabel: `${Number(row.amount_delta) >= 0 ? "+" : ""}${formatCurrency(Number(row.amount_delta ?? 0))}`,
+          description: row.description ?? "-",
+          stripeSessionId,
+          receiptUrl: stripePaymentIntentId ? receiptByPaymentIntentId.get(stripePaymentIntentId) ?? null : null,
+        };
+      }),
       providerSummaries,
       routingRules,
       modelCatalogRows,

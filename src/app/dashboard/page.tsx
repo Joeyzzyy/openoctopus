@@ -21,12 +21,20 @@ import { AutoRefreshOnReturn } from "./auto-refresh-on-return";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-type DashboardView = "dashboard" | "models" | "api-keys" | "api-calling-doc";
+type DashboardView =
+  | "dashboard"
+  | "request-details"
+  | "billing-details"
+  | "models"
+  | "api-keys"
+  | "api-calling-doc";
 type RequestInterval = "minute" | "hour" | "day";
 type RequestRange = "60m" | "6h" | "24h" | "7d" | "30d" | "90d";
 type ModelType = "all" | "image" | "video" | "text-coding";
 const pageNav = [
-  { label: "Dashboard", view: "dashboard" },
+  { label: "Top-up Balance", view: "dashboard" },
+  { label: "Request Details", view: "request-details" },
+  { label: "Billing Details", view: "billing-details" },
   { label: "Models", view: "models" },
   { label: "API Keys", view: "api-keys" },
   { label: "API Calling Doc", view: "api-calling-doc" },
@@ -392,7 +400,7 @@ export default async function DashboardPage({
     modelType: selectedModelType,
   });
 
-  const { apiKeys, metrics, modelCatalogRows, requestFilters, requestPagination, requestQueueRows, analyticsRequests, user } =
+  const { apiKeys, metrics, modelCatalogRows, requestFilters, requestPagination, requestQueueRows, analyticsRequests, billingRows, user } =
     data;
 
   const walletMetric = metrics.find((metric) => metric.label === "Wallet Balance");
@@ -542,8 +550,11 @@ export default async function DashboardPage({
                     ))}
                   </div>
                 </article>
+              </>
+            ) : null}
 
-                <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+            {view === "request-details" ? (
+              <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
                   <div className="mb-4 flex flex-col gap-3">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
@@ -563,7 +574,7 @@ export default async function DashboardPage({
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Link
                             href={buildDashboardHref({
-                              view: "dashboard",
+                              view: "request-details",
                               requestsPage: 1,
                               apiKeyId: null,
                               analyticsInterval,
@@ -582,7 +593,7 @@ export default async function DashboardPage({
                             <Link
                               key={item.id}
                               href={buildDashboardHref({
-                                view: "dashboard",
+                                view: "request-details",
                                 requestsPage: 1,
                                 apiKeyId: item.id,
                                 analyticsInterval,
@@ -608,7 +619,7 @@ export default async function DashboardPage({
                             <Link
                               key={option.value}
                               href={buildDashboardHref({
-                                view: "dashboard",
+                                view: "request-details",
                                 requestsPage: 1,
                                 apiKeyId: selectedApiKeyId,
                                 analyticsInterval: option.value,
@@ -634,7 +645,7 @@ export default async function DashboardPage({
                             <Link
                               key={option.value}
                               href={buildDashboardHref({
-                                view: "dashboard",
+                                view: "request-details",
                                 requestsPage: 1,
                                 apiKeyId: selectedApiKeyId,
                                 analyticsInterval,
@@ -804,7 +815,7 @@ export default async function DashboardPage({
                       <div className="flex items-center gap-2">
                         <Link
                           href={buildDashboardHref({
-                            view: "dashboard",
+                            view: "request-details",
                             requestsPage: Math.max(1, requestPagination.page - 1),
                             apiKeyId: selectedApiKeyId,
                             analyticsInterval,
@@ -827,7 +838,7 @@ export default async function DashboardPage({
                                 ) : null}
                                 <Link
                                   href={buildDashboardHref({
-                                    view: "dashboard",
+                                    view: "request-details",
                                     requestsPage: page,
                                     apiKeyId: selectedApiKeyId,
                                     analyticsInterval,
@@ -848,7 +859,7 @@ export default async function DashboardPage({
                         </div>
                         <Link
                           href={buildDashboardHref({
-                            view: "dashboard",
+                            view: "request-details",
                             requestsPage: Math.min(requestPagination.totalPages, requestPagination.page + 1),
                             apiKeyId: selectedApiKeyId,
                             analyticsInterval,
@@ -870,7 +881,71 @@ export default async function DashboardPage({
                     </div>
                   ) : null}
                 </section>
-              </>
+            ) : null}
+
+            {view === "billing-details" ? (
+              <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm sm:p-5">
+                <div className="mb-4">
+                  <h2 className="text-xl font-semibold text-black">Billing details</h2>
+                  <p className="mt-1 text-sm text-black/55">
+                    Top-up ledger and Stripe receipt/invoice download links for completed payments.
+                  </p>
+                </div>
+
+                <div className="relative w-full overflow-auto">
+                  <table className="w-full min-w-[860px] text-sm">
+                    <thead>
+                      <tr className="border-b border-black/10 text-left">
+                        {["Time", "Type", "Amount", "Description", "Stripe Session", "Invoice / Receipt"].map(
+                          (heading) => (
+                            <th key={heading} className="h-10 px-2 text-[10px] tracking-[1px] text-black/50">
+                              {heading}
+                            </th>
+                          )
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {billingRows.length > 0 ? (
+                        billingRows.map((row) => (
+                          <tr
+                            key={row.id}
+                            className="border-b border-black/10 transition-colors hover:bg-black/[0.02]"
+                          >
+                            <td className="px-2 py-3 text-xs text-black/60">{row.createdAtLabel}</td>
+                            <td className="px-2 py-3 text-sm text-black">{row.typeLabel}</td>
+                            <td className="px-2 py-3 text-sm text-black/70">{row.amountLabel}</td>
+                            <td className="px-2 py-3 text-sm text-black/70">{row.description}</td>
+                            <td className="px-2 py-3 text-xs text-black/60">
+                              {row.stripeSessionId ?? "—"}
+                            </td>
+                            <td className="px-2 py-3 text-sm">
+                              {row.receiptUrl ? (
+                                <a
+                                  href={row.receiptUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]"
+                                >
+                                  Download
+                                </a>
+                              ) : (
+                                <span className="text-xs text-black/45">Pending</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td className="px-2 py-20 text-center text-sm text-black/50" colSpan={6}>
+                            No billing records yet
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             ) : null}
 
             {view === "models" ? (
