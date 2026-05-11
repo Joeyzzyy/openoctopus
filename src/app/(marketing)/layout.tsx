@@ -13,7 +13,7 @@ export default async function MarketingLayout({
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FCFCFA] text-[#111827]">
-      <MarketingHeader isLoggedIn={!!user} />
+      <MarketingHeader isLoggedIn={!!user} userLabel={user?.email ?? user?.user_metadata?.name ?? null} />
       <main className="flex-1">{children}</main>
       <MarketingFooter />
     </div>

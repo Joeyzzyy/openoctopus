@@ -472,7 +472,7 @@ export default async function DashboardPage({
             <form action="/auth/sign-out" method="post" className="ml-auto">
               <div className="flex items-center gap-2">
                 <span className="hidden max-w-[280px] truncate text-[13px] text-[#6B7280] md:inline">
-                  {user.email ?? user.name}
+                  Hi, {user.email ?? user.name}
                 </span>
                 <button
                   type="submit"

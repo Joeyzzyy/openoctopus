@@ -179,7 +179,12 @@ export default async function Home() {
               ))}
             </nav>
 
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              {user ? (
+                <span className="hidden max-w-[260px] truncate text-[13px] text-[#6B7280] md:inline">
+                  Hi, {user.email ?? user.user_metadata?.name ?? "there"}
+                </span>
+              ) : null}
               <Link
                 href={destination}
                 className="inline-flex h-9 items-center justify-center rounded-md bg-[#111827] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0B1220]"

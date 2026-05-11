@@ -8,7 +8,13 @@ const NAV_ITEMS = [
   { label: "About", href: "/about" },
 ];
 
-export function MarketingHeader({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
+export function MarketingHeader({
+  isLoggedIn = false,
+  userLabel,
+}: {
+  isLoggedIn?: boolean;
+  userLabel?: string | null;
+}) {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center px-6 md:px-8">
@@ -32,7 +38,12 @@ export function MarketingHeader({ isLoggedIn = false }: { isLoggedIn?: boolean }
             ))}
           </nav>
 
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {isLoggedIn && userLabel ? (
+              <span className="hidden max-w-[260px] truncate text-[13px] text-[#6B7280] md:inline">
+                Hi, {userLabel}
+              </span>
+            ) : null}
             <Link
               href={isLoggedIn ? "/dashboard" : "/login"}
               className="inline-flex h-9 items-center justify-center rounded-md bg-[#111827] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0B1220]"
