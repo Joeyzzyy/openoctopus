@@ -13,7 +13,7 @@ export function TopUpForm() {
       <div className="flex flex-col gap-3">
         <div>
           <p className="text-sm font-medium text-black">Top up credit</p>
-          <p className="mt-1 text-xs text-black/55">Minimum $5. You can enter any amount and pay with Stripe Checkout.</p>
+          <p className="mt-1 text-xs text-black/55">Minimum $1. You can enter any amount and pay with Stripe Checkout.</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -37,11 +37,11 @@ export function TopUpForm() {
           <span>Amount</span>
           <input
             type="number"
-            min={5}
+            min={1}
             step={1}
             name="amountUsd"
             value={amount}
-            onChange={(event) => setAmount(Number(event.target.value || 5))}
+            onChange={(event) => setAmount(Number(event.target.value || 1))}
             className="h-9 w-32 rounded-md border border-black/[0.12] bg-white px-3 text-sm text-black outline-none"
           />
           <span className="text-black/45">USD</span>

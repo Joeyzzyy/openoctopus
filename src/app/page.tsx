@@ -244,11 +244,10 @@ export default async function Home() {
                     {destinationLabel}
                   </Link>
                   <Link
-                    href="/bestof"
+                    href="/pricing"
                     className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-black/[0.08] bg-transparent px-10 py-4 text-[14px] font-medium text-[#111827] shadow-sm transition-colors hover:bg-black/[0.03]"
                   >
                     <span>Explore Models</span>
-                    <ExploreModelStack />
                   </Link>
                 </div>
               </div>
@@ -335,25 +334,6 @@ export default async function Home() {
           </div>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function ExploreModelStack() {
-  return (
-    <div className="relative h-5 w-5 overflow-hidden">
-      <div className="flex translate-y-0 flex-col transition-transform duration-300 ease-in-out">
-        <div className="flex h-5 w-5 items-center justify-center">
-          <span className="flex size-5 items-center justify-center rounded-full bg-[#111827] text-[9px] font-semibold text-white">
-            O
-          </span>
-        </div>
-        <div className="flex h-5 w-5 items-center justify-center">
-          <span className="flex size-5 items-center justify-center rounded-full border border-black/[0.08] bg-white text-[9px] font-semibold text-[#111827]">
-            D
-          </span>
-        </div>
-      </div>
     </div>
   );
 }

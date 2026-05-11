@@ -238,7 +238,7 @@ export async function toggleApiKeyStatus(
 }
 
 const createTopUpCheckoutSchema = z.object({
-  amountUsd: z.coerce.number().int().min(5).max(10_000),
+  amountUsd: z.coerce.number().int().min(1).max(10_000),
 });
 
 export async function createTopUpCheckoutSession(formData: FormData) {
