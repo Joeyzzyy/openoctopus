@@ -790,12 +790,16 @@ export async function getDashboardData({
           createdAtLabel: formatTimestamp(row.created_at),
           typeLabel:
             row.entry_type === "topup"
-              ? "Top-up"
+              ? "Top-up (Credit)"
               : row.entry_type === "refund"
                 ? "Refund"
-                : row.entry_type === "adjustment"
-                  ? "Adjustment"
-                  : "Settlement",
+              : row.entry_type === "adjustment"
+                  ? Number(row.amount_delta ?? 0) < 0
+                    ? "Adjustment (Debit)"
+                    : "Adjustment (Credit)"
+                  : Number(row.amount_delta ?? 0) < 0
+                    ? "Usage Charge"
+                    : "Settlement Credit",
           amountLabel: `${Number(row.amount_delta) >= 0 ? "+" : ""}${formatCurrency(Number(row.amount_delta ?? 0))}`,
           description: row.description ?? "-",
           stripeSessionId,

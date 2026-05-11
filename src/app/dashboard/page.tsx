@@ -912,10 +912,14 @@ export default async function DashboardPage({
                             key={row.id}
                             className="border-b border-black/10 transition-colors hover:bg-black/[0.02]"
                           >
-                            <td className="px-2 py-3 text-xs text-black/60">{row.createdAtLabel}</td>
+                            <td className="whitespace-nowrap px-2 py-3 text-xs text-black/60">
+                              {row.createdAtLabel}
+                            </td>
                             <td className="px-2 py-3 text-sm text-black">{row.typeLabel}</td>
                             <td className="px-2 py-3 text-sm text-black/70">{row.amountLabel}</td>
-                            <td className="px-2 py-3 text-sm text-black/70">{row.description}</td>
+                            <td className="max-w-[360px] whitespace-normal break-words px-2 py-3 text-sm text-black/70">
+                              {row.description}
+                            </td>
                             <td className="px-2 py-3 text-xs text-black/60">
                               {row.stripeSessionId ?? "—"}
                             </td>
