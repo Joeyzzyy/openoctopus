@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import Link from "next/link";
 import {
   Fingerprint,
   Network,
@@ -8,6 +9,7 @@ import {
   ShieldCheck,
   Waypoints,
 } from "lucide-react";
+import { Logo } from "@/components/layout/Logo";
 import { getInternalAdminData } from "@/lib/internal-admin-server";
 import { clearApiKeyRequestRecords, unlockInternalAccess } from "./actions";
 import { INTERNAL_ACCESS_COOKIE, INTERNAL_ACCESS_COOKIE_VALUE } from "@/lib/internal-access";
@@ -1088,6 +1090,21 @@ export default async function InternalPage({
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#FCFCFA] text-[#111111]">
+      <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 w-full max-w-[1960px] items-center px-3 xl:px-4">
+          <div className="relative flex w-full items-center text-sm md:text-base">
+            <Link
+              href="/"
+              className="-ml-2 rounded-md px-2 py-1.5 text-[#6B7280] transition-colors hover:bg-black/[0.03] hover:text-[#111827]"
+            >
+              <Logo className="text-[#111827]" />
+            </Link>
+            <span className="ml-3 inline-flex items-center rounded-md border border-black/[0.08] bg-white px-2.5 py-1 text-[12px] font-medium text-black/65">
+              内部控制台
+            </span>
+          </div>
+        </div>
+      </header>
       <div
         className="pointer-events-none fixed inset-0"
         style={{
@@ -1106,14 +1123,7 @@ export default async function InternalPage({
       />
 
       <div className="relative mx-auto w-full max-w-[1960px] px-3 pb-10 xl:px-4">
-        <section className="min-h-[calc(100vh-108px)] py-8">
-          <div className="mb-6">
-            <div>
-              <h1 className="mt-2 text-3xl font-semibold leading-none tracking-[-0.05em] text-[#111111]">
-                内部控制台
-              </h1>
-            </div>
-          </div>
+        <section className="min-h-[calc(100vh-108px)] py-4">
           <InternalShell activeTab={activeTab} selectedTemplateKey={selectedTemplateKey} tabs={sidebarTabs}>
           {activeTab === "public-models" ? (
             <>
