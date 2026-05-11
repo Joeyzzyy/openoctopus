@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X, Search, Globe } from "lucide-react";
+import { Menu, X, Globe } from "lucide-react";
 import { useScrollPosition } from "@/hooks/useScrollPosition";
 import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
@@ -53,16 +53,6 @@ export function Header({
         </nav>
 
         <div className="flex flex-1 items-center justify-end gap-2 md:gap-3">
-          <div className="hidden h-9 items-center rounded-lg border border-white/10 bg-white/10 px-3 shadow-sm transition-colors hover:bg-white/15 md:flex">
-            <Search className="h-4 w-4 text-white/70" />
-            <input
-              readOnly
-              value=""
-              placeholder="Search model..."
-              className="h-full w-[108px] border-none bg-transparent pl-2 text-[12px] text-white outline-none placeholder:text-white/50 xl:w-[128px]"
-            />
-          </div>
-
           <button className="flex h-9 min-w-9 items-center justify-center rounded-lg border border-white/10 bg-white/10 px-2 text-white/80 transition-colors hover:bg-white/15 md:min-w-[56px] md:px-2.5">
             <Globe className="h-4 w-4" />
             <span className="ml-1 hidden text-[12px] font-medium md:inline">EN</span>

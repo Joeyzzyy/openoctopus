@@ -6,7 +6,6 @@ import {
   LineChart,
   LogOut,
   ReceiptText,
-  Search,
   Wallet,
 } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
@@ -31,12 +30,6 @@ const pageNav = [
   { label: "Models", view: "models" },
   { label: "API Keys", view: "api-keys" },
   { label: "API Calling Doc", view: "api-calling-doc" },
-] as const;
-const marketingNavItems = [
-  { label: "Pricing", href: "/pricing" },
-  { label: "Docs", href: "/docs" },
-  { label: "Enterprise", href: "/enterprise" },
-  { label: "About", href: "/about" },
 ] as const;
 
 const requestStatusStyles = {
@@ -475,25 +468,6 @@ export default async function DashboardPage({
             >
               <Logo className="text-[#111827]" />
             </Link>
-
-            <div className="ml-4 hidden lg:block">
-              <div className="relative flex h-9 w-60 items-center gap-2 rounded-md bg-[#F2F4F7] px-3 text-[#6B7280] transition-colors hover:bg-[#ECEFF3]">
-                <Search className="h-4 w-4 shrink-0 opacity-70" />
-                <span className="text-[13px]">Search</span>
-              </div>
-            </div>
-
-            <nav className="ml-4 hidden items-center gap-1 lg:flex">
-              {marketingNavItems.map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className="rounded-md px-3 py-2 text-[14px] font-medium text-[#6B7280] transition-colors hover:bg-black/[0.03] hover:text-[#111827]"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
 
             <form action="/auth/sign-out" method="post" className="ml-auto">
               <div className="flex items-center gap-2">

@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Clapperboard,
   CreditCard,
-  Search,
   ShieldCheck,
   Sparkles,
   UserRound,
@@ -167,13 +166,6 @@ export default async function Home() {
             >
               <Logo className="text-[#111827]" />
             </Link>
-
-            <div className="ml-4 hidden lg:block">
-              <div className="relative flex h-9 w-60 items-center gap-2 rounded-md bg-[#F2F4F7] px-3 text-[#6B7280] transition-colors hover:bg-[#ECEFF3]">
-                <Search className="h-4 w-4 shrink-0 opacity-70" />
-                <span className="text-[13px]">Search</span>
-              </div>
-            </div>
 
             <nav className="ml-4 hidden items-center gap-1 lg:flex">
               {NAV_ITEMS.map((item) => (
