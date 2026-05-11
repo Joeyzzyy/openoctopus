@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod/v4";
 import crypto from "crypto";
+import Stripe from "stripe";
 
 // ---------- helpers ----------
 
@@ -36,6 +38,26 @@ type ActionResult = {
   error?: string;
   data?: Record<string, unknown>;
 };
+
+function buildDashboardAlertHref(input: {
+  message: string;
+  level: "success" | "warning" | "error" | "info";
+}) {
+  return `/dashboard?view=dashboard&alert=${encodeURIComponent(input.message)}&alertLevel=${input.level}`;
+}
+
+function resolveAppBaseUrl() {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  }
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return "http://localhost:3000";
+}
 
 // ---------- Create API Key ----------
 
@@ -208,5 +230,96 @@ export async function toggleApiKeyStatus(
       success: false,
       error: e instanceof Error ? e.message : "Unknown error",
     };
+  }
+}
+
+const createTopUpCheckoutSchema = z.object({
+  amountUsd: z.coerce.number().int().min(5).max(10_000),
+});
+
+export async function createTopUpCheckoutSession(formData: FormData) {
+  try {
+    const parsed = createTopUpCheckoutSchema.safeParse({
+      amountUsd: formData.get("amountUsd"),
+    });
+
+    if (!parsed.success) {
+      redirect(
+        buildDashboardAlertHref({
+          message: parsed.error.issues[0]?.message ?? "Invalid top-up amount",
+          level: "error",
+        })
+      );
+    }
+
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeSecretKey) {
+      redirect(
+        buildDashboardAlertHref({
+          message: "Stripe is not configured yet. Missing STRIPE_SECRET_KEY.",
+          level: "warning",
+        })
+      );
+    }
+
+    const amountUsd = parsed.data.amountUsd;
+    const amountCents = Math.round(amountUsd * 100);
+    const { userId, workspaceId } = await getAuthedWorkspace();
+    const stripe = new Stripe(stripeSecretKey ?? "sk_test_placeholder");
+    const baseUrl = resolveAppBaseUrl();
+    const topupPriceId = process.env.STRIPE_TOPUP_PRICE_ID?.trim();
+    const topupProductId = process.env.STRIPE_TOPUP_PRODUCT_ID?.trim();
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      success_url: `${baseUrl}/dashboard?view=dashboard&refreshWallet=1&alert=${encodeURIComponent("Top-up successful. Your balance is updating now.")}&alertLevel=success`,
+      cancel_url: `${baseUrl}/dashboard?view=dashboard&alert=${encodeURIComponent("Top-up failed. Please try again.")}&alertLevel=error&alertDurationMs=10000`,
+      line_items: topupPriceId
+        ? [
+            {
+              price: topupPriceId,
+              quantity: amountUsd,
+            },
+          ]
+        : [
+            {
+              quantity: 1,
+              price_data: {
+                currency: "usd",
+                unit_amount: amountCents,
+                product_data: {
+                  name: "OpenOctopus Wallet Top-up",
+                  description: `Wallet recharge: $${amountUsd.toFixed(2)}`,
+                },
+              },
+            },
+          ],
+      metadata: {
+        workspaceId,
+        userId,
+        amountUsd: amountUsd.toFixed(2),
+        topupMode: topupPriceId ? "fixed_price_quantity" : "dynamic_price_data",
+        topupProductId: topupProductId ?? "",
+      },
+      allow_promotion_codes: false,
+    });
+
+    if (!session.url) {
+      redirect(
+        buildDashboardAlertHref({
+          message: "Stripe checkout session created without redirect URL.",
+          level: "error",
+        })
+      );
+    }
+
+    redirect(session.url);
+  } catch (error) {
+    redirect(
+      buildDashboardAlertHref({
+        message: error instanceof Error ? error.message : "Failed to start top-up checkout.",
+        level: "error",
+      })
+    );
   }
 }

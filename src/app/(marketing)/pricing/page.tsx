@@ -80,9 +80,8 @@ export default async function PricingPage() {
   return (
     <main className="mx-auto w-full max-w-7xl px-6 py-12 md:px-10 md:py-16">
       <header className="mb-6">
-        <p className="text-xs uppercase tracking-[0.16em] text-black/45">Pricing</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[#111827]">Model Pricing</h1>
-        <p className="mt-3 text-sm text-black/60">Live pricing sourced from internal configuration (active public models only).</p>
+        <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[#111827]">Pricing</h1>
+        <p className="mt-3 text-sm text-black/60">Live model prices from active public catalog entries.</p>
       </header>
 
       <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">

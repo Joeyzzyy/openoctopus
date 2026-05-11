@@ -15,6 +15,8 @@ import { DashboardMobileNav, DashboardSidebar } from "./dashboard-sidebar";
 import { ApiKeysTable } from "./api-keys-table";
 import { ApiQuickstartCard } from "./api-quickstart-card";
 import { ModelCatalogTable } from "./model-catalog-table";
+import { TopUpForm } from "./top-up-form";
+import { AutoRefreshOnReturn } from "./auto-refresh-on-return";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -455,6 +457,7 @@ export default async function DashboardPage({
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#FCFCFA] text-[#111111]">
+      <AutoRefreshOnReturn />
       <div
         className="pointer-events-none fixed inset-0"
         style={{
@@ -541,6 +544,9 @@ export default async function DashboardPage({
 
             {view === "dashboard" ? (
               <>
+                <section className="mb-4">
+                  <TopUpForm />
+                </section>
                 <article className="mb-6 space-y-3 md:mb-8">
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     {overviewCards.map((card) => (

@@ -13,6 +13,7 @@ export function GlobalAlertToaster() {
   useEffect(() => {
     const alertMessage = searchParams.get("alert");
     const alertLevel = searchParams.get("alertLevel");
+    const alertDurationRaw = searchParams.get("alertDurationMs");
     if (!alertMessage) {
       return;
     }
@@ -23,19 +24,26 @@ export function GlobalAlertToaster() {
     }
 
     lastShownRef.current = dedupeKey;
+    const parsedDuration = alertDurationRaw ? Number(alertDurationRaw) : NaN;
+    const duration =
+      Number.isFinite(parsedDuration) && parsedDuration >= 1000 && parsedDuration <= 60000
+        ? parsedDuration
+        : undefined;
+
     if (alertLevel === "success") {
-      toast.success(alertMessage);
+      toast.success(alertMessage, { duration });
     } else if (alertLevel === "warning") {
-      toast.warning(alertMessage);
+      toast.warning(alertMessage, { duration });
     } else if (alertLevel === "info") {
-      toast.info(alertMessage);
+      toast.info(alertMessage, { duration });
     } else {
-      toast.error(alertMessage);
+      toast.error(alertMessage, { duration });
     }
 
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.delete("alert");
     nextParams.delete("alertLevel");
+    nextParams.delete("alertDurationMs");
     const nextQuery = nextParams.toString();
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
   }, [pathname, router, searchParams]);
