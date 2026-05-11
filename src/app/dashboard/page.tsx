@@ -898,7 +898,15 @@ export default async function DashboardPage({
                       <tr className="border-b border-black/10 text-left">
                         {["Time", "Type", "Amount", "Description", "Stripe Session", "Invoice / Receipt"].map(
                           (heading) => (
-                            <th key={heading} className="h-10 px-2 text-[10px] tracking-[1px] text-black/50">
+                            <th
+                              key={heading}
+                              className={cn(
+                                "h-10 px-2 text-[10px] tracking-[1px] text-black/50",
+                                heading === "Invoice / Receipt"
+                                  ? "sticky right-0 z-20 bg-white text-right"
+                                  : ""
+                              )}
+                            >
                               {heading}
                             </th>
                           )
@@ -923,7 +931,7 @@ export default async function DashboardPage({
                             <td className="px-2 py-3 text-xs text-black/60">
                               {row.stripeSessionId ?? "—"}
                             </td>
-                            <td className="px-2 py-3 text-sm">
+                            <td className="sticky right-0 z-10 bg-white px-2 py-3 text-right text-sm">
                               {row.receiptUrl ? (
                                 <a
                                   href={row.receiptUrl}
