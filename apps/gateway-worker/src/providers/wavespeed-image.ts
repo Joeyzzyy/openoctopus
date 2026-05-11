@@ -1,4 +1,3 @@
-import { env } from "../config.js";
 import { getJson, postJson } from "../lib/http.js";
 import { getByPath } from "../lib/object-path.js";
 import type {
@@ -9,27 +8,85 @@ import type {
   SubmitRequestResult,
 } from "./types.js";
 
+type WaveSpeedExecutionConfig = {
+  submitPath: string;
+  statusPath: string;
+  authHeaderName: string;
+  authHeaderPrefix: string;
+  resultUrlPath: string;
+  statusFieldPath: string;
+  taskIdPath: string;
+  requestIdPath: string;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function readRequiredString(
+  source: Record<string, unknown>,
+  key: keyof WaveSpeedExecutionConfig
+) {
+  const value = source[key];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`WaveSpeed executionConfig.${key} is required`);
+  }
+  return value.trim();
+}
+
+function readWaveSpeedExecutionConfig(provider: SubmitRequestInput["provider"] | PollRequestInput["provider"]) {
+  const configRecord = asRecord(provider.config);
+  const executionConfig = asRecord(configRecord?.executionConfig);
+  if (!executionConfig) {
+    throw new Error("WaveSpeed provider.config.executionConfig is required");
+  }
+
+  return {
+    submitPath: readRequiredString(executionConfig, "submitPath"),
+    statusPath: readRequiredString(executionConfig, "statusPath"),
+    authHeaderName: readRequiredString(executionConfig, "authHeaderName"),
+    authHeaderPrefix: readRequiredString(executionConfig, "authHeaderPrefix"),
+    resultUrlPath: readRequiredString(executionConfig, "resultUrlPath"),
+    statusFieldPath: readRequiredString(executionConfig, "statusFieldPath"),
+    taskIdPath: readRequiredString(executionConfig, "taskIdPath"),
+    requestIdPath: readRequiredString(executionConfig, "requestIdPath"),
+  } satisfies WaveSpeedExecutionConfig;
+}
+
+function readProviderBaseUrl(provider: SubmitRequestInput["provider"] | PollRequestInput["provider"]) {
+  if (!provider.baseUrl || provider.baseUrl.trim().length === 0) {
+    throw new Error("WaveSpeed provider.baseUrl is required");
+  }
+
+  return provider.baseUrl;
+}
+
 export class WaveSpeedImageAdapter implements ProviderAdapter {
   slug = "wavespeed-images";
 
-  private buildHeaders(secret: string) {
-    const apiKeyValue = env.WAVESPEED_IMAGE_API_KEY_PREFIX
-      ? `${env.WAVESPEED_IMAGE_API_KEY_PREFIX} ${secret}`
+  private buildHeaders(secret: string, config: WaveSpeedExecutionConfig) {
+    const apiKeyValue = config.authHeaderPrefix
+      ? `${config.authHeaderPrefix} ${secret}`
       : secret;
 
     return {
-      [env.WAVESPEED_IMAGE_API_KEY_HEADER]: apiKeyValue,
+      [config.authHeaderName]: apiKeyValue,
     };
   }
 
   async submit(input: SubmitRequestInput): Promise<SubmitRequestResult> {
+    const executionConfig = readWaveSpeedExecutionConfig(input.provider);
+    const baseUrl = readProviderBaseUrl(input.provider);
     const submitUrl = new URL(
-      env.WAVESPEED_IMAGE_SUBMIT_PATH,
-      input.provider.baseUrl ?? env.WAVESPEED_BASE_URL
+      executionConfig.submitPath,
+      baseUrl
     ).toString();
 
     const { data } = await postJson<Record<string, unknown>>(submitUrl, {
-      headers: this.buildHeaders(input.provider.secret),
+      headers: this.buildHeaders(input.provider.secret, executionConfig),
       body: {
         model: input.upstreamModelSlug,
         prompt: input.prompt,
@@ -38,16 +95,16 @@ export class WaveSpeedImageAdapter implements ProviderAdapter {
     });
 
     const requestId = String(
-      getByPath(data, env.WAVESPEED_IMAGE_REQUEST_ID_FIELD) ?? input.requestId
+      getByPath(data, executionConfig.requestIdPath) ?? input.requestId
     );
     const taskId =
-      getByPath(data, env.WAVESPEED_IMAGE_TASK_ID_FIELD) ??
+      getByPath(data, executionConfig.taskIdPath) ??
       getByPath(data, "prediction_id") ??
       getByPath(data, "task_id");
     const status = String(
-      getByPath(data, env.WAVESPEED_IMAGE_STATUS_FIELD) ?? "processing"
+      getByPath(data, executionConfig.statusFieldPath) ?? "processing"
     );
-    const resultUrl = getByPath(data, env.WAVESPEED_IMAGE_RESULT_URL_FIELD);
+    const resultUrl = getByPath(data, executionConfig.resultUrlPath);
 
     if ((status === "succeeded" || status === "completed") && typeof resultUrl === "string") {
       return {
@@ -75,23 +132,25 @@ export class WaveSpeedImageAdapter implements ProviderAdapter {
   }
 
   async poll(input: PollRequestInput): Promise<PollRequestResult> {
-    const statusPath = env.WAVESPEED_IMAGE_STATUS_PATH.replace(
+    const executionConfig = readWaveSpeedExecutionConfig(input.provider);
+    const baseUrl = readProviderBaseUrl(input.provider);
+    const statusPath = executionConfig.statusPath.replace(
       "{taskId}",
       input.upstreamTaskId
     );
     const statusUrl = new URL(
       statusPath,
-      input.provider.baseUrl ?? env.WAVESPEED_BASE_URL
+      baseUrl
     ).toString();
 
     const { data } = await getJson<Record<string, unknown>>(statusUrl, {
-      headers: this.buildHeaders(input.provider.secret),
+      headers: this.buildHeaders(input.provider.secret, executionConfig),
     });
 
     const status = String(
-      getByPath(data, env.WAVESPEED_IMAGE_STATUS_FIELD) ?? "processing"
+      getByPath(data, executionConfig.statusFieldPath) ?? "processing"
     );
-    const resultUrl = getByPath(data, env.WAVESPEED_IMAGE_RESULT_URL_FIELD);
+    const resultUrl = getByPath(data, executionConfig.resultUrlPath);
 
     if (status === "failed" || status === "error" || status === "canceled") {
       return {
