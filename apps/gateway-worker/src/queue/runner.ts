@@ -168,9 +168,61 @@ async function sendFeishuFailureAlert(input: {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        msg_type: "text",
+        msg_type: "post",
         content: {
-          text: lines.join("\n"),
+          post: {
+            en_us: {
+              title: "OpenOctopus Request Failed",
+              content: [
+                [
+                  { tag: "text", text: "⚠️ " },
+                  { tag: "text", text: "Reason: ", style: ["bold"] },
+                  { tag: "text", text: normalizeReason() },
+                ],
+                [
+                  { tag: "text", text: "Time: ", style: ["bold"] },
+                  { tag: "text", text: formatShanghaiTimestamp(input.occurredAt ?? new Date()) },
+                  { tag: "text", text: "   " },
+                  { tag: "text", text: "Phase: ", style: ["bold"] },
+                  { tag: "text", text: input.phase },
+                ],
+                [
+                  { tag: "text", text: "Code: ", style: ["bold"] },
+                  { tag: "text", text: input.errorCode },
+                  { tag: "text", text: "   " },
+                  { tag: "text", text: "Request ID: ", style: ["bold"] },
+                  { tag: "text", text: input.requestId },
+                ],
+                [
+                  { tag: "text", text: "Workspace: ", style: ["bold"] },
+                  { tag: "text", text: `${workspaceName} (${workspaceSlug})` },
+                ],
+                [
+                  { tag: "text", text: "API Key: ", style: ["bold"] },
+                  { tag: "text", text: `${apiKeyName} (${apiKeyPrefix})` },
+                ],
+                [
+                  { tag: "text", text: "Capability: ", style: ["bold"] },
+                  { tag: "text", text: input.capability },
+                  { tag: "text", text: "   " },
+                  { tag: "text", text: "Public Model: ", style: ["bold"] },
+                  { tag: "text", text: input.publicModelSlug },
+                ],
+                [
+                  { tag: "text", text: "Upstream: ", style: ["bold"] },
+                  { tag: "text", text: `${input.providerSlug} / ${input.upstreamModelSlug}` },
+                ],
+                [
+                  { tag: "text", text: "Endpoint: ", style: ["bold"] },
+                  { tag: "text", text: input.endpoint },
+                ],
+                [
+                  { tag: "text", text: "Raw: ", style: ["bold"] },
+                  { tag: "text", text: rawPreview },
+                ],
+              ],
+            },
+          },
         },
       }),
     });
