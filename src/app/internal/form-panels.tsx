@@ -72,6 +72,16 @@ type ExecutionConfigFormState = {
   submitBodyTemplate: string;
 };
 
+type SchemaFieldState = {
+  id: string;
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+  example: string;
+  exposedToCustomer: boolean;
+};
+
 function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormState> {
   if (slug === "sync-json-v1") {
     return {
@@ -111,6 +121,244 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
     resultValueType: "url",
     resultMimeType: "image/png",
   };
+}
+
+function randomFieldId() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields") {
+  try {
+    const parsed = JSON.parse(schemaText) as Record<string, unknown>;
+    const raw = parsed[key];
+    if (!Array.isArray(raw)) {
+      return [] as SchemaFieldState[];
+    }
+    return raw
+      .map((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+          return null;
+        }
+        const row = item as Record<string, unknown>;
+        const name = typeof row.name === "string" ? row.name.trim() : "";
+        if (!name) {
+          return null;
+        }
+        return {
+          id: randomFieldId(),
+          name,
+          type: typeof row.type === "string" ? row.type : "",
+          required: Boolean(row.required),
+          description: typeof row.description === "string" ? row.description : "",
+          example: row.example !== undefined && row.example !== null ? String(row.example) : "",
+          exposedToCustomer:
+            typeof row.exposedToCustomer === "boolean"
+              ? row.exposedToCustomer
+              : typeof row.customerVisible === "boolean"
+                ? row.customerVisible
+                : true,
+        } satisfies SchemaFieldState;
+      })
+      .filter((row): row is SchemaFieldState => Boolean(row));
+  } catch {
+    return [] as SchemaFieldState[];
+  }
+}
+
+function parseOfficialDocUrl(schemaText: string) {
+  try {
+    const parsed = JSON.parse(schemaText) as Record<string, unknown>;
+    return typeof parsed.officialDocUrl === "string" ? parsed.officialDocUrl : "";
+  } catch {
+    return "";
+  }
+}
+
+function SchemaFieldEditor({
+  name,
+  keyName,
+  defaultSchemaText,
+  includeRequired,
+  disabled,
+}: {
+  name: "inputSchema" | "outputSchema";
+  keyName: "params" | "fields";
+  defaultSchemaText: string;
+  includeRequired: boolean;
+  disabled: boolean;
+}) {
+  const [officialDocUrl, setOfficialDocUrl] = useState(() => parseOfficialDocUrl(defaultSchemaText));
+  const [rows, setRows] = useState<SchemaFieldState[]>(() =>
+    parseSchemaFieldsFromText(defaultSchemaText, keyName)
+  );
+
+  useEffect(() => {
+    setOfficialDocUrl(parseOfficialDocUrl(defaultSchemaText));
+    setRows(parseSchemaFieldsFromText(defaultSchemaText, keyName));
+  }, [defaultSchemaText, keyName]);
+
+  const addRow = () => {
+    setRows((current) => [
+      ...current,
+      {
+        id: randomFieldId(),
+        name: "",
+        type: "",
+        required: false,
+        description: "",
+        example: "",
+        exposedToCustomer: true,
+      },
+    ]);
+  };
+
+  const updateRow = (id: string, updater: (row: SchemaFieldState) => SchemaFieldState) => {
+    setRows((current) => current.map((row) => (row.id === id ? updater(row) : row)));
+  };
+
+  const removeRow = (id: string) => {
+    setRows((current) => current.filter((row) => row.id !== id));
+  };
+
+  const normalizedRows = rows
+    .map((row) => ({
+      name: row.name.trim(),
+      type: row.type.trim(),
+      required: row.required,
+      description: row.description.trim(),
+      example: row.example.trim(),
+      exposedToCustomer: row.exposedToCustomer,
+    }))
+    .filter((row) => row.name.length > 0);
+
+  const schemaValue = JSON.stringify(
+    {
+      officialDocUrl: officialDocUrl.trim(),
+      [keyName]: normalizedRows.map((row) => ({
+        name: row.name,
+        type: row.type || undefined,
+        ...(includeRequired ? { required: row.required } : {}),
+        description: row.description || undefined,
+        example: row.example || undefined,
+        exposedToCustomer: row.exposedToCustomer,
+      })),
+    },
+    null,
+    2
+  );
+
+  return (
+    <div className="space-y-3 rounded-xl border border-black/[0.08] bg-white p-3">
+      <input type="hidden" name={name} value={schemaValue} />
+
+      <label className="block">
+        <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Official Doc URL</span>
+        <input
+          value={officialDocUrl}
+          onChange={(event) => setOfficialDocUrl(event.target.value)}
+          disabled={disabled}
+          className={formInputClassName}
+          placeholder="https://provider-docs.example.com/..."
+        />
+      </label>
+
+      <div className="space-y-2">
+        {rows.length === 0 ? (
+          <p className="text-xs text-black/50">No fields yet. Add field rows below.</p>
+        ) : null}
+        {rows.map((row) => (
+          <div key={row.id} className="grid gap-2 rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-2 md:grid-cols-12">
+            <input
+              value={row.name}
+              onChange={(event) => updateRow(row.id, (current) => ({ ...current, name: event.target.value }))}
+              disabled={disabled}
+              className="md:col-span-2 h-9 rounded-md border border-black/[0.08] bg-white px-2 text-xs"
+              placeholder="name"
+            />
+            <input
+              value={row.type}
+              onChange={(event) => updateRow(row.id, (current) => ({ ...current, type: event.target.value }))}
+              disabled={disabled}
+              className="md:col-span-2 h-9 rounded-md border border-black/[0.08] bg-white px-2 text-xs"
+              placeholder="type"
+            />
+            <input
+              value={row.description}
+              onChange={(event) => updateRow(row.id, (current) => ({ ...current, description: event.target.value }))}
+              disabled={disabled}
+              className="md:col-span-4 h-9 rounded-md border border-black/[0.08] bg-white px-2 text-xs"
+              placeholder="description"
+            />
+            <input
+              value={row.example}
+              onChange={(event) => updateRow(row.id, (current) => ({ ...current, example: event.target.value }))}
+              disabled={disabled}
+              className="md:col-span-2 h-9 rounded-md border border-black/[0.08] bg-white px-2 text-xs"
+              placeholder="example"
+            />
+            <div className="md:col-span-2 flex items-center justify-end gap-2">
+              {includeRequired ? (
+                <label className="inline-flex items-center gap-1 text-[11px] text-black/65">
+                  <input
+                    type="checkbox"
+                    checked={row.required}
+                    onChange={(event) =>
+                      updateRow(row.id, (current) => ({ ...current, required: event.target.checked }))
+                    }
+                    disabled={disabled}
+                    className="size-3.5"
+                  />
+                  Required
+                </label>
+              ) : null}
+              <label className="inline-flex items-center gap-1 text-[11px] text-black/65">
+                <input
+                  type="checkbox"
+                  checked={row.exposedToCustomer}
+                  onChange={(event) =>
+                    updateRow(row.id, (current) => ({
+                      ...current,
+                      exposedToCustomer: event.target.checked,
+                    }))
+                  }
+                  disabled={disabled}
+                  className="size-3.5"
+                />
+                Expose
+              </label>
+              <button
+                type="button"
+                onClick={() => removeRow(row.id)}
+                disabled={disabled}
+                className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-black/[0.04] disabled:opacity-50"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={addRow}
+          disabled={disabled}
+          className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-black/[0.03] disabled:opacity-50"
+        >
+          Add Field
+        </button>
+        <span className="text-[11px] text-black/45">Saved as JSON automatically</span>
+      </div>
+
+      <details className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2">
+        <summary className="cursor-pointer text-[11px] text-black/60">Preview JSON</summary>
+        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[11px] text-black/70">
+          {schemaValue}
+        </pre>
+      </details>
+    </div>
+  );
 }
 
 const formInputClassName =
@@ -998,30 +1246,28 @@ export function CreateProviderModelForm({
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
             上游官方输入参数说明（JSON）
           </span>
-          <textarea
+          <SchemaFieldEditor
             name="inputSchema"
-            rows={10}
-            defaultValue={defaultInputSchema}
+            keyName="params"
+            defaultSchemaText={defaultInputSchema}
+            includeRequired
             disabled={disabled}
-            className={formTextAreaClassName}
-            placeholder={`{\n  "officialDocUrl": "https://provider-docs.example.com/image-api",\n  "params": [\n    {\n      "name": "size",\n      "type": "string",\n      "required": false,\n      "description": "Output image size",\n      "example": "1024x1024",\n      "exposedToCustomer": true\n    },\n    {\n      "name": "style",\n      "type": "string",\n      "required": false,\n      "description": "Visual style preset",\n      "example": "photorealistic",\n      "exposedToCustomer": false\n    }\n  ]\n}`}
           />
-          <FieldHint help="建议按 params 数组逐项记录：name/type/required/description/example/exposedToCustomer。dashboard 会自动读取并展示给客户。" />
+          <FieldHint help="在可视化表格里逐项录入入参字段：name/type/required/description/example/exposedToCustomer。" />
         </label>
 
         <label className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
             上游官方输出参数说明（JSON）
           </span>
-          <textarea
+          <SchemaFieldEditor
             name="outputSchema"
-            rows={8}
-            defaultValue={defaultOutputSchema}
+            keyName="fields"
+            defaultSchemaText={defaultOutputSchema}
+            includeRequired={false}
             disabled={disabled}
-            className={formTextAreaClassName}
-            placeholder={`{\n  "officialDocUrl": "https://provider-docs.example.com/image-api-response",\n  "fields": [\n    {\n      "name": "raw.data[0].url",\n      "type": "string",\n      "description": "Original provider output URL path",\n      "example": "https://provider-cdn.example.com/result.png",\n      "exposedToCustomer": false\n    },\n    {\n      "name": "output_payload.assets[0].url",\n      "type": "string",\n      "description": "Normalized asset URL returned by OpenOctopus",\n      "example": "https://api.openoctopus.com/v1/files/{requestId}/assets/0",\n      "exposedToCustomer": true\n    }\n  ]\n}`}
           />
-          <FieldHint help="建议按 fields 数组逐项记录：name/type/description/example/exposedToCustomer。output 大结构固定，但可补充 raw 和扩展字段说明。" />
+          <FieldHint help="在可视化表格里逐项录入出参字段：name/type/description/example/exposedToCustomer。" />
         </label>
         <label className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">官方成本价格链接</span>
