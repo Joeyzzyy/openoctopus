@@ -19,9 +19,7 @@ import {
   CreateProviderButton,
   CreateModelVendorButton,
   CreateSupportedModelButton,
-  CreateProviderModelMappingButton,
   CreateRoutingRuleButton,
-  EconomicsPanel,
   ModelVendorsPanel,
   ProvidersPanel,
   PublicModelsPanel,
@@ -1136,31 +1134,10 @@ export default async function InternalPage({
                 >
                 <PublicModelsPanel
                   models={data.supportedModels}
+                  providerModels={data.providerModels}
                   modelVendors={data.modelVendors}
                   capabilityOptions={capabilityOptions}
                 />
-                </SectionShell>
-              </section>
-              <section>
-                <SectionShell
-                  id="economics-panel"
-                  title="模型总表管理"
-                  description=" "
-                  headerRight={
-                    <CreateProviderModelMappingButton
-                      supportedModels={data.supportedModels}
-                      providers={data.providers}
-                      workerTemplates={data.workerTemplates ?? []}
-                      providerModels={data.providerModels}
-                    />
-                  }
-                >
-                  <EconomicsPanel
-                    supportedModels={data.supportedModels}
-                    providerModels={data.providerModels}
-                    providers={data.providers}
-                    workerTemplates={data.workerTemplates ?? []}
-                  />
                 </SectionShell>
               </section>
             </>
