@@ -103,6 +103,7 @@ export type DashboardData = {
     description: string;
     stripeSessionId: string | null;
     receiptUrl: string | null;
+    invoiceUrl: string | null;
   }>;
   providerSummaries: Array<{
     name: string;
@@ -301,35 +302,61 @@ function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardDa
   };
 }
 
-async function buildStripeReceiptUrlMap(paymentIntentIds: string[]) {
+async function buildStripeBillingLinkMap(paymentIntentIds: string[]) {
   const uniqueIds = Array.from(new Set(paymentIntentIds.filter((id) => id.length > 0)));
   if (uniqueIds.length === 0) {
-    return new Map<string, string>();
+    return new Map<string, { receiptUrl: string | null; invoiceUrl: string | null }>();
   }
 
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeSecretKey) {
-    return new Map<string, string>();
+    return new Map<string, { receiptUrl: string | null; invoiceUrl: string | null }>();
   }
 
   const stripe = new Stripe(stripeSecretKey);
-  const receiptByPaymentIntentId = new Map<string, string>();
+  const billingLinksByPaymentIntentId = new Map<
+    string,
+    { receiptUrl: string | null; invoiceUrl: string | null }
+  >();
 
   for (const paymentIntentId of uniqueIds) {
     try {
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
-        expand: ["latest_charge"],
+        expand: ["latest_charge", "invoice"],
       });
+
+      let receiptUrl: string | null = null;
+      let invoiceUrl: string | null = null;
       const latestCharge = paymentIntent.latest_charge;
       if (latestCharge && typeof latestCharge !== "string" && latestCharge.receipt_url) {
-        receiptByPaymentIntentId.set(paymentIntentId, latestCharge.receipt_url);
+        receiptUrl = latestCharge.receipt_url;
       }
+
+      const paymentIntentLike = paymentIntent as unknown as {
+        invoice?: unknown;
+      };
+      const invoice = paymentIntentLike.invoice;
+      if (invoice && typeof invoice === "object") {
+        const invoiceLike = invoice as { hosted_invoice_url?: unknown; invoice_pdf?: unknown };
+        invoiceUrl =
+          (typeof invoiceLike.hosted_invoice_url === "string" && invoiceLike.hosted_invoice_url.length > 0
+            ? invoiceLike.hosted_invoice_url
+            : null) ??
+          (typeof invoiceLike.invoice_pdf === "string" && invoiceLike.invoice_pdf.length > 0
+            ? invoiceLike.invoice_pdf
+            : null);
+      }
+
+      billingLinksByPaymentIntentId.set(paymentIntentId, {
+        receiptUrl,
+        invoiceUrl,
+      });
     } catch {
       continue;
     }
   }
 
-  return receiptByPaymentIntentId;
+  return billingLinksByPaymentIntentId;
 }
 
 export async function getDashboardData({
@@ -499,7 +526,7 @@ export async function getDashboardData({
         return typeof paymentIntentId === "string" ? paymentIntentId : "";
       })
       .filter((id) => id.length > 0);
-    const receiptByPaymentIntentId = await buildStripeReceiptUrlMap(stripePaymentIntentIds);
+    const billingLinksByPaymentIntentId = await buildStripeBillingLinkMap(stripePaymentIntentIds);
 
     const spendTrend = Array.from({ length: 7 }).map((_, index) => {
       const date = new Date();
@@ -805,7 +832,12 @@ export async function getDashboardData({
           amountLabel: `${Number(row.amount_delta) >= 0 ? "+" : ""}${formatCurrency(Number(row.amount_delta ?? 0))}`,
           description: "Balance Topup Through Stripe",
           stripeSessionId,
-          receiptUrl: stripePaymentIntentId ? receiptByPaymentIntentId.get(stripePaymentIntentId) ?? null : null,
+          receiptUrl: stripePaymentIntentId
+            ? (billingLinksByPaymentIntentId.get(stripePaymentIntentId)?.receiptUrl ?? null)
+            : null,
+          invoiceUrl: stripePaymentIntentId
+            ? (billingLinksByPaymentIntentId.get(stripePaymentIntentId)?.invoiceUrl ?? null)
+            : null,
         };
       }),
       providerSummaries,

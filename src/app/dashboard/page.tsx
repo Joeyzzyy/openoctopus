@@ -995,15 +995,29 @@ export default async function DashboardPage({
                               {row.description}
                             </td>
                             <td className="sticky right-0 z-10 bg-white px-2 py-3 text-right text-sm">
-                              {row.receiptUrl ? (
-                                <a
-                                  href={row.receiptUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]"
-                                >
-                                  Download Invoice
-                                </a>
+                              {row.invoiceUrl || row.receiptUrl ? (
+                                <div className="flex items-center justify-end gap-2">
+                                  {row.invoiceUrl ? (
+                                    <a
+                                      href={row.invoiceUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]"
+                                    >
+                                      Download Invoice
+                                    </a>
+                                  ) : null}
+                                  {row.receiptUrl ? (
+                                    <a
+                                      href={row.receiptUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]"
+                                    >
+                                      Download Receipt
+                                    </a>
+                                  ) : null}
+                                </div>
                               ) : (
                                 <span className="text-xs text-black/45">Pending</span>
                               )}
