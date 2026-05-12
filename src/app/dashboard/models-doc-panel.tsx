@@ -4,7 +4,6 @@ import { useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ApiQuickstartCard } from "./api-quickstart-card";
 import { ModelCatalogFilters } from "./model-catalog-filters";
-import { ModelCatalogTable } from "./model-catalog-table";
 
 type ModelType = "image" | "video" | "text-coding";
 
@@ -93,7 +92,6 @@ export function ModelsDocPanel({
           <div className="mb-4">
             <ApiQuickstartCard models={filteredRows} initialModel={selectedModelSlug} />
           </div>
-          <ModelCatalogTable rows={filteredRows} />
         </>
       )}
     </>
