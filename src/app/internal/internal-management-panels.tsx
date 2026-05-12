@@ -844,7 +844,7 @@ export function PublicModelsPanel({
     <div className="space-y-4">
       {models.length > 0 ? (
         <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
-          <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+          <table className="min-w-[2160px] border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="text-xs text-black/50">
                 <th className="min-w-[220px] border-b border-black/[0.08] px-3 py-2.5">可售模型Slug</th>
@@ -852,13 +852,12 @@ export function PublicModelsPanel({
                 <th className="min-w-[120px] border-b border-black/[0.08] px-3 py-2.5">厂商</th>
                 <th className="min-w-[90px] border-b border-black/[0.08] px-3 py-2.5">模态</th>
                 <th className="min-w-[120px] border-b border-black/[0.08] px-3 py-2.5">能力类型</th>
-                <th className="min-w-[80px] border-b border-black/[0.08] px-3 py-2.5">启用</th>
                 <th className="min-w-[130px] border-b border-black/[0.08] px-3 py-2.5">添加时间</th>
                 <th className="min-w-[200px] border-b border-black/[0.08] px-3 py-2.5">计费摘要</th>
                 <th className="min-w-[260px] border-b border-black/[0.08] px-3 py-2.5">计费配置(JSON)</th>
                 <th className="min-w-[120px] border-b border-black/[0.08] px-3 py-2.5">供应商模型总数</th>
                 <th className="min-w-[110px] border-b border-black/[0.08] px-3 py-2.5">启用映射数</th>
-                <th className="sticky right-0 z-10 min-w-[150px] border-b border-black/[0.08] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
+                <th className="sticky right-0 z-10 min-w-[220px] border-b border-black/[0.08] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
                   操作
                 </th>
               </tr>
@@ -871,42 +870,31 @@ export function PublicModelsPanel({
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.provider}</td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{modalityLabel(model.modality)}</td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.capability ? capabilityLabel(model.capability) : "-"}</td>
-                  <td className="sticky right-0 z-10 border-b border-black/[0.06] bg-white px-3 py-3 align-middle shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
-                    <form action={updateSupportedModelState}>
-                      <input type="hidden" name="supportedModelId" value={model.id} />
-                      <input type="hidden" name="active" value={model.active ? "false" : "true"} />
-                      <button
-                        type="submit"
-                        className={`inline-flex h-6 w-[58px] cursor-pointer items-center rounded-full border p-[2px] transition-all ${
-                          model.active
-                            ? "border-[#9CC9A5] bg-[#EAF7ED]"
-                            : "border-black/[0.14] bg-[#F2F2F1]"
-                        }`}
-                        aria-label={model.active ? "停用模型" : "启用模型"}
-                      >
-                        <span
-                          className={`inline-flex h-5 min-w-[26px] items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-5 transition-all ${
-                            model.active
-                              ? "ml-auto bg-[#2F7A3E] text-white shadow-[0_1px_2px_rgba(20,28,20,0.2)]"
-                              : "mr-auto bg-[#70757D] text-white shadow-[0_1px_2px_rgba(20,28,20,0.16)]"
-                          }`}
-                        >
-                          {model.active ? "开" : "关"}
-                        </span>
-                      </button>
-                    </form>
-                  </td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.createdLabel}</td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.billingSummary}</td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
-                    <p className="max-w-[420px] truncate font-mono text-[11px] text-black/60" title={model.billingConfigText}>
+                    <p className="max-w-[420px] whitespace-pre-wrap break-words font-mono text-[11px] text-black/60" title={model.billingConfigText}>
                       {model.billingConfigText}
                     </p>
                   </td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.providerModelCount}</td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.activeProviderModelCount}</td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                  <td className="sticky right-0 z-10 min-w-[220px] border-b border-black/[0.06] bg-white px-3 py-3 align-middle shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
                     <div className="flex flex-wrap items-center gap-2">
+                      <form action={updateSupportedModelState}>
+                        <input type="hidden" name="supportedModelId" value={model.id} />
+                        <input type="hidden" name="active" value={model.active ? "false" : "true"} />
+                        <button
+                          type="submit"
+                          className={`inline-flex h-7 min-w-[64px] items-center justify-center rounded-md border px-2 text-[11px] font-medium transition-colors ${
+                            model.active
+                              ? "border-[#9CC9A5] bg-[#EAF7ED] text-[#2F7A3E] hover:bg-[#def0e3]"
+                              : "border-black/[0.14] bg-[#F2F2F1] text-black/70 hover:bg-[#ebebea]"
+                          }`}
+                        >
+                          {model.active ? "停用" : "启用"}
+                        </button>
+                      </form>
                       <ManagementDialog
                         trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                         title={`编辑 ${model.display_name}`}
