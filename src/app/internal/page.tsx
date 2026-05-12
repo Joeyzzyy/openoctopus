@@ -2012,15 +2012,20 @@ export default async function InternalPage({
                         {hasPagedRequests ? (
                           <div className="space-y-3">
                             {pagedRequests.map((request) => (
-                              <article
-                                key={request.id}
-                                className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm"
-                              >
-                                <div className="flex flex-col gap-3">
-                                  <div className="flex flex-wrap items-center justify-between gap-3">
+                              <article key={request.id} className="rounded-xl border border-black/[0.08] bg-white px-3 py-3">
+                                <div className="flex flex-col gap-2.5">
+                                  <div className="flex flex-wrap items-start justify-between gap-2.5">
                                     <div className="min-w-0">
                                       <div className="flex flex-wrap items-center gap-2">
-                                        <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
+                                        <span
+                                          className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
+                                            request.status === "failed"
+                                              ? "border-[#F4C9C4] bg-[#FDF0EE] text-[#B54432]"
+                                              : request.status === "succeeded"
+                                                ? "border-[#BFE5CC] bg-[#EDF9F1] text-[#1F7A44]"
+                                                : "border-[#E9E1CF] bg-[#F6F1E7] text-[#6F5B27]"
+                                          }`}
+                                        >
                                           {request.status}
                                         </span>
                                         <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
@@ -2030,28 +2035,41 @@ export default async function InternalPage({
                                           {request.createdLabel}
                                         </span>
                                       </div>
-                                      <p className="mt-2 truncate text-sm font-medium text-black">{request.public_model_slug}</p>
-                                      <p className="mt-1 text-xs text-black/50">
+                                      <p className="mt-1 truncate text-sm font-medium text-black">{request.public_model_slug}</p>
+                                      <p className="mt-0.5 text-xs text-black/50">
                                         上游：{request.providerName} / {request.upstreamModelSlug}
                                       </p>
-                                      <p className="mt-1 text-xs text-black/45">
+                                      <p className="mt-0.5 text-xs text-black/45">
                                         调用方：{request.customerName} · {request.apiKeyName} · {request.apiKeyPrefix}
                                       </p>
+                                      {request.status === "failed" &&
+                                      (request.error_message || request.lastAttempt.error_message) ? (
+                                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#b54432]">
+                                          {request.error_message ?? request.lastAttempt.error_message}
+                                        </p>
+                                      ) : null}
                                     </div>
-                                    <div className="rounded-xl border border-black/[0.06] bg-white px-3 py-2 text-xs text-black/55">
-                                      请求 ID：{request.id}
+                                    <div className="rounded-md border border-black/[0.06] bg-[#FCFCFA] px-2.5 py-1.5 text-[11px] text-black/55">
+                                      <span className="font-medium text-black/60">请求 ID：</span>
+                                      <span className="font-mono">{request.id}</span>
                                     </div>
                                   </div>
 
-                                  <div className="grid gap-2 sm:grid-cols-3">
-                                    <RequestMetricCard label="客户收费" value={request.customerChargeLabel} />
-                                    <RequestMetricCard label="供应商成本" value={request.providerCostLabel} />
-                                    <RequestMetricCard label="利润" value={request.profitLabel} />
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                                    <span className="text-black/60">
+                                      客户收费 <span className="font-semibold text-black">{request.customerChargeLabel}</span>
+                                    </span>
+                                    <span className="text-black/60">
+                                      供应商成本 <span className="font-semibold text-black">{request.providerCostLabel}</span>
+                                    </span>
+                                    <span className="text-black/60">
+                                      利润 <span className="font-semibold text-black">{request.profitLabel}</span>
+                                    </span>
                                   </div>
                                 </div>
 
-                                <details className="mt-4 group rounded-xl border border-black/[0.06] bg-white">
-                                  <summary className="cursor-pointer list-none px-3 py-2.5 text-sm text-black/70">
+                                <details className="mt-3 group rounded-lg border border-black/[0.06] bg-[#FCFCFA]">
+                                  <summary className="cursor-pointer list-none px-3 py-2 text-xs text-black/70">
                                     <span className="inline-flex items-center gap-2">
                                       <span className="text-black/50 group-open:hidden">展开明细</span>
                                       <span className="hidden text-black/50 group-open:inline">收起明细</span>
@@ -2069,9 +2087,9 @@ export default async function InternalPage({
                                     </span>
                                   </summary>
 
-                                  <div className="border-t border-black/[0.06] px-3 py-3">
+                                  <div className="border-t border-black/[0.06] px-3 py-2.5">
                                     {request.lastAttempt ? (
-                                      <div className="mb-3 rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 text-xs">
+                                      <div className="mb-3 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-xs">
                                         <div className="flex items-center justify-between gap-3">
                                           <span className="text-black/58">
                                             最后一次尝试 #{request.lastAttempt.attempt_no}
@@ -2081,9 +2099,14 @@ export default async function InternalPage({
                                           </span>
                                         </div>
                                         {request.error_message || request.lastAttempt.error_message ? (
-                                          <p className="mt-2 leading-5 text-[#b54432]">
-                                            {request.error_message ?? request.lastAttempt.error_message}
-                                          </p>
+                                          <div className="mt-2 rounded-md border border-[#F4C9C4] bg-[#FDF0EE] px-2.5 py-2">
+                                            <p className="text-[11px] font-medium uppercase tracking-[0.5px] text-[#B54432]">
+                                              Upstream raw error
+                                            </p>
+                                            <pre className="mt-1 max-h-44 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5 text-[#B54432]">
+                                              {request.error_message ?? request.lastAttempt.error_message}
+                                            </pre>
+                                          </div>
                                         ) : null}
                                       </div>
                                     ) : null}
