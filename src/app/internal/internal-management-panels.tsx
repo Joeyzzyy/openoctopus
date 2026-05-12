@@ -825,16 +825,22 @@ function ActiveCheckbox({
 export function PublicModelsPanel({
   models,
   providerModels = [],
+  providers = [],
+  workerTemplates = [],
   modelVendors = [],
   capabilityOptions,
 }: {
   models: SupportedModelSummary[];
   providerModels?: ProviderModelSummary[];
+  providers?: ProviderSummary[];
+  workerTemplates?: WorkerTemplateSummary[];
   modelVendors?: ModelVendorSummary[];
   capabilityOptions: readonly CapabilityOption[];
 }) {
   const safeModelVendors = Array.isArray(modelVendors) ? modelVendors : [];
   const safeProviderModels = Array.isArray(providerModels) ? providerModels : [];
+  const safeProviders = Array.isArray(providers) ? providers : [];
+  const safeWorkerTemplates = Array.isArray(workerTemplates) ? workerTemplates : [];
   const vendorSuggestions = Array.from(
     new Set([
       ...safeModelVendors.map((item) => item.name),
@@ -844,6 +850,30 @@ export function PublicModelsPanel({
     .filter((name) => name.trim().toLowerCase() !== "openoctopus")
     .sort((a, b) => a.localeCompare(b, "en-US"));
   const vendorOptions = vendorSuggestions.map((name) => ({ value: name, label: name }));
+  const providerOptions = safeProviders.map((item) => ({
+    id: item.id,
+    name: item.name,
+    slug: item.slug,
+  }));
+  const workerTemplateOptions = (safeWorkerTemplates.length > 0
+    ? safeWorkerTemplates.map((item) => ({ slug: item.slug, displayName: item.display_name }))
+    : Array.from(new Set(safeProviderModels.map((item) => item.executionTemplate)))
+        .filter((slug): slug is string => Boolean(slug))
+        .map((slug) => ({ slug, displayName: slug }))).sort((a, b) =>
+    a.displayName.localeCompare(b.displayName, "zh-CN")
+  );
+  const supportedModelOptions = models.map((item) => ({
+    id: item.id,
+    modelSlug: item.model_slug,
+    displayName: item.display_name,
+    capability: item.capability,
+  }));
+  const executionConfigPresets = safeProviderModels.map((item) => ({
+    id: item.id,
+    label: `${item.supportedModelName} / ${item.providerName} / ${item.upstream_model_slug}`,
+    executionTemplate: item.executionTemplate,
+    executionConfigText: item.executionConfigText,
+  }));
   const providerModelsBySupportedModelId = safeProviderModels.reduce((map, item) => {
     if (!item.supported_model_id) {
       return map;
@@ -903,17 +933,87 @@ export function PublicModelsPanel({
                           return <p className="text-xs text-black/45">暂无映射</p>;
                         }
                         return (
-                          <div className="space-y-1.5">
-                            {mappings.map((mapping) => (
-                              <div key={mapping.id} className="rounded border border-black/[0.08] bg-[#FCFCFA] px-2 py-1.5 text-[11px]">
-                                <p className="text-black/75">
-                                  {mapping.providerName} · {mapping.upstream_model_slug}
-                                </p>
-                                <p className="mt-0.5 text-black/50">
-                                  成本: {mapping.pricingSummary} · {mapping.active ? "已启用" : "未启用"}
-                                </p>
-                              </div>
-                            ))}
+                          <div className="overflow-x-auto rounded border border-black/[0.08] bg-[#FCFCFA]">
+                            <table className="min-w-[640px] w-full text-[11px]">
+                              <thead>
+                                <tr className="border-b border-black/[0.08] text-black/50">
+                                  <th className="px-2 py-1.5 text-left">供应商</th>
+                                  <th className="px-2 py-1.5 text-left">上游模型</th>
+                                  <th className="px-2 py-1.5 text-left">成本</th>
+                                  <th className="px-2 py-1.5 text-left">状态</th>
+                                  <th className="px-2 py-1.5 text-left">操作</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {mappings.map((mapping) => (
+                                  <tr key={mapping.id} className="border-b border-black/[0.06] last:border-b-0">
+                                    <td className="px-2 py-1.5 text-black/75">{mapping.providerName}</td>
+                                    <td className="px-2 py-1.5 font-mono text-black/70">{mapping.upstream_model_slug}</td>
+                                    <td className="px-2 py-1.5 text-black/70">{mapping.pricingSummary}</td>
+                                    <td className="px-2 py-1.5 text-black/60">{mapping.active ? "已启用" : "未启用"}</td>
+                                    <td className="px-2 py-1.5">
+                                      <div className="flex items-center gap-2">
+                                        <ManagementDialog
+                                          trigger={<ModalButton tone="secondary">编辑</ModalButton>}
+                                          title={`编辑映射 ${mapping.supportedModelName} / ${mapping.providerName}`}
+                                          description=" "
+                                        >
+                                          {({ close }) => (
+                                            <CreateProviderModelForm
+                                              action={updateProviderModelDetails}
+                                              providerModelId={mapping.id}
+                                              supportedModels={supportedModelOptions}
+                                              providers={providerOptions}
+                                              workerTemplates={workerTemplateOptions.map((item) => ({
+                                                id: item.slug,
+                                                displayName: item.displayName,
+                                                slug: item.slug,
+                                              }))}
+                                              executionConfigPresets={executionConfigPresets.filter(
+                                                (preset) => preset.id !== mapping.id
+                                              )}
+                                              defaultSupportedModelSlug={mapping.public_model_slug}
+                                              defaultProviderId={mapping.provider_id}
+                                              defaultUpstreamModelSlug={mapping.upstream_model_slug}
+                                              defaultPricing={mapping.pricingText}
+                                              defaultPricingSourceUrl={mapping.pricingSourceUrl ?? undefined}
+                                              defaultPricingSourceNote={mapping.pricingSourceNote ?? undefined}
+                                              defaultPricingSourceEvidence={JSON.stringify(mapping.pricingSourceEvidence)}
+                                              defaultInputSchema={mapping.inputSchemaText}
+                                              defaultOutputSchema={mapping.outputSchemaText}
+                                              defaultExecutionTemplate={mapping.executionTemplate}
+                                              defaultExecutionConfig={mapping.executionConfigText}
+                                              defaultActive={mapping.active}
+                                              submitLabel="保存供应商模型"
+                                              className="grid gap-4"
+                                              onSuccess={close}
+                                              disabled={false}
+                                            />
+                                          )}
+                                        </ManagementDialog>
+                                        <ManagementDialog
+                                          trigger={<ModalButton tone="secondary">删除</ModalButton>}
+                                          title={`删除映射 ${mapping.supportedModelName} / ${mapping.providerName}`}
+                                          description="确认删除该模型映射。删除后不可恢复。"
+                                        >
+                                          {({ close }) => (
+                                            <ManagedDialogForm action={deleteProviderModel} close={close}>
+                                              <input type="hidden" name="providerModelId" value={mapping.id} />
+                                              <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
+                                                删除后，该可售模型到供应商模型的映射将失效。若仍被路由引用会阻止删除。
+                                              </div>
+                                              <div className="flex justify-end">
+                                                <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
+                                              </div>
+                                            </ManagedDialogForm>
+                                          )}
+                                        </ManagementDialog>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
                         );
                       })()}

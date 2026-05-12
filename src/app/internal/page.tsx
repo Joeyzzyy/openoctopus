@@ -18,6 +18,7 @@ import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
 import {
   CreateProviderButton,
   CreateModelVendorButton,
+  CreateProviderModelMappingButton,
   CreateSupportedModelButton,
   CreateRoutingRuleButton,
   ModelVendorsPanel,
@@ -1125,16 +1126,26 @@ export default async function InternalPage({
                 title="可售模型管理"
                 description=" "
                 headerRight={
-                  <CreateSupportedModelButton
-                    capabilityOptions={capabilityOptions}
-                    modelVendors={data.modelVendors}
-                    models={data.supportedModels}
-                  />
+                  <div className="flex items-center gap-2">
+                    <CreateSupportedModelButton
+                      capabilityOptions={capabilityOptions}
+                      modelVendors={data.modelVendors}
+                      models={data.supportedModels}
+                    />
+                    <CreateProviderModelMappingButton
+                      supportedModels={data.supportedModels}
+                      providers={data.providers}
+                      workerTemplates={data.workerTemplates ?? []}
+                      providerModels={data.providerModels}
+                    />
+                  </div>
                 }
                 >
                 <PublicModelsPanel
                   models={data.supportedModels}
                   providerModels={data.providerModels}
+                  providers={data.providers}
+                  workerTemplates={data.workerTemplates ?? []}
                   modelVendors={data.modelVendors}
                   capabilityOptions={capabilityOptions}
                 />
