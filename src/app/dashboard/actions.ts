@@ -276,7 +276,7 @@ export async function createTopUpCheckoutSession(formData: FormData) {
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      success_url: `${baseUrl}/dashboard?view=dashboard&refreshWallet=1&alert=${encodeURIComponent("Top-up successful. Your balance is updating now.")}&alertLevel=success`,
+      success_url: `${baseUrl}/dashboard?view=dashboard&refreshWallet=1&celebrateTopup=1&topupAmount=${encodeURIComponent(amountUsd.toFixed(2))}&alert=${encodeURIComponent("Top-up successful. Your balance is updating now.")}&alertLevel=success`,
       cancel_url: `${baseUrl}/dashboard?view=dashboard&alert=${encodeURIComponent("Top-up failed. Please try again.")}&alertLevel=error&alertDurationMs=10000`,
       line_items: topupPriceId
         ? [

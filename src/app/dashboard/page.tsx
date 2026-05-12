@@ -18,6 +18,7 @@ import { ApiQuickstartCard } from "./api-quickstart-card";
 import { ModelCatalogTable } from "./model-catalog-table";
 import { TopUpForm } from "./top-up-form";
 import { AutoRefreshOnReturn } from "./auto-refresh-on-return";
+import { TopUpCelebration } from "./top-up-celebration";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -482,6 +483,7 @@ export default async function DashboardPage({
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#FCFCFA] text-[#111111]">
       <AutoRefreshOnReturn />
+      <TopUpCelebration />
       <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center px-6">
           <div className="relative flex w-full items-center text-sm md:text-base">
