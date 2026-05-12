@@ -498,7 +498,7 @@ export default async function DashboardPage({
   ];
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#FCFCFA] text-[#111111]">
+    <main className="relative min-h-screen overflow-x-hidden bg-[#FCFCFA] text-[#111111]">
       <AutoRefreshOnReturn />
       <TopUpCelebration />
       <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">

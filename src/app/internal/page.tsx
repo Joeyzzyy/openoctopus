@@ -900,7 +900,7 @@ export default async function InternalPage({
 
   if (!hasPasswordAccess) {
     return (
-      <main className="relative min-h-screen overflow-hidden bg-[#FCFCFA] text-[#111111]">
+      <main className="relative min-h-screen overflow-x-hidden bg-[#FCFCFA] text-[#111111]">
         <div className="relative mx-auto flex min-h-screen w-full max-w-[520px] items-center px-4 py-10">
           <section className="w-full rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm">
             <form action={unlockInternalAccess} className="grid gap-3">
@@ -1089,7 +1089,7 @@ export default async function InternalPage({
   const imageRecentLogs = data.globalMonitoring.recentImageRequests.slice(0, 12);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#FCFCFA] text-[#111111]">
+    <main className="relative min-h-screen overflow-x-hidden bg-[#FCFCFA] text-[#111111]">
       <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
         <div className="mx-auto flex h-14 w-full max-w-[1960px] items-center px-3 xl:px-4">
           <div className="relative flex w-full items-center text-sm md:text-base">
