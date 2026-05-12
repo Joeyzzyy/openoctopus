@@ -16,6 +16,7 @@ import { DashboardMobileNav, DashboardSidebar } from "./dashboard-sidebar";
 import { ApiKeysTable } from "./api-keys-table";
 import { ApiQuickstartCard } from "./api-quickstart-card";
 import { ModelCatalogTable } from "./model-catalog-table";
+import { ModelCatalogFilters } from "./model-catalog-filters";
 import { TopUpForm } from "./top-up-form";
 import { AutoRefreshOnReturn } from "./auto-refresh-on-return";
 import { TopUpCelebration } from "./top-up-celebration";
@@ -30,6 +31,7 @@ type DashboardView =
 type RequestInterval = "minute" | "hour" | "day";
 type RequestRange = "60m" | "6h" | "24h" | "7d" | "30d" | "90d";
 type ModelType = "all" | "image" | "video" | "text-coding";
+type ModelCapabilityType = Exclude<ModelType, "all">;
 type BillingFlow = "incoming" | "outgoing";
 const pageNav = [
   { label: "Top-up Balance", view: "dashboard" },
@@ -105,6 +107,14 @@ function parseModelType(value: string | undefined): ModelType {
   return allowed.includes(value as ModelType) ? (value as ModelType) : "all";
 }
 
+function parseModelSlug(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function parseBillingFlow(value: string | undefined): BillingFlow {
   return value === "outgoing" ? "outgoing" : "incoming";
 }
@@ -163,6 +173,7 @@ function buildDashboardHref(input: {
   analyticsInterval: RequestInterval;
   analyticsRange: RequestRange;
   modelType?: ModelType;
+  modelSlug?: string | null;
   billingFlow?: BillingFlow;
 }) {
   const params = new URLSearchParams();
@@ -173,6 +184,9 @@ function buildDashboardHref(input: {
   params.set("analyticsRange", input.analyticsRange);
   if (input.modelType && input.modelType !== "all") {
     params.set("modelType", input.modelType);
+  }
+  if (input.modelSlug) {
+    params.set("modelSlug", input.modelSlug);
   }
   if (input.apiKeyId) {
     params.set("apiKey", input.apiKeyId);
@@ -378,6 +392,7 @@ export default async function DashboardPage({
   const billingPage = Number.isFinite(rawBillingPage) ? Math.max(1, Math.floor(rawBillingPage)) : 1;
   const selectedApiKeyId = getSearchValue(resolvedSearchParams, "apiKey") ?? null;
   const selectedModelType = parseModelType(getSearchValue(resolvedSearchParams, "modelType"));
+  const selectedModelSlug = parseModelSlug(getSearchValue(resolvedSearchParams, "modelSlug"));
   const selectedBillingFlow = parseBillingFlow(getSearchValue(resolvedSearchParams, "billingFlow"));
 
   const data = await getDashboardData({
@@ -400,6 +415,7 @@ export default async function DashboardPage({
       analyticsInterval,
       analyticsRange,
       modelType: selectedModelType,
+      modelSlug: selectedModelSlug,
       billingFlow: selectedBillingFlow,
     }),
   }));
@@ -410,6 +426,7 @@ export default async function DashboardPage({
     analyticsInterval,
     analyticsRange,
     modelType: selectedModelType,
+    modelSlug: selectedModelSlug,
     billingFlow: selectedBillingFlow,
   });
 
@@ -428,14 +445,14 @@ export default async function DashboardPage({
   const filteredSpend = analyticsRequests.reduce((sum, row) => sum + row.costValue, 0);
   const filteredRequests = analyticsRequests.length;
   const successfulRequests = analyticsRequests.filter((row) => row.status === "succeeded").length;
-  const modelRowsByType = {
+  const modelRowsByType: Record<ModelCapabilityType, typeof modelCatalogRows> = {
     image: modelCatalogRows.filter((row) => row.capability.includes("image")),
     video: modelCatalogRows.filter((row) => row.capability.includes("video")),
     "text-coding": modelCatalogRows.filter(
       (row) => row.capability.includes("text") || row.capability.includes("code")
     ),
   } as const;
-  const modelCatalogRowsFiltered =
+  const modelCatalogRowsByType =
     selectedModelType === "all"
       ? modelCatalogRows
       : selectedModelType === "image"
@@ -443,12 +460,9 @@ export default async function DashboardPage({
         : selectedModelType === "video"
           ? modelRowsByType.video
           : modelRowsByType["text-coding"];
-  const modelTypeOptions: Array<{ value: ModelType; label: string; count: number }> = [
-    { value: "all", label: "All", count: modelCatalogRows.length },
-    { value: "image", label: "Image", count: modelRowsByType.image.length },
-    { value: "video", label: "Video", count: modelRowsByType.video.length },
-    { value: "text-coding", label: "Text / Coding", count: modelRowsByType["text-coding"].length },
-  ];
+  const modelCatalogRowsFiltered = selectedModelSlug
+    ? modelCatalogRowsByType.filter((row) => row.publicModel === selectedModelSlug)
+    : modelCatalogRowsByType;
   const billingRowsFiltered = billingRows.filter((row) =>
     selectedBillingFlow === "incoming" ? row.amountValue >= 0 : row.amountValue < 0
   );
@@ -923,6 +937,7 @@ export default async function DashboardPage({
                       analyticsInterval,
                       analyticsRange,
                       modelType: selectedModelType,
+                      modelSlug: selectedModelSlug,
                       billingFlow: "incoming",
                     })}
                     className={cn(
@@ -943,6 +958,7 @@ export default async function DashboardPage({
                       analyticsInterval,
                       analyticsRange,
                       modelType: selectedModelType,
+                      modelSlug: selectedModelSlug,
                       billingFlow: "outgoing",
                     })}
                     className={cn(
@@ -1035,6 +1051,7 @@ export default async function DashboardPage({
                           analyticsInterval,
                           analyticsRange,
                           modelType: selectedModelType,
+                          modelSlug: selectedModelSlug,
                           billingFlow: selectedBillingFlow,
                         })}
                         aria-disabled={normalizedBillingPage <= 1}
@@ -1061,6 +1078,7 @@ export default async function DashboardPage({
                                   analyticsInterval,
                                   analyticsRange,
                                   modelType: selectedModelType,
+                                  modelSlug: selectedModelSlug,
                                   billingFlow: selectedBillingFlow,
                                 })}
                                 className={cn(
@@ -1085,6 +1103,7 @@ export default async function DashboardPage({
                           analyticsInterval,
                           analyticsRange,
                           modelType: selectedModelType,
+                          modelSlug: selectedModelSlug,
                           billingFlow: selectedBillingFlow,
                         })}
                         aria-disabled={normalizedBillingPage >= billingTotalPages}
@@ -1107,31 +1126,27 @@ export default async function DashboardPage({
 
             {view === "models" ? (
               <section className="p-0">
-                <div className="mb-4 flex flex-wrap items-center gap-2">
-                  {modelTypeOptions.map((item) => (
-                    <Link
-                      key={item.value}
-                      href={buildDashboardHref({
-                        view: "models",
-                        requestsPage: 1,
-                        apiKeyId: selectedApiKeyId,
-                        analyticsInterval,
-                        analyticsRange,
-                        modelType: item.value,
-                      })}
-                      className={cn(
-                        "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
-                        selectedModelType === item.value
-                          ? "border-black bg-black text-white"
-                          : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                      )}
-                    >
-                      {item.label} ({item.count})
-                    </Link>
-                  ))}
+                <div className="mb-4">
+                  <ModelCatalogFilters
+                    selectedType={selectedModelType}
+                    selectedModelSlug={selectedModelSlug}
+                    modelOptions={modelCatalogRows.map((row) => ({
+                      slug: row.publicModel,
+                      label: row.displayName,
+                      capability: row.capability,
+                    }))}
+                    baseParams={{
+                      view: "models",
+                      requestsPage: "1",
+                      billingPage: "1",
+                      analyticsInterval,
+                      analyticsRange,
+                      apiKey: selectedApiKeyId,
+                    }}
+                  />
                 </div>
                 <div className="mb-4">
-                  <ApiQuickstartCard models={modelCatalogRowsFiltered} />
+                  <ApiQuickstartCard models={modelCatalogRowsByType} initialModel={selectedModelSlug} />
                 </div>
                 <ModelCatalogTable rows={modelCatalogRowsFiltered} />
               </section>
