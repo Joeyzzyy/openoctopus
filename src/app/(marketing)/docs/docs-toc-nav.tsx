@@ -22,33 +22,46 @@ export function DocsTocNav({ sections }: { sections: readonly TocSection[] }) {
       setActiveId(fromHash);
     }
 
-    const elements = sectionIds
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => Boolean(el));
+    const resolveActiveSection = () => {
+      const sectionsWithTop = sectionIds
+        .map((id) => {
+          const element = document.getElementById(id);
+          if (!element) return null;
+          return {
+            id,
+            top: element.getBoundingClientRect().top + window.scrollY,
+          };
+        })
+        .filter((item): item is { id: string; top: number } => Boolean(item))
+        .sort((a, b) => a.top - b.top);
 
-    if (elements.length === 0) return;
+      if (sectionsWithTop.length === 0) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+      const thresholdY = window.scrollY + 140;
+      let nextActiveId = sectionsWithTop[0].id;
 
-        if (visible[0]?.target?.id) {
-          setActiveId(visible[0].target.id);
+      for (const section of sectionsWithTop) {
+        if (section.top <= thresholdY) {
+          nextActiveId = section.id;
+        } else {
+          break;
         }
-      },
-      {
-        rootMargin: "-25% 0px -55% 0px",
-        threshold: [0.1, 0.25, 0.5, 0.75],
       }
-    );
 
-    for (const element of elements) {
-      observer.observe(element);
-    }
+      setActiveId(nextActiveId);
+    };
 
-    return () => observer.disconnect();
+    const onScroll = () => resolveActiveSection();
+    const onHashChange = () => resolveActiveSection();
+
+    resolveActiveSection();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("hashchange", onHashChange);
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("hashchange", onHashChange);
+    };
   }, [sectionIds]);
 
   return (
@@ -57,7 +70,16 @@ export function DocsTocNav({ sections }: { sections: readonly TocSection[] }) {
         <a
           key={section.id}
           href={`#${section.id}`}
-          onClick={() => setActiveId(section.id)}
+          onClick={(event) => {
+            event.preventDefault();
+            const target = document.getElementById(section.id);
+            if (!target) return;
+
+            setActiveId(section.id);
+            const top = target.getBoundingClientRect().top + window.scrollY - 108;
+            window.scrollTo({ top, behavior: "smooth" });
+            window.history.replaceState(null, "", `#${section.id}`);
+          }}
           className={cn(
             "block rounded-lg px-3 py-2 text-sm transition-colors",
             activeId === section.id
