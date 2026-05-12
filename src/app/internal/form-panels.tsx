@@ -1208,23 +1208,6 @@ export function CreateProviderModelForm({
                   placeholder="response.outputUrl"
                 />
               </label>
-              <label className="block md:col-span-2">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提交 Body 模板（JSON）</span>
-                <textarea
-                  value={executionConfigState.submitBodyTemplate}
-                  onChange={(event) =>
-                    setExecutionConfigState((current) => ({
-                      ...current,
-                      submitBodyTemplate: event.target.value,
-                    }))
-                  }
-                  disabled={disabled}
-                  className={formTextAreaClassName}
-                  rows={8}
-                  placeholder={'{\n  "contents": [\n    {\n      "parts": [\n        { "text": "{{prompt}}" }\n      ]\n    }\n  ]\n}'}
-                />
-                <FieldHint help="可选。用于把统一入参映射为上游真实请求体。支持变量：{{prompt}}、{{upstreamModel}}，以及 input 里的同名字段（如 {{size}}）。" />
-              </label>
               <label className="block">
                 <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">结果值类型</span>
                 <select
@@ -1347,6 +1330,23 @@ export function CreateProviderModelForm({
               </button>
             </div>
             <div className={schemaEditorTab === "input" ? "block" : "hidden"}>
+              <label className="mb-3 block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提交 Body 模板（JSON）</span>
+                <textarea
+                  value={executionConfigState.submitBodyTemplate}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      submitBodyTemplate: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={8}
+                  placeholder={'{\n  "contents": [\n    {\n      "parts": [\n        { "text": "{{prompt}}" }\n      ]\n    }\n  ]\n}'}
+                />
+                <FieldHint help="可选。用于把统一入参映射为上游真实请求体。支持变量：{{prompt}}、{{upstreamModel}}，以及 input 里的同名字段（如 {{size}}）。" />
+              </label>
               <SchemaFieldEditor
                 name="inputSchema"
                 keyName="params"
