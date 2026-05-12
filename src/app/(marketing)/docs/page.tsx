@@ -9,7 +9,6 @@ import {
 } from "@/lib/api-docs";
 
 const sidebarSections = [
-  { id: "overview", label: "Overview" },
   { id: "authentication", label: "Authentication" },
   { id: "quickstart", label: "Quickstart" },
   { id: "endpoints", label: "Endpoints" },
@@ -230,36 +229,6 @@ export default function DocsPage() {
           </aside>
 
           <div className="space-y-6">
-            <DocsSection
-              id="overview"
-              eyebrow="Overview"
-              title="What the API gives you"
-              description="Use a single OpenOctopus API key to submit image and video generation tasks through stable public model slugs."
-            >
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                  <p className="text-sm font-medium text-black">Unified auth</p>
-                  <p className="mt-2 text-sm leading-6 text-black/58">
-                    One bearer token works across public OpenOctopus models.
-                  </p>
-                </div>
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                  <p className="text-sm font-medium text-black">Async tasks</p>
-                  <p className="mt-2 text-sm leading-6 text-black/58">
-                    Generation endpoints return a task id first, then you poll
-                    for the final result.
-                  </p>
-                </div>
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                  <p className="text-sm font-medium text-black">Routed models</p>
-                  <p className="mt-2 text-sm leading-6 text-black/58">
-                    You call public slugs while OpenOctopus handles upstream
-                    routing behind the scenes.
-                  </p>
-                </div>
-              </div>
-            </DocsSection>
-
             <DocsSection
               id="authentication"
               eyebrow="Authentication"
