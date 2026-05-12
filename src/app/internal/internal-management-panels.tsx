@@ -215,6 +215,19 @@ function summarizeInputSchema(schemaText: string) {
   }
 }
 
+function readModelDescriptionFromBillingConfig(configText: string) {
+  try {
+    const parsed = JSON.parse(configText) as Record<string, unknown>;
+    const metadata =
+      parsed.metadata && typeof parsed.metadata === "object" && !Array.isArray(parsed.metadata)
+        ? (parsed.metadata as Record<string, unknown>)
+        : null;
+    return typeof metadata?.modelDescription === "string" ? metadata.modelDescription : "";
+  } catch {
+    return "";
+  }
+}
+
 function readTemplateMode(config: Record<string, unknown> | null) {
   const mode = typeof config?.mode === "string" ? config.mode.trim() : "";
   if (mode === "sync" || mode === "sync-json-v1") {
@@ -903,7 +916,7 @@ export function PublicModelsPanel({
                         {({ close }) => (
                         <ManagedDialogForm action={updateSupportedModelDetails} close={close}>
                           <input type="hidden" name="supportedModelId" value={model.id} />
-                          <input type="hidden" name="active" value={model.active ? "true" : "false"} />
+                          <input type="hidden" name="active" value="true" />
                           <FormSelect
                             label="模型厂商（内部分类）"
                             name="provider"
@@ -912,6 +925,13 @@ export function PublicModelsPanel({
                           />
                           <FormField label="可售模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
                           <FormField label="显示名称" name="displayName" defaultValue={model.display_name} required />
+                          <FormTextArea
+                            label="模型介绍"
+                            name="modelDescription"
+                            defaultValue={readModelDescriptionFromBillingConfig(model.billingConfigText)}
+                            placeholder="用于对外展示的模型简介，例如适用场景、风格、速度与质量特点。"
+                            help="可选。会随模型配置保存。"
+                          />
                           <FormSelect
                             label="模态"
                             name="modality"
@@ -1134,6 +1154,12 @@ export function CreateSupportedModelButton({
         />
         <FormField label="可售模型 Slug" name="modelSlug" defaultValue="openoctopus/gemini-2.5-flash-image" required />
         <FormField label="显示名称" name="displayName" defaultValue="Gemini Image" required />
+        <FormTextArea
+          label="模型介绍"
+          name="modelDescription"
+          placeholder="用于对外展示的模型简介，例如适用场景、风格、速度与质量特点。"
+          help="可选。会随模型配置保存。"
+        />
         <FormSelect
           label="模态"
           name="modality"
@@ -1152,7 +1178,7 @@ export function CreateSupportedModelButton({
         <BillingConfigEditor
           initialValue={'{"billingMode":"hybrid","currency":"USD","charges":{"perImage":0.039,"inputTextTokensPerMillion":0.30}}'}
         />
-        <ActiveCheckbox name="active" defaultChecked />
+        <input type="hidden" name="active" value="true" />
         <div className="flex justify-end">
           <SubmitButton label="创建可售模型" />
         </div>
@@ -1274,7 +1300,7 @@ export function EconomicsPanel({
             {Array.from(groupedByProvider.entries()).map(([providerId, providerGroup]) => (
               <section key={providerId} className="rounded-2xl border border-black/[0.08] bg-white shadow-sm">
                 <div className="border-b border-black/[0.08] bg-[#F3F7FF] px-4 py-3 text-sm font-semibold text-[#355FB4]">
-                  供应商：{providerGroup.providerName} · {providerGroup.providerSlug}
+                  供应商：{providerGroup.providerName}
                 </div>
                 <div className="space-y-4 p-3">
                   {Array.from(providerGroup.vendors.entries()).map(([vendor, vendorRows]) => (

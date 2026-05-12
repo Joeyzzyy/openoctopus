@@ -1452,6 +1452,7 @@ const createSupportedModelSchema = z.object({
   provider: z.string().min(2).max(80),
   modelSlug: z.string().min(3).max(160),
   displayName: z.string().min(2).max(120),
+  modelDescription: z.string().trim().max(2000).nullable(),
   modality: modalitySchema,
   capability: capabilitySchema,
   billingConfig: z.unknown(),
@@ -1464,13 +1465,21 @@ export async function createSupportedModel(formData: FormData) {
     provider: formData.get("provider"),
     modelSlug: formData.get("modelSlug"),
     displayName: formData.get("displayName"),
+    modelDescription: normalizeOptionalText(formData.get("modelDescription")),
     modality: formData.get("modality"),
     capability: formData.get("capability"),
     billingConfig: parseBillingConfigField(formData.get("billingConfig")).config,
     active: parseBooleanField(formData.get("active")),
   });
   const billingConfig = parseBillingConfig(parsed.billingConfig);
-  const legacyBillingFields = deriveLegacyBillingFields(billingConfig);
+  const billingConfigWithMeta = {
+    ...billingConfig,
+    metadata: {
+      ...(((billingConfig as Record<string, unknown>).metadata as Record<string, unknown> | undefined) ?? {}),
+      modelDescription: parsed.modelDescription,
+    },
+  };
+  const legacyBillingFields = deriveLegacyBillingFields(billingConfigWithMeta);
 
   const invalidCapabilityForModality =
     (parsed.modality === "image" &&
@@ -1489,7 +1498,7 @@ export async function createSupportedModel(formData: FormData) {
       display_name: parsed.displayName,
       modality: parsed.modality,
       capability: parsed.capability,
-      billing_config: billingConfig,
+      billing_config: billingConfigWithMeta,
       unit_label: legacyBillingFields.unitLabel,
       default_unit_cost: legacyBillingFields.defaultUnitCost,
       active: parsed.active,
@@ -1511,7 +1520,7 @@ export async function createSupportedModel(formData: FormData) {
     summary: `Created public model ${parsed.modelSlug}`,
     details: {
       ...parsed,
-      billingConfig,
+      billingConfig: billingConfigWithMeta,
     },
   });
 
@@ -1620,6 +1629,7 @@ const updateSupportedModelDetailsSchema = z.object({
   provider: z.string().min(2).max(80),
   modelSlug: z.string().min(3).max(160),
   displayName: z.string().min(2).max(120),
+  modelDescription: z.string().trim().max(2000).nullable(),
   modality: modalitySchema,
   capability: capabilitySchema,
   billingConfig: z.unknown(),
@@ -1633,13 +1643,21 @@ export async function updateSupportedModelDetails(formData: FormData) {
     provider: formData.get("provider"),
     modelSlug: formData.get("modelSlug"),
     displayName: formData.get("displayName"),
+    modelDescription: normalizeOptionalText(formData.get("modelDescription")),
     modality: formData.get("modality"),
     capability: formData.get("capability"),
     billingConfig: parseBillingConfigField(formData.get("billingConfig")).config,
     active: parseBooleanField(formData.get("active")),
   });
   const billingConfig = parseBillingConfig(parsed.billingConfig);
-  const legacyBillingFields = deriveLegacyBillingFields(billingConfig);
+  const billingConfigWithMeta = {
+    ...billingConfig,
+    metadata: {
+      ...(((billingConfig as Record<string, unknown>).metadata as Record<string, unknown> | undefined) ?? {}),
+      modelDescription: parsed.modelDescription,
+    },
+  };
+  const legacyBillingFields = deriveLegacyBillingFields(billingConfigWithMeta);
 
   const invalidCapabilityForModality =
     (parsed.modality === "image" &&
@@ -1672,7 +1690,7 @@ export async function updateSupportedModelDetails(formData: FormData) {
       display_name: parsed.displayName,
       modality: parsed.modality,
       capability: parsed.capability,
-      billing_config: billingConfig,
+      billing_config: billingConfigWithMeta,
       unit_label: legacyBillingFields.unitLabel,
       default_unit_cost: legacyBillingFields.defaultUnitCost,
       active: parsed.active,
@@ -1717,7 +1735,7 @@ export async function updateSupportedModelDetails(formData: FormData) {
     summary: `Updated public model ${parsed.modelSlug}`,
     details: {
       ...parsed,
-      billingConfig,
+      billingConfig: billingConfigWithMeta,
     },
   });
 

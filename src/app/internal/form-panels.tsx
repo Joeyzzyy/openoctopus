@@ -957,16 +957,7 @@ export function CreateProviderModelForm({
             example="gemini-2.5-flash-image"
           />
         </label>
-        <label className="flex items-center gap-3 rounded-md border border-black/[0.08] bg-white px-3 py-3 text-sm text-black/72 md:col-span-2">
-          <input
-            type="checkbox"
-            name="active"
-            defaultChecked={defaultActive}
-            disabled={disabled}
-            className="size-4 rounded border-black/20 bg-white accent-black"
-          />
-          启用
-        </label>
+        <input type="hidden" name="active" value="true" />
         </div>
 
         <div className={activeTab === "protocol" ? "contents" : "hidden"}>
