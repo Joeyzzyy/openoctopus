@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageHero, SurfaceCard } from "@/components/marketing/page-primitives";
+import { DocsTocNav } from "./docs-toc-nav";
 import {
   buildImageGenerationCurl,
   buildTaskStatusCurl,
@@ -215,17 +216,7 @@ export default function DocsPage() {
               <p className="text-[10px] uppercase tracking-[1px] text-black/45">
                 On This Page
               </p>
-              <nav className="mt-4 space-y-1">
-                {sidebarSections.map((section) => (
-                  <a
-                    key={section.id}
-                    href={`#${section.id}`}
-                    className="block rounded-lg px-3 py-2 text-sm text-black/62 transition-colors hover:bg-black/[0.03] hover:text-black"
-                  >
-                    {section.label}
-                  </a>
-                ))}
-              </nav>
+              <DocsTocNav sections={sidebarSections} />
               <div className="mt-5 rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
                 <p className="text-[10px] uppercase tracking-[1px] text-black/45">
                   Base URL
