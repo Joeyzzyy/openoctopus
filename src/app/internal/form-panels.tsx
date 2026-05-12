@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { toast } from "sonner";
 import { createProviderModel, createRoutingRule } from "./actions";
 import { SubmitButton } from "./submit-button";
 
@@ -847,7 +848,49 @@ export function CreateProviderModelForm({
     <form
       action={action}
       className={className}
-      onSubmit={() => {
+      onSubmit={(event) => {
+        const formData = new FormData(event.currentTarget);
+        const missing: string[] = [];
+
+        const supportedModelValue = String(formData.get("supportedModelId") ?? "").trim();
+        const providerValue = String(formData.get("providerId") ?? "").trim();
+        const upstreamModelValue = String(formData.get("upstreamModelSlug") ?? "").trim();
+        const capabilityValue = String(formData.get("capability") ?? "").trim();
+
+        if (!supportedModelValue) {
+          missing.push("可售模型");
+        }
+        if (!providerValue) {
+          missing.push("供应商");
+        }
+        if (!upstreamModelValue) {
+          missing.push("上游模型标识");
+        }
+        if (!capabilityValue) {
+          missing.push("能力类型");
+        }
+        if (!executionConfigState.submitPath.trim()) {
+          missing.push("submitPath");
+        }
+        if (!executionConfigState.taskIdPath.trim()) {
+          missing.push("taskIdPath");
+        }
+        if (!executionConfigState.resultUrlPath.trim()) {
+          missing.push("resultUrlPath");
+        }
+        if (isAsyncMode && !executionConfigState.pollPath.trim()) {
+          missing.push("pollPath");
+        }
+        if (isAsyncMode && !executionConfigState.statusPath.trim()) {
+          missing.push("statusPath");
+        }
+
+        if (missing.length > 0) {
+          event.preventDefault();
+          toast.error(`Missing required fields: ${missing.join(", ")}`);
+          return;
+        }
+
         setSubmitted(true);
       }}
     >

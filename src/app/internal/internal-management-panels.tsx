@@ -898,18 +898,18 @@ export function PublicModelsPanel({
   return (
     <div className="space-y-4">
       {models.length > 0 ? (
-        <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-2xl border border-black/[0.06] bg-white shadow-sm">
           <table className="min-w-[2160px] border-separate border-spacing-0 text-left text-sm">
             <thead>
-              <tr className="text-xs text-black/50">
-                <th className="min-w-[220px] border-b border-black/[0.08] px-3 py-2.5">可售模型Slug</th>
-                <th className="min-w-[140px] border-b border-black/[0.08] px-3 py-2.5">显示名称</th>
-                <th className="min-w-[120px] border-b border-black/[0.08] px-3 py-2.5">厂商</th>
-                <th className="min-w-[90px] border-b border-black/[0.08] px-3 py-2.5">模态</th>
-                <th className="min-w-[120px] border-b border-black/[0.08] px-3 py-2.5">能力类型</th>
-                <th className="min-w-[130px] border-b border-black/[0.08] px-3 py-2.5">添加时间</th>
-                <th className="min-w-[200px] border-b border-black/[0.08] px-3 py-2.5">计费摘要</th>
-                <th className="sticky right-0 z-10 min-w-[220px] border-b border-black/[0.08] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
+              <tr className="bg-[#FCFCFA] text-xs text-black/45">
+                <th className="min-w-[220px] border-b border-black/[0.06] px-3 py-2.5">可售模型Slug</th>
+                <th className="min-w-[140px] border-b border-black/[0.06] px-3 py-2.5">显示名称</th>
+                <th className="min-w-[120px] border-b border-black/[0.06] px-3 py-2.5">厂商</th>
+                <th className="min-w-[90px] border-b border-black/[0.06] px-3 py-2.5">模态</th>
+                <th className="min-w-[120px] border-b border-black/[0.06] px-3 py-2.5">能力类型</th>
+                <th className="min-w-[130px] border-b border-black/[0.06] px-3 py-2.5">添加时间</th>
+                <th className="min-w-[200px] border-b border-black/[0.06] px-3 py-2.5">计费摘要</th>
+                <th className="sticky right-0 z-10 min-w-[220px] border-b border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.16)]">
                   操作
                 </th>
               </tr>
@@ -918,14 +918,14 @@ export function PublicModelsPanel({
               {models.map((model) => (
                 <Fragment key={model.id}>
                   <tr>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle font-mono text-xs text-black/72">{model.model_slug}</td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-sm font-medium text-black">{model.display_name}</td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.provider}</td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{modalityLabel(model.modality)}</td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.capability ? capabilityLabel(model.capability) : "-"}</td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.createdLabel}</td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.billingSummary}</td>
-                    <td className="sticky right-0 z-10 min-w-[220px] border-b border-black/[0.06] bg-white px-3 py-3 align-middle shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
+                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle font-mono text-xs text-black/72">{model.model_slug}</td>
+                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle text-sm font-medium text-black">{model.display_name}</td>
+                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle text-xs text-black/60">{model.provider}</td>
+                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle text-xs text-black/60">{modalityLabel(model.modality)}</td>
+                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle text-xs text-black/60">{model.capability ? capabilityLabel(model.capability) : "-"}</td>
+                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle text-xs text-black/60">{model.createdLabel}</td>
+                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle text-xs text-black/60">{model.billingSummary}</td>
+                    <td className="sticky right-0 z-10 min-w-[220px] border-b border-black/[0.05] bg-white px-3 py-3 align-middle shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.16)]">
                       <div className="flex flex-wrap items-center gap-2">
                       <form action={updateSupportedModelState}>
                         <input type="hidden" name="supportedModelId" value={model.id} />
@@ -1009,27 +1009,27 @@ export function PublicModelsPanel({
                     </td>
                   </tr>
                   <tr>
-                    <td colSpan={8} className="border-b border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
+                    <td colSpan={8} className="border-b border-black/[0.05] bg-[#FAFAF9] px-3 py-2.5">
                       {(() => {
                         const mappings = providerModelsBySupportedModelId.get(model.id) ?? [];
                         if (mappings.length === 0) {
                           return <p className="text-xs text-black/45">供应商模型映射：暂无</p>;
                         }
                         return (
-                          <div className="overflow-x-auto rounded border border-black/[0.08] bg-white">
+                          <div className="overflow-x-auto rounded-md border border-black/[0.06] bg-white">
                             <table className="min-w-[760px] w-full text-[11px]">
                               <thead>
-                                <tr className="border-b border-black/[0.08] text-black/50">
-                                  <th className="px-2 py-1.5 text-left">供应商</th>
-                                  <th className="px-2 py-1.5 text-left">上游模型</th>
-                                  <th className="px-2 py-1.5 text-left">成本</th>
-                                  <th className="px-2 py-1.5 text-left">状态</th>
-                                  <th className="px-2 py-1.5 text-left">操作</th>
+                                <tr className="border-b border-black/[0.06] bg-[#FCFCFA] text-black/45">
+                                  <th className="px-2 py-1.5 text-left font-medium">供应商</th>
+                                  <th className="px-2 py-1.5 text-left font-medium">上游模型</th>
+                                  <th className="px-2 py-1.5 text-left font-medium">成本</th>
+                                  <th className="px-2 py-1.5 text-left font-medium">状态</th>
+                                  <th className="px-2 py-1.5 text-left font-medium">操作</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {mappings.map((mapping) => (
-                                  <tr key={mapping.id} className="border-b border-black/[0.06] last:border-b-0">
+                                  <tr key={mapping.id} className="border-b border-black/[0.05] last:border-b-0">
                                     <td className="px-2 py-1.5 text-black/75">{mapping.providerName}</td>
                                     <td className="px-2 py-1.5 font-mono text-black/70">{mapping.upstream_model_slug}</td>
                                     <td className="px-2 py-1.5 text-black/70">{mapping.pricingSummary}</td>
