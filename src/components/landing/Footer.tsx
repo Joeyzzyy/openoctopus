@@ -8,8 +8,6 @@ const footerSections = [
       { label: "Home", href: "/" },
       { label: "Documentation", href: "/docs" },
       { label: "Pricing", href: "/pricing" },
-      { label: "Enterprise", href: "/enterprise" },
-      { label: "About Us", href: "/about" },
     ],
   },
   {
@@ -24,8 +22,8 @@ const footerSections = [
   {
     title: "Legal",
     links: [
-      { label: "Terms of Service", href: "/about" },
-      { label: "Privacy Policy", href: "/about" },
+      { label: "Terms of Service", href: "/docs" },
+      { label: "Privacy Policy", href: "/docs" },
       { label: "Support", href: "mailto:support@openoctopus.ai" },
       { label: "Status", href: "https://status.wavespeed.ai/" },
     ],

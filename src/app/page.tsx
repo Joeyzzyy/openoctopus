@@ -28,8 +28,6 @@ const FOOTER_NAV_ITEMS = [
   { label: "Docs", href: "/docs" },
   { label: "Learn More", href: "/resource" },
   { label: "Tools", href: "/tools" },
-  { label: "Enterprise", href: "/enterprise" },
-  { label: "About", href: "/about" },
 ];
 
 const CAPABILITY_CARDS = [
