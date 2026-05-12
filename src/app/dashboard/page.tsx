@@ -30,8 +30,8 @@ type DashboardView =
   | "api-keys";
 type RequestInterval = "minute" | "hour" | "day";
 type RequestRange = "60m" | "6h" | "24h" | "7d" | "30d" | "90d";
-type ModelType = "all" | "image" | "video" | "text-coding";
-type ModelCapabilityType = Exclude<ModelType, "all">;
+type ModelType = "image" | "video" | "text-coding";
+type ModelCapabilityType = ModelType;
 type BillingFlow = "incoming" | "outgoing";
 const pageNav = [
   { label: "Top-up Balance", view: "dashboard" },
@@ -103,8 +103,8 @@ function parseRequestRange(value: string | undefined, interval: RequestInterval)
 }
 
 function parseModelType(value: string | undefined): ModelType {
-  const allowed: ModelType[] = ["all", "image", "video", "text-coding"];
-  return allowed.includes(value as ModelType) ? (value as ModelType) : "all";
+  const allowed: ModelType[] = ["image", "video", "text-coding"];
+  return allowed.includes(value as ModelType) ? (value as ModelType) : "image";
 }
 
 function parseModelSlug(value: string | undefined): string | null {
@@ -182,7 +182,7 @@ function buildDashboardHref(input: {
   params.set("billingPage", String(input.billingPage ?? 1));
   params.set("analyticsInterval", input.analyticsInterval);
   params.set("analyticsRange", input.analyticsRange);
-  if (input.modelType && input.modelType !== "all") {
+  if (input.modelType) {
     params.set("modelType", input.modelType);
   }
   if (input.modelSlug) {
@@ -453,13 +453,11 @@ export default async function DashboardPage({
     ),
   } as const;
   const modelCatalogRowsByType =
-    selectedModelType === "all"
-      ? modelCatalogRows
-      : selectedModelType === "image"
-        ? modelRowsByType.image
-        : selectedModelType === "video"
-          ? modelRowsByType.video
-          : modelRowsByType["text-coding"];
+    selectedModelType === "image"
+      ? modelRowsByType.image
+      : selectedModelType === "video"
+        ? modelRowsByType.video
+        : modelRowsByType["text-coding"];
   const modelCatalogRowsFiltered = selectedModelSlug
     ? modelCatalogRowsByType.filter((row) => row.publicModel === selectedModelSlug)
     : modelCatalogRowsByType;

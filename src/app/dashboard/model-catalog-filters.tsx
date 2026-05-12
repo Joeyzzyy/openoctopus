@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-type ModelType = "all" | "image" | "video" | "text-coding";
+type ModelType = "image" | "video" | "text-coding";
 
 type ModelOption = {
   slug: string;
@@ -11,7 +11,7 @@ type ModelOption = {
   capability: string;
 };
 
-function capabilityGroup(capability: string): Exclude<ModelType, "all"> {
+function capabilityGroup(capability: string): ModelType {
   if (capability.includes("video")) {
     return "video";
   }
@@ -48,11 +48,8 @@ export function ModelCatalogFilters({
   }, [modelOptions]);
 
   const visibleModels = useMemo(() => {
-    if (selectedType === "all") {
-      return modelOptions;
-    }
     return grouped[selectedType];
-  }, [grouped, modelOptions, selectedType]);
+  }, [grouped, selectedType]);
 
   const navigate = (nextType: ModelType, nextModelSlug: string | null) => {
     const params = new URLSearchParams();
@@ -63,9 +60,7 @@ export function ModelCatalogFilters({
       }
     }
 
-    if (nextType !== "all") {
-      params.set("modelType", nextType);
-    }
+    params.set("modelType", nextType);
     if (nextModelSlug) {
       params.set("modelSlug", nextModelSlug);
     }
@@ -81,16 +76,18 @@ export function ModelCatalogFilters({
           value={selectedType}
           onChange={(event) => {
             const nextType = event.target.value as ModelType;
-            const nextVisibleModels =
-              nextType === "all" ? modelOptions : grouped[nextType];
+            const nextVisibleModels = grouped[nextType];
             const currentStillVisible = nextVisibleModels.some(
               (item) => item.slug === selectedModelSlug
             );
-            navigate(nextType, currentStillVisible ? selectedModelSlug : null);
+            const nextSlug =
+              currentStillVisible && selectedModelSlug
+                ? selectedModelSlug
+                : (nextVisibleModels[0]?.slug ?? null);
+            navigate(nextType, nextSlug);
           }}
           className="h-9 w-full rounded-md border border-black/[0.1] bg-[#FCFCFA] px-3 text-xs text-black/80"
         >
-          <option value="all">All types</option>
           <option value="image">Image</option>
           <option value="video">Video</option>
           <option value="text-coding">Text / Coding</option>
@@ -100,39 +97,15 @@ export function ModelCatalogFilters({
       <label className="block">
         <span className="mb-1.5 block text-[11px] tracking-[0.35px] text-black/55">Model</span>
         <select
-          value={selectedModelSlug ?? ""}
+          value={selectedModelSlug ?? visibleModels[0]?.slug ?? ""}
           onChange={(event) => navigate(selectedType, event.target.value || null)}
           className="h-9 w-full rounded-md border border-black/[0.1] bg-[#FCFCFA] px-3 text-xs text-black/80"
         >
-          <option value="">All models</option>
-          {(selectedType === "all" || selectedType === "image") && grouped.image.length > 0 ? (
-            <optgroup label="Image">
-              {grouped.image.map((item) => (
-                <option key={item.slug} value={item.slug}>
-                  {item.label}
-                </option>
-              ))}
-            </optgroup>
-          ) : null}
-          {(selectedType === "all" || selectedType === "video") && grouped.video.length > 0 ? (
-            <optgroup label="Video">
-              {grouped.video.map((item) => (
-                <option key={item.slug} value={item.slug}>
-                  {item.label}
-                </option>
-              ))}
-            </optgroup>
-          ) : null}
-          {(selectedType === "all" || selectedType === "text-coding") &&
-          grouped["text-coding"].length > 0 ? (
-            <optgroup label="Text / Coding">
-              {grouped["text-coding"].map((item) => (
-                <option key={item.slug} value={item.slug}>
-                  {item.label}
-                </option>
-              ))}
-            </optgroup>
-          ) : null}
+          {visibleModels.map((item) => (
+            <option key={item.slug} value={item.slug}>
+              {item.label}
+            </option>
+          ))}
         </select>
       </label>
     </div>
