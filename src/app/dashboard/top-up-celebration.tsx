@@ -49,15 +49,14 @@ export function TopUpCelebration() {
     );
     setVisible(true);
 
+    const hideTimer = window.setTimeout(() => setVisible(false), 4800);
     const cleanupTimer = window.setTimeout(() => {
       const nextParams = new URLSearchParams(searchParams.toString());
       nextParams.delete("celebrateTopup");
       nextParams.delete("topupAmount");
       const nextQuery = nextParams.toString();
       router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
-    }, 900);
-
-    const hideTimer = window.setTimeout(() => setVisible(false), 4800);
+    }, 5200);
 
     return () => {
       window.clearTimeout(cleanupTimer);

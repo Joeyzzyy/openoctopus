@@ -1008,18 +1008,8 @@ export default async function DashboardPage({
                                       : "pointer-events-none text-black/35 opacity-60"
                                   )}
                                 >
-                                  Download Invoice
+                                  Open Billing Document
                                 </a>
-                                {row.receiptUrl ? (
-                                  <a
-                                    href={row.receiptUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]"
-                                  >
-                                    Download Receipt
-                                  </a>
-                                ) : null}
                               </div>
                             </td>
                           </tr>
