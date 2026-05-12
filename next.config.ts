@@ -37,25 +37,16 @@ const nextConfig: NextConfig = {
           basePath: false,
         },
         {
-          source: "/ai-api-platforms",
-          destination: "https://openoctopus-seo.vercel.app/ai-api-platforms",
+          source: "/resource",
+          destination: "https://openoctopus-seo.vercel.app/resource",
           basePath: false,
         },
         {
-          source: "/ai-api-platforms/:path*",
-          destination: "https://openoctopus-seo.vercel.app/ai-api-platforms/:path*",
+          source: "/resource/:path*",
+          destination: "https://openoctopus-seo.vercel.app/resource/:path*",
           basePath: false,
-        },
-        {
-          source: "/topics",
-          destination: "https://openoctopus-seo.vercel.app/topics",
-          basePath: false,
-        },
-        {
-          source: "/topics/:path*",
-          destination: "https://openoctopus-seo.vercel.app/topics/:path*",
-          basePath: false,
-        },
+        }
+
       ],
     };
   },
