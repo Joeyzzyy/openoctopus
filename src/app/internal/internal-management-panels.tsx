@@ -898,64 +898,47 @@ export function PublicModelsPanel({
   return (
     <div className="space-y-4">
       {models.length > 0 ? (
-        <div className="overflow-x-auto rounded-2xl border border-black/[0.06] bg-white shadow-sm">
-          <table className="min-w-[2160px] border-separate border-spacing-0 text-left text-sm">
-            <thead>
-              <tr className="bg-[#FCFCFA] text-xs text-black/45">
-                <th className="min-w-[220px] border-b border-black/[0.06] px-3 py-2.5">可售模型Slug</th>
-                <th className="min-w-[140px] border-b border-black/[0.06] px-3 py-2.5">显示名称</th>
-                <th className="min-w-[120px] border-b border-black/[0.06] px-3 py-2.5">厂商</th>
-                <th className="min-w-[90px] border-b border-black/[0.06] px-3 py-2.5">模态</th>
-                <th className="min-w-[120px] border-b border-black/[0.06] px-3 py-2.5">能力类型</th>
-                <th className="min-w-[130px] border-b border-black/[0.06] px-3 py-2.5">添加时间</th>
-                <th className="min-w-[200px] border-b border-black/[0.06] px-3 py-2.5">计费摘要</th>
-                <th className="sticky right-0 z-10 min-w-[220px] border-b border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.16)]">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {models.map((model) => (
-                <Fragment key={model.id}>
-                  <tr>
-                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle font-mono text-xs text-black/72">{model.model_slug}</td>
-                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle text-sm font-medium text-black">{model.display_name}</td>
-                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle text-xs text-black/60">{model.provider}</td>
-                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle text-xs text-black/60">{modalityLabel(model.modality)}</td>
-                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle text-xs text-black/60">{model.capability ? capabilityLabel(model.capability) : "-"}</td>
-                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle text-xs text-black/60">{model.createdLabel}</td>
-                    <td className="border-b border-black/[0.05] px-3 py-3 align-middle text-xs text-black/60">{model.billingSummary}</td>
-                    <td className="sticky right-0 z-10 min-w-[220px] border-b border-black/[0.05] bg-white px-3 py-3 align-middle shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.16)]">
-                      <div className="flex flex-wrap items-center gap-2">
-                      <form action={updateSupportedModelState}>
-                        <input type="hidden" name="supportedModelId" value={model.id} />
-                        <input type="hidden" name="active" value={model.active ? "false" : "true"} />
-                        <button
-                          type="submit"
-                          className={`inline-flex h-7 min-w-[64px] items-center justify-center rounded-md border px-2 text-[11px] font-medium transition-colors ${
-                            model.active
-                              ? "border-[#9CC9A5] bg-[#EAF7ED] text-[#2F7A3E] hover:bg-[#def0e3]"
-                              : "border-black/[0.14] bg-[#F2F2F1] text-black/70 hover:bg-[#ebebea]"
-                          }`}
-                        >
-                          {model.active ? "停用" : "启用"}
-                        </button>
-                      </form>
-                      <ManagementDialog
-                        trigger={<ModalButton tone="secondary">编辑</ModalButton>}
-                        title={`编辑 ${model.display_name}`}
-                        description="在独立弹窗中编辑这个可售模型。"
+        <div className="space-y-4">
+          {models.map((model) => {
+            const mappings = providerModelsBySupportedModelId.get(model.id) ?? [];
+            return (
+              <section key={model.id} className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-mono text-xs text-black/55">{model.model_slug}</p>
+                    <h3 className="mt-1 text-base font-semibold text-black">{model.display_name}</h3>
+                    <p className="mt-1 text-xs text-black/55">
+                      {model.provider} · {modalityLabel(model.modality)} ·{" "}
+                      {model.capability ? capabilityLabel(model.capability) : "-"}
+                    </p>
+                    <p className="mt-1 text-xs text-black/45">添加时间：{model.createdLabel}</p>
+                    <p className="mt-2 text-xs text-black/65">{model.billingSummary}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <form action={updateSupportedModelState}>
+                      <input type="hidden" name="supportedModelId" value={model.id} />
+                      <input type="hidden" name="active" value={model.active ? "false" : "true"} />
+                      <button
+                        type="submit"
+                        className={`inline-flex h-7 min-w-[64px] items-center justify-center rounded-md border px-2 text-[11px] font-medium transition-colors ${
+                          model.active
+                            ? "border-[#9CC9A5] bg-[#EAF7ED] text-[#2F7A3E] hover:bg-[#def0e3]"
+                            : "border-black/[0.14] bg-[#F2F2F1] text-black/70 hover:bg-[#ebebea]"
+                        }`}
                       >
-                        {({ close }) => (
+                        {model.active ? "停用" : "启用"}
+                      </button>
+                    </form>
+                    <ManagementDialog
+                      trigger={<ModalButton tone="secondary">编辑</ModalButton>}
+                      title={`编辑 ${model.display_name}`}
+                      description="在独立弹窗中编辑这个可售模型。"
+                    >
+                      {({ close }) => (
                         <ManagedDialogForm action={updateSupportedModelDetails} close={close}>
                           <input type="hidden" name="supportedModelId" value={model.id} />
                           <input type="hidden" name="active" value="true" />
-                          <FormSelect
-                            label="模型厂商（内部分类）"
-                            name="provider"
-                            defaultValue={model.provider}
-                            options={vendorOptions}
-                          />
+                          <FormSelect label="模型厂商（内部分类）" name="provider" defaultValue={model.provider} options={vendorOptions} />
                           <FormField label="可售模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
                           <FormField label="显示名称" name="displayName" defaultValue={model.display_name} required />
                           <FormTextArea
@@ -975,137 +958,126 @@ export function PublicModelsPanel({
                               { value: "audio", label: "音频" },
                             ]}
                           />
-                          <FormSelect
-                            label="能力类型"
-                            name="capability"
-                            defaultValue={model.capability ?? "image_generation"}
-                            options={[...capabilityOptions]}
-                          />
+                          <FormSelect label="能力类型" name="capability" defaultValue={model.capability ?? "image_generation"} options={[...capabilityOptions]} />
                           <BillingConfigEditor initialValue={model.billingConfigText} />
                           <div className="flex justify-end">
                             <SubmitButton label="保存可售模型" />
                           </div>
                         </ManagedDialogForm>
-                        )}
-                      </ManagementDialog>
-                      <ManagementDialog
-                        trigger={<ModalButton tone="secondary">删除</ModalButton>}
-                        title={`删除 ${model.display_name}`}
-                        description="确认删除这个可售模型。"
-                      >
-                        {({ close }) => (
-                          <ManagedDialogForm action={deleteSupportedModel} close={close}>
-                            <input type="hidden" name="supportedModelId" value={model.id} />
-                            <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
-                              删除后不可恢复。若该模型仍有关联的供应商模型映射或路由配置，系统会阻止删除。
-                            </div>
-                            <div className="flex justify-end">
-                              <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
-                            </div>
-                          </ManagedDialogForm>
-                        )}
-                      </ManagementDialog>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td colSpan={8} className="border-b border-black/[0.05] bg-[#FAFAF9] px-3 py-2.5">
-                      {(() => {
-                        const mappings = providerModelsBySupportedModelId.get(model.id) ?? [];
-                        if (mappings.length === 0) {
-                          return <p className="text-xs text-black/45">供应商模型映射：暂无</p>;
-                        }
-                        return (
-                          <div className="overflow-x-auto rounded-md border border-black/[0.06] bg-white">
-                            <table className="min-w-[760px] w-full text-[11px]">
-                              <thead>
-                                <tr className="border-b border-black/[0.06] bg-[#FCFCFA] text-black/45">
-                                  <th className="px-2 py-1.5 text-left font-medium">供应商</th>
-                                  <th className="px-2 py-1.5 text-left font-medium">上游模型</th>
-                                  <th className="px-2 py-1.5 text-left font-medium">成本</th>
-                                  <th className="px-2 py-1.5 text-left font-medium">状态</th>
-                                  <th className="px-2 py-1.5 text-left font-medium">操作</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {mappings.map((mapping) => (
-                                  <tr key={mapping.id} className="border-b border-black/[0.05] last:border-b-0">
-                                    <td className="px-2 py-1.5 text-black/75">{mapping.providerName}</td>
-                                    <td className="px-2 py-1.5 font-mono text-black/70">{mapping.upstream_model_slug}</td>
-                                    <td className="px-2 py-1.5 text-black/70">{mapping.pricingSummary}</td>
-                                    <td className="px-2 py-1.5 text-black/60">{mapping.active ? "已启用" : "未启用"}</td>
-                                    <td className="px-2 py-1.5">
-                                      <div className="flex items-center gap-2">
-                                        <ManagementDialog
-                                          trigger={<ModalButton tone="secondary">编辑</ModalButton>}
-                                          title={`编辑映射 ${mapping.supportedModelName} / ${mapping.providerName}`}
-                                          description=" "
-                                        >
-                                          {({ close }) => (
-                                            <CreateProviderModelForm
-                                              action={updateProviderModelDetails}
-                                              providerModelId={mapping.id}
-                                              supportedModels={supportedModelOptions}
-                                              providers={providerOptions}
-                                              workerTemplates={workerTemplateOptions.map((item) => ({
-                                                id: item.slug,
-                                                displayName: item.displayName,
-                                                slug: item.slug,
-                                              }))}
-                                              executionConfigPresets={executionConfigPresets.filter(
-                                                (preset) => preset.id !== mapping.id
-                                              )}
-                                              defaultSupportedModelSlug={mapping.public_model_slug}
-                                              defaultProviderId={mapping.provider_id}
-                                              defaultUpstreamModelSlug={mapping.upstream_model_slug}
-                                              defaultPricing={mapping.pricingText}
-                                              defaultPricingSourceUrl={mapping.pricingSourceUrl ?? undefined}
-                                              defaultPricingSourceNote={mapping.pricingSourceNote ?? undefined}
-                                              defaultPricingSourceEvidence={JSON.stringify(mapping.pricingSourceEvidence)}
-                                              defaultInputSchema={mapping.inputSchemaText}
-                                              defaultOutputSchema={mapping.outputSchemaText}
-                                              defaultExecutionTemplate={mapping.executionTemplate}
-                                              defaultExecutionConfig={mapping.executionConfigText}
-                                              defaultActive={mapping.active}
-                                              submitLabel="保存供应商模型"
-                                              className="grid gap-4"
-                                              onSuccess={close}
-                                              disabled={false}
-                                            />
-                                          )}
-                                        </ManagementDialog>
-                                        <ManagementDialog
-                                          trigger={<ModalButton tone="secondary">删除</ModalButton>}
-                                          title={`删除映射 ${mapping.supportedModelName} / ${mapping.providerName}`}
-                                          description="确认删除该模型映射。删除后不可恢复。"
-                                        >
-                                          {({ close }) => (
-                                            <ManagedDialogForm action={deleteProviderModel} close={close}>
-                                              <input type="hidden" name="providerModelId" value={mapping.id} />
-                                              <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
-                                                删除后，该可售模型到供应商模型的映射将失效。若仍被路由引用会阻止删除。
-                                              </div>
-                                              <div className="flex justify-end">
-                                                <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
-                                              </div>
-                                            </ManagedDialogForm>
-                                          )}
-                                        </ManagementDialog>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                      )}
+                    </ManagementDialog>
+                    <ManagementDialog
+                      trigger={<ModalButton tone="secondary">删除</ModalButton>}
+                      title={`删除 ${model.display_name}`}
+                      description="确认删除这个可售模型。"
+                    >
+                      {({ close }) => (
+                        <ManagedDialogForm action={deleteSupportedModel} close={close}>
+                          <input type="hidden" name="supportedModelId" value={model.id} />
+                          <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
+                            删除后不可恢复。若该模型仍有关联的供应商模型映射或路由配置，系统会阻止删除。
                           </div>
-                        );
-                      })()}
-                    </td>
-                  </tr>
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
+                          <div className="flex justify-end">
+                            <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
+                          </div>
+                        </ManagedDialogForm>
+                      )}
+                    </ManagementDialog>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-lg border border-black/[0.06] bg-[#FAFAF9] p-3">
+                  <p className="mb-2 text-[11px] font-medium tracking-[0.25px] text-black/55">供应商供应模型列表</p>
+                  {mappings.length === 0 ? (
+                    <p className="text-xs text-black/45">暂无映射</p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-md border border-black/[0.06] bg-white">
+                      <table className="min-w-[760px] w-full text-[11px]">
+                        <thead>
+                          <tr className="border-b border-black/[0.06] bg-[#FCFCFA] text-black/45">
+                            <th className="px-2 py-1.5 text-left font-medium">供应商</th>
+                            <th className="px-2 py-1.5 text-left font-medium">上游模型</th>
+                            <th className="px-2 py-1.5 text-left font-medium">成本</th>
+                            <th className="px-2 py-1.5 text-left font-medium">状态</th>
+                            <th className="px-2 py-1.5 text-left font-medium">操作</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mappings.map((mapping) => (
+                            <tr key={mapping.id} className="border-b border-black/[0.05] last:border-b-0">
+                              <td className="px-2 py-1.5 text-black/75">{mapping.providerName}</td>
+                              <td className="px-2 py-1.5 font-mono text-black/70">{mapping.upstream_model_slug}</td>
+                              <td className="px-2 py-1.5 text-black/70">{mapping.pricingSummary}</td>
+                              <td className="px-2 py-1.5 text-black/60">{mapping.active ? "已启用" : "未启用"}</td>
+                              <td className="px-2 py-1.5">
+                                <div className="flex items-center gap-2">
+                                  <ManagementDialog
+                                    trigger={<ModalButton tone="secondary">编辑</ModalButton>}
+                                    title={`编辑映射 ${mapping.supportedModelName} / ${mapping.providerName}`}
+                                    description=" "
+                                  >
+                                    {({ close }) => (
+                                      <CreateProviderModelForm
+                                        action={updateProviderModelDetails}
+                                        providerModelId={mapping.id}
+                                        supportedModels={supportedModelOptions}
+                                        providers={providerOptions}
+                                        workerTemplates={workerTemplateOptions.map((item) => ({
+                                          id: item.slug,
+                                          displayName: item.displayName,
+                                          slug: item.slug,
+                                        }))}
+                                        executionConfigPresets={executionConfigPresets.filter(
+                                          (preset) => preset.id !== mapping.id
+                                        )}
+                                        defaultSupportedModelSlug={mapping.public_model_slug}
+                                        defaultProviderId={mapping.provider_id}
+                                        defaultUpstreamModelSlug={mapping.upstream_model_slug}
+                                        defaultPricing={mapping.pricingText}
+                                        defaultPricingSourceUrl={mapping.pricingSourceUrl ?? undefined}
+                                        defaultPricingSourceNote={mapping.pricingSourceNote ?? undefined}
+                                        defaultPricingSourceEvidence={JSON.stringify(mapping.pricingSourceEvidence)}
+                                        defaultInputSchema={mapping.inputSchemaText}
+                                        defaultOutputSchema={mapping.outputSchemaText}
+                                        defaultExecutionTemplate={mapping.executionTemplate}
+                                        defaultExecutionConfig={mapping.executionConfigText}
+                                        defaultActive={mapping.active}
+                                        submitLabel="保存供应商模型"
+                                        className="grid gap-4"
+                                        onSuccess={close}
+                                        disabled={false}
+                                      />
+                                    )}
+                                  </ManagementDialog>
+                                  <ManagementDialog
+                                    trigger={<ModalButton tone="secondary">删除</ModalButton>}
+                                    title={`删除映射 ${mapping.supportedModelName} / ${mapping.providerName}`}
+                                    description="确认删除该模型映射。删除后不可恢复。"
+                                  >
+                                    {({ close }) => (
+                                      <ManagedDialogForm action={deleteProviderModel} close={close}>
+                                        <input type="hidden" name="providerModelId" value={mapping.id} />
+                                        <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
+                                          删除后，该可售模型到供应商模型的映射将失效。若仍被路由引用会阻止删除。
+                                        </div>
+                                        <div className="flex justify-end">
+                                          <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
+                                        </div>
+                                      </ManagedDialogForm>
+                                    )}
+                                  </ManagementDialog>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </section>
+            );
+          })}
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
@@ -1753,9 +1725,9 @@ export function CreateProviderModelMappingButton({
 
   return (
     <ManagementDialog
-      trigger={<ModalButton>新建供应商模型映射</ModalButton>}
+      trigger={<ModalButton>新建供应商供应模型</ModalButton>}
       disabled={!hasProviders || !hasSupportedModels}
-      title="新建供应商模型映射"
+      title="新建供应商供应模型"
       description="先选择可售模型与供应商，再填写执行协议配置和成本配置。"
     >
       {({ close }) => (
