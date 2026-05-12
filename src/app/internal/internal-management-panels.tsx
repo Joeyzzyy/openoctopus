@@ -1242,123 +1242,133 @@ export function EconomicsPanel({
     });
 
   const filteredRows = rows;
+  const groupedByProvider = filteredRows.reduce(
+    (acc, row) => {
+      const providerKey = row.providerModel.provider_id;
+      const providerEntry = acc.get(providerKey) ?? {
+        providerName: row.providerName,
+        providerSlug: row.providerSlug,
+        vendors: new Map<string, typeof filteredRows>(),
+      };
+      const vendorRows = providerEntry.vendors.get(row.vendor) ?? [];
+      vendorRows.push(row);
+      providerEntry.vendors.set(row.vendor, vendorRows);
+      acc.set(providerKey, providerEntry);
+      return acc;
+    },
+    new Map<
+      string,
+      {
+        providerName: string;
+        providerSlug: string;
+        vendors: Map<string, typeof filteredRows>;
+      }
+    >()
+  );
 
   return (
     <div className="space-y-4">
       {rows.length > 0 ? (
         <>
-          <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
-            <table className="min-w-[2520px] border-separate border-spacing-0 text-left text-sm">
-              <thead>
-                <tr className="text-xs text-black/50">
-                  <th className="w-[230px] border-b border-black/[0.08] px-3 py-2.5">分类</th>
-                  <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
-                  <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">上游模型</th>
-                  <th className="w-[150px] border-b border-black/[0.08] px-3 py-2.5">能力</th>
-                  <th className="w-[230px] border-b border-black/[0.08] px-3 py-2.5">参数文档</th>
-                  <th className="w-[240px] border-b border-black/[0.08] px-3 py-2.5">售价</th>
-                  <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">成本</th>
-                  <th className="w-[140px] border-b border-black/[0.08] px-3 py-2.5">标准利润</th>
-                  <th className="w-[140px] border-b border-black/[0.08] px-3 py-2.5">来源证据</th>
-                  <th className="w-[120px] border-b border-black/[0.08] px-3 py-2.5">状态</th>
-                  <th className="sticky right-0 z-10 w-[180px] border-b border-black/[0.08] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
-                    操作
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.length > 0 ? (
-                  filteredRows.map((row, index) => {
-                    const prev = filteredRows[index - 1] ?? null;
-                    const providerChanged = !prev || prev.providerName !== row.providerName;
-                    const vendorChanged = providerChanged || prev.vendor !== row.vendor;
-
-                    return (
-                      <Fragment key={`row-group-${row.providerModel.id}`}>
-                        {providerChanged ? (
-                          <tr key={`provider-${row.providerModel.id}`}>
-                            <td colSpan={11} className="border-b border-black/[0.06] bg-[#F3F7FF] px-3 py-2.5 text-sm font-semibold text-[#355FB4]">
-                              供应商：{row.providerName} · {row.providerSlug}
-                            </td>
-                          </tr>
-                        ) : null}
-                        {vendorChanged ? (
-                          <tr key={`vendor-${row.providerModel.id}`}>
-                            <td colSpan={11} className="border-b border-black/[0.06] bg-[#FCFCFA] px-3 py-2 text-xs font-medium text-black/70">
-                              模型公司：{row.vendor}
-                            </td>
-                          </tr>
-                        ) : null}
-                        <tr key={row.providerModel.id}>
-                          <td className="w-[230px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/55">
-                            {row.providerName}
-                            <br />
-                            {row.vendor}
-                          </td>
-                          <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top">
-                            <p className="text-sm font-medium text-black">{row.supportedModel.display_name}</p>
-                            <p className="mt-1 text-xs text-black/50">{row.supportedModel.model_slug}</p>
-                          </td>
-                          <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top">
-                            <p className="text-sm text-black">{row.providerModel.upstream_model_slug}</p>
-                            <p className="mt-1 text-xs text-black/50">{row.providerModel.public_model_slug}</p>
-                          </td>
-                          <td className="w-[150px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{row.providerModel.capability}</td>
-                          <td className="w-[230px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
-                            <p>{summarizeInputSchema(row.providerModel.inputSchemaText)}</p>
-                            {readSchemaDocUrl(row.providerModel.inputSchemaText) ? (
-                              <a
-                                href={readSchemaDocUrl(row.providerModel.inputSchemaText) ?? ""}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="mt-1 inline-flex text-[11px] text-[#355FB4] underline-offset-2 hover:underline"
-                              >
-                                官方参数文档
-                              </a>
-                            ) : (
-                              <p className="mt-1 text-[11px] text-black/45">未填官方文档链接</p>
-                            )}
-                          </td>
-                          <td className="w-[240px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{row.supportedModel.billingSummary}</td>
-                          <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
-                            <p>{row.providerModel.pricingSummary}</p>
-                            {row.providerModel.pricingSourceUrl ? (
-                              <a
-                                href={row.providerModel.pricingSourceUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="mt-1 inline-flex text-[11px] text-[#355FB4] underline-offset-2 hover:underline"
-                              >
-                                官方价格链接
-                              </a>
-                            ) : null}
-                          </td>
-                          <td className="w-[140px] border-b border-black/[0.06] px-3 py-3 align-top">
-                            {row.margin === null ? (
-                              <p className="text-xs text-black/45">口径不一致</p>
-                            ) : (
-                              <p className={`text-sm font-medium ${row.margin >= 0 ? "text-[#335D2D]" : "text-[#b54432]"}`}>
-                                {formatCurrency(row.margin)}
-                              </p>
-                            )}
-                          </td>
-                          <td className="w-[140px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
-                            <p>截图：{row.providerModel.pricingSourceEvidence.length}</p>
-                            <p className="mt-1">备注：{row.providerModel.pricingSourceNote ? "有" : "无"}</p>
-                          </td>
-                          <td className="w-[120px] border-b border-black/[0.06] px-3 py-3 align-top">
-                            <span
-                              className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
-                                row.providerModel.active
-                                  ? "border-[#D7EADB] bg-[#EDF8F0] text-[#335D2D]"
-                                  : "border-black/[0.08] bg-[#FCFCFA] text-black/60"
-                              }`}
-                            >
-                              {row.providerModel.active ? "已启用" : "未启用"}
-                            </span>
-                          </td>
-                          <td className="sticky right-0 z-10 w-[180px] border-b border-black/[0.06] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
-                            <div className="flex flex-wrap gap-2">
+          <div className="space-y-4">
+            {Array.from(groupedByProvider.entries()).map(([providerId, providerGroup]) => (
+              <section key={providerId} className="rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+                <div className="border-b border-black/[0.08] bg-[#F3F7FF] px-4 py-3 text-sm font-semibold text-[#355FB4]">
+                  供应商：{providerGroup.providerName} · {providerGroup.providerSlug}
+                </div>
+                <div className="space-y-4 p-3">
+                  {Array.from(providerGroup.vendors.entries()).map(([vendor, vendorRows]) => (
+                    <div key={`${providerId}-${vendor}`} className="rounded-xl border border-black/[0.06]">
+                      <div className="border-b border-black/[0.06] bg-[#FCFCFA] px-3 py-2 text-xs font-medium text-black/70">
+                        模型公司：{vendor}
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-[1860px] border-separate border-spacing-0 text-left text-sm">
+                          <thead>
+                            <tr className="text-xs text-black/50">
+                              <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
+                              <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">上游模型</th>
+                              <th className="w-[140px] border-b border-black/[0.08] px-3 py-2.5">能力</th>
+                              <th className="w-[210px] border-b border-black/[0.08] px-3 py-2.5">参数文档</th>
+                              <th className="w-[240px] border-b border-black/[0.08] px-3 py-2.5">售价</th>
+                              <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">成本</th>
+                              <th className="w-[130px] border-b border-black/[0.08] px-3 py-2.5">标准利润</th>
+                              <th className="w-[130px] border-b border-black/[0.08] px-3 py-2.5">来源证据</th>
+                              <th className="w-[110px] border-b border-black/[0.08] px-3 py-2.5">状态</th>
+                              <th className="sticky right-0 z-10 w-[180px] border-b border-black/[0.08] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
+                                操作
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {vendorRows.map((row) => (
+                              <tr key={row.providerModel.id}>
+                                <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top">
+                                  <p className="text-sm font-medium text-black">{row.supportedModel.display_name}</p>
+                                  <p className="mt-1 text-xs text-black/50">{row.supportedModel.model_slug}</p>
+                                </td>
+                                <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top">
+                                  <p className="text-sm text-black">{row.providerModel.upstream_model_slug}</p>
+                                  <p className="mt-1 text-xs text-black/50">{row.providerModel.public_model_slug}</p>
+                                </td>
+                                <td className="w-[140px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                                  {row.providerModel.capability}
+                                </td>
+                                <td className="w-[210px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                                  <p>{summarizeInputSchema(row.providerModel.inputSchemaText)}</p>
+                                  {readSchemaDocUrl(row.providerModel.inputSchemaText) ? (
+                                    <a
+                                      href={readSchemaDocUrl(row.providerModel.inputSchemaText) ?? ""}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="mt-1 inline-flex text-[11px] text-[#355FB4] underline-offset-2 hover:underline"
+                                    >
+                                      官方参数文档
+                                    </a>
+                                  ) : (
+                                    <p className="mt-1 text-[11px] text-black/45">未填官方文档链接</p>
+                                  )}
+                                </td>
+                                <td className="w-[240px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{row.supportedModel.billingSummary}</td>
+                                <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                                  <p>{row.providerModel.pricingSummary}</p>
+                                  {row.providerModel.pricingSourceUrl ? (
+                                    <a
+                                      href={row.providerModel.pricingSourceUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="mt-1 inline-flex text-[11px] text-[#355FB4] underline-offset-2 hover:underline"
+                                    >
+                                      官方价格链接
+                                    </a>
+                                  ) : null}
+                                </td>
+                                <td className="w-[130px] border-b border-black/[0.06] px-3 py-3 align-top">
+                                  {row.margin === null ? (
+                                    <p className="text-xs text-black/45">口径不一致</p>
+                                  ) : (
+                                    <p className={`text-sm font-medium ${row.margin >= 0 ? "text-[#335D2D]" : "text-[#b54432]"}`}>
+                                      {formatCurrency(row.margin)}
+                                    </p>
+                                  )}
+                                </td>
+                                <td className="w-[130px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                                  <p>截图：{row.providerModel.pricingSourceEvidence.length}</p>
+                                  <p className="mt-1">备注：{row.providerModel.pricingSourceNote ? "有" : "无"}</p>
+                                </td>
+                                <td className="w-[110px] border-b border-black/[0.06] px-3 py-3 align-top">
+                                  <span
+                                    className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
+                                      row.providerModel.active
+                                        ? "border-[#D7EADB] bg-[#EDF8F0] text-[#335D2D]"
+                                        : "border-black/[0.08] bg-[#FCFCFA] text-black/60"
+                                    }`}
+                                  >
+                                    {row.providerModel.active ? "已启用" : "未启用"}
+                                  </span>
+                                </td>
+                                <td className="sticky right-0 z-10 w-[180px] border-b border-black/[0.06] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
+                                  <div className="flex flex-wrap gap-2">
                               <ManagementDialog
                                 trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                                 title={`编辑 ${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
@@ -1412,21 +1422,18 @@ export function EconomicsPanel({
                                   </ManagedDialogForm>
                                 )}
                               </ManagementDialog>
-                            </div>
-                          </td>
-                        </tr>
-                      </Fragment>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={11} className="px-3 py-8 text-center text-sm text-black/55">
-                      当前筛选条件下没有结果。
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         </>
       ) : (
