@@ -199,12 +199,6 @@ export default function DocsPage() {
         description="OpenOctopus provides a unified API for image and video generation. Use one API key, one base URL, and public model slugs routed by the platform."
         primaryAction={{ href: "/login", label: "Get API Key" }}
         secondaryAction={{ href: "/pricing", label: "View pricing" }}
-        stats={[
-          { label: "Auth", value: "Bearer" },
-          { label: "Flow", value: "Async" },
-          { label: "Base URL", value: "1" },
-          { label: "Surface", value: "Unified" },
-        ]}
       />
 
       <div className="px-6 pb-14 md:px-8 md:pb-20">
