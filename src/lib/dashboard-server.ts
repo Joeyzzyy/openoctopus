@@ -126,6 +126,7 @@ export type DashboardData = {
   modelCatalogRows: Array<{
     id: string;
     publicModel: string;
+    displayName: string;
     providerName: string;
     providerKind: string;
     upstreamModelSlug: string;
@@ -133,6 +134,9 @@ export type DashboardData = {
     strategy: string;
     primary: string;
     fallback: string;
+    inputSchemaText: string;
+    outputSchemaText: string;
+    officialDocUrl: string | null;
   }>;
   requestFilters: {
     apiKeys: Array<{
@@ -516,7 +520,7 @@ export async function getDashboardData({
       supabaseAdmin.from("providers").select("id, name, regions, status"),
       supabaseAdmin
         .from("provider_models")
-        .select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id, capability, active"),
+        .select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id, capability, active, input_schema, output_schema"),
       supabaseAdmin
         .from("supported_models")
         .select("id, model_slug, display_name, capability, active"),
@@ -702,6 +706,7 @@ export async function getDashboardData({
         return {
           id: `${model.id}-${index}`,
           publicModel: model.model_slug,
+          displayName: model.display_name ?? model.model_slug,
           providerName: route
             ? route.providerName
             : primaryProvider?.name ?? "Unassigned",
@@ -724,6 +729,15 @@ export async function getDashboardData({
                   .join(" | ")
               : "unassigned",
           fallback: route ? route.fallback : "manual failover only",
+          inputSchemaText: JSON.stringify(primaryProviderModel?.input_schema ?? {}, null, 2),
+          outputSchemaText: JSON.stringify(primaryProviderModel?.output_schema ?? {}, null, 2),
+          officialDocUrl:
+            typeof primaryProviderModel?.input_schema === "object" &&
+            primaryProviderModel?.input_schema !== null &&
+            !Array.isArray(primaryProviderModel?.input_schema) &&
+            typeof (primaryProviderModel.input_schema as Record<string, unknown>).officialDocUrl === "string"
+              ? ((primaryProviderModel.input_schema as Record<string, unknown>).officialDocUrl as string)
+              : null,
         };
       });
 

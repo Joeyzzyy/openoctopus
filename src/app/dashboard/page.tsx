@@ -26,8 +26,7 @@ type DashboardView =
   | "dashboard"
   | "request-details"
   | "models"
-  | "api-keys"
-  | "api-calling-doc";
+  | "api-keys";
 type RequestInterval = "minute" | "hour" | "day";
 type RequestRange = "60m" | "6h" | "24h" | "7d" | "30d" | "90d";
 type ModelType = "all" | "image" | "video" | "text-coding";
@@ -35,8 +34,7 @@ type BillingFlow = "incoming" | "outgoing";
 const pageNav = [
   { label: "Top-up Balance", view: "dashboard" },
   { label: "API Keys", view: "api-keys" },
-  { label: "API Calling Doc", view: "api-calling-doc" },
-  { label: "Models", view: "models" },
+  { label: "Models & API Doc", view: "models" },
   { label: "Request Details", view: "request-details" },
 ] as const;
 
@@ -1132,6 +1130,9 @@ export default async function DashboardPage({
                     </Link>
                   ))}
                 </div>
+                <div className="mb-4">
+                  <ApiQuickstartCard models={modelCatalogRowsFiltered} />
+                </div>
                 <ModelCatalogTable rows={modelCatalogRowsFiltered} />
               </section>
             ) : null}
@@ -1163,11 +1164,6 @@ export default async function DashboardPage({
               </>
             ) : null}
 
-            {view === "api-calling-doc" ? (
-              <section className="p-0">
-                <ApiQuickstartCard />
-              </section>
-            ) : null}
           </section>
         </div>
       </div>
