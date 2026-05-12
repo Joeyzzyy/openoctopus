@@ -578,7 +578,7 @@ export default async function DashboardPage({
             ) : null}
 
             {view === "request-details" ? (
-              <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+              <section className="p-0">
                   <div className="mb-4 flex flex-col gap-3">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
@@ -908,7 +908,7 @@ export default async function DashboardPage({
             ) : null}
 
             {view === "dashboard" ? (
-              <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm sm:p-5">
+              <section className="p-0">
                 <div className="mb-4">
                   <h2 className="text-xl font-semibold text-black">Billing details</h2>
                   <p className="mt-1 text-sm text-black/55">
@@ -1108,7 +1108,7 @@ export default async function DashboardPage({
             ) : null}
 
             {view === "models" ? (
-              <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm sm:p-5">
+              <section className="p-0">
                 <div className="mb-4 flex flex-wrap items-center gap-2">
                   {modelTypeOptions.map((item) => (
                     <Link
@@ -1138,7 +1138,7 @@ export default async function DashboardPage({
 
             {view === "api-keys" ? (
               <>
-                <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm sm:p-5">
+                <section className="p-0">
                   <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <h2 className="text-xl font-semibold text-black">API Keys</h2>
@@ -1164,7 +1164,7 @@ export default async function DashboardPage({
             ) : null}
 
             {view === "api-calling-doc" ? (
-              <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm sm:p-5">
+              <section className="p-0">
                 <ApiQuickstartCard />
               </section>
             ) : null}
