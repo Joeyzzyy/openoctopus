@@ -52,6 +52,102 @@ type QueueName = "inference_jobs" | "inference_polling";
 const POLLING_RECOVERY_STALE_SECONDS = 120;
 const POLLING_TIMEOUT_SECONDS = 20 * 60;
 const POLLING_RECOVERY_BATCH_SIZE = 20;
+const FEISHU_ERROR_WEBHOOK_URL = process.env.FEISHU_BOT_WEBHOOK_URL?.trim() ?? "";
+
+function formatShanghaiTimestamp(value: Date | string | null | undefined) {
+  if (!value) {
+    return "n/a";
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return (
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(date) + " UTC+8"
+  );
+}
+
+async function sendFeishuFailureAlert(input: {
+  phase: "submit" | "poll" | "timeout" | "system";
+  requestId: string;
+  workspaceId: string;
+  apiKeyId: string | null;
+  capability: string;
+  publicModelSlug: string;
+  providerSlug: string;
+  upstreamModelSlug: string;
+  endpoint: string;
+  errorCode: string;
+  errorMessage: string;
+  occurredAt?: Date;
+}) {
+  if (!FEISHU_ERROR_WEBHOOK_URL) {
+    return;
+  }
+
+  const [workspaceResp, apiKeyResp] = await Promise.all([
+    supabaseAdmin
+      .from("workspaces")
+      .select("name, slug")
+      .eq("id", input.workspaceId)
+      .maybeSingle(),
+    input.apiKeyId
+      ? supabaseAdmin
+          .from("api_keys")
+          .select("name, key_prefix")
+          .eq("id", input.apiKeyId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+
+  const workspaceName = workspaceResp.data?.name ?? "Unknown workspace";
+  const workspaceSlug = workspaceResp.data?.slug ?? "unknown-workspace";
+  const apiKeyName = apiKeyResp.data?.name ?? "unknown-key";
+  const apiKeyPrefix = apiKeyResp.data?.key_prefix ?? "n/a";
+
+  const lines = [
+    "\u26a0\ufe0f OpenOctopus Request Failed",
+    `Time: ${formatShanghaiTimestamp(input.occurredAt ?? new Date())}`,
+    `Phase: ${input.phase}`,
+    `Request ID: ${input.requestId}`,
+    `Workspace: ${workspaceName} (${workspaceSlug})`,
+    `API Key: ${apiKeyName} (${apiKeyPrefix})`,
+    `Capability: ${input.capability}`,
+    `Public Model: ${input.publicModelSlug}`,
+    `Upstream: ${input.providerSlug} / ${input.upstreamModelSlug}`,
+    `Endpoint: ${input.endpoint}`,
+    `Error Code: ${input.errorCode}`,
+    "Raw Error:",
+    input.errorMessage,
+  ];
+
+  try {
+    await fetch(FEISHU_ERROR_WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        msg_type: "text",
+        content: {
+          text: lines.join("\n"),
+        },
+      }),
+    });
+  } catch {
+    // keep worker path non-blocking on alert delivery failures
+  }
+}
 
 async function resolveProviderAdapterSlug(slug: string) {
   const { data, error } = await supabaseAdmin
@@ -345,7 +441,11 @@ async function failRequestAndDeleteQueueMessage(input: {
   errorCode: string;
   errorMessage: string;
   startedAt?: Date;
+  capability?: string;
+  providerSlug?: string;
+  upstreamModelSlug?: string;
 }) {
+  const completedAt = new Date();
   await supabaseAdmin
     .from("inference_requests")
     .update({
@@ -357,7 +457,7 @@ async function failRequestAndDeleteQueueMessage(input: {
       actual_provider_cost: 0,
       actual_profit: 0,
       ...(input.startedAt ? { started_at: input.startedAt.toISOString() } : {}),
-      completed_at: new Date().toISOString(),
+      completed_at: completedAt.toISOString(),
     })
     .eq("id", input.requestId);
 
@@ -381,6 +481,21 @@ async function failRequestAndDeleteQueueMessage(input: {
     // Old queued messages can reference API keys that were later deleted.
     // Do not let settlement backfill failures keep unrecoverable jobs alive.
   }
+
+  await sendFeishuFailureAlert({
+    phase: "system",
+    requestId: input.requestId,
+    workspaceId: input.workspaceId,
+    apiKeyId: input.apiKeyId,
+    capability: input.capability ?? "unknown",
+    publicModelSlug: input.publicModelSlug,
+    providerSlug: input.providerSlug ?? "unknown-provider",
+    upstreamModelSlug: input.upstreamModelSlug ?? "unknown-upstream-model",
+    endpoint: input.endpoint,
+    errorCode: input.errorCode,
+    errorMessage: input.errorMessage,
+    occurredAt: completedAt,
+  });
 
   await deleteQueueMessage({
     queueName: input.queueName,
@@ -445,6 +560,9 @@ export async function processNextInferenceJob() {
       errorCode: "provider_credential_unavailable",
       errorMessage: "Provider credential secret is missing or not managed internally",
       startedAt: new Date(),
+      capability: message.capability,
+      providerSlug: message.providerSlug,
+      upstreamModelSlug: message.upstreamModelSlug,
     });
 
     return true;
@@ -471,6 +589,9 @@ export async function processNextInferenceJob() {
       errorCode: "provider_credential_decrypt_failed",
       errorMessage,
       startedAt: new Date(),
+      capability: message.capability,
+      providerSlug: message.providerSlug,
+      upstreamModelSlug: message.upstreamModelSlug,
     });
     return true;
   }
@@ -589,6 +710,7 @@ export async function processNextInferenceJob() {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown provider submit error";
+    const completedAt = new Date();
 
     await supabaseAdmin
       .from("inference_requests")
@@ -597,7 +719,7 @@ export async function processNextInferenceJob() {
         error_code: "provider_submit_failed",
         error_message: errorMessage,
         started_at: new Date(attemptStartedAt).toISOString(),
-        completed_at: new Date().toISOString(),
+        completed_at: completedAt.toISOString(),
       })
       .eq("id", message.requestId);
 
@@ -625,6 +747,21 @@ export async function processNextInferenceJob() {
         providerCost: 0,
         profit: 0,
       }),
+    });
+
+    await sendFeishuFailureAlert({
+      phase: "submit",
+      requestId: message.requestId,
+      workspaceId: message.workspaceId,
+      apiKeyId: message.apiKeyId,
+      capability: message.capability,
+      publicModelSlug: message.publicModelSlug,
+      providerSlug: message.providerSlug,
+      upstreamModelSlug: message.upstreamModelSlug,
+      endpoint: message.endpoint,
+      errorCode: "provider_submit_failed",
+      errorMessage,
+      occurredAt: completedAt,
     });
 
     await deleteQueueMessage({
@@ -837,6 +974,9 @@ export async function processNextPollingJob() {
       endpoint: message.endpoint,
       errorCode: "provider_credential_unavailable",
       errorMessage: "Provider credential secret is missing or not managed internally",
+      capability: message.capability,
+      providerSlug: message.providerSlug,
+      upstreamModelSlug: message.upstreamModelSlug,
     });
 
     return true;
@@ -862,6 +1002,9 @@ export async function processNextPollingJob() {
       endpoint: message.endpoint,
       errorCode: "provider_credential_decrypt_failed",
       errorMessage,
+      capability: message.capability,
+      providerSlug: message.providerSlug,
+      upstreamModelSlug: message.upstreamModelSlug,
     });
     return true;
   }
@@ -888,6 +1031,7 @@ export async function processNextPollingJob() {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown provider poll error";
+    const completedAt = new Date();
 
     await supabaseAdmin
       .from("inference_requests")
@@ -895,7 +1039,7 @@ export async function processNextPollingJob() {
         status: "failed",
         error_code: "provider_poll_failed",
         error_message: errorMessage,
-        completed_at: new Date().toISOString(),
+        completed_at: completedAt.toISOString(),
       })
       .eq("id", message.requestId);
 
@@ -922,6 +1066,21 @@ export async function processNextPollingJob() {
         providerCost: 0,
         profit: 0,
       }),
+    });
+
+    await sendFeishuFailureAlert({
+      phase: "poll",
+      requestId: message.requestId,
+      workspaceId: message.workspaceId,
+      apiKeyId: message.apiKeyId,
+      capability: message.capability,
+      publicModelSlug: message.publicModelSlug,
+      providerSlug: message.providerSlug,
+      upstreamModelSlug: message.upstreamModelSlug,
+      endpoint: message.endpoint,
+      errorCode: "provider_poll_failed",
+      errorMessage,
+      occurredAt: completedAt,
     });
 
     await deleteQueueMessage({
@@ -1040,6 +1199,7 @@ export async function processNextPollingJob() {
       }),
     });
   } else {
+    const completedAt = new Date();
     await supabaseAdmin
       .from("inference_requests")
       .update({
@@ -1050,7 +1210,7 @@ export async function processNextPollingJob() {
         actual_customer_charge: 0,
         actual_provider_cost: 0,
         actual_profit: 0,
-        completed_at: new Date().toISOString(),
+        completed_at: completedAt.toISOString(),
       })
       .eq("id", message.requestId);
 
@@ -1078,6 +1238,21 @@ export async function processNextPollingJob() {
         providerCost: 0,
         profit: 0,
       }),
+    });
+
+    await sendFeishuFailureAlert({
+      phase: "poll",
+      requestId: message.requestId,
+      workspaceId: message.workspaceId,
+      apiKeyId: message.apiKeyId,
+      capability: message.capability,
+      publicModelSlug: message.publicModelSlug,
+      providerSlug: message.providerSlug,
+      upstreamModelSlug: message.upstreamModelSlug,
+      endpoint: message.endpoint,
+      errorCode: result.errorCode,
+      errorMessage: result.errorMessage,
+      occurredAt: completedAt,
     });
   }
 
@@ -1136,6 +1311,7 @@ async function markProcessingRequestTimeout(input: {
   publicModelSlug: string;
   endpoint: string;
 }) {
+  const completedAt = new Date();
   await supabaseAdmin
     .from("inference_requests")
     .update({
@@ -1146,7 +1322,7 @@ async function markProcessingRequestTimeout(input: {
       actual_customer_charge: 0,
       actual_provider_cost: 0,
       actual_profit: 0,
-      completed_at: new Date().toISOString(),
+      completed_at: completedAt.toISOString(),
     })
     .eq("id", input.requestId)
     .eq("status", "processing");
@@ -1175,6 +1351,21 @@ async function markProcessingRequestTimeout(input: {
       providerCost: 0,
       profit: 0,
     }),
+  });
+
+  await sendFeishuFailureAlert({
+    phase: "timeout",
+    requestId: input.requestId,
+    workspaceId: input.workspaceId,
+    apiKeyId: input.apiKeyId,
+    capability: "unknown",
+    publicModelSlug: input.publicModelSlug,
+    providerSlug: "unknown-provider",
+    upstreamModelSlug: "unknown-upstream-model",
+    endpoint: input.endpoint,
+    errorCode: "upstream_timeout",
+    errorMessage: "Upstream task timed out during polling.",
+    occurredAt: completedAt,
   });
 }
 
