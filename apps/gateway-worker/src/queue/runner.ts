@@ -95,6 +95,36 @@ async function sendFeishuFailureAlert(input: {
     return;
   }
 
+  const normalizeReason = () => {
+    const lower = input.errorMessage.toLowerCase();
+    if (
+      lower.includes("429") ||
+      lower.includes("quota") ||
+      lower.includes("rate limit") ||
+      lower.includes("too many requests") ||
+      lower.includes("engineoverloaded")
+    ) {
+      return "Upstream provider is throttling or overloaded. Retry later.";
+    }
+    if (lower.includes("timed out") || lower.includes("timeout")) {
+      return "Upstream request timed out.";
+    }
+    if (input.errorCode === "provider_credential_unavailable") {
+      return "Provider credential is unavailable.";
+    }
+    if (input.errorCode === "provider_credential_decrypt_failed") {
+      return "Provider credential decrypt failed.";
+    }
+    return "Upstream request failed.";
+  };
+
+  const compactRawError = input.errorMessage
+    .replace(/\s+/g, " ")
+    .replace(/body=\{[\s\S]*$/i, "body=<omitted>")
+    .trim();
+  const rawPreview =
+    compactRawError.length > 420 ? `${compactRawError.slice(0, 420)}...` : compactRawError;
+
   const [workspaceResp, apiKeyResp] = await Promise.all([
     supabaseAdmin
       .from("workspaces")
@@ -117,8 +147,10 @@ async function sendFeishuFailureAlert(input: {
 
   const lines = [
     "\u26a0\ufe0f OpenOctopus Request Failed",
+    `Reason: ${normalizeReason()}`,
     `Time: ${formatShanghaiTimestamp(input.occurredAt ?? new Date())}`,
     `Phase: ${input.phase}`,
+    `Code: ${input.errorCode}`,
     `Request ID: ${input.requestId}`,
     `Workspace: ${workspaceName} (${workspaceSlug})`,
     `API Key: ${apiKeyName} (${apiKeyPrefix})`,
@@ -126,9 +158,7 @@ async function sendFeishuFailureAlert(input: {
     `Public Model: ${input.publicModelSlug}`,
     `Upstream: ${input.providerSlug} / ${input.upstreamModelSlug}`,
     `Endpoint: ${input.endpoint}`,
-    `Error Code: ${input.errorCode}`,
-    "Raw Error:",
-    input.errorMessage,
+    `Raw: ${rawPreview}`,
   ];
 
   try {
