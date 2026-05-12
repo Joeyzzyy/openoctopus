@@ -216,14 +216,6 @@ export default function DocsPage() {
                 On This Page
               </p>
               <DocsTocNav sections={sidebarSections} />
-              <div className="mt-5 rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
-                <p className="text-[10px] uppercase tracking-[1px] text-black/45">
-                  Base URL
-                </p>
-                <code className="mt-2 block break-all text-[11px] leading-5 text-black/72">
-                  {PUBLIC_API_BASE_URL}
-                </code>
-              </div>
               </div>
             </SurfaceCard>
           </aside>
