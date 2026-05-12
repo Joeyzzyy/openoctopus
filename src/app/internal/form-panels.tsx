@@ -263,9 +263,6 @@ function SchemaFieldEditor({
       </label>
 
       <div className="space-y-2">
-        {rows.length === 0 ? (
-          <p className="text-xs text-black/50">No fields yet. Add field rows below.</p>
-        ) : null}
         {rows.map((row) => (
           <div key={row.id} className="grid gap-2 rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-2 md:grid-cols-12">
             <input
@@ -348,11 +345,11 @@ function SchemaFieldEditor({
         >
           Add Field
         </button>
-        <span className="text-[11px] text-black/45">Saved as JSON automatically</span>
+        <span className="text-[11px] text-black/45">{rows.length} field(s)</span>
       </div>
 
       <details className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2">
-        <summary className="cursor-pointer text-[11px] text-black/60">Preview JSON</summary>
+        <summary className="cursor-pointer text-[11px] text-black/60">JSON Preview</summary>
         <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[11px] text-black/70">
           {schemaValue}
         </pre>
@@ -810,6 +807,7 @@ export function CreateProviderModelForm({
   className?: string;
 }) {
   type ProviderModelFormTab = "basic" | "protocol" | "params" | "cost";
+  type SchemaEditorTab = "input" | "output";
   const fallbackSupportedModelId = supportedModels[0]?.id ?? "";
   const templateSupportedModelId =
     supportedModels.find((item) => item.modelSlug === defaultSupportedModelSlug)?.id ??
@@ -837,6 +835,7 @@ export function CreateProviderModelForm({
     executionTemplate === "rest-async-poll-v1" || executionTemplate === "upload-async-poll-v1";
   const isAsyncMode = executionConfigState.mode === "async" || (executionConfigState.mode === "auto" && templateIsAsync);
   const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("basic");
+  const [schemaEditorTab, setSchemaEditorTab] = useState<SchemaEditorTab>("input");
 
   useEffect(() => {
     setExecutionTemplate(defaultExecutionTemplate);
@@ -1321,31 +1320,51 @@ export function CreateProviderModelForm({
         </div>
 
         <div className={activeTab === "params" ? "contents" : "hidden"}>
-          <label className="block md:col-span-2">
-            <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
-              上游官方输入参数说明
-            </span>
-            <SchemaFieldEditor
-              name="inputSchema"
-              keyName="params"
-              defaultSchemaText={defaultInputSchema}
-              includeRequired
-              disabled={disabled}
-            />
-          </label>
-
-          <label className="block md:col-span-2">
-            <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
-              上游官方输出参数说明
-            </span>
-            <SchemaFieldEditor
-              name="outputSchema"
-              keyName="fields"
-              defaultSchemaText={defaultOutputSchema}
-              includeRequired={false}
-              disabled={disabled}
-            />
-          </label>
+          <div className="block md:col-span-2">
+            <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上游参数文档配置</span>
+            <div className="mb-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSchemaEditorTab("input")}
+                className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                  schemaEditorTab === "input"
+                    ? "border-black bg-black text-white"
+                    : "border-black/[0.12] bg-white text-black/70 hover:bg-black/[0.03]"
+                }`}
+              >
+                Input Params
+              </button>
+              <button
+                type="button"
+                onClick={() => setSchemaEditorTab("output")}
+                className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                  schemaEditorTab === "output"
+                    ? "border-black bg-black text-white"
+                    : "border-black/[0.12] bg-white text-black/70 hover:bg-black/[0.03]"
+                }`}
+              >
+                Output Params
+              </button>
+            </div>
+            <div className={schemaEditorTab === "input" ? "block" : "hidden"}>
+              <SchemaFieldEditor
+                name="inputSchema"
+                keyName="params"
+                defaultSchemaText={defaultInputSchema}
+                includeRequired
+                disabled={disabled}
+              />
+            </div>
+            <div className={schemaEditorTab === "output" ? "block" : "hidden"}>
+              <SchemaFieldEditor
+                name="outputSchema"
+                keyName="fields"
+                defaultSchemaText={defaultOutputSchema}
+                includeRequired={false}
+                disabled={disabled}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
