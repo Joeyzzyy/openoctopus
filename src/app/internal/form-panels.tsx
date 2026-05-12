@@ -1323,7 +1323,7 @@ export function CreateProviderModelForm({
         <div className={activeTab === "params" ? "contents" : "hidden"}>
           <label className="block md:col-span-2">
             <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
-              上游官方输入参数说明（JSON）
+              上游官方输入参数说明
             </span>
             <SchemaFieldEditor
               name="inputSchema"
@@ -1332,12 +1332,11 @@ export function CreateProviderModelForm({
               includeRequired
               disabled={disabled}
             />
-            <FieldHint help="在可视化表格里逐项录入入参字段：name/type/required/description/example/exposedToCustomer。" />
           </label>
 
           <label className="block md:col-span-2">
             <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
-              上游官方输出参数说明（JSON）
+              上游官方输出参数说明
             </span>
             <SchemaFieldEditor
               name="outputSchema"
@@ -1346,7 +1345,6 @@ export function CreateProviderModelForm({
               includeRequired={false}
               disabled={disabled}
             />
-            <FieldHint help="在可视化表格里逐项录入出参字段：name/type/description/example/exposedToCustomer。" />
           </label>
         </div>
       </div>
