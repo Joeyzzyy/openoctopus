@@ -284,11 +284,13 @@ function formatRelativeTimestamp(value: string | null) {
   }
 
   return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Shanghai",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  }).format(date);
+    hour12: true,
+  }).format(date) + " CST";
 }
 
 function formatCurrency(value: number | null | undefined) {
