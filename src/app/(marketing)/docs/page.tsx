@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PageHero, SurfaceCard } from "@/components/marketing/page-primitives";
 import { DocsTocNav } from "./docs-toc-nav";
 import {
@@ -152,7 +151,7 @@ export const metadata = {
 
 function CodeBlock({ code }: { code: string }) {
   return (
-    <pre className="mt-4 overflow-x-auto rounded-xl border border-[#2A2623] bg-[#171412] p-4 text-xs leading-6 text-[#F8F3E8] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+    <pre className="mt-2 overflow-x-auto rounded-lg border border-[#2A2623] bg-[#171412] p-3 text-[11px] leading-5 text-[#F8F3E8]">
       <code>{code}</code>
     </pre>
   );
@@ -174,18 +173,18 @@ function DocsSection({
   return (
     <section
       id={id}
-      className="scroll-mt-28 rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm ring-1 ring-black/[0.02] md:p-6"
+      className="scroll-mt-28 rounded-xl border border-black/[0.08] bg-white p-4 shadow-sm"
     >
       <p className="text-[10px] font-semibold uppercase tracking-[1.2px] text-black/42">
         {eyebrow}
       </p>
-      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-black md:text-[30px]">
+      <h2 className="mt-1 text-lg font-semibold tracking-tight text-black">
         {title}
       </h2>
-      <p className="mt-3 max-w-3xl text-sm leading-7 text-black/60">
+      <p className="mt-2 max-w-4xl text-sm leading-6 text-black/60">
         {description}
       </p>
-      <div className="mt-6">{children}</div>
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
@@ -227,29 +226,27 @@ export default function DocsPage() {
               title="Base URL and API key"
               description="All requests use the same base URL and a standard bearer token in the Authorization header."
             >
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">
-                    Base URL
-                  </p>
-                  <code className="mt-2 block break-all rounded bg-white px-2 py-2 text-[12px] leading-6 text-black/75">
-                    {PUBLIC_API_BASE_URL}
-                  </code>
-                </div>
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">
-                    Header
-                  </p>
-                  <code className="mt-2 block break-all rounded bg-white px-2 py-2 text-[12px] leading-6 text-black/75">
-                    Authorization: Bearer ooq_your_api_key
-                  </code>
-                </div>
+              <div className="overflow-auto rounded-lg border border-black/[0.08]">
+                <table className="w-full min-w-[640px] text-sm">
+                  <tbody>
+                    <tr className="border-b border-black/[0.08]">
+                      <td className="w-40 bg-[#FAFAF8] px-3 py-2.5 text-xs font-medium text-black/55">Base URL</td>
+                      <td className="px-3 py-2.5 font-mono text-[12px] text-black/75">{PUBLIC_API_BASE_URL}</td>
+                    </tr>
+                    <tr>
+                      <td className="w-40 bg-[#FAFAF8] px-3 py-2.5 text-xs font-medium text-black/55">Header</td>
+                      <td className="px-3 py-2.5 font-mono text-[12px] text-black/75">
+                        Authorization: Bearer ooq_your_api_key
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <div className="mt-4 rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4 text-sm leading-7 text-black/60">
+              <p className="mt-3 text-sm leading-6 text-black/60">
                 Create API keys from the dashboard after signing in. Save the
                 full key when it is created because the full value is only shown
                 once.
-              </div>
+              </p>
             </DocsSection>
 
             <DocsSection
@@ -258,26 +255,26 @@ export default function DocsPage() {
               title="From account to first request"
               description="This is the shortest path from a new account to a working API call."
             >
-              <div className="grid gap-3">
+              <ol className="space-y-2">
                 {quickstartSteps.map((step, index) => (
-                  <div
+                  <li
                     key={step.title}
-                    className="grid gap-3 rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-4 md:grid-cols-[40px_minmax(0,1fr)]"
+                    className="grid grid-cols-[28px_minmax(0,1fr)] gap-3 border-b border-black/[0.08] py-2 last:border-b-0"
                   >
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white text-sm font-semibold text-black">
+                    <div className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-black/[0.1] text-xs font-semibold text-black">
                       {index + 1}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-black">
                         {step.title}
                       </p>
-                      <p className="mt-2 text-sm leading-6 text-black/58">
+                      <p className="mt-1 text-sm leading-6 text-black/58">
                         {step.detail}
                       </p>
                     </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ol>
             </DocsSection>
 
             <DocsSection
@@ -286,27 +283,25 @@ export default function DocsPage() {
               title="Public API surface"
               description="These are the customer-facing endpoints currently reflected by the app and gateway worker."
             >
-              <div className="grid gap-3">
-                {endpoints.map((endpoint) => (
-                  <div
-                    key={`${endpoint.method}-${endpoint.path}`}
-                    className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4 transition-colors hover:bg-white"
-                  >
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="inline-flex rounded-md bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[1px] text-black/52">
-                          {endpoint.method}
-                        </p>
-                        <p className="mt-1 break-all text-sm font-medium text-black">
-                          {endpoint.path}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-black/58">
-                      {endpoint.detail}
-                    </p>
-                  </div>
-                ))}
+              <div className="overflow-auto rounded-lg border border-black/[0.08]">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead>
+                    <tr className="border-b border-black/[0.08] bg-[#FAFAF8] text-left">
+                      <th className="px-3 py-2 text-[11px] font-medium text-black/55">Method</th>
+                      <th className="px-3 py-2 text-[11px] font-medium text-black/55">Path</th>
+                      <th className="px-3 py-2 text-[11px] font-medium text-black/55">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {endpoints.map((endpoint) => (
+                      <tr key={`${endpoint.method}-${endpoint.path}`} className="border-b border-black/[0.06] last:border-b-0">
+                        <td className="px-3 py-2 font-mono text-[12px] text-black">{endpoint.method}</td>
+                        <td className="px-3 py-2 font-mono text-[12px] text-black">{endpoint.path}</td>
+                        <td className="px-3 py-2 text-black/65">{endpoint.detail}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </DocsSection>
 
@@ -316,19 +311,19 @@ export default function DocsPage() {
               title="Common request patterns"
               description="Start with the model list endpoint, then send generation requests, and finally poll the task status endpoint."
             >
-              <div className="space-y-6">
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+              <div className="space-y-4">
+                <div className="border-b border-black/[0.08] pb-3">
                   <h3 className="text-lg font-semibold text-black">
                     List models
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-black/58">
+                  <p className="mt-1 text-sm leading-6 text-black/58">
                     Fetch the current public model catalog before hard-coding
                     model names in your own app.
                   </p>
                   <CodeBlock code={modelsExample} />
                 </div>
 
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                <div className="border-b border-black/[0.08] pb-3">
                   <h3 className="text-lg font-semibold text-black">
                     Image generation
                   </h3>
@@ -339,7 +334,7 @@ export default function DocsPage() {
                   <CodeBlock code={imageRequestExample} />
                 </div>
 
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                <div className="border-b border-black/[0.08] pb-3">
                   <h3 className="text-lg font-semibold text-black">
                     Video generation
                   </h3>
@@ -350,7 +345,7 @@ export default function DocsPage() {
                   <CodeBlock code={videoRequestExample} />
                 </div>
 
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                <div>
                   <h3 className="text-lg font-semibold text-black">
                     JavaScript example
                   </h3>
@@ -369,15 +364,15 @@ export default function DocsPage() {
               title="Queued task and final result"
               description="Generation endpoints are asynchronous. Expect a queued task response first, then poll until you receive a terminal result."
             >
-              <div className="grid gap-4">
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+              <div className="space-y-4">
+                <div className="border-b border-black/[0.08] pb-3">
                   <h3 className="text-lg font-semibold text-black">
                     Initial queued response
                   </h3>
                   <CodeBlock code={queuedResponseExample} />
                 </div>
 
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                <div className="border-b border-black/[0.08] pb-3">
                   <h3 className="text-lg font-semibold text-black">
                     Task status polling
                   </h3>
@@ -395,14 +390,14 @@ export default function DocsPage() {
                   <CodeBlock code={taskStatusExample} />
                 </div>
 
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                <div className="border-b border-black/[0.08] pb-3">
                   <h3 className="text-lg font-semibold text-black">
                     Example completed response
                   </h3>
                   <CodeBlock code={completedTaskExample} />
                 </div>
 
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                <div className="border-b border-black/[0.08] pb-3">
                   <h3 className="text-lg font-semibold text-black">
                     Unified image output contract
                   </h3>
@@ -462,11 +457,11 @@ export default function DocsPage() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-black/[0.08] bg-[#FAF9F4] p-4">
+                <div>
                   <h3 className="text-lg font-semibold text-black">
                     Request body fields
                   </h3>
-                  <div className="mt-3 space-y-3 text-sm leading-6 text-black/58">
+                  <ul className="mt-2 space-y-2 text-sm leading-6 text-black/58">
                     <p>
                       <code className="rounded bg-white px-1 py-0.5 text-[12px]">
                         model
@@ -487,7 +482,7 @@ export default function DocsPage() {
                       is a free-form object for model-specific parameters such
                       as size, aspect ratio, duration, or seed.
                     </p>
-                  </div>
+                  </ul>
                 </div>
               </div>
             </DocsSection>
@@ -498,9 +493,7 @@ export default function DocsPage() {
               title="Structured error responses"
               description="Authentication failures and request validation failures use a simple error envelope with a machine-readable code."
             >
-              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                <CodeBlock code={errorExample} />
-              </div>
+              <CodeBlock code={errorExample} />
             </DocsSection>
 
           </div>
