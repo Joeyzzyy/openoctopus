@@ -809,6 +809,7 @@ export function CreateProviderModelForm({
   submitLabel?: string;
   className?: string;
 }) {
+  type ProviderModelFormTab = "basic" | "protocol" | "params" | "cost";
   const fallbackSupportedModelId = supportedModels[0]?.id ?? "";
   const templateSupportedModelId =
     supportedModels.find((item) => item.modelSlug === defaultSupportedModelSlug)?.id ??
@@ -835,6 +836,7 @@ export function CreateProviderModelForm({
   const templateIsAsync =
     executionTemplate === "rest-async-poll-v1" || executionTemplate === "upload-async-poll-v1";
   const isAsyncMode = executionConfigState.mode === "async" || (executionConfigState.mode === "auto" && templateIsAsync);
+  const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("basic");
 
   useEffect(() => {
     setExecutionTemplate(defaultExecutionTemplate);
@@ -855,7 +857,32 @@ export function CreateProviderModelForm({
         <input type="hidden" name="providerModelId" value={providerModelId} />
       ) : null}
       <input type="hidden" name="pricingSourceEvidence" value={defaultPricingSourceEvidence} />
+      <div className="mb-3 flex flex-wrap gap-2">
+        {[
+          { key: "basic", label: "基本信息" },
+          { key: "protocol", label: "调用协议配置" },
+          { key: "params", label: "提交参数" },
+          { key: "cost", label: "供应商成本配置" },
+        ].map((tab) => {
+          const active = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key as ProviderModelFormTab)}
+              className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                active
+                  ? "border-black bg-black text-white"
+                  : "border-black/[0.12] bg-white text-black/70 hover:bg-black/[0.03]"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
       <div className="grid gap-4 md:grid-cols-2">
+        <div className={activeTab === "basic" ? "contents" : "hidden"}>
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">可售模型</span>
           <select
@@ -931,7 +958,19 @@ export function CreateProviderModelForm({
             example="gemini-2.5-flash-image"
           />
         </label>
+        <label className="flex items-center gap-3 rounded-md border border-black/[0.08] bg-white px-3 py-3 text-sm text-black/72 md:col-span-2">
+          <input
+            type="checkbox"
+            name="active"
+            defaultChecked={defaultActive}
+            disabled={disabled}
+            className="size-4 rounded border-black/20 bg-white accent-black"
+          />
+          启用
+        </label>
+        </div>
 
+        <div className={activeTab === "protocol" ? "contents" : "hidden"}>
         <div className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">调用协议配置</span>
           <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
@@ -1231,7 +1270,9 @@ export function CreateProviderModelForm({
             </div>
           </div>
         </div>
+        </div>
 
+        <div className={activeTab === "cost" ? "contents" : "hidden"}>
         <div className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">供应商成本配置</span>
           <BillingConfigEditor
@@ -1241,34 +1282,6 @@ export function CreateProviderModelForm({
             generatedLabel="生成的供应商计费配置"
           />
         </div>
-
-        <label className="block md:col-span-2">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
-            上游官方输入参数说明（JSON）
-          </span>
-          <SchemaFieldEditor
-            name="inputSchema"
-            keyName="params"
-            defaultSchemaText={defaultInputSchema}
-            includeRequired
-            disabled={disabled}
-          />
-          <FieldHint help="在可视化表格里逐项录入入参字段：name/type/required/description/example/exposedToCustomer。" />
-        </label>
-
-        <label className="block md:col-span-2">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
-            上游官方输出参数说明（JSON）
-          </span>
-          <SchemaFieldEditor
-            name="outputSchema"
-            keyName="fields"
-            defaultSchemaText={defaultOutputSchema}
-            includeRequired={false}
-            disabled={disabled}
-          />
-          <FieldHint help="在可视化表格里逐项录入出参字段：name/type/description/example/exposedToCustomer。" />
-        </label>
         <label className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">官方成本价格链接</span>
           <input
@@ -1305,17 +1318,37 @@ export function CreateProviderModelForm({
           />
           <FieldHint help="可选，上传官方价格页截图。保存后会把文件路径记录到供应商模型里。" />
         </label>
+        </div>
 
-        <label className="flex items-center gap-3 rounded-md border border-black/[0.08] bg-white px-3 py-3 text-sm text-black/72">
-          <input
-            type="checkbox"
-            name="active"
-            defaultChecked={defaultActive}
-            disabled={disabled}
-            className="size-4 rounded border-black/20 bg-white accent-black"
-          />
-          启用
-        </label>
+        <div className={activeTab === "params" ? "contents" : "hidden"}>
+          <label className="block md:col-span-2">
+            <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
+              上游官方输入参数说明（JSON）
+            </span>
+            <SchemaFieldEditor
+              name="inputSchema"
+              keyName="params"
+              defaultSchemaText={defaultInputSchema}
+              includeRequired
+              disabled={disabled}
+            />
+            <FieldHint help="在可视化表格里逐项录入入参字段：name/type/required/description/example/exposedToCustomer。" />
+          </label>
+
+          <label className="block md:col-span-2">
+            <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
+              上游官方输出参数说明（JSON）
+            </span>
+            <SchemaFieldEditor
+              name="outputSchema"
+              keyName="fields"
+              defaultSchemaText={defaultOutputSchema}
+              includeRequired={false}
+              disabled={disabled}
+            />
+            <FieldHint help="在可视化表格里逐项录入出参字段：name/type/description/example/exposedToCustomer。" />
+          </label>
+        </div>
       </div>
 
       <div className="mt-4">
