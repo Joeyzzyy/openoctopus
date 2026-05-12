@@ -815,21 +815,25 @@ export async function processNextInferenceJob() {
       .eq("request_id", message.requestId)
       .eq("attempt_no", 1);
 
-    await recordRequestSettlement({
-      requestId: message.requestId,
-      workspaceId: message.workspaceId,
-      apiKeyId: message.apiKeyId,
-      publicModelSlug: message.publicModelSlug,
-      endpoint: message.endpoint,
-      customerCharge: 0,
-      providerCost: 0,
-      statusCode: 500,
-      breakdown: buildSettlementBreakdown({
+    try {
+      await recordRequestSettlement({
+        requestId: message.requestId,
+        workspaceId: message.workspaceId,
+        apiKeyId: message.apiKeyId,
+        publicModelSlug: message.publicModelSlug,
+        endpoint: message.endpoint,
         customerCharge: 0,
         providerCost: 0,
-        profit: 0,
-      }),
-    });
+        statusCode: 500,
+        breakdown: buildSettlementBreakdown({
+          customerCharge: 0,
+          providerCost: 0,
+          profit: 0,
+        }),
+      });
+    } catch {
+      // Never block failure alerting on settlement write errors.
+    }
 
     await sendFeishuFailureAlert({
       phase: "submit",
@@ -1134,21 +1138,25 @@ export async function processNextPollingJob() {
       .eq("request_id", message.requestId)
       .eq("attempt_no", 1);
 
-    await recordRequestSettlement({
-      requestId: message.requestId,
-      workspaceId: message.workspaceId,
-      apiKeyId: message.apiKeyId,
-      publicModelSlug: message.publicModelSlug,
-      endpoint: message.endpoint,
-      customerCharge: 0,
-      providerCost: 0,
-      statusCode: 500,
-      breakdown: buildSettlementBreakdown({
+    try {
+      await recordRequestSettlement({
+        requestId: message.requestId,
+        workspaceId: message.workspaceId,
+        apiKeyId: message.apiKeyId,
+        publicModelSlug: message.publicModelSlug,
+        endpoint: message.endpoint,
         customerCharge: 0,
         providerCost: 0,
-        profit: 0,
-      }),
-    });
+        statusCode: 500,
+        breakdown: buildSettlementBreakdown({
+          customerCharge: 0,
+          providerCost: 0,
+          profit: 0,
+        }),
+      });
+    } catch {
+      // Never block failure alerting on settlement write errors.
+    }
 
     await sendFeishuFailureAlert({
       phase: "poll",
@@ -1306,21 +1314,25 @@ export async function processNextPollingJob() {
       .eq("request_id", message.requestId)
       .eq("attempt_no", 1);
 
-    await recordRequestSettlement({
-      requestId: message.requestId,
-      workspaceId: message.workspaceId,
-      apiKeyId: message.apiKeyId,
-      publicModelSlug: message.publicModelSlug,
-      endpoint: message.endpoint,
-      customerCharge: 0,
-      providerCost: 0,
-      statusCode: 500,
-      breakdown: buildSettlementBreakdown({
+    try {
+      await recordRequestSettlement({
+        requestId: message.requestId,
+        workspaceId: message.workspaceId,
+        apiKeyId: message.apiKeyId,
+        publicModelSlug: message.publicModelSlug,
+        endpoint: message.endpoint,
         customerCharge: 0,
         providerCost: 0,
-        profit: 0,
-      }),
-    });
+        statusCode: 500,
+        breakdown: buildSettlementBreakdown({
+          customerCharge: 0,
+          providerCost: 0,
+          profit: 0,
+        }),
+      });
+    } catch {
+      // Never block failure alerting on settlement write errors.
+    }
 
     await sendFeishuFailureAlert({
       phase: "poll",
@@ -1419,21 +1431,25 @@ async function markProcessingRequestTimeout(input: {
     .eq("attempt_no", 1)
     .eq("status", "processing");
 
-  await recordRequestSettlement({
-    requestId: input.requestId,
-    workspaceId: input.workspaceId,
-    apiKeyId: input.apiKeyId,
-    publicModelSlug: input.publicModelSlug,
-    endpoint: input.endpoint,
-    customerCharge: 0,
-    providerCost: 0,
-    statusCode: 504,
-    breakdown: buildSettlementBreakdown({
+  try {
+    await recordRequestSettlement({
+      requestId: input.requestId,
+      workspaceId: input.workspaceId,
+      apiKeyId: input.apiKeyId,
+      publicModelSlug: input.publicModelSlug,
+      endpoint: input.endpoint,
       customerCharge: 0,
       providerCost: 0,
-      profit: 0,
-    }),
-  });
+      statusCode: 504,
+      breakdown: buildSettlementBreakdown({
+        customerCharge: 0,
+        providerCost: 0,
+        profit: 0,
+      }),
+    });
+  } catch {
+    // Never block timeout alerting on settlement write errors.
+  }
 
   await sendFeishuFailureAlert({
     phase: "timeout",
