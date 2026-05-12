@@ -239,23 +239,6 @@ export default function DocsPage() {
           </aside>
 
           <div className="space-y-6">
-            <div className="rounded-2xl border border-black/[0.08] bg-gradient-to-r from-[#FAF6EC] via-[#FFFFFF] to-[#F5F8FF] p-5 shadow-sm">
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl border border-black/[0.08] bg-white px-3 py-3">
-                  <p className="text-[11px] uppercase tracking-[1px] text-black/45">Auth</p>
-                  <p className="mt-1 text-sm font-medium text-black">Bearer Token</p>
-                </div>
-                <div className="rounded-xl border border-black/[0.08] bg-white px-3 py-3">
-                  <p className="text-[11px] uppercase tracking-[1px] text-black/45">Request Style</p>
-                  <p className="mt-1 text-sm font-medium text-black">Asynchronous Tasks</p>
-                </div>
-                <div className="rounded-xl border border-black/[0.08] bg-white px-3 py-3">
-                  <p className="text-[11px] uppercase tracking-[1px] text-black/45">Coverage</p>
-                  <p className="mt-1 text-sm font-medium text-black">Image + Video</p>
-                </div>
-              </div>
-            </div>
-
             <DocsSection
               id="overview"
               eyebrow="Overview"
