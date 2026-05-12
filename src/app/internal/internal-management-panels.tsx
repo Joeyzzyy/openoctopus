@@ -909,7 +909,6 @@ export function PublicModelsPanel({
                 <th className="min-w-[120px] border-b border-black/[0.08] px-3 py-2.5">能力类型</th>
                 <th className="min-w-[130px] border-b border-black/[0.08] px-3 py-2.5">添加时间</th>
                 <th className="min-w-[200px] border-b border-black/[0.08] px-3 py-2.5">计费摘要</th>
-                <th className="min-w-[320px] border-b border-black/[0.08] px-3 py-2.5">供应商模型映射</th>
                 <th className="sticky right-0 z-10 min-w-[220px] border-b border-black/[0.08] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
                   操作
                 </th>
@@ -926,15 +925,99 @@ export function PublicModelsPanel({
                     <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.capability ? capabilityLabel(model.capability) : "-"}</td>
                     <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.createdLabel}</td>
                     <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.billingSummary}</td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                    <td className="sticky right-0 z-10 min-w-[220px] border-b border-black/[0.06] bg-white px-3 py-3 align-middle shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
+                      <div className="flex flex-wrap items-center gap-2">
+                      <form action={updateSupportedModelState}>
+                        <input type="hidden" name="supportedModelId" value={model.id} />
+                        <input type="hidden" name="active" value={model.active ? "false" : "true"} />
+                        <button
+                          type="submit"
+                          className={`inline-flex h-7 min-w-[64px] items-center justify-center rounded-md border px-2 text-[11px] font-medium transition-colors ${
+                            model.active
+                              ? "border-[#9CC9A5] bg-[#EAF7ED] text-[#2F7A3E] hover:bg-[#def0e3]"
+                              : "border-black/[0.14] bg-[#F2F2F1] text-black/70 hover:bg-[#ebebea]"
+                          }`}
+                        >
+                          {model.active ? "停用" : "启用"}
+                        </button>
+                      </form>
+                      <ManagementDialog
+                        trigger={<ModalButton tone="secondary">编辑</ModalButton>}
+                        title={`编辑 ${model.display_name}`}
+                        description="在独立弹窗中编辑这个可售模型。"
+                      >
+                        {({ close }) => (
+                        <ManagedDialogForm action={updateSupportedModelDetails} close={close}>
+                          <input type="hidden" name="supportedModelId" value={model.id} />
+                          <input type="hidden" name="active" value="true" />
+                          <FormSelect
+                            label="模型厂商（内部分类）"
+                            name="provider"
+                            defaultValue={model.provider}
+                            options={vendorOptions}
+                          />
+                          <FormField label="可售模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
+                          <FormField label="显示名称" name="displayName" defaultValue={model.display_name} required />
+                          <FormTextArea
+                            label="模型介绍"
+                            name="modelDescription"
+                            defaultValue={readModelDescriptionFromBillingConfig(model.billingConfigText)}
+                            placeholder="用于对外展示的模型简介，例如适用场景、风格、速度与质量特点。"
+                            help="可选。会随模型配置保存。"
+                          />
+                          <FormSelect
+                            label="模态"
+                            name="modality"
+                            defaultValue={model.modality}
+                            options={[
+                              { value: "image", label: "图片" },
+                              { value: "video", label: "视频" },
+                              { value: "audio", label: "音频" },
+                            ]}
+                          />
+                          <FormSelect
+                            label="能力类型"
+                            name="capability"
+                            defaultValue={model.capability ?? "image_generation"}
+                            options={[...capabilityOptions]}
+                          />
+                          <BillingConfigEditor initialValue={model.billingConfigText} />
+                          <div className="flex justify-end">
+                            <SubmitButton label="保存可售模型" />
+                          </div>
+                        </ManagedDialogForm>
+                        )}
+                      </ManagementDialog>
+                      <ManagementDialog
+                        trigger={<ModalButton tone="secondary">删除</ModalButton>}
+                        title={`删除 ${model.display_name}`}
+                        description="确认删除这个可售模型。"
+                      >
+                        {({ close }) => (
+                          <ManagedDialogForm action={deleteSupportedModel} close={close}>
+                            <input type="hidden" name="supportedModelId" value={model.id} />
+                            <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
+                              删除后不可恢复。若该模型仍有关联的供应商模型映射或路由配置，系统会阻止删除。
+                            </div>
+                            <div className="flex justify-end">
+                              <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
+                            </div>
+                          </ManagedDialogForm>
+                        )}
+                      </ManagementDialog>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={8} className="border-b border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
                       {(() => {
                         const mappings = providerModelsBySupportedModelId.get(model.id) ?? [];
                         if (mappings.length === 0) {
-                          return <p className="text-xs text-black/45">暂无映射</p>;
+                          return <p className="text-xs text-black/45">供应商模型映射：暂无</p>;
                         }
                         return (
-                          <div className="overflow-x-auto rounded border border-black/[0.08] bg-[#FCFCFA]">
-                            <table className="min-w-[640px] w-full text-[11px]">
+                          <div className="overflow-x-auto rounded border border-black/[0.08] bg-white">
+                            <table className="min-w-[760px] w-full text-[11px]">
                               <thead>
                                 <tr className="border-b border-black/[0.08] text-black/50">
                                   <th className="px-2 py-1.5 text-left">供应商</th>
@@ -1017,88 +1100,6 @@ export function PublicModelsPanel({
                           </div>
                         );
                       })()}
-                    </td>
-                    <td className="sticky right-0 z-10 min-w-[220px] border-b border-black/[0.06] bg-white px-3 py-3 align-middle shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
-                      <div className="flex flex-wrap items-center gap-2">
-                      <form action={updateSupportedModelState}>
-                        <input type="hidden" name="supportedModelId" value={model.id} />
-                        <input type="hidden" name="active" value={model.active ? "false" : "true"} />
-                        <button
-                          type="submit"
-                          className={`inline-flex h-7 min-w-[64px] items-center justify-center rounded-md border px-2 text-[11px] font-medium transition-colors ${
-                            model.active
-                              ? "border-[#9CC9A5] bg-[#EAF7ED] text-[#2F7A3E] hover:bg-[#def0e3]"
-                              : "border-black/[0.14] bg-[#F2F2F1] text-black/70 hover:bg-[#ebebea]"
-                          }`}
-                        >
-                          {model.active ? "停用" : "启用"}
-                        </button>
-                      </form>
-                      <ManagementDialog
-                        trigger={<ModalButton tone="secondary">编辑</ModalButton>}
-                        title={`编辑 ${model.display_name}`}
-                        description="在独立弹窗中编辑这个可售模型。"
-                      >
-                        {({ close }) => (
-                        <ManagedDialogForm action={updateSupportedModelDetails} close={close}>
-                          <input type="hidden" name="supportedModelId" value={model.id} />
-                          <input type="hidden" name="active" value="true" />
-                          <FormSelect
-                            label="模型厂商（内部分类）"
-                            name="provider"
-                            defaultValue={model.provider}
-                            options={vendorOptions}
-                          />
-                          <FormField label="可售模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
-                          <FormField label="显示名称" name="displayName" defaultValue={model.display_name} required />
-                          <FormTextArea
-                            label="模型介绍"
-                            name="modelDescription"
-                            defaultValue={readModelDescriptionFromBillingConfig(model.billingConfigText)}
-                            placeholder="用于对外展示的模型简介，例如适用场景、风格、速度与质量特点。"
-                            help="可选。会随模型配置保存。"
-                          />
-                          <FormSelect
-                            label="模态"
-                            name="modality"
-                            defaultValue={model.modality}
-                            options={[
-                              { value: "image", label: "图片" },
-                              { value: "video", label: "视频" },
-                              { value: "audio", label: "音频" },
-                            ]}
-                          />
-                          <FormSelect
-                            label="能力类型"
-                            name="capability"
-                            defaultValue={model.capability ?? "image_generation"}
-                            options={[...capabilityOptions]}
-                          />
-                          <BillingConfigEditor initialValue={model.billingConfigText} />
-                          <div className="flex justify-end">
-                            <SubmitButton label="保存可售模型" />
-                          </div>
-                        </ManagedDialogForm>
-                        )}
-                      </ManagementDialog>
-                      <ManagementDialog
-                        trigger={<ModalButton tone="secondary">删除</ModalButton>}
-                        title={`删除 ${model.display_name}`}
-                        description="确认删除这个可售模型。"
-                      >
-                        {({ close }) => (
-                          <ManagedDialogForm action={deleteSupportedModel} close={close}>
-                            <input type="hidden" name="supportedModelId" value={model.id} />
-                            <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
-                              删除后不可恢复。若该模型仍有关联的供应商模型映射或路由配置，系统会阻止删除。
-                            </div>
-                            <div className="flex justify-end">
-                              <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
-                            </div>
-                          </ManagedDialogForm>
-                        )}
-                      </ManagementDialog>
-                      </div>
                     </td>
                   </tr>
                 </Fragment>
