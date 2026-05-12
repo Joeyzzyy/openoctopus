@@ -1,6 +1,6 @@
 "use client";
 import { Fragment, useEffect, useState } from "react";
-import { BadgeCheck, CircleAlert, Pencil, Plus } from "lucide-react";
+import { BadgeCheck, CircleAlert } from "lucide-react";
 import { deriveLegacyBillingFields, parseBillingConfig } from "@/lib/billing-config";
 import {
   createModelVendor,
@@ -858,7 +858,9 @@ export function PublicModelsPanel({
                 <th className="min-w-[260px] border-b border-black/[0.08] px-3 py-2.5">计费配置(JSON)</th>
                 <th className="min-w-[120px] border-b border-black/[0.08] px-3 py-2.5">供应商模型总数</th>
                 <th className="min-w-[110px] border-b border-black/[0.08] px-3 py-2.5">启用映射数</th>
-                <th className="min-w-[150px] border-b border-black/[0.08] px-3 py-2.5">操作</th>
+                <th className="sticky right-0 z-10 min-w-[150px] border-b border-black/[0.08] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
+                  操作
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -869,7 +871,7 @@ export function PublicModelsPanel({
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.provider}</td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{modalityLabel(model.modality)}</td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.capability ? capabilityLabel(model.capability) : "-"}</td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                  <td className="sticky right-0 z-10 border-b border-black/[0.06] bg-white px-3 py-3 align-middle shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
                     <form action={updateSupportedModelState}>
                       <input type="hidden" name="supportedModelId" value={model.id} />
                       <input type="hidden" name="active" value={model.active ? "false" : "true"} />
@@ -906,7 +908,7 @@ export function PublicModelsPanel({
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
                     <div className="flex flex-wrap items-center gap-2">
                       <ManagementDialog
-                        trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                        trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                         title={`编辑 ${model.display_name}`}
                         description="在独立弹窗中编辑这个可售模型。"
                       >
@@ -1081,7 +1083,7 @@ export function ModelVendorsPanel({
 export function CreateModelVendorButton() {
   return (
     <ManagementDialog
-      trigger={<ModalButton><Plus className="size-3.5" />新建</ModalButton>}
+      trigger={<ModalButton>新建</ModalButton>}
       title="新建模型厂商"
       description=" "
     >
@@ -1129,7 +1131,7 @@ export function CreateSupportedModelButton({
 
   return (
     <ManagementDialog
-      trigger={<ModalButton><Plus className="size-3.5" />新建</ModalButton>}
+      trigger={<ModalButton>新建</ModalButton>}
       title="新建可售模型"
       description="在独立弹窗中创建新的客户侧模型定义。"
     >
@@ -1370,7 +1372,7 @@ export function EconomicsPanel({
                           <td className="sticky right-0 z-10 w-[180px] border-b border-black/[0.06] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
                             <div className="flex flex-wrap gap-2">
                               <ManagementDialog
-                                trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                                trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                                 title={`编辑 ${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
                                 description=" "
                               >
@@ -1604,7 +1606,7 @@ export function CreateProviderModelMappingButton({
 
   return (
     <ManagementDialog
-      trigger={<ModalButton><Plus className="size-3.5" />新建供应商模型映射</ModalButton>}
+      trigger={<ModalButton>新建供应商模型映射</ModalButton>}
       disabled={!hasProviders || !hasSupportedModels}
       title="新建供应商模型映射"
       description="先选择可售模型与供应商，再填写执行协议配置和成本配置。"
@@ -1687,7 +1689,7 @@ export function ProvidersPanel({
                     <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
                       <div className="flex flex-wrap gap-2">
                         <ManagementDialog
-                          trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                          trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                           title="编辑"
                         >
                           {({ close }) => (
@@ -1704,8 +1706,8 @@ export function ProvidersPanel({
                           )}
                         </ManagementDialog>
                         <ManagementDialog
-                          trigger={<ModalButton tone="secondary"><Plus className="size-3.5" />管理密钥</ModalButton>}
-                          title={`管理供应商密钥：${provider.name}`}
+                          trigger={<ModalButton tone="secondary">管理密钥</ModalButton>}
+                          title="密钥管理"
                           description="在弹窗里新增、编辑、轮换或删除这个供应商的密钥。"
                         >
                           <CredentialsPanel credentials={providerCredentials} providers={[provider]} selectedTemplate={null} />
@@ -1755,7 +1757,7 @@ export function CreateProviderButton({
 }) {
   return (
     <ManagementDialog
-      trigger={<ModalButton><Plus className="size-3.5" />新建供应商</ModalButton>}
+      trigger={<ModalButton>新建供应商</ModalButton>}
       title="新建供应商"
       description="在独立弹窗中创建新的上游供应商。"
     >
@@ -1797,7 +1799,7 @@ export function CredentialsPanel({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有供应商密钥</div>
         <ManagementDialog
-          trigger={<ModalButton><Plus className="size-3.5" />新建供应商密钥</ModalButton>}
+          trigger={<ModalButton>新建供应商密钥</ModalButton>}
           disabled={!hasProviders}
           title="新建供应商密钥"
           description="在独立弹窗中创建新的供应商密钥，不直接嵌在列表里编辑。"
@@ -1875,7 +1877,7 @@ export function CredentialsPanel({
                   </button>
                 </form>
                 <ManagementDialog
-                  trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                  trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                 title={`编辑 ${credential.label}`}
                 description="在弹窗中编辑这个已有供应商密钥。"
               >
@@ -2006,7 +2008,7 @@ export function ModelsPanel({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-black/55">已有供应商模型</div>
         <ManagementDialog
-          trigger={<ModalButton><Plus className="size-3.5" />新建供应商模型</ModalButton>}
+          trigger={<ModalButton>新建供应商模型</ModalButton>}
           disabled={!hasProviders || !hasSupportedModels}
           title="新建供应商模型"
           description="在独立弹窗中，把可售模型映射到某个供应商的具体模型。"
@@ -2052,7 +2054,7 @@ export function ModelsPanel({
               </div>
 
               <ManagementDialog
-                trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                 title={`编辑 ${item.upstream_model_slug}`}
                 description="在独立弹窗中编辑这个供应商模型。"
               >
@@ -2235,7 +2237,7 @@ export function RoutesPanel({
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
                     <div className="flex flex-wrap gap-2">
                       <ManagementDialog
-                        trigger={<ModalButton tone="secondary"><Pencil className="size-3.5" />编辑</ModalButton>}
+                        trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                         title={`编辑路由：${rule.public_model_slug}`}
                         description="在独立弹窗中编辑这个路由。"
                       >
@@ -2323,7 +2325,7 @@ export function CreateRoutingRuleButton({
 
   return (
     <ManagementDialog
-      trigger={<ModalButton><Plus className="size-3.5" />新建路由</ModalButton>}
+      trigger={<ModalButton>新建路由</ModalButton>}
       disabled={!hasProviderModels || !hasSupportedModels}
       title="新建路由规则"
       description="在弹窗中创建新路由，避免与现有线上路由记录混在一起。"
