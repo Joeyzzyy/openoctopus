@@ -388,6 +388,48 @@ async function buildStripeInvoiceUrlMap(invoiceIds: string[]) {
   return invoiceUrlById;
 }
 
+async function buildStripeInvoiceUrlMapBySessionId(sessionIds: string[]) {
+  const uniqueIds = Array.from(new Set(sessionIds.filter((id) => id.length > 0)));
+  if (uniqueIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    return new Map<string, string>();
+  }
+
+  const stripe = new Stripe(stripeSecretKey);
+  const invoiceUrlBySessionId = new Map<string, string>();
+
+  for (const sessionId of uniqueIds) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ["invoice"],
+      });
+      const sessionLike = session as unknown as { invoice?: unknown };
+      const invoice = sessionLike.invoice;
+      if (invoice && typeof invoice === "object") {
+        const invoiceLike = invoice as { hosted_invoice_url?: unknown; invoice_pdf?: unknown };
+        const invoiceUrl =
+          (typeof invoiceLike.hosted_invoice_url === "string" && invoiceLike.hosted_invoice_url.length > 0
+            ? invoiceLike.hosted_invoice_url
+            : null) ??
+          (typeof invoiceLike.invoice_pdf === "string" && invoiceLike.invoice_pdf.length > 0
+            ? invoiceLike.invoice_pdf
+            : null);
+        if (invoiceUrl) {
+          invoiceUrlBySessionId.set(sessionId, invoiceUrl);
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return invoiceUrlBySessionId;
+}
+
 export async function getDashboardData({
   requestsPage = 1,
   requestsApiKeyId = null,
@@ -555,6 +597,13 @@ export async function getDashboardData({
         return typeof paymentIntentId === "string" ? paymentIntentId : "";
       })
       .filter((id) => id.length > 0);
+    const stripeSessionIds = (walletLedgerRows ?? [])
+      .map((row) => {
+        const metadata = (row as { metadata?: Record<string, unknown> }).metadata;
+        const sessionId = metadata?.stripe_checkout_session_id;
+        return typeof sessionId === "string" ? sessionId : "";
+      })
+      .filter((id) => id.length > 0);
     const stripeInvoiceIds = (walletLedgerRows ?? [])
       .map((row) => {
         const metadata = (row as { metadata?: Record<string, unknown> }).metadata;
@@ -564,6 +613,7 @@ export async function getDashboardData({
       .filter((id) => id.length > 0);
     const billingLinksByPaymentIntentId = await buildStripeBillingLinkMap(stripePaymentIntentIds);
     const invoiceUrlById = await buildStripeInvoiceUrlMap(stripeInvoiceIds);
+    const invoiceUrlBySessionId = await buildStripeInvoiceUrlMapBySessionId(stripeSessionIds);
 
     const spendTrend = Array.from({ length: 7 }).map((_, index) => {
       const date = new Date();
@@ -877,6 +927,7 @@ export async function getDashboardData({
             ? (billingLinksByPaymentIntentId.get(stripePaymentIntentId)?.receiptUrl ?? null)
             : null,
           invoiceUrl:
+            (stripeSessionId ? invoiceUrlBySessionId.get(stripeSessionId) ?? null : null) ??
             (stripeInvoiceId ? invoiceUrlById.get(stripeInvoiceId) ?? null : null) ??
             (stripePaymentIntentId
               ? (billingLinksByPaymentIntentId.get(stripePaymentIntentId)?.invoiceUrl ?? null)
