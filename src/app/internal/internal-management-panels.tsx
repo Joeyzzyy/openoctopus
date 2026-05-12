@@ -1287,7 +1287,7 @@ export function EconomicsPanel({
                           <thead>
                             <tr className="text-xs text-black/50">
                               <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
-                              <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">上游模型</th>
+                              <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">模型 Slug</th>
                               <th className="w-[140px] border-b border-black/[0.08] px-3 py-2.5">能力</th>
                               <th className="w-[210px] border-b border-black/[0.08] px-3 py-2.5">参数文档</th>
                               <th className="w-[240px] border-b border-black/[0.08] px-3 py-2.5">售价</th>
@@ -1305,11 +1305,9 @@ export function EconomicsPanel({
                               <tr key={row.providerModel.id}>
                                 <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top">
                                   <p className="text-sm font-medium text-black">{row.supportedModel.display_name}</p>
-                                  <p className="mt-1 text-xs text-black/50">{row.supportedModel.model_slug}</p>
                                 </td>
                                 <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top">
-                                  <p className="text-sm text-black">{row.providerModel.upstream_model_slug}</p>
-                                  <p className="mt-1 text-xs text-black/50">{row.providerModel.public_model_slug}</p>
+                                  <p className="font-mono text-xs text-black/70">{row.supportedModel.model_slug}</p>
                                 </td>
                                 <td className="w-[140px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
                                   {row.providerModel.capability}
