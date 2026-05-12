@@ -1768,10 +1768,22 @@ export async function deleteSupportedModel(formData: FormData) {
     throw new Error(routingError.message);
   }
   if ((providerModelRows ?? []).length > 0) {
-    throw new Error("该可售模型仍有关联的供应商模型映射，无法删除。");
+    redirect(
+      buildInternalAlertHref({
+        tab: "public-models",
+        level: "error",
+        message: "该可售模型仍有关联的供应商模型映射，无法删除。",
+      })
+    );
   }
   if ((routingRows ?? []).length > 0) {
-    throw new Error("该可售模型仍被路由配置使用，无法删除。");
+    redirect(
+      buildInternalAlertHref({
+        tab: "public-models",
+        level: "error",
+        message: "该可售模型仍被路由配置使用，无法删除。",
+      })
+    );
   }
 
   const { error } = await supabase
