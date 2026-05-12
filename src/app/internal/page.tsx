@@ -76,12 +76,6 @@ const tabs = [
     description: "定义用户可售模型、供应商模型映射与价格联动。",
   },
   {
-    key: "economics",
-    group: "basic",
-    label: "模型价格总表",
-    description: "统一查看和维护售价、成本、利润与调用协议配置。",
-  },
-  {
     key: "routes",
     group: "basic",
     label: "路由配置",
@@ -1147,11 +1141,6 @@ export default async function InternalPage({
                 />
                 </SectionShell>
               </section>
-            </>
-          ) : null}
-
-          {activeTab === "economics" ? (
-            <>
               <section>
                 <SectionShell
                   id="economics-panel"
@@ -1313,7 +1302,7 @@ export default async function InternalPage({
                       <p>
                         再到
                         {" "}
-                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("economics")}>
+                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href="/internal?tab=public-models#economics-panel">
                           模型价格总表
                         </a>
                         ，创建 provider model 映射并绑定执行模板。
@@ -1438,7 +1427,7 @@ export default async function InternalPage({
                       <p>
                         再到
                         {" "}
-                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("economics")}>
+                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href="/internal?tab=public-models#economics-panel">
                           模型价格总表
                         </a>
                         ，创建 provider model 映射并绑定执行模板。
