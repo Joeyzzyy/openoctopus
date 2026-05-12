@@ -1,5 +1,6 @@
 import { PageHero } from "@/components/marketing/page-primitives";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
   title: "API Docs — OpenOctopus",
@@ -7,14 +8,21 @@ export const metadata = {
     "Public API documentation for authenticating, listing models, and submitting OpenOctopus generation requests.",
 };
 
-export default function DocsPage() {
+export default async function DocsPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const destination = user ? "/dashboard" : "/login";
+  const destinationLabel = user ? "Dashboard" : "Get API Key";
+
   return (
     <>
       <PageHero
         eyebrow="API Documentation"
         title="Build against the OpenOctopus API"
         description="Unified image and video API docs. This page uses the same source as the dashboard API Calling Doc, so updates stay in sync automatically."
-        primaryAction={{ href: "/login", label: "Get API Key" }}
+        primaryAction={{ href: destination, label: destinationLabel }}
         secondaryAction={{ href: "/pricing", label: "View pricing" }}
       />
 
