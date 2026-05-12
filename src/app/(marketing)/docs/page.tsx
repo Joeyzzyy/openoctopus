@@ -551,20 +551,6 @@ export default function DocsPage() {
               </div>
             </DocsSection>
 
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/login"
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-black/85"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/dashboard"
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-black/10 bg-white px-4 text-sm font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
-              >
-                Open Dashboard
-              </Link>
-            </div>
           </div>
         </div>
       </div>
