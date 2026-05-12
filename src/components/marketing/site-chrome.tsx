@@ -1,10 +1,18 @@
 import Link from "next/link";
 import { Logo } from "@/components/layout/Logo";
 
-const NAV_ITEMS = [
+const HEADER_NAV_ITEMS = [
   { label: "Pricing", href: "/pricing" },
   { label: "Docs", href: "/docs" },
-  { label: "Learn More", href: "/topics" },
+  { label: "Learn More", href: "/resource" },
+  { label: "Tools", href: "/tools" },
+];
+
+const FOOTER_NAV_ITEMS = [
+  { label: "Pricing", href: "/pricing" },
+  { label: "Docs", href: "/docs" },
+  { label: "Learn More", href: "/resource" },
+  { label: "Tools", href: "/tools" },
   { label: "Enterprise", href: "/enterprise" },
   { label: "About", href: "/about" },
 ];
@@ -28,7 +36,7 @@ export function MarketingHeader({
           </Link>
 
           <nav className="ml-5 hidden items-center gap-1 lg:flex">
-            {NAV_ITEMS.map((item) => (
+            {HEADER_NAV_ITEMS.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
@@ -70,7 +78,7 @@ export function MarketingFooter() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4 text-[13px] text-[#6B7280]">
-          {NAV_ITEMS.map((item) => (
+          {FOOTER_NAV_ITEMS.map((item) => (
             <Link key={item.label} href={item.href} className="transition-colors hover:text-[#111827]">
               {item.label}
             </Link>
