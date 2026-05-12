@@ -1004,9 +1004,9 @@ export function CreateProviderModelForm({
             defaultValue={defaultInputSchema}
             disabled={disabled}
             className={formTextAreaClassName}
-            placeholder={`{\n  "officialDocUrl": "https://provider-docs.example.com/image-api",\n  "params": [\n    {\n      "name": "size",\n      "type": "string",\n      "required": false,\n      "enum": ["1024x1024", "1536x1024"],\n      "default": "1024x1024",\n      "description": "Output image size"\n    }\n  ]\n}`}
+            placeholder={`{\n  "officialDocUrl": "https://provider-docs.example.com/image-api",\n  "params": [\n    {\n      "name": "size",\n      "type": "string",\n      "required": false,\n      "description": "Output image size",\n      "example": "1024x1024",\n      "exposedToCustomer": true\n    },\n    {\n      "name": "style",\n      "type": "string",\n      "required": false,\n      "description": "Visual style preset",\n      "example": "photorealistic",\n      "exposedToCustomer": false\n    }\n  ]\n}`}
           />
-          <FieldHint help="记录上游官方支持的所有入参（名称、类型、范围、默认值、说明）。用于决定未来对客户开放哪些参数。" />
+          <FieldHint help="建议按 params 数组逐项记录：name/type/required/description/example/exposedToCustomer。dashboard 会自动读取并展示给客户。" />
         </label>
 
         <label className="block md:col-span-2">
@@ -1019,9 +1019,9 @@ export function CreateProviderModelForm({
             defaultValue={defaultOutputSchema}
             disabled={disabled}
             className={formTextAreaClassName}
-            placeholder={`{\n  "officialDocUrl": "https://provider-docs.example.com/image-api-response",\n  "fields": [\n    {\n      "name": "data[0].url",\n      "type": "string",\n      "description": "Generated image URL"\n    }\n  ]\n}`}
+            placeholder={`{\n  "officialDocUrl": "https://provider-docs.example.com/image-api-response",\n  "fields": [\n    {\n      "name": "raw.data[0].url",\n      "type": "string",\n      "description": "Original provider output URL path",\n      "example": "https://provider-cdn.example.com/result.png",\n      "exposedToCustomer": false\n    },\n    {\n      "name": "output_payload.assets[0].url",\n      "type": "string",\n      "description": "Normalized asset URL returned by OpenOctopus",\n      "example": "https://api.openoctopus.com/v1/files/{requestId}/assets/0",\n      "exposedToCustomer": true\n    }\n  ]\n}`}
           />
-          <FieldHint help="记录上游官方返回结构说明。注意：客户实际读取仍走统一 output_payload.assets 格式。" />
+          <FieldHint help="建议按 fields 数组逐项记录：name/type/description/example/exposedToCustomer。output 大结构固定，但可补充 raw 和扩展字段说明。" />
         </label>
         <label className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">官方成本价格链接</span>

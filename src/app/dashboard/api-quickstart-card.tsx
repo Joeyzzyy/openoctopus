@@ -14,8 +14,119 @@ type ModelDocItem = {
   officialDocUrl: string | null;
 };
 
-type MainTab = "quickstart" | "response" | "schemas";
+type MainTab = "quickstart" | "input" | "output";
 type LanguageTab = "curl" | "nodejs" | "python" | "go" | "ruby";
+
+function safeParseJsonObject(value: string | null | undefined) {
+  if (!value) {
+    return {};
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+type FieldDoc = {
+  name: string;
+  type?: string;
+  required?: boolean;
+  description?: string;
+  example?: string;
+  exposedToCustomer?: boolean;
+};
+
+function extractFieldDocs(schema: Record<string, unknown>, key: "params" | "fields") {
+  const raw = schema[key];
+  if (!Array.isArray(raw)) {
+    return [] as FieldDoc[];
+  }
+
+  return raw.reduce<FieldDoc[]>((acc, item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return acc;
+      }
+      const row = item as Record<string, unknown>;
+      const name = typeof row.name === "string" ? row.name.trim() : "";
+      if (!name) {
+        return acc;
+      }
+      acc.push({
+        name,
+        type: typeof row.type === "string" ? row.type : undefined,
+        required: typeof row.required === "boolean" ? row.required : undefined,
+        description: typeof row.description === "string" ? row.description : undefined,
+        example:
+          row.example !== undefined && row.example !== null
+            ? String(row.example)
+            : undefined,
+        exposedToCustomer:
+          typeof row.exposedToCustomer === "boolean"
+            ? row.exposedToCustomer
+            : typeof row.customerVisible === "boolean"
+            ? row.customerVisible
+              : undefined,
+      });
+      return acc;
+    }, []);
+}
+
+function FieldDocTable({
+  rows,
+  kind,
+}: {
+  rows: FieldDoc[];
+  kind: "input" | "output";
+}) {
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-black/[0.08] bg-white">
+      <table className="min-w-full text-xs text-black/75">
+        <thead>
+          <tr className="border-b border-black/[0.08] bg-[#FCFCFA] text-[10px] uppercase tracking-[0.8px] text-black/45">
+            <th className="px-3 py-2 text-left">Field</th>
+            <th className="px-3 py-2 text-left">Type</th>
+            <th className="px-3 py-2 text-left">{kind === "input" ? "Required" : "Exposed"}</th>
+            <th className="px-3 py-2 text-left">Description</th>
+            <th className="px-3 py-2 text-left">Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={`${row.name}-${index}`} className="border-b border-black/[0.06] align-top last:border-b-0">
+              <td className="px-3 py-2 font-mono text-[11px] text-black">{row.name}</td>
+              <td className="px-3 py-2">{row.type ?? "-"}</td>
+              <td className="px-3 py-2">
+                {kind === "input"
+                  ? row.required === true
+                    ? "Yes"
+                    : row.required === false
+                      ? "No"
+                      : "-"
+                  : row.exposedToCustomer === true
+                    ? "Yes"
+                    : row.exposedToCustomer === false
+                      ? "No"
+                      : "-"}
+              </td>
+              <td className="px-3 py-2">{row.description ?? "-"}</td>
+              <td className="px-3 py-2 font-mono text-[11px] text-black/65">{row.example ?? "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 function CodeBlock({
   code,
@@ -191,48 +302,12 @@ export function ApiQuickstartCard({
     safeModels.find((item) => item.publicModel === selectedModelSlug) ?? safeModels[0] ?? null;
 
   const capability = selectedModel?.capability ?? "image generation";
+  const providerInputSchema = safeParseJsonObject(selectedModel?.inputSchemaText);
+  const providerOutputSchema = safeParseJsonObject(selectedModel?.outputSchemaText);
+  const inputFieldDocs = extractFieldDocs(providerInputSchema, "params");
+  const outputFieldDocs = extractFieldDocs(providerOutputSchema, "fields");
   const createExamples = buildCreateExamples(selectedModel?.publicModel ?? fallbackModel, capability);
   const taskExample = buildTaskStatusCurl();
-
-  const imageResultShape = `{
-  "id": "task_id",
-  "status": "succeeded",
-  "capability": "image_generation",
-  "output_payload": {
-    "format": "openoctopus.image.output.v1",
-    "raw": { "...": "provider payload" },
-    "assets": [
-      {
-        "id": "0",
-        "index": 0,
-        "type": "image",
-        "url": "data:image/...;base64,... | /v1/files/:requestId/assets/:assetIndex | https://...",
-        "sourceUrl": "optional",
-        "mimeType": "image/png"
-      }
-    ]
-  }
-}`;
-
-  const videoResultShape = `{
-  "id": "task_id",
-  "status": "succeeded",
-  "capability": "video_generation",
-  "output_payload": {
-    "format": "openoctopus.video.output.v1",
-    "raw": { "...": "provider payload" },
-    "assets": [
-      {
-        "id": "0",
-        "index": 0,
-        "type": "video",
-        "url": "https://... | /v1/files/:requestId/assets/:assetIndex",
-        "mimeType": "video/mp4",
-        "durationSeconds": 5
-      }
-    ]
-  }
-}`;
 
   const [copiedBlock, setCopiedBlock] = useState<string | null>(null);
 
@@ -248,8 +323,38 @@ export function ApiQuickstartCard({
       ? "border-black bg-black text-white"
       : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]";
 
+  const embeddedInputSchema = JSON.stringify(
+    {
+      standard: {
+        model: "public model slug (required)",
+        prompt: "user prompt (required)",
+        input: "provider-specific options (optional object)",
+      },
+      providerExtension: providerInputSchema,
+    },
+    null,
+    2
+  );
+
+  const embeddedOutputSchema = JSON.stringify(
+    {
+      standard: {
+        id: "task id",
+        status: "queued | processing | succeeded | failed | cancelled",
+        capability: "image_generation | video_generation",
+        output_payload: {
+          format: "openoctopus.image.output.v1 | openoctopus.video.output.v1",
+          assets: "normalized output assets",
+          raw: "full upstream raw payload (provider original response)",
+        },
+      },
+      providerExtension: providerOutputSchema,
+    },
+    null,
+    2
+  );
+
   const currentCreateExample = createExamples[languageTab];
-  const isVideo = capability.includes("video");
 
   return (
     <section className="rounded-[28px] border border-black/[0.08] bg-white p-4 shadow-[0_24px_70px_rgba(17,24,39,0.08)] sm:p-6">
@@ -277,17 +382,17 @@ export function ApiQuickstartCard({
         </button>
         <button
           type="button"
-          onClick={() => setMainTab("response")}
-          className={`inline-flex h-8 cursor-pointer items-center rounded-md border px-3 text-xs font-medium transition-colors ${tabClass(mainTab === "response")}`}
+          onClick={() => setMainTab("input")}
+          className={`inline-flex h-8 cursor-pointer items-center rounded-md border px-3 text-xs font-medium transition-colors ${tabClass(mainTab === "input")}`}
         >
-          Response Contract
+          Input Params
         </button>
         <button
           type="button"
-          onClick={() => setMainTab("schemas")}
-          className={`inline-flex h-8 cursor-pointer items-center rounded-md border px-3 text-xs font-medium transition-colors ${tabClass(mainTab === "schemas")}`}
+          onClick={() => setMainTab("output")}
+          className={`inline-flex h-8 cursor-pointer items-center rounded-md border px-3 text-xs font-medium transition-colors ${tabClass(mainTab === "output")}`}
         >
-          Model Schemas
+          Output Params
         </button>
       </div>
 
@@ -351,14 +456,26 @@ export function ApiQuickstartCard({
         </div>
       ) : null}
 
-      {mainTab === "response" ? (
+      {mainTab === "input" ? (
         <div className="mt-4 space-y-3">
           <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-            <p className="text-[10px] uppercase tracking-[1px] text-black/45">Unified Result Contract</p>
+            <div>
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                Input Schema (Standard + Provider Extension)
+              </p>
+              <p className="mt-1 text-xs leading-5 text-black/55">
+                Standard request contract merged with this model's upstream input parameters.
+              </p>
+            </div>
+            {inputFieldDocs.length > 0 ? (
+              <div className="mt-3">
+                <FieldDocTable rows={inputFieldDocs} kind="input" />
+              </div>
+            ) : null}
             <div className="mt-3">
               <CodeBlock
-                code={isVideo ? videoResultShape : imageResultShape}
-                copyId="result"
+                code={embeddedInputSchema}
+                copyId="input-schema"
                 copiedBlock={copiedBlock}
                 onCopy={copyText}
               />
@@ -367,29 +484,25 @@ export function ApiQuickstartCard({
         </div>
       ) : null}
 
-      {mainTab === "schemas" ? (
+      {mainTab === "output" ? (
         <div className="mt-4 space-y-3">
           <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
             <div>
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Model Input Schema (Internal)</p>
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                Output Schema (Standard + Provider Extension)
+              </p>
+              <p className="mt-1 text-xs leading-5 text-black/55">
+                Standard output contract merged with this model's upstream raw output structure.
+              </p>
             </div>
+            {outputFieldDocs.length > 0 ? (
+              <div className="mt-3">
+                <FieldDocTable rows={outputFieldDocs} kind="output" />
+              </div>
+            ) : null}
             <div className="mt-3">
               <CodeBlock
-                code={selectedModel?.inputSchemaText ?? "{}"}
-                copyId="input-schema"
-                copiedBlock={copiedBlock}
-                onCopy={copyText}
-              />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-            <div>
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Model Output Schema (Internal)</p>
-            </div>
-            <div className="mt-3">
-              <CodeBlock
-                code={selectedModel?.outputSchemaText ?? "{}"}
+                code={embeddedOutputSchema}
                 copyId="output-schema"
                 copiedBlock={copiedBlock}
                 onCopy={copyText}
