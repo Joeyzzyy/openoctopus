@@ -16,7 +16,7 @@ import { DashboardMobileNav, DashboardSidebar } from "./dashboard-sidebar";
 import { ApiKeysTable } from "./api-keys-table";
 import { ApiQuickstartCard } from "./api-quickstart-card";
 import { ModelCatalogTable } from "./model-catalog-table";
-import { ModelCatalogFilters } from "./model-catalog-filters";
+import { ModelsDocPanel } from "./models-doc-panel";
 import { TopUpForm } from "./top-up-form";
 import { AutoRefreshOnReturn } from "./auto-refresh-on-return";
 import { TopUpCelebration } from "./top-up-celebration";
@@ -1124,29 +1124,20 @@ export default async function DashboardPage({
 
             {view === "models" ? (
               <section className="p-0">
-                <div className="mb-4">
-                  <ModelCatalogFilters
-                    selectedType={selectedModelType}
-                    selectedModelSlug={selectedModelSlug}
-                    modelOptions={modelCatalogRows.map((row) => ({
-                      slug: row.publicModel,
-                      label: row.displayName,
-                      capability: row.capability,
-                    }))}
-                    baseParams={{
-                      view: "models",
-                      requestsPage: "1",
-                      billingPage: "1",
-                      analyticsInterval,
-                      analyticsRange,
-                      apiKey: selectedApiKeyId,
-                    }}
-                  />
-                </div>
-                <div className="mb-4">
-                  <ApiQuickstartCard models={modelCatalogRowsByType} initialModel={selectedModelSlug} />
-                </div>
-                <ModelCatalogTable rows={modelCatalogRowsFiltered} />
+                <ModelsDocPanel
+                  selectedType={selectedModelType}
+                  selectedModelSlug={selectedModelSlug}
+                  allRows={modelCatalogRows}
+                  filteredRows={modelCatalogRowsFiltered}
+                  baseParams={{
+                    view: "models",
+                    requestsPage: "1",
+                    billingPage: "1",
+                    analyticsInterval,
+                    analyticsRange,
+                    apiKey: selectedApiKeyId,
+                  }}
+                />
               </section>
             ) : null}
 

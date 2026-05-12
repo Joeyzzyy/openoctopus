@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { usePathname, useRouter } from "next/navigation";
 
 type ModelType = "image" | "video" | "text-coding";
 
@@ -25,16 +24,13 @@ export function ModelCatalogFilters({
   selectedType,
   selectedModelSlug,
   modelOptions,
-  baseParams,
+  onNavigate,
 }: {
   selectedType: ModelType;
   selectedModelSlug: string | null;
   modelOptions: ModelOption[];
-  baseParams: Record<string, string | null>;
+  onNavigate: (nextType: ModelType, nextModelSlug: string | null) => void;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-
   const grouped = useMemo(() => {
     const byType = {
       image: [] as ModelOption[],
@@ -50,23 +46,6 @@ export function ModelCatalogFilters({
   const visibleModels = useMemo(() => {
     return grouped[selectedType];
   }, [grouped, selectedType]);
-
-  const navigate = (nextType: ModelType, nextModelSlug: string | null) => {
-    const params = new URLSearchParams();
-
-    for (const [key, value] of Object.entries(baseParams)) {
-      if (value) {
-        params.set(key, value);
-      }
-    }
-
-    params.set("modelType", nextType);
-    if (nextModelSlug) {
-      params.set("modelSlug", nextModelSlug);
-    }
-
-    router.push(`${pathname}?${params.toString()}`);
-  };
 
   return (
     <div className="grid gap-3 rounded-2xl border border-black/[0.08] bg-white p-3 md:grid-cols-2">
@@ -84,7 +63,7 @@ export function ModelCatalogFilters({
               currentStillVisible && selectedModelSlug
                 ? selectedModelSlug
                 : (nextVisibleModels[0]?.slug ?? null);
-            navigate(nextType, nextSlug);
+            onNavigate(nextType, nextSlug);
           }}
           className="h-9 w-full rounded-md border border-black/[0.1] bg-[#FCFCFA] px-3 text-xs text-black/80"
         >
@@ -98,7 +77,7 @@ export function ModelCatalogFilters({
         <span className="mb-1.5 block text-[11px] tracking-[0.35px] text-black/55">Model</span>
         <select
           value={selectedModelSlug ?? visibleModels[0]?.slug ?? ""}
-          onChange={(event) => navigate(selectedType, event.target.value || null)}
+          onChange={(event) => onNavigate(selectedType, event.target.value || null)}
           className="h-9 w-full rounded-md border border-black/[0.1] bg-[#FCFCFA] px-3 text-xs text-black/80"
         >
           {visibleModels.map((item) => (

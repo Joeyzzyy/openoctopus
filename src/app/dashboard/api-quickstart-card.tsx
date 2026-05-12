@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Check, Copy, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { buildTaskStatusCurl, PUBLIC_API_BASE_URL } from "@/lib/api-docs";
@@ -63,11 +63,18 @@ export function ApiQuickstartCard({
         ];
 
   const fallbackModel = safeModels[0]?.publicModel ?? "openoctopus/seedream-4.5";
-  const [selectedModelSlug, setSelectedModelSlug] = useState(
-    initialModel && safeModels.some((item) => item.publicModel === initialModel)
-      ? initialModel
-      : fallbackModel
+  const resolvedModel = useMemo(
+    () =>
+      initialModel && safeModels.some((item) => item.publicModel === initialModel)
+        ? initialModel
+        : fallbackModel,
+    [initialModel, safeModels, fallbackModel]
   );
+  const [selectedModelSlug, setSelectedModelSlug] = useState(resolvedModel);
+  useEffect(() => {
+    setSelectedModelSlug(resolvedModel);
+  }, [resolvedModel]);
+
   const selectedModel =
     safeModels.find((item) => item.publicModel === selectedModelSlug) ?? safeModels[0] ?? null;
 
@@ -169,42 +176,19 @@ console.log("image url:", imageAsset.url);`;
     <section className="rounded-[28px] border border-black/[0.08] bg-white p-4 shadow-[0_24px_70px_rgba(17,24,39,0.08)] sm:p-6">
       <div>
         <p className="text-[10px] uppercase tracking-[1px] text-black/45">API Quickstart</p>
-        <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em] text-[#111827] sm:mt-2 sm:text-xl">
-          Model-aware API doc from internal configuration
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60">
-          Select a model. Request examples, official schema notes, and output structure update automatically.
-        </p>
+        {selectedModel?.officialDocUrl ? (
+          <a
+            href={selectedModel.officialDocUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex h-9 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs text-black/75 transition-colors hover:bg-black/[0.03]"
+          >
+            Official Upstream Docs
+          </a>
+        ) : null}
       </div>
 
       <div className="mt-5 space-y-3">
-        <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
-          <p className="text-[10px] uppercase tracking-[1px] text-black/45">Model</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <select
-              value={selectedModelSlug}
-              onChange={(event) => setSelectedModelSlug(event.target.value)}
-              className="h-9 min-w-[260px] rounded-md border border-black/[0.08] bg-white px-3 text-xs text-black/75"
-            >
-              {safeModels.map((item) => (
-                <option key={item.publicModel} value={item.publicModel}>
-                  {item.displayName} ({item.publicModel})
-                </option>
-              ))}
-            </select>
-            {selectedModel?.officialDocUrl ? (
-              <a
-                href={selectedModel.officialDocUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-9 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs text-black/75 transition-colors hover:bg-black/[0.03]"
-              >
-                Official Upstream Docs
-              </a>
-            ) : null}
-          </div>
-        </div>
-
         <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
