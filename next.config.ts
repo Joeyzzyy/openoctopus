@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
         },
         {
           source: "/api/tools",
-          destination: "https://openoctopus-tools.vercel.app/api/tools",
+          destination: "https://openoctopus-tools-theta.vercel.app/api/tools",
           basePath: false,
         },
         {
