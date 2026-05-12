@@ -18,12 +18,12 @@ const nextConfig: NextConfig = {
       beforeFiles: [
         {
           source: "/tools",
-          destination: "https://openoctopus-tools.vercel.app/tools",
+          destination: "https://openoctopus-tools-theta.vercel.app/tools",
           basePath: false,
         },
         {
           source: "/tools/:path*",
-          destination: "https://openoctopus-tools.vercel.app/tools/:path*",
+          destination: "https://openoctopus-tools-theta.vercel.app/tools/:path*",
           basePath: false,
         },
         {
