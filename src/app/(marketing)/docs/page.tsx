@@ -152,7 +152,7 @@ export const metadata = {
 
 function CodeBlock({ code }: { code: string }) {
   return (
-    <pre className="mt-4 overflow-x-auto rounded-lg border border-black/8 bg-[#1C1917] p-4 text-xs leading-6 text-[#f4f1ea]">
+    <pre className="mt-4 overflow-x-auto rounded-xl border border-[#2A2623] bg-[#171412] p-4 text-xs leading-6 text-[#F8F3E8] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
       <code>{code}</code>
     </pre>
   );
@@ -174,12 +174,12 @@ function DocsSection({
   return (
     <section
       id={id}
-      className="scroll-mt-28 rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm md:p-6"
+      className="scroll-mt-28 rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm ring-1 ring-black/[0.02] md:p-6"
     >
-      <p className="text-[10px] uppercase tracking-[1px] text-black/42">
+      <p className="text-[10px] font-semibold uppercase tracking-[1.2px] text-black/42">
         {eyebrow}
       </p>
-      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-black">
+      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-black md:text-[30px]">
         {title}
       </h2>
       <p className="mt-3 max-w-3xl text-sm leading-7 text-black/60">
@@ -209,9 +209,15 @@ export default function DocsPage() {
 
       <div className="px-6 pb-14 md:px-8 md:pb-20">
         <div className="mx-auto max-w-7xl">
-        <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
+        <div className="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)] xl:gap-8">
           <aside className="xl:sticky xl:top-28 xl:self-start">
-            <SurfaceCard className="p-4">
+            <SurfaceCard className="overflow-hidden p-0">
+              <div className="border-b border-black/[0.06] bg-gradient-to-r from-[#F6EFE3] to-[#FAF8F2] px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[1.2px] text-black/45">
+                  OpenOctopus Docs
+                </p>
+              </div>
+              <div className="p-4">
               <p className="text-[10px] uppercase tracking-[1px] text-black/45">
                 On This Page
               </p>
@@ -234,10 +240,28 @@ export default function DocsPage() {
                   {PUBLIC_API_BASE_URL}
                 </code>
               </div>
+              </div>
             </SurfaceCard>
           </aside>
 
           <div className="space-y-6">
+            <div className="rounded-2xl border border-black/[0.08] bg-gradient-to-r from-[#FAF6EC] via-[#FFFFFF] to-[#F5F8FF] p-5 shadow-sm">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-black/[0.08] bg-white px-3 py-3">
+                  <p className="text-[11px] uppercase tracking-[1px] text-black/45">Auth</p>
+                  <p className="mt-1 text-sm font-medium text-black">Bearer Token</p>
+                </div>
+                <div className="rounded-xl border border-black/[0.08] bg-white px-3 py-3">
+                  <p className="text-[11px] uppercase tracking-[1px] text-black/45">Request Style</p>
+                  <p className="mt-1 text-sm font-medium text-black">Asynchronous Tasks</p>
+                </div>
+                <div className="rounded-xl border border-black/[0.08] bg-white px-3 py-3">
+                  <p className="text-[11px] uppercase tracking-[1px] text-black/45">Coverage</p>
+                  <p className="mt-1 text-sm font-medium text-black">Image + Video</p>
+                </div>
+              </div>
+            </div>
+
             <DocsSection
               id="overview"
               eyebrow="Overview"
@@ -337,11 +361,11 @@ export default function DocsPage() {
                 {endpoints.map((endpoint) => (
                   <div
                     key={`${endpoint.method}-${endpoint.path}`}
-                    className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4"
+                    className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4 transition-colors hover:bg-white"
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                        <p className="inline-flex rounded-md bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[1px] text-black/52">
                           {endpoint.method}
                         </p>
                         <p className="mt-1 break-all text-sm font-medium text-black">
@@ -509,7 +533,7 @@ export default function DocsPage() {
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-black/8 bg-[#faf9f6] p-4">
+                <div className="rounded-xl border border-black/[0.08] bg-[#FAF9F4] p-4">
                   <h3 className="text-lg font-semibold text-black">
                     Request body fields
                   </h3>
