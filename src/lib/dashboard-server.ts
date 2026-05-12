@@ -359,6 +359,35 @@ async function buildStripeBillingLinkMap(paymentIntentIds: string[]) {
   return billingLinksByPaymentIntentId;
 }
 
+async function buildStripeInvoiceUrlMap(invoiceIds: string[]) {
+  const uniqueIds = Array.from(new Set(invoiceIds.filter((id) => id.length > 0)));
+  if (uniqueIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    return new Map<string, string>();
+  }
+
+  const stripe = new Stripe(stripeSecretKey);
+  const invoiceUrlById = new Map<string, string>();
+
+  for (const invoiceId of uniqueIds) {
+    try {
+      const invoice = await stripe.invoices.retrieve(invoiceId);
+      const url = invoice.hosted_invoice_url ?? invoice.invoice_pdf ?? null;
+      if (url) {
+        invoiceUrlById.set(invoiceId, url);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return invoiceUrlById;
+}
+
 export async function getDashboardData({
   requestsPage = 1,
   requestsApiKeyId = null,
@@ -526,7 +555,15 @@ export async function getDashboardData({
         return typeof paymentIntentId === "string" ? paymentIntentId : "";
       })
       .filter((id) => id.length > 0);
+    const stripeInvoiceIds = (walletLedgerRows ?? [])
+      .map((row) => {
+        const metadata = (row as { metadata?: Record<string, unknown> }).metadata;
+        const invoiceId = metadata?.stripe_invoice_id;
+        return typeof invoiceId === "string" ? invoiceId : "";
+      })
+      .filter((id) => id.length > 0);
     const billingLinksByPaymentIntentId = await buildStripeBillingLinkMap(stripePaymentIntentIds);
+    const invoiceUrlById = await buildStripeInvoiceUrlMap(stripeInvoiceIds);
 
     const spendTrend = Array.from({ length: 7 }).map((_, index) => {
       const date = new Date();
@@ -812,6 +849,10 @@ export async function getDashboardData({
           metadata && typeof metadata.stripe_payment_intent_id === "string"
             ? metadata.stripe_payment_intent_id
             : null;
+        const stripeInvoiceId =
+          metadata && typeof metadata.stripe_invoice_id === "string"
+            ? metadata.stripe_invoice_id
+            : null;
 
         return {
           id: row.id,
@@ -835,9 +876,11 @@ export async function getDashboardData({
           receiptUrl: stripePaymentIntentId
             ? (billingLinksByPaymentIntentId.get(stripePaymentIntentId)?.receiptUrl ?? null)
             : null,
-          invoiceUrl: stripePaymentIntentId
-            ? (billingLinksByPaymentIntentId.get(stripePaymentIntentId)?.invoiceUrl ?? null)
-            : null,
+          invoiceUrl:
+            (stripeInvoiceId ? invoiceUrlById.get(stripeInvoiceId) ?? null : null) ??
+            (stripePaymentIntentId
+              ? (billingLinksByPaymentIntentId.get(stripePaymentIntentId)?.invoiceUrl ?? null)
+              : null),
         };
       }),
       providerSummaries,

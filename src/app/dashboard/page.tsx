@@ -995,32 +995,32 @@ export default async function DashboardPage({
                               {row.description}
                             </td>
                             <td className="sticky right-0 z-10 bg-white px-2 py-3 text-right text-sm">
-                              {row.invoiceUrl || row.receiptUrl ? (
-                                <div className="flex items-center justify-end gap-2">
-                                  {row.invoiceUrl ? (
-                                    <a
-                                      href={row.invoiceUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]"
-                                    >
-                                      Download Invoice
-                                    </a>
-                                  ) : null}
-                                  {row.receiptUrl ? (
-                                    <a
-                                      href={row.receiptUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]"
-                                    >
-                                      Download Receipt
-                                    </a>
-                                  ) : null}
-                                </div>
-                              ) : (
-                                <span className="text-xs text-black/45">Pending</span>
-                              )}
+                              <div className="flex items-center justify-end gap-2">
+                                <a
+                                  href={row.invoiceUrl ?? row.receiptUrl ?? "#"}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  aria-disabled={!row.invoiceUrl && !row.receiptUrl}
+                                  className={cn(
+                                    "inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium transition-colors",
+                                    row.invoiceUrl || row.receiptUrl
+                                      ? "text-black/70 hover:bg-black/[0.03]"
+                                      : "pointer-events-none text-black/35 opacity-60"
+                                  )}
+                                >
+                                  Download Invoice
+                                </a>
+                                {row.receiptUrl ? (
+                                  <a
+                                    href={row.receiptUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]"
+                                  >
+                                    Download Receipt
+                                  </a>
+                                ) : null}
+                              </div>
                             </td>
                           </tr>
                         ))

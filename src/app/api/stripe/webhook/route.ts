@@ -93,6 +93,7 @@ export async function POST(request: Request) {
       stripe_checkout_session_id: session.id,
       stripe_payment_intent_id:
         typeof session.payment_intent === "string" ? session.payment_intent : null,
+      stripe_invoice_id: typeof session.invoice === "string" ? session.invoice : null,
       amount_usd: amountUsd,
     },
     created_by: userId,

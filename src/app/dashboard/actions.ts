@@ -306,6 +306,9 @@ export async function createTopUpCheckoutSession(formData: FormData) {
         topupProductId: topupProductId ?? "",
       },
       allow_promotion_codes: false,
+      invoice_creation: {
+        enabled: true,
+      },
     });
 
     if (!session.url) {
