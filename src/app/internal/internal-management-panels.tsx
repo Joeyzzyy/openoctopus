@@ -132,6 +132,8 @@ type ProviderModelSummary = {
   }>;
   executionTemplate: string;
   executionConfigText: string;
+  inputSchemaText: string;
+  outputSchemaText: string;
   runtimeDiagnostics: string[];
 };
 
@@ -177,6 +179,39 @@ function readComparableUnitCost(configText: string) {
     return deriveLegacyBillingFields(config);
   } catch {
     return null;
+  }
+}
+
+function readSchemaDocUrl(schemaText: string) {
+  try {
+    const parsed = JSON.parse(schemaText) as Record<string, unknown>;
+    const candidates = [
+      parsed.officialDocUrl,
+      parsed.docUrl,
+      parsed.docsUrl,
+      parsed.sourceUrl,
+    ];
+    const url = candidates.find((item) => typeof item === "string" && item.trim().length > 0);
+    return typeof url === "string" ? url.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function summarizeInputSchema(schemaText: string) {
+  try {
+    const parsed = JSON.parse(schemaText) as Record<string, unknown>;
+    const params = Array.isArray(parsed.params) ? parsed.params : null;
+    if (params) {
+      return `参数 ${params.length} 项`;
+    }
+    const properties =
+      parsed.properties && typeof parsed.properties === "object" && !Array.isArray(parsed.properties)
+        ? Object.keys(parsed.properties as Record<string, unknown>).length
+        : 0;
+    return properties > 0 ? `参数 ${properties} 项` : "已配置";
+  } catch {
+    return "格式无效";
   }
 }
 
@@ -1223,13 +1258,14 @@ export function EconomicsPanel({
       {rows.length > 0 ? (
         <>
           <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
-            <table className="min-w-[2360px] border-separate border-spacing-0 text-left text-sm">
+            <table className="min-w-[2520px] border-separate border-spacing-0 text-left text-sm">
               <thead>
                 <tr className="text-xs text-black/50">
                   <th className="w-[230px] border-b border-black/[0.08] px-3 py-2.5">分类</th>
                   <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
                   <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">上游模型</th>
                   <th className="w-[150px] border-b border-black/[0.08] px-3 py-2.5">能力</th>
+                  <th className="w-[230px] border-b border-black/[0.08] px-3 py-2.5">参数文档</th>
                   <th className="w-[240px] border-b border-black/[0.08] px-3 py-2.5">售价</th>
                   <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">成本</th>
                   <th className="w-[140px] border-b border-black/[0.08] px-3 py-2.5">标准利润</th>
@@ -1251,14 +1287,14 @@ export function EconomicsPanel({
                       <Fragment key={`row-group-${row.providerModel.id}`}>
                         {providerChanged ? (
                           <tr key={`provider-${row.providerModel.id}`}>
-                            <td colSpan={10} className="border-b border-black/[0.06] bg-[#F3F7FF] px-3 py-2.5 text-sm font-semibold text-[#355FB4]">
+                            <td colSpan={11} className="border-b border-black/[0.06] bg-[#F3F7FF] px-3 py-2.5 text-sm font-semibold text-[#355FB4]">
                               供应商：{row.providerName} · {row.providerSlug}
                             </td>
                           </tr>
                         ) : null}
                         {vendorChanged ? (
                           <tr key={`vendor-${row.providerModel.id}`}>
-                            <td colSpan={10} className="border-b border-black/[0.06] bg-[#FCFCFA] px-3 py-2 text-xs font-medium text-black/70">
+                            <td colSpan={11} className="border-b border-black/[0.06] bg-[#FCFCFA] px-3 py-2 text-xs font-medium text-black/70">
                               模型公司：{row.vendor}
                             </td>
                           </tr>
@@ -1278,6 +1314,21 @@ export function EconomicsPanel({
                             <p className="mt-1 text-xs text-black/50">{row.providerModel.public_model_slug}</p>
                           </td>
                           <td className="w-[150px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{row.providerModel.capability}</td>
+                          <td className="w-[230px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                            <p>{summarizeInputSchema(row.providerModel.inputSchemaText)}</p>
+                            {readSchemaDocUrl(row.providerModel.inputSchemaText) ? (
+                              <a
+                                href={readSchemaDocUrl(row.providerModel.inputSchemaText) ?? ""}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-1 inline-flex text-[11px] text-[#355FB4] underline-offset-2 hover:underline"
+                              >
+                                官方参数文档
+                              </a>
+                            ) : (
+                              <p className="mt-1 text-[11px] text-black/45">未填官方文档链接</p>
+                            )}
+                          </td>
                           <td className="w-[240px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{row.supportedModel.billingSummary}</td>
                           <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
                             <p>{row.providerModel.pricingSummary}</p>
@@ -1342,6 +1393,8 @@ export function EconomicsPanel({
                                     defaultPricingSourceUrl={row.providerModel.pricingSourceUrl ?? undefined}
                                     defaultPricingSourceNote={row.providerModel.pricingSourceNote ?? undefined}
                                     defaultPricingSourceEvidence={JSON.stringify(row.providerModel.pricingSourceEvidence)}
+                                    defaultInputSchema={row.providerModel.inputSchemaText}
+                                    defaultOutputSchema={row.providerModel.outputSchemaText}
                                     defaultExecutionTemplate={row.providerModel.executionTemplate}
                                     defaultExecutionConfig={row.providerModel.executionConfigText}
                                     defaultActive={row.providerModel.active}
@@ -1377,7 +1430,7 @@ export function EconomicsPanel({
                   })
                 ) : (
                   <tr>
-                    <td colSpan={10} className="px-3 py-8 text-center text-sm text-black/55">
+                    <td colSpan={11} className="px-3 py-8 text-center text-sm text-black/55">
                       当前筛选条件下没有结果。
                     </td>
                   </tr>
@@ -2018,6 +2071,8 @@ export function ModelsPanel({
                     defaultPricingSourceUrl={item.pricingSourceUrl ?? undefined}
                     defaultPricingSourceNote={item.pricingSourceNote ?? undefined}
                     defaultPricingSourceEvidence={JSON.stringify(item.pricingSourceEvidence)}
+                    defaultInputSchema={item.inputSchemaText}
+                    defaultOutputSchema={item.outputSchemaText}
                     defaultExecutionTemplate={item.executionTemplate}
                     defaultExecutionConfig={item.executionConfigText}
                     defaultActive={item.active}

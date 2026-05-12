@@ -527,6 +527,8 @@ export function CreateProviderModelForm({
   defaultPricingSourceUrl,
   defaultPricingSourceNote,
   defaultPricingSourceEvidence = "[]",
+  defaultInputSchema = "{}",
+  defaultOutputSchema = "{}",
   defaultExecutionTemplate = "rest-async-poll-v1",
   defaultExecutionConfig = '{"submitPath":"/v1/models/{upstreamModel}:generate","pollPath":"/v1/operations/{taskId}","taskIdPath":"name","statusPath":"done","resultUrlPath":"response.outputUrl"}',
   defaultActive = true,
@@ -548,6 +550,8 @@ export function CreateProviderModelForm({
   defaultPricingSourceUrl?: string;
   defaultPricingSourceNote?: string;
   defaultPricingSourceEvidence?: string;
+  defaultInputSchema?: string;
+  defaultOutputSchema?: string;
   defaultExecutionTemplate?: string;
   defaultExecutionConfig?: string;
   defaultActive?: boolean;
@@ -990,8 +994,35 @@ export function CreateProviderModelForm({
           />
         </div>
 
-        <input type="hidden" name="inputSchema" value="{}" />
-        <input type="hidden" name="outputSchema" value="{}" />
+        <label className="block md:col-span-2">
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
+            上游官方输入参数说明（JSON）
+          </span>
+          <textarea
+            name="inputSchema"
+            rows={10}
+            defaultValue={defaultInputSchema}
+            disabled={disabled}
+            className={formTextAreaClassName}
+            placeholder={`{\n  "officialDocUrl": "https://provider-docs.example.com/image-api",\n  "params": [\n    {\n      "name": "size",\n      "type": "string",\n      "required": false,\n      "enum": ["1024x1024", "1536x1024"],\n      "default": "1024x1024",\n      "description": "Output image size"\n    }\n  ]\n}`}
+          />
+          <FieldHint help="记录上游官方支持的所有入参（名称、类型、范围、默认值、说明）。用于决定未来对客户开放哪些参数。" />
+        </label>
+
+        <label className="block md:col-span-2">
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
+            上游官方输出参数说明（JSON）
+          </span>
+          <textarea
+            name="outputSchema"
+            rows={8}
+            defaultValue={defaultOutputSchema}
+            disabled={disabled}
+            className={formTextAreaClassName}
+            placeholder={`{\n  "officialDocUrl": "https://provider-docs.example.com/image-api-response",\n  "fields": [\n    {\n      "name": "data[0].url",\n      "type": "string",\n      "description": "Generated image URL"\n    }\n  ]\n}`}
+          />
+          <FieldHint help="记录上游官方返回结构说明。注意：客户实际读取仍走统一 output_payload.assets 格式。" />
+        </label>
         <label className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">官方成本价格链接</span>
           <input

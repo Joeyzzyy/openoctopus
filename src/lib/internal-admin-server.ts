@@ -910,6 +910,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       ),
       executionTemplate: providerModel.execution_template ?? "rest-async-poll-v1",
       executionConfigText: formatJson(providerModel.execution_config),
+      inputSchemaText: formatJson(providerModel.input_schema),
+      outputSchemaText: formatJson(providerModel.output_schema),
       runtimeDiagnostics: getProviderModelRuntimeDiagnostics({
         providerModel,
         provider: provider ?? null,
