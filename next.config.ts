@@ -38,12 +38,12 @@ const nextConfig: NextConfig = {
         },
         {
           source: "/resource",
-          destination: "https://openoctopus-seo.vercel.app/resource",
+          destination: "https://openoctopus-seo-nine.vercel.app/resource",
           basePath: false,
         },
         {
           source: "/resource/:path*",
-          destination: "https://openoctopus-seo.vercel.app/resource/:path*",
+          destination: "https://openoctopus-seo-nine.vercel.app/resource/:path*",
           basePath: false,
         }
 
