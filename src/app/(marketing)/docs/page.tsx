@@ -1,6 +1,7 @@
 import { PageHero } from "@/components/marketing/page-primitives";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { createClient } from "@/lib/supabase/server";
+import { unstable_noStore as noStore } from "next/cache";
 
 export const metadata = {
   title: "API Docs — OpenOctopus",
@@ -9,6 +10,7 @@ export const metadata = {
 };
 
 export default async function DocsPage() {
+  noStore();
   const supabase = await createClient();
   const {
     data: { user },

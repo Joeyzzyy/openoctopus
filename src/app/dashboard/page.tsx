@@ -25,7 +25,6 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 type DashboardView =
   | "dashboard"
   | "request-details"
-  | "billing-details"
   | "models"
   | "api-keys"
   | "api-calling-doc";
@@ -39,7 +38,6 @@ const pageNav = [
   { label: "API Calling Doc", view: "api-calling-doc" },
   { label: "Models", view: "models" },
   { label: "Request Details", view: "request-details" },
-  { label: "Billing Details", view: "billing-details" },
 ] as const;
 
 const requestStatusStyles = {
@@ -162,6 +160,7 @@ function formatBucketLabel(date: Date, interval: RequestInterval) {
 function buildDashboardHref(input: {
   view: DashboardView;
   requestsPage?: number;
+  billingPage?: number;
   apiKeyId?: string | null;
   analyticsInterval: RequestInterval;
   analyticsRange: RequestRange;
@@ -171,6 +170,7 @@ function buildDashboardHref(input: {
   const params = new URLSearchParams();
   params.set("view", input.view);
   params.set("requestsPage", String(input.requestsPage ?? 1));
+  params.set("billingPage", String(input.billingPage ?? 1));
   params.set("analyticsInterval", input.analyticsInterval);
   params.set("analyticsRange", input.analyticsRange);
   if (input.modelType && input.modelType !== "all") {
@@ -179,7 +179,7 @@ function buildDashboardHref(input: {
   if (input.apiKeyId) {
     params.set("apiKey", input.apiKeyId);
   }
-  if (input.billingFlow && input.view === "billing-details") {
+  if (input.billingFlow && input.view === "dashboard") {
     params.set("billingFlow", input.billingFlow);
   }
   return `/dashboard?${params.toString()}`;
@@ -376,6 +376,8 @@ export default async function DashboardPage({
   );
   const rawRequestsPage = Number(getSearchValue(resolvedSearchParams, "requestsPage") ?? "1");
   const requestsPage = Number.isFinite(rawRequestsPage) ? rawRequestsPage : 1;
+  const rawBillingPage = Number(getSearchValue(resolvedSearchParams, "billingPage") ?? "1");
+  const billingPage = Number.isFinite(rawBillingPage) ? Math.max(1, Math.floor(rawBillingPage)) : 1;
   const selectedApiKeyId = getSearchValue(resolvedSearchParams, "apiKey") ?? null;
   const selectedModelType = parseModelType(getSearchValue(resolvedSearchParams, "modelType"));
   const selectedBillingFlow = parseBillingFlow(getSearchValue(resolvedSearchParams, "billingFlow"));
@@ -452,6 +454,11 @@ export default async function DashboardPage({
   const billingRowsFiltered = billingRows.filter((row) =>
     selectedBillingFlow === "incoming" ? row.amountValue >= 0 : row.amountValue < 0
   );
+  const billingPageSize = 5;
+  const billingTotalPages = Math.max(1, Math.ceil(billingRowsFiltered.length / billingPageSize));
+  const normalizedBillingPage = Math.min(billingPage, billingTotalPages);
+  const billingStart = (normalizedBillingPage - 1) * billingPageSize;
+  const billingRowsPage = billingRowsFiltered.slice(billingStart, billingStart + billingPageSize);
 
   const overviewCards = [
     {
@@ -900,7 +907,7 @@ export default async function DashboardPage({
                 </section>
             ) : null}
 
-            {view === "billing-details" ? (
+            {view === "dashboard" ? (
               <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-4">
                   <h2 className="text-xl font-semibold text-black">Billing details</h2>
@@ -911,8 +918,9 @@ export default async function DashboardPage({
                 <div className="mb-4 flex flex-wrap gap-2">
                   <Link
                     href={buildDashboardHref({
-                      view: "billing-details",
+                      view: "dashboard",
                       requestsPage: 1,
+                      billingPage: 1,
                       apiKeyId: selectedApiKeyId,
                       analyticsInterval,
                       analyticsRange,
@@ -930,8 +938,9 @@ export default async function DashboardPage({
                   </Link>
                   <Link
                     href={buildDashboardHref({
-                      view: "billing-details",
+                      view: "dashboard",
                       requestsPage: 1,
+                      billingPage: 1,
                       apiKeyId: selectedApiKeyId,
                       analyticsInterval,
                       analyticsRange,
@@ -959,7 +968,7 @@ export default async function DashboardPage({
                               key={heading}
                               className={cn(
                                 "h-10 px-2 text-[10px] tracking-[1px] text-black/50",
-                                heading === "Invoice / Receipt"
+                                heading === "Operation"
                                   ? "sticky right-0 z-20 bg-white text-right"
                                   : ""
                               )}
@@ -971,8 +980,8 @@ export default async function DashboardPage({
                       </tr>
                     </thead>
                     <tbody>
-                      {billingRowsFiltered.length > 0 ? (
-                        billingRowsFiltered.map((row) => (
+                      {billingRowsPage.length > 0 ? (
+                        billingRowsPage.map((row) => (
                           <tr
                             key={row.id}
                             className="border-b border-black/10 transition-colors hover:bg-black/[0.02]"
@@ -1011,6 +1020,86 @@ export default async function DashboardPage({
                     </tbody>
                   </table>
                 </div>
+
+                {billingTotalPages > 1 ? (
+                  <div className="mt-4 flex flex-col gap-3 border-t border-black/10 px-1 py-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={buildDashboardHref({
+                          view: "dashboard",
+                          requestsPage: 1,
+                          billingPage: Math.max(1, normalizedBillingPage - 1),
+                          apiKeyId: selectedApiKeyId,
+                          analyticsInterval,
+                          analyticsRange,
+                          modelType: selectedModelType,
+                          billingFlow: selectedBillingFlow,
+                        })}
+                        aria-disabled={normalizedBillingPage <= 1}
+                        className={cn(
+                          "inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
+                          normalizedBillingPage <= 1 && "pointer-events-none opacity-40"
+                        )}
+                      >
+                        Previous
+                      </Link>
+                      <div className="flex items-center gap-2">
+                        {buildVisibleRequestPages(normalizedBillingPage, billingTotalPages).map(
+                          (page, index, pages) => (
+                            <div key={page} className="flex items-center gap-2">
+                              {index > 0 && page - pages[index - 1] > 1 ? (
+                                <span className="text-xs text-black/35">…</span>
+                              ) : null}
+                              <Link
+                                href={buildDashboardHref({
+                                  view: "dashboard",
+                                  requestsPage: 1,
+                                  billingPage: page,
+                                  apiKeyId: selectedApiKeyId,
+                                  analyticsInterval,
+                                  analyticsRange,
+                                  modelType: selectedModelType,
+                                  billingFlow: selectedBillingFlow,
+                                })}
+                                className={cn(
+                                  "inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors",
+                                  page === normalizedBillingPage
+                                    ? "border-black bg-black text-white"
+                                    : "border-black/10 bg-white text-black/70 hover:bg-black/[0.03]"
+                                )}
+                              >
+                                {page}
+                              </Link>
+                            </div>
+                          )
+                        )}
+                      </div>
+                      <Link
+                        href={buildDashboardHref({
+                          view: "dashboard",
+                          requestsPage: 1,
+                          billingPage: Math.min(billingTotalPages, normalizedBillingPage + 1),
+                          apiKeyId: selectedApiKeyId,
+                          analyticsInterval,
+                          analyticsRange,
+                          modelType: selectedModelType,
+                          billingFlow: selectedBillingFlow,
+                        })}
+                        aria-disabled={normalizedBillingPage >= billingTotalPages}
+                        className={cn(
+                          "inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
+                          normalizedBillingPage >= billingTotalPages &&
+                            "pointer-events-none opacity-40"
+                        )}
+                      >
+                        Next
+                      </Link>
+                    </div>
+                    <span className="text-xs text-black/50">
+                      Page {normalizedBillingPage} of {billingTotalPages}
+                    </span>
+                  </div>
+                ) : null}
               </section>
             ) : null}
 
