@@ -72,7 +72,7 @@ const tabs = [
     key: "public-models",
     group: "basic",
     label: "可售模型管理",
-    description: "定义用户可售模型、供应商模型映射与价格联动。",
+    description: "定义用户可售模型、供应商供应模型列表与价格联动。",
   },
   {
     key: "routes",
@@ -1277,7 +1277,7 @@ export default async function InternalPage({
                   </div>
 
                   <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">3. 创建可售模型与供应商模型映射</h3>
+                    <h3 className="text-base font-semibold text-black">3. 创建可售模型与供应商供应模型列表</h3>
                     <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
                       <p>
                         进入
@@ -1402,7 +1402,7 @@ export default async function InternalPage({
                   </div>
 
                   <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">3. 创建可售模型与供应商模型映射</h3>
+                    <h3 className="text-base font-semibold text-black">3. 创建可售模型与供应商供应模型列表</h3>
                     <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
                       <p>
                         进入
