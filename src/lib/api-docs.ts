@@ -1,6 +1,4 @@
-export const PUBLIC_API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "https://alluring-reflection-production-eafd.up.railway.app";
+export const PUBLIC_API_BASE_URL = "https://api.openoctopus.com";
 
 export const DEFAULT_QUICKSTART_MODEL = "openoctopus/seedream-4.5";
 
