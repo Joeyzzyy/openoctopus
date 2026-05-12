@@ -803,7 +803,7 @@ export async function getDashboardData({
                     : "Settlement Credit",
           amountValue: Number(row.amount_delta ?? 0),
           amountLabel: `${Number(row.amount_delta) >= 0 ? "+" : ""}${formatCurrency(Number(row.amount_delta ?? 0))}`,
-          description: row.description ?? "-",
+          description: "Balance Topup Through Stripe",
           stripeSessionId,
           receiptUrl: stripePaymentIntentId ? receiptByPaymentIntentId.get(stripePaymentIntentId) ?? null : null,
         };
