@@ -25,6 +25,38 @@ const videoRequestSchema = z.object({
   resolution: z.string().optional(),
 });
 
+function normalizePublicErrorMessage(errorCode: string | null, errorMessage: string | null) {
+  const raw = (errorMessage ?? "").toLowerCase();
+
+  if (errorCode === "provider_submit_failed") {
+    if (
+      raw.includes(" 429") ||
+      raw.includes("quota") ||
+      raw.includes("rate limit") ||
+      raw.includes("rate-limit") ||
+      raw.includes("too many requests")
+    ) {
+      return "Upstream provider capacity is temporarily limited. Please retry shortly.";
+    }
+
+    return "The upstream provider could not accept this request. Please retry.";
+  }
+
+  if (errorCode === "upstream_timeout") {
+    return "The generation request timed out upstream. Please retry.";
+  }
+
+  if (errorCode === "upstream_failed") {
+    return "The upstream provider failed to complete this request. Please retry.";
+  }
+
+  if (errorCode === "upstream_result_missing") {
+    return "The upstream provider returned an incomplete result. Please retry.";
+  }
+
+  return errorMessage ?? "Request failed. Please retry.";
+}
+
 export async function registerTaskRoutes(app: FastifyInstance) {
   const sendRequestError = (reply: { code: (statusCode: number) => { send: (body: unknown) => unknown } }, error: unknown) => {
     if (error instanceof RequestValidationError) {
@@ -226,6 +258,13 @@ export async function registerTaskRoutes(app: FastifyInstance) {
           capability: data.capability,
           outputPayload: data.output_payload,
         }),
+      };
+    }
+
+    if (data.status === "failed") {
+      return {
+        ...data,
+        error_message: normalizePublicErrorMessage(data.error_code, data.error_message),
       };
     }
 
