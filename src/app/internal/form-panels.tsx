@@ -252,8 +252,20 @@ function SchemaFieldEditor({
     <div className="space-y-3 rounded-xl border border-black/[0.08] bg-white p-3">
       <input type="hidden" name={name} value={schemaValue} />
 
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={addRow}
+          disabled={disabled}
+          className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-black/[0.03] disabled:opacity-50"
+        >
+          添加字段
+        </button>
+        <span className="text-[11px] text-black/45">{rows.length} 个字段</span>
+      </div>
+
       <label className="block">
-        <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Official Doc URL</span>
+        <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">官方文档链接</span>
         <input
           value={officialDocUrl}
           onChange={(event) => setOfficialDocUrl(event.target.value)}
@@ -263,6 +275,10 @@ function SchemaFieldEditor({
         />
       </label>
 
+      <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2 py-1.5 text-[11px] text-black/55">
+        建议填写：参数名、类型、说明、示例。`必填` 表示调用时必须提供；`对外开放` 表示该字段会展示给客户。
+      </div>
+
       <div className="space-y-2">
         {rows.map((row) => (
           <div key={row.id} className="grid gap-2 rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-2 md:grid-cols-12">
@@ -271,28 +287,28 @@ function SchemaFieldEditor({
               onChange={(event) => updateRow(row.id, (current) => ({ ...current, name: event.target.value }))}
               disabled={disabled}
               className="md:col-span-2 h-9 rounded-md border border-black/[0.08] bg-white px-2 text-xs"
-              placeholder="name"
+              placeholder="参数名，如 size"
             />
             <input
               value={row.type}
               onChange={(event) => updateRow(row.id, (current) => ({ ...current, type: event.target.value }))}
               disabled={disabled}
               className="md:col-span-2 h-9 rounded-md border border-black/[0.08] bg-white px-2 text-xs"
-              placeholder="type"
+              placeholder="类型，如 string"
             />
             <input
               value={row.description}
               onChange={(event) => updateRow(row.id, (current) => ({ ...current, description: event.target.value }))}
               disabled={disabled}
               className="md:col-span-4 h-9 rounded-md border border-black/[0.08] bg-white px-2 text-xs"
-              placeholder="description"
+              placeholder="字段说明"
             />
             <input
               value={row.example}
               onChange={(event) => updateRow(row.id, (current) => ({ ...current, example: event.target.value }))}
               disabled={disabled}
               className="md:col-span-2 h-9 rounded-md border border-black/[0.08] bg-white px-2 text-xs"
-              placeholder="example"
+              placeholder="示例值"
             />
             <div className="md:col-span-2 flex items-center justify-end gap-2">
               {includeRequired ? (
@@ -303,10 +319,10 @@ function SchemaFieldEditor({
                     onChange={(event) =>
                       updateRow(row.id, (current) => ({ ...current, required: event.target.checked }))
                     }
-                    disabled={disabled}
-                    className="size-3.5"
-                  />
-                  Required
+                  disabled={disabled}
+                  className="size-3.5"
+                />
+                  必填
                 </label>
               ) : null}
               <label className="inline-flex items-center gap-1 text-[11px] text-black/65">
@@ -322,7 +338,7 @@ function SchemaFieldEditor({
                   disabled={disabled}
                   className="size-3.5"
                 />
-                Expose
+                对外开放
               </label>
               <button
                 type="button"
@@ -330,27 +346,15 @@ function SchemaFieldEditor({
                 disabled={disabled}
                 className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-black/[0.04] disabled:opacity-50"
               >
-                Remove
+                删除
               </button>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={addRow}
-          disabled={disabled}
-          className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-black/[0.03] disabled:opacity-50"
-        >
-          Add Field
-        </button>
-        <span className="text-[11px] text-black/45">{rows.length} field(s)</span>
-      </div>
-
       <details className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2">
-        <summary className="cursor-pointer text-[11px] text-black/60">JSON Preview</summary>
+        <summary className="cursor-pointer text-[11px] text-black/60">JSON 预览</summary>
         <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[11px] text-black/70">
           {schemaValue}
         </pre>
@@ -1339,7 +1343,6 @@ export function CreateProviderModelForm({
 
         <div className={activeTab === "params" ? "contents" : "hidden"}>
           <div className="block md:col-span-2">
-            <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上游参数文档配置</span>
             <div className="mb-3 flex flex-wrap gap-2">
               <button
                 type="button"
@@ -1350,7 +1353,7 @@ export function CreateProviderModelForm({
                     : "border-black/[0.12] bg-white text-black/70 hover:bg-black/[0.03]"
                 }`}
               >
-                Input Params
+                入参
               </button>
               <button
                 type="button"
@@ -1361,11 +1364,18 @@ export function CreateProviderModelForm({
                     : "border-black/[0.12] bg-white text-black/70 hover:bg-black/[0.03]"
                 }`}
               >
-                Output Params
+                出参
               </button>
             </div>
             <div className={schemaEditorTab === "input" ? "block" : "hidden"}>
-              <label className="mb-3 block">
+              <SchemaFieldEditor
+                name="inputSchema"
+                keyName="params"
+                defaultSchemaText={defaultInputSchema}
+                includeRequired
+                disabled={disabled}
+              />
+              <label className="mt-3 block">
                 <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提交 Body 模板（JSON）</span>
                 <textarea
                   value={executionConfigState.submitBodyTemplate}
@@ -1380,15 +1390,7 @@ export function CreateProviderModelForm({
                   rows={8}
                   placeholder={'{\n  "contents": [\n    {\n      "parts": [\n        { "text": "{{prompt}}" }\n      ]\n    }\n  ]\n}'}
                 />
-                <FieldHint help="可选。用于把统一入参映射为上游真实请求体。支持变量：{{prompt}}、{{upstreamModel}}，以及 input 里的同名字段（如 {{size}}）。" />
               </label>
-              <SchemaFieldEditor
-                name="inputSchema"
-                keyName="params"
-                defaultSchemaText={defaultInputSchema}
-                includeRequired
-                disabled={disabled}
-              />
             </div>
             <div className={schemaEditorTab === "output" ? "block" : "hidden"}>
               <SchemaFieldEditor
