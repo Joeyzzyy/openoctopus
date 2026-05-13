@@ -192,29 +192,54 @@ function SchemaFieldEditor({
   const [rows, setRows] = useState<SchemaFieldState[]>(() =>
     parseSchemaFieldsFromText(defaultSchemaText, keyName)
   );
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<SchemaFieldState>({
+    id: "",
+    name: "",
+    type: "",
+    required: false,
+    description: "",
+    example: "",
+    exposedToCustomer: true,
+  });
 
   useEffect(() => {
     setOfficialDocUrl(parseOfficialDocUrl(defaultSchemaText));
     setRows(parseSchemaFieldsFromText(defaultSchemaText, keyName));
   }, [defaultSchemaText, keyName]);
 
-  const addRow = () => {
-    setRows((current) => [
-      ...current,
-      {
-        id: randomFieldId(),
-        name: "",
-        type: "",
-        required: false,
-        description: "",
-        example: "",
-        exposedToCustomer: true,
-      },
-    ]);
+  const openCreateEditor = () => {
+    setEditingId(null);
+    setDraft({
+      id: randomFieldId(),
+      name: "",
+      type: "",
+      required: false,
+      description: "",
+      example: "",
+      exposedToCustomer: true,
+    });
+    setEditorOpen(true);
   };
 
-  const updateRow = (id: string, updater: (row: SchemaFieldState) => SchemaFieldState) => {
-    setRows((current) => current.map((row) => (row.id === id ? updater(row) : row)));
+  const openEditEditor = (row: SchemaFieldState) => {
+    setEditingId(row.id);
+    setDraft({ ...row });
+    setEditorOpen(true);
+  };
+
+  const saveDraft = () => {
+    if (!draft.name.trim()) {
+      toast.error("请先填写参数名");
+      return;
+    }
+    if (editingId) {
+      setRows((current) => current.map((row) => (row.id === editingId ? { ...draft, name: draft.name.trim() } : row)));
+    } else {
+      setRows((current) => [...current, { ...draft, name: draft.name.trim() }]);
+    }
+    setEditorOpen(false);
   };
 
   const removeRow = (id: string) => {
@@ -255,7 +280,7 @@ function SchemaFieldEditor({
       <div className="flex items-center justify-between gap-2">
         <button
           type="button"
-          onClick={addRow}
+          onClick={openCreateEditor}
           disabled={disabled}
           className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-black/[0.03] disabled:opacity-50"
         >
@@ -280,78 +305,134 @@ function SchemaFieldEditor({
       </div>
 
       <div className="space-y-2">
+        {rows.length === 0 ? <p className="text-xs text-black/45">暂无字段，点击“添加字段”开始配置。</p> : null}
         {rows.map((row) => (
-          <div key={row.id} className="grid gap-2 rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-2 md:grid-cols-12">
-            <input
-              value={row.name}
-              onChange={(event) => updateRow(row.id, (current) => ({ ...current, name: event.target.value }))}
-              disabled={disabled}
-              className="md:col-span-2 h-9 rounded-md border border-black/[0.08] bg-white px-2 text-xs"
-              placeholder="参数名，如 size"
-            />
-            <input
-              value={row.type}
-              onChange={(event) => updateRow(row.id, (current) => ({ ...current, type: event.target.value }))}
-              disabled={disabled}
-              className="md:col-span-2 h-9 rounded-md border border-black/[0.08] bg-white px-2 text-xs"
-              placeholder="类型，如 string"
-            />
-            <input
-              value={row.description}
-              onChange={(event) => updateRow(row.id, (current) => ({ ...current, description: event.target.value }))}
-              disabled={disabled}
-              className="md:col-span-4 h-9 rounded-md border border-black/[0.08] bg-white px-2 text-xs"
-              placeholder="字段说明"
-            />
-            <input
-              value={row.example}
-              onChange={(event) => updateRow(row.id, (current) => ({ ...current, example: event.target.value }))}
-              disabled={disabled}
-              className="md:col-span-2 h-9 rounded-md border border-black/[0.08] bg-white px-2 text-xs"
-              placeholder="示例值"
-            />
-            <div className="md:col-span-2 flex items-center justify-end gap-2">
+          <div key={row.id} className="rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-black">{row.name}</p>
+                <p className="mt-0.5 text-xs text-black/55">{row.type || "未填写类型"}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => openEditEditor(row)}
+                  disabled={disabled}
+                  className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-black/[0.04] disabled:opacity-50"
+                >
+                  编辑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeRow(row.id)}
+                  disabled={disabled}
+                  className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-black/[0.04] disabled:opacity-50"
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-black/65">{row.description || "未填写说明"}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-black/55">
+              <span className="rounded border border-black/[0.08] bg-white px-2 py-0.5">示例：{row.example || "-"}</span>
               {includeRequired ? (
-                <label className="inline-flex items-center gap-1 text-[11px] text-black/65">
-                  <input
-                    type="checkbox"
-                    checked={row.required}
-                    onChange={(event) =>
-                      updateRow(row.id, (current) => ({ ...current, required: event.target.checked }))
-                    }
-                  disabled={disabled}
-                  className="size-3.5"
-                />
-                  必填
-                </label>
+                <span className="rounded border border-black/[0.08] bg-white px-2 py-0.5">
+                  必填：{row.required ? "是" : "否"}
+                </span>
               ) : null}
-              <label className="inline-flex items-center gap-1 text-[11px] text-black/65">
-                <input
-                  type="checkbox"
-                  checked={row.exposedToCustomer}
-                  onChange={(event) =>
-                    updateRow(row.id, (current) => ({
-                      ...current,
-                      exposedToCustomer: event.target.checked,
-                    }))
-                  }
-                  disabled={disabled}
-                  className="size-3.5"
-                />
-                对外开放
-              </label>
-              <button
-                type="button"
-                onClick={() => removeRow(row.id)}
-                disabled={disabled}
-                className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-black/[0.04] disabled:opacity-50"
-              >
-                删除
-              </button>
+              <span className="rounded border border-black/[0.08] bg-white px-2 py-0.5">
+                对外开放：{row.exposedToCustomer ? "是" : "否"}
+              </span>
             </div>
           </div>
         ))}
       </div>
+
+      {editorOpen ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-xl rounded-xl border border-black/[0.08] bg-white p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-black">{editingId ? "编辑字段" : "新增字段"}</h4>
+              <button
+                type="button"
+                onClick={() => setEditorOpen(false)}
+                className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-black/[0.04]"
+              >
+                关闭
+              </button>
+            </div>
+            <div className="grid gap-2 md:grid-cols-2">
+              <input
+                value={draft.name}
+                onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+                disabled={disabled}
+                className={`${formInputClassName} h-9 text-xs`}
+                placeholder="参数名，如 size"
+              />
+              <input
+                value={draft.type}
+                onChange={(event) => setDraft((current) => ({ ...current, type: event.target.value }))}
+                disabled={disabled}
+                className={`${formInputClassName} h-9 text-xs`}
+                placeholder="类型，如 string"
+              />
+              <input
+                value={draft.example}
+                onChange={(event) => setDraft((current) => ({ ...current, example: event.target.value }))}
+                disabled={disabled}
+                className={`${formInputClassName} h-9 text-xs md:col-span-2`}
+                placeholder="示例值"
+              />
+              <textarea
+                value={draft.description}
+                onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+                disabled={disabled}
+                className={`${formTextAreaClassName} text-xs md:col-span-2`}
+                rows={3}
+                placeholder="字段说明"
+              />
+              {includeRequired ? (
+                <label className="inline-flex items-center gap-2 text-xs text-black/70">
+                  <input
+                    type="checkbox"
+                    checked={draft.required}
+                    onChange={(event) => setDraft((current) => ({ ...current, required: event.target.checked }))}
+                    className="size-3.5"
+                  />
+                  必填（客户调用时必须传）
+                </label>
+              ) : null}
+              <label className="inline-flex items-center gap-2 text-xs text-black/70">
+                <input
+                  type="checkbox"
+                  checked={draft.exposedToCustomer}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, exposedToCustomer: event.target.checked }))
+                  }
+                  className="size-3.5"
+                />
+                对外开放（在 Dashboard 文档展示）
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditorOpen(false)}
+                className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-black/[0.03]"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={saveDraft}
+                className="h-8 rounded-md border border-black bg-black px-3 text-xs text-white hover:bg-black/90"
+              >
+                保存字段
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <details className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2">
         <summary className="cursor-pointer text-[11px] text-black/60">JSON 预览</summary>
