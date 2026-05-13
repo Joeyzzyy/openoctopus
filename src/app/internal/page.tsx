@@ -1083,7 +1083,7 @@ export default async function InternalPage({
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#FCFCFA] text-[#111111]">
-      <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
+      <header className="fixed left-0 right-0 top-0 z-50 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
         <div className="mx-auto flex h-14 w-full max-w-[1960px] items-center px-3 xl:px-4">
           <div className="relative flex w-full items-center text-sm md:text-base">
             <Link
@@ -1115,7 +1115,7 @@ export default async function InternalPage({
         }}
       />
 
-      <div className="relative mx-auto w-full max-w-[1960px] px-3 pb-10 xl:px-4">
+      <div className="relative mx-auto w-full max-w-[1960px] px-3 pb-10 pt-[72px] xl:px-4">
         <section className="min-h-[calc(100vh-108px)] py-4">
           <InternalShell activeTab={activeTab} selectedTemplateKey={selectedTemplateKey} tabs={sidebarTabs}>
           {activeTab === "public-models" ? (
