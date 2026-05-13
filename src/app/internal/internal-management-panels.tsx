@@ -629,7 +629,7 @@ function ManagementDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger disabled={disabled}>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-3xl">
+      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-5xl">
         <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5">
           <DialogTitle className="font-medium text-black">{title}</DialogTitle>
           {description ? (

@@ -142,6 +142,62 @@ const SCHEMA_FIELD_TYPE_OPTIONS = [
   "base64",
 ];
 
+function buildSchemaAiPromptTemplate(keyName: "params" | "fields") {
+  if (keyName === "params") {
+    return [
+      "你是 API 文档结构化助手。请把我提供的模型文档整理为“输入参数导入 JSON”，严格按以下规则输出：",
+      "1) 只输出 JSON，不要任何解释、Markdown、代码块标记。",
+      "2) 顶层必须是对象，包含：officialDocUrl, params。",
+      "3) params 必须是数组；每个元素包含：name, type, required, description, example, exposedToCustomer。",
+      "4) required 必须是 true/false 布尔值。",
+      "5) exposedToCustomer 必须是 true/false 布尔值。",
+      "6) type 仅可使用：string, number, integer, boolean, array, object, url, base64。",
+      "7) example 统一输出为字符串。",
+      "8) 字段名保持上游原文，不要擅自改名。",
+      "",
+      "输出格式示例：",
+      '{',
+      '  "officialDocUrl": "https://example.com/docs",',
+      '  "params": [',
+      '    {',
+      '      "name": "prompt",',
+      '      "type": "string",',
+      '      "required": true,',
+      '      "description": "Text prompt for generation.",',
+      '      "example": "A cinematic portrait...",',
+      '      "exposedToCustomer": true',
+      "    }",
+      "  ]",
+      "}",
+    ].join("\n");
+  }
+
+  return [
+    "你是 API 文档结构化助手。请把我提供的模型文档整理为“输出参数导入 JSON”，严格按以下规则输出：",
+    "1) 只输出 JSON，不要任何解释、Markdown、代码块标记。",
+    "2) 顶层必须是对象，包含：officialDocUrl, fields。",
+    "3) fields 必须是数组；每个元素包含：name, type, description, example, exposedToCustomer。",
+    "4) exposedToCustomer 必须是 true/false 布尔值。",
+    "5) type 仅可使用：string, number, integer, boolean, array, object, url, base64。",
+    "6) example 统一输出为字符串。",
+    "7) 字段名保持上游原文，不要擅自改名。",
+    "",
+    "输出格式示例：",
+    "{",
+    '  "officialDocUrl": "https://example.com/docs",',
+    '  "fields": [',
+    "    {",
+    '      "name": "outputs",',
+    '      "type": "array",',
+    '      "description": "Generated asset URLs.",',
+    '      "example": "[\\"https://cdn.example.com/a.png\\"]",',
+    '      "exposedToCustomer": true',
+    "    }",
+    "  ]",
+    "}",
+  ].join("\n");
+}
+
 function randomFieldId() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -392,6 +448,16 @@ function SchemaFieldEditor({
             导入 JSON
           </button>
         </div>
+      </div>
+
+      <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5">
+        <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">AI 提示词模板（可复制给其他 AI）</p>
+        <textarea
+          value={buildSchemaAiPromptTemplate(keyName)}
+          readOnly
+          rows={10}
+          className={`${formTextAreaClassName} text-xs`}
+        />
       </div>
 
       <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2 py-1.5 text-[11px] text-black/55">
