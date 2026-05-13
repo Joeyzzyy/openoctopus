@@ -2798,6 +2798,61 @@ function ensureProxyEnvForGemini() {
   }
 }
 
+function extractFirstJsonObject(text: string) {
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced?.[1]?.trim() || trimmed;
+  const start = candidate.indexOf("{");
+  if (start < 0) return "";
+
+  let depth = 0;
+  let inString = false;
+  let escaping = false;
+  for (let i = start; i < candidate.length; i += 1) {
+    const ch = candidate[i];
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+      } else if (ch === "\\") {
+        escaping = true;
+      } else if (ch === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === "\"") {
+      inString = true;
+      continue;
+    }
+    if (ch === "{") depth += 1;
+    if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return candidate.slice(start, i + 1);
+      }
+    }
+  }
+
+  return candidate;
+}
+
+function safeJsonParseObject(text: string) {
+  const candidate = extractFirstJsonObject(text);
+  if (!candidate) return null;
+  try {
+    const parsed = JSON.parse(candidate) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function generateProviderModelDraftFromSource(input: {
   sourceText: string;
   sourceLabel?: string;
@@ -2933,7 +2988,10 @@ export async function generateProviderModelDraftFromSource(input: {
 
     let result: z.infer<typeof providerModelAutofillResultSchema>;
     try {
-      const parsedResult = JSON.parse(text) as Record<string, unknown>;
+      const parsedResult = safeJsonParseObject(text);
+      if (!parsedResult) {
+        throw new Error("invalid-json");
+      }
       result = providerModelAutofillResultSchema.parse(parsedResult);
     } catch {
       await supabase.from("internal_model_ai_usage_logs").insert({
@@ -2950,7 +3008,10 @@ export async function generateProviderModelDraftFromSource(input: {
         error_message: "Failed to parse Gemini JSON output",
         raw_response: geminiJson,
       });
-      return { ok: false as const, error: "Gemini returned invalid JSON for autofill" };
+      return {
+        ok: false as const,
+        error: "Gemini 返回内容不是可解析 JSON。请重试，或减少粘贴内容长度后再试。",
+      };
     }
 
       await supabase.from("internal_model_ai_usage_logs").insert({
