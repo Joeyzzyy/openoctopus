@@ -1489,9 +1489,25 @@ export function CreateProviderModelForm({
           ) : null}
           {autofillPreviewJson ? (
             <div className="mt-2 rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5">
-              <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">
-                识别结果完整 JSON（空字段表示未识别）
-              </p>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[11px] tracking-[0.35px] text-black/60">
+                  识别结果完整 JSON（空字段表示未识别）
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(autofillPreviewJson);
+                      toast.success("已复制识别结果 JSON");
+                    } catch {
+                      toast.error("复制失败，请重试");
+                    }
+                  }}
+                  className="inline-flex h-7 cursor-pointer items-center rounded border border-black/[0.1] bg-white px-2 text-[11px] text-black/65 hover:bg-black/[0.03]"
+                >
+                  复制 JSON
+                </button>
+              </div>
               <pre className="max-h-[340px] overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-black/70">
                 {autofillPreviewJson}
               </pre>
