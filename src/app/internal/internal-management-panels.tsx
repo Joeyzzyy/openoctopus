@@ -690,7 +690,7 @@ function ManagementDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger disabled={disabled}>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] [&>button]:hidden sm:max-w-5xl">
+      <DialogContent className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] [&>button]:hidden sm:max-w-5xl">
         <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -717,7 +717,7 @@ function ManagementDialog({
             </div>
           </div>
         </DialogHeader>
-        <div className="px-5 pb-5 pt-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-5">
           {typeof children === "function"
             ? (children as (controls: { close: () => void }) => React.ReactNode)({
                 close: () => setOpen(false),
