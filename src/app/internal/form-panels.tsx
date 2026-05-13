@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import {
   createProviderModel,
   createRoutingRule,
-  generateProviderModelDraftFromUrl,
+  generateProviderModelDraftFromSource,
 } from "./actions";
 import { SubmitButton } from "./submit-button";
 
@@ -1165,7 +1165,8 @@ export function CreateProviderModelForm({
   const [upstreamModelSlug, setUpstreamModelSlug] = useState(defaultUpstreamModelSlug ?? "");
   const [pricingSourceUrlState, setPricingSourceUrlState] = useState(defaultPricingSourceUrl ?? "");
   const [pricingSourceNoteState, setPricingSourceNoteState] = useState(defaultPricingSourceNote ?? "");
-  const [autofillSourceUrl, setAutofillSourceUrl] = useState("");
+  const [autofillSourceLabel, setAutofillSourceLabel] = useState("");
+  const [autofillSourceText, setAutofillSourceText] = useState("");
   const [autofillSummary, setAutofillSummary] = useState("");
   const [seedInputSchemaText, setSeedInputSchemaText] = useState("");
   const [seedOutputSchemaText, setSeedOutputSchemaText] = useState("");
@@ -1203,7 +1204,8 @@ export function CreateProviderModelForm({
     setUpstreamModelSlug(defaultUpstreamModelSlug ?? "");
     setPricingSourceUrlState(defaultPricingSourceUrl ?? "");
     setPricingSourceNoteState(defaultPricingSourceNote ?? "");
-    setAutofillSourceUrl("");
+    setAutofillSourceLabel("");
+    setAutofillSourceText("");
     setAutofillSummary("");
     setSeedInputSchemaText("");
     setSeedOutputSchemaText("");
@@ -1216,27 +1218,32 @@ export function CreateProviderModelForm({
   ]);
 
   const runAutofillFromUrl = () => {
-    const sourceUrl = autofillSourceUrl.trim();
-    if (!sourceUrl) {
-      toast.error("请先输入文档 URL");
+    const sourceText = autofillSourceText.trim();
+    if (!sourceText) {
+      toast.error("请先粘贴文档内容");
       return;
     }
 
     startAutofillTransition(async () => {
-      try {
-        const result = await generateProviderModelDraftFromUrl({ sourceUrl });
-        setUpstreamModelSlug(result.upstreamModelSlug ?? "");
-        setExecutionTemplate(result.executionTemplate || "rest-async-poll-v1");
-        setExecutionConfigState(parseExecutionConfigState(result.executionConfigText || "{}"));
-        setSeedInputSchemaText(result.inputSchemaText || "{}");
-        setSeedOutputSchemaText(result.outputSchemaText || "{}");
-        setPricingSourceUrlState(result.pricingSourceUrl ?? "");
-        setPricingSourceNoteState(result.pricingSourceNote ?? "");
-        setAutofillSummary(result.summary ?? "");
-        toast.success("已完成自动解析并填充");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "自动填充失败");
+      const result = await generateProviderModelDraftFromSource({
+        sourceText,
+        sourceLabel: autofillSourceLabel.trim() || undefined,
+      });
+      if (!result.ok) {
+        toast.error(result.error || "自动填充失败");
+        return;
       }
+
+      const payload = result.data;
+      setUpstreamModelSlug(payload.upstreamModelSlug ?? "");
+      setExecutionTemplate(payload.executionTemplate || "rest-async-poll-v1");
+      setExecutionConfigState(parseExecutionConfigState(payload.executionConfigText || "{}"));
+      setSeedInputSchemaText(payload.inputSchemaText || "{}");
+      setSeedOutputSchemaText(payload.outputSchemaText || "{}");
+      setPricingSourceUrlState(payload.pricingSourceUrl ?? "");
+      setPricingSourceNoteState(payload.pricingSourceNote ?? "");
+      setAutofillSummary(payload.summary ?? "");
+      toast.success("已完成自动解析并填充");
     });
   };
 
@@ -1336,14 +1343,22 @@ export function CreateProviderModelForm({
           className="grid gap-3 md:grid-cols-2"
         >
         <label className="block md:col-span-2">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">文档 URL 自动填充</span>
-          <div className="flex items-center gap-2">
-            <input
-              value={autofillSourceUrl}
-              onChange={(event) => setAutofillSourceUrl(event.target.value)}
-              placeholder="https://provider-docs.example.com/model-api"
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">文档内容自动填充</span>
+          <input
+            value={autofillSourceLabel}
+            onChange={(event) => setAutofillSourceLabel(event.target.value)}
+            placeholder="来源标识（可选），例如 wavespeed/imagen4-fast"
+            disabled={disabled || isAutofilling}
+            className={formInputClassName}
+          />
+          <div className="mt-2 flex items-start gap-2">
+            <textarea
+              value={autofillSourceText}
+              onChange={(event) => setAutofillSourceText(event.target.value)}
+              placeholder="把上游文档整页内容粘贴到这里..."
               disabled={disabled || isAutofilling}
-              className={formInputClassName}
+              className={formTextAreaClassName}
+              rows={8}
             />
             <button
               type="button"
@@ -1354,7 +1369,7 @@ export function CreateProviderModelForm({
               {isAutofilling ? "解析中..." : "AI 自动填充"}
             </button>
           </div>
-          <FieldHint help="读取文档并自动填充调用协议、入参/出参、示例与来源说明（仅 internal 使用）。" />
+          <FieldHint help="粘贴文档全文后自动填充调用协议、入参/出参、示例与来源说明（仅 internal 使用）。" />
           {autofillSummary ? (
             <p className="mt-2 rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2.5 py-2 text-xs text-black/65">
               {autofillSummary}

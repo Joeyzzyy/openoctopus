@@ -2721,7 +2721,8 @@ export async function updateModelEconomicsBundle(formData: FormData) {
 }
 
 const providerModelAutofillSchema = z.object({
-  sourceUrl: z.string().url(),
+  sourceText: z.string().trim().min(20).max(400_000),
+  sourceLabel: z.string().trim().max(500).optional(),
 });
 
 const providerModelAutofillResultSchema = z.object({
@@ -2758,38 +2759,65 @@ function estimateGeminiCostUsd(inputTokens: number, outputTokens: number) {
   return Number((inputCost + outputCost).toFixed(8));
 }
 
-export async function generateProviderModelDraftFromUrl(input: {
-  sourceUrl: string;
+function formatGeminiNetworkError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "unknown");
+  const lower = message.toLowerCase();
+
+  if (lower.includes("connect timeout") || lower.includes("timeout")) {
+    return "Gemini network timeout: 与 Google API 建立连接超时，请检查本机/服务器外网连通性或代理设置后重试。";
+  }
+  if (lower.includes("enotfound") || lower.includes("dns")) {
+    return "Gemini DNS error: 无法解析 Google API 域名，请检查 DNS 或网络环境。";
+  }
+  if (lower.includes("fetch failed")) {
+    return "Gemini network failed: 当前环境无法访问 Google API（可能是网络受限/被墙/代理未配置）。";
+  }
+  return `Gemini request failed: ${message}`;
+}
+
+function resolveProxyUrl() {
+  return (
+    process.env.INTERNAL_HTTP_PROXY ||
+    process.env.HTTPS_PROXY ||
+    process.env.HTTP_PROXY ||
+    process.env.ALL_PROXY ||
+    "http://127.0.0.1:7890"
+  );
+}
+
+function ensureProxyEnvForGemini() {
+  const proxyUrl = resolveProxyUrl();
+  if (!process.env.HTTPS_PROXY && proxyUrl) {
+    process.env.HTTPS_PROXY = proxyUrl;
+  }
+  if (!process.env.HTTP_PROXY && proxyUrl) {
+    process.env.HTTP_PROXY = proxyUrl;
+  }
+  if (!process.env.NODE_USE_ENV_PROXY) {
+    process.env.NODE_USE_ENV_PROXY = "1";
+  }
+}
+
+export async function generateProviderModelDraftFromSource(input: {
+  sourceText: string;
+  sourceLabel?: string;
 }) {
   const startedAt = Date.now();
   const { supabase, userId, workspaceId } = await getInternalAdminContext();
-  const parsedInput = providerModelAutofillSchema.parse(input);
-  const apiKey = process.env.INTERNAL_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
+  const actorUserId = /^[0-9a-f-]{36}$/i.test(userId) ? userId : null;
 
-  if (!apiKey) {
-    throw new Error("Missing INTERNAL_GEMINI_API_KEY");
-  }
+  try {
+    const parsedInput = providerModelAutofillSchema.parse(input);
+    const apiKey = process.env.INTERNAL_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
+    ensureProxyEnvForGemini();
 
-  const sourceResponse = await fetch(parsedInput.sourceUrl, {
-    method: "GET",
-    headers: {
-      "user-agent": "OpenOctopusInternalModelAutofill/1.0",
-      accept: "text/html,application/json,text/plain,*/*",
-    },
-    cache: "no-store",
-  });
+    if (!apiKey) {
+      return { ok: false as const, error: "Missing INTERNAL_GEMINI_API_KEY" };
+    }
+    const compactSourceText = stripHtmlToText(parsedInput.sourceText).slice(0, 120_000);
+    const sourceLabel = parsedInput.sourceLabel?.trim() || "manual://pasted-content";
 
-  if (!sourceResponse.ok) {
-    throw new Error(`Failed to fetch source URL: ${sourceResponse.status}`);
-  }
-
-  const contentType = sourceResponse.headers.get("content-type") ?? "";
-  const rawBody = await sourceResponse.text();
-  const sourceText =
-    contentType.includes("text/html") ? stripHtmlToText(rawBody) : rawBody;
-  const compactSourceText = sourceText.slice(0, 120_000);
-
-  const prompt = [
+    const prompt = [
     "You are an API integration analyst.",
     "Return ONLY valid JSON. No markdown.",
     "Task: read upstream model API documentation and output a provider model mapping draft for OpenOctopus internal console.",
@@ -2802,137 +2830,173 @@ export async function generateProviderModelDraftFromUrl(input: {
     "6) requestExampleJson / submitResponseExampleJson / normalizedOutputExampleJson should be JSON string examples when available.",
     "7) pricingSourceUrl and pricingSourceNote should be filled when pricing clues exist; otherwise null/empty.",
     "",
-    `Source URL: ${parsedInput.sourceUrl}`,
-    "Source document content:",
-    compactSourceText,
-  ].join("\n");
+      `Source Label: ${sourceLabel}`,
+      "Source document content:",
+      compactSourceText,
+    ].join("\n");
 
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        generationConfig: {
-          temperature: 0.1,
-          responseMimeType: "application/json",
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }],
+    let geminiRes: Response;
+    try {
+      geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${encodeURIComponent(apiKey)}`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
           },
-        ],
-      }),
+          body: JSON.stringify({
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: "application/json",
+            },
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: prompt }],
+              },
+            ],
+          }),
+        }
+      );
+    } catch (error) {
+      const msg = formatGeminiNetworkError(error);
+      await supabase.from("internal_model_ai_usage_logs").insert({
+        workspace_id: workspaceId,
+        actor_user_id: actorUserId,
+        source_url: sourceLabel,
+        model: "gemini-2.5-pro",
+        status: "failed",
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        estimated_cost_usd: 0,
+        latency_ms: Date.now() - startedAt,
+        error_message: msg.slice(0, 4000),
+      });
+      return { ok: false as const, error: msg };
     }
-  );
 
-  const geminiJson = (await geminiRes.json()) as Record<string, unknown>;
-  const usage = (geminiJson.usageMetadata ?? {}) as Record<string, unknown>;
-  const inputTokens = Number(usage.promptTokenCount ?? usage.inputTokenCount ?? 0);
-  const outputTokens = Number(usage.candidatesTokenCount ?? usage.outputTokenCount ?? 0);
-  const totalTokens = Number(usage.totalTokenCount ?? inputTokens + outputTokens);
-  const estimatedCostUsd = estimateGeminiCostUsd(inputTokens, outputTokens);
+    const geminiJson = (await geminiRes.json()) as Record<string, unknown>;
+    const usage = (geminiJson.usageMetadata ?? {}) as Record<string, unknown>;
+    const inputTokens = Number(usage.promptTokenCount ?? usage.inputTokenCount ?? 0);
+    const outputTokens = Number(usage.candidatesTokenCount ?? usage.outputTokenCount ?? 0);
+    const totalTokens = Number(usage.totalTokenCount ?? inputTokens + outputTokens);
+    const estimatedCostUsd = estimateGeminiCostUsd(inputTokens, outputTokens);
 
-  const candidates = Array.isArray(geminiJson.candidates)
-    ? (geminiJson.candidates as Array<Record<string, unknown>>)
-    : [];
-  const text = candidates[0]?.content &&
-    typeof candidates[0].content === "object" &&
-    !Array.isArray(candidates[0].content)
-      ? (() => {
-          const parts = (candidates[0].content as Record<string, unknown>).parts;
-          if (!Array.isArray(parts)) return "";
-          const first = parts[0];
-          if (!first || typeof first !== "object" || Array.isArray(first)) return "";
-          return typeof (first as Record<string, unknown>).text === "string"
-            ? ((first as Record<string, unknown>).text as string)
-            : "";
-        })()
-      : "";
+    const candidates = Array.isArray(geminiJson.candidates)
+      ? (geminiJson.candidates as Array<Record<string, unknown>>)
+      : [];
+    const text = candidates[0]?.content &&
+      typeof candidates[0].content === "object" &&
+      !Array.isArray(candidates[0].content)
+        ? (() => {
+            const parts = (candidates[0].content as Record<string, unknown>).parts;
+            if (!Array.isArray(parts)) return "";
+            const first = parts[0];
+            if (!first || typeof first !== "object" || Array.isArray(first)) return "";
+            return typeof (first as Record<string, unknown>).text === "string"
+              ? ((first as Record<string, unknown>).text as string)
+              : "";
+          })()
+        : "";
 
-  if (!geminiRes.ok) {
-    const errorMessage =
-      typeof (geminiJson.error as Record<string, unknown> | undefined)?.message === "string"
-        ? ((geminiJson.error as Record<string, unknown>).message as string)
-        : `Gemini request failed with ${geminiRes.status}`;
-    await supabase.from("internal_model_ai_usage_logs").insert({
+    if (!geminiRes.ok) {
+      const errorMessage =
+        typeof (geminiJson.error as Record<string, unknown> | undefined)?.message === "string"
+          ? ((geminiJson.error as Record<string, unknown>).message as string)
+          : `Gemini request failed with ${geminiRes.status}`;
+      const detailedError =
+        geminiRes.status === 400
+          ? `Gemini 400: 请求参数错误。${errorMessage}`
+          : geminiRes.status === 401 || geminiRes.status === 403
+            ? `Gemini 鉴权失败（${geminiRes.status}）：请检查 INTERNAL_GEMINI_API_KEY 是否正确、是否有权限访问 gemini-2.5-pro。`
+            : geminiRes.status === 429
+              ? `Gemini 限流（429）：当前请求频率或配额超限，请稍后重试。`
+              : geminiRes.status >= 500
+                ? `Gemini 服务异常（${geminiRes.status}）：上游暂时不可用，请稍后重试。`
+                : `Gemini 请求失败（${geminiRes.status}）：${errorMessage}`;
+      await supabase.from("internal_model_ai_usage_logs").insert({
+        workspace_id: workspaceId,
+        actor_user_id: actorUserId,
+        source_url: sourceLabel,
+        model: "gemini-2.5-pro",
+        status: "failed",
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        total_tokens: totalTokens,
+        estimated_cost_usd: estimatedCostUsd,
+        latency_ms: Date.now() - startedAt,
+        error_message: detailedError.slice(0, 4000),
+      });
+      return { ok: false as const, error: detailedError };
+    }
+
+    let result: z.infer<typeof providerModelAutofillResultSchema>;
+    try {
+      const parsedResult = JSON.parse(text) as Record<string, unknown>;
+      result = providerModelAutofillResultSchema.parse(parsedResult);
+    } catch {
+      await supabase.from("internal_model_ai_usage_logs").insert({
+        workspace_id: workspaceId,
+        actor_user_id: actorUserId,
+        source_url: sourceLabel,
+        model: "gemini-2.5-pro",
+        status: "failed",
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        total_tokens: totalTokens,
+        estimated_cost_usd: estimatedCostUsd,
+        latency_ms: Date.now() - startedAt,
+        error_message: "Failed to parse Gemini JSON output",
+        raw_response: geminiJson,
+      });
+      return { ok: false as const, error: "Gemini returned invalid JSON for autofill" };
+    }
+
+      await supabase.from("internal_model_ai_usage_logs").insert({
       workspace_id: workspaceId,
-      actor_user_id: /^[0-9a-f-]{36}$/i.test(userId) ? userId : null,
-      source_url: parsedInput.sourceUrl,
+      actor_user_id: actorUserId,
+      source_url: sourceLabel,
       model: "gemini-2.5-pro",
-      status: "failed",
+      status: "succeeded",
       input_tokens: inputTokens,
       output_tokens: outputTokens,
       total_tokens: totalTokens,
       estimated_cost_usd: estimatedCostUsd,
       latency_ms: Date.now() - startedAt,
-      error_message: errorMessage.slice(0, 4000),
+      result_payload: result,
     });
-    throw new Error(errorMessage);
-  }
 
-  let result: z.infer<typeof providerModelAutofillResultSchema>;
-  try {
-    const parsedResult = JSON.parse(text) as Record<string, unknown>;
-    result = providerModelAutofillResultSchema.parse(parsedResult);
-  } catch {
-    await supabase.from("internal_model_ai_usage_logs").insert({
-      workspace_id: workspaceId,
-      actor_user_id: /^[0-9a-f-]{36}$/i.test(userId) ? userId : null,
-      source_url: parsedInput.sourceUrl,
-      model: "gemini-2.5-pro",
-      status: "failed",
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      total_tokens: totalTokens,
-      estimated_cost_usd: estimatedCostUsd,
-      latency_ms: Date.now() - startedAt,
-      error_message: "Failed to parse Gemini JSON output",
-      raw_response: geminiJson,
+    await logAdminAudit({
+      supabase,
+      userId,
+      workspaceId,
+      action: "provider_model.autofill.generate",
+      targetType: "provider_model",
+      summary: `Generated provider model draft from URL`,
+      details: {
+        sourceLabel,
+        model: "gemini-2.5-pro",
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        estimatedCostUsd,
+        upstreamModelSlug: result.upstreamModelSlug,
+      },
     });
-    throw new Error("Gemini returned invalid JSON for autofill");
+
+    revalidatePath("/internal");
+    return {
+      ok: true as const,
+      data: {
+        ...result,
+        inputSchemaText: JSON.stringify(result.inputSchema ?? {}, null, 2),
+        outputSchemaText: JSON.stringify(result.outputSchema ?? {}, null, 2),
+        executionConfigText: JSON.stringify(result.executionConfig ?? {}, null, 2),
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Autofill failed";
+    return { ok: false as const, error: message };
   }
-
-  await supabase.from("internal_model_ai_usage_logs").insert({
-    workspace_id: workspaceId,
-    actor_user_id: /^[0-9a-f-]{36}$/i.test(userId) ? userId : null,
-    source_url: parsedInput.sourceUrl,
-    model: "gemini-2.5-pro",
-    status: "succeeded",
-    input_tokens: inputTokens,
-    output_tokens: outputTokens,
-    total_tokens: totalTokens,
-    estimated_cost_usd: estimatedCostUsd,
-    latency_ms: Date.now() - startedAt,
-    result_payload: result,
-  });
-
-  await logAdminAudit({
-    supabase,
-    userId,
-    workspaceId,
-    action: "provider_model.autofill.generate",
-    targetType: "provider_model",
-    summary: `Generated provider model draft from URL`,
-    details: {
-      sourceUrl: parsedInput.sourceUrl,
-      model: "gemini-2.5-pro",
-      inputTokens,
-      outputTokens,
-      totalTokens,
-      estimatedCostUsd,
-      upstreamModelSlug: result.upstreamModelSlug,
-    },
-  });
-
-  revalidatePath("/internal");
-  return {
-    ...result,
-    inputSchemaText: JSON.stringify(result.inputSchema ?? {}, null, 2),
-    outputSchemaText: JSON.stringify(result.outputSchema ?? {}, null, 2),
-    executionConfigText: JSON.stringify(result.executionConfig ?? {}, null, 2),
-  };
 }
