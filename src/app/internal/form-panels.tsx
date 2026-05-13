@@ -124,6 +124,24 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
   };
 }
 
+function executionTemplateLabelZh(slug: string) {
+  if (slug === "rest-async-poll-v1") return "标准异步轮询";
+  if (slug === "upload-async-poll-v1") return "上传后异步轮询";
+  if (slug === "sync-json-v1") return "同步返回";
+  return "自定义调用协议";
+}
+
+const SCHEMA_FIELD_TYPE_OPTIONS = [
+  "string",
+  "number",
+  "integer",
+  "boolean",
+  "array",
+  "object",
+  "url",
+  "base64",
+];
+
 function randomFieldId() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -197,7 +215,7 @@ function SchemaFieldEditor({
   const [draft, setDraft] = useState<SchemaFieldState>({
     id: "",
     name: "",
-    type: "",
+    type: "string",
     required: false,
     description: "",
     example: "",
@@ -214,7 +232,7 @@ function SchemaFieldEditor({
     setDraft({
       id: randomFieldId(),
       name: "",
-      type: "",
+      type: "string",
       required: false,
       description: "",
       example: "",
@@ -369,13 +387,19 @@ function SchemaFieldEditor({
                 className={`${formInputClassName} h-9 text-xs`}
                 placeholder="参数名，如 size"
               />
-              <input
+              <select
                 value={draft.type}
                 onChange={(event) => setDraft((current) => ({ ...current, type: event.target.value }))}
                 disabled={disabled}
-                className={`${formInputClassName} h-9 text-xs`}
-                placeholder="类型，如 string"
-              />
+                className={`${formSelectClassName} h-9 text-xs`}
+              >
+                <option value="">请选择类型</option>
+                {SCHEMA_FIELD_TYPE_OPTIONS.map((typeOption) => (
+                  <option key={typeOption} value={typeOption}>
+                    {typeOption}
+                  </option>
+                ))}
+              </select>
               <input
                 value={draft.example}
                 onChange={(event) => setDraft((current) => ({ ...current, example: event.target.value }))}
@@ -922,8 +946,7 @@ export function CreateProviderModelForm({
   submitLabel?: string;
   className?: string;
 }) {
-  type ProviderModelFormTab = "basic" | "protocol" | "params" | "cost";
-  type SchemaEditorTab = "input" | "output";
+  type ProviderModelFormTab = "basic" | "protocol" | "input-params" | "output-params" | "cost";
   const fallbackSupportedModelId = supportedModels[0]?.id ?? "";
   const templateSupportedModelId =
     supportedModels.find((item) => item.modelSlug === defaultSupportedModelSlug)?.id ??
@@ -951,7 +974,6 @@ export function CreateProviderModelForm({
     executionTemplate === "rest-async-poll-v1" || executionTemplate === "upload-async-poll-v1";
   const isAsyncMode = executionConfigState.mode === "async" || (executionConfigState.mode === "auto" && templateIsAsync);
   const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("basic");
-  const [schemaEditorTab, setSchemaEditorTab] = useState<SchemaEditorTab>("input");
 
   useEffect(() => {
     setExecutionTemplate(defaultExecutionTemplate);
@@ -1018,7 +1040,8 @@ export function CreateProviderModelForm({
         {[
           { key: "basic", label: "基本信息" },
           { key: "protocol", label: "调用协议配置" },
-          { key: "params", label: "提交参数" },
+          { key: "input-params", label: "输入参数" },
+          { key: "output-params", label: "输出参数" },
           { key: "cost", label: "供应商成本配置" },
         ].map((tab) => {
           const active = activeTab === tab.key;
@@ -1142,7 +1165,7 @@ export function CreateProviderModelForm({
                 >
                   {workerTemplateOptions.map((item) => (
                     <option key={item.id} value={item.slug}>
-                      {item.displayName} ({item.slug})
+                      {executionTemplateLabelZh(item.slug)}
                     </option>
                   ))}
                 </select>
@@ -1452,66 +1475,43 @@ export function CreateProviderModelForm({
         </label>
         </div>
 
-        <div className={activeTab === "params" ? "contents" : "hidden"}>
+        <div className={activeTab === "input-params" ? "contents" : "hidden"}>
           <div className="block md:col-span-2">
-            <div className="mb-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setSchemaEditorTab("input")}
-                className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
-                  schemaEditorTab === "input"
-                    ? "border-black bg-black text-white"
-                    : "border-black/[0.12] bg-white text-black/70 hover:bg-black/[0.03]"
-                }`}
-              >
-                入参
-              </button>
-              <button
-                type="button"
-                onClick={() => setSchemaEditorTab("output")}
-                className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
-                  schemaEditorTab === "output"
-                    ? "border-black bg-black text-white"
-                    : "border-black/[0.12] bg-white text-black/70 hover:bg-black/[0.03]"
-                }`}
-              >
-                出参
-              </button>
-            </div>
-            <div className={schemaEditorTab === "input" ? "block" : "hidden"}>
-              <SchemaFieldEditor
-                name="inputSchema"
-                keyName="params"
-                defaultSchemaText={defaultInputSchema}
-                includeRequired
+            <SchemaFieldEditor
+              name="inputSchema"
+              keyName="params"
+              defaultSchemaText={defaultInputSchema}
+              includeRequired
+              disabled={disabled}
+            />
+            <label className="mt-3 block">
+              <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提交 Body 模板（JSON）</span>
+              <textarea
+                value={executionConfigState.submitBodyTemplate}
+                onChange={(event) =>
+                  setExecutionConfigState((current) => ({
+                    ...current,
+                    submitBodyTemplate: event.target.value,
+                  }))
+                }
                 disabled={disabled}
+                className={formTextAreaClassName}
+                rows={8}
+                placeholder={'{\n  "contents": [\n    {\n      "parts": [\n        { "text": "{{prompt}}" }\n      ]\n    }\n  ]\n}'}
               />
-              <label className="mt-3 block">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提交 Body 模板（JSON）</span>
-                <textarea
-                  value={executionConfigState.submitBodyTemplate}
-                  onChange={(event) =>
-                    setExecutionConfigState((current) => ({
-                      ...current,
-                      submitBodyTemplate: event.target.value,
-                    }))
-                  }
-                  disabled={disabled}
-                  className={formTextAreaClassName}
-                  rows={8}
-                  placeholder={'{\n  "contents": [\n    {\n      "parts": [\n        { "text": "{{prompt}}" }\n      ]\n    }\n  ]\n}'}
-                />
-              </label>
-            </div>
-            <div className={schemaEditorTab === "output" ? "block" : "hidden"}>
-              <SchemaFieldEditor
-                name="outputSchema"
-                keyName="fields"
-                defaultSchemaText={defaultOutputSchema}
-                includeRequired={false}
-                disabled={disabled}
-              />
-            </div>
+            </label>
+          </div>
+        </div>
+
+        <div className={activeTab === "output-params" ? "contents" : "hidden"}>
+          <div className="block md:col-span-2">
+            <SchemaFieldEditor
+              name="outputSchema"
+              keyName="fields"
+              defaultSchemaText={defaultOutputSchema}
+              includeRequired={false}
+              disabled={disabled}
+            />
           </div>
         </div>
       </div>
