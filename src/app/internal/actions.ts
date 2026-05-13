@@ -2953,6 +2953,42 @@ function safeJsonParseObject(text: string) {
   }
 }
 
+async function requestDeepSeekJsonObject(input: {
+  apiKey: string;
+  prompt: string;
+}) {
+  const response = await fetch("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${input.apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+      messages: [{ role: "user", content: input.prompt }],
+    }),
+  });
+
+  const json = (await response.json()) as Record<string, unknown>;
+  const usage = (json.usage ?? {}) as Record<string, unknown>;
+  const inputTokens = Number(usage.prompt_tokens ?? 0);
+  const outputTokens = Number(usage.completion_tokens ?? 0);
+  const totalTokens = Number(usage.total_tokens ?? inputTokens + outputTokens);
+  const text = (() => {
+    const choices = Array.isArray(json.choices)
+      ? (json.choices as Array<Record<string, unknown>>)
+      : [];
+    const message = choices[0]?.message;
+    if (!message || typeof message !== "object" || Array.isArray(message)) return "";
+    const content = (message as Record<string, unknown>).content;
+    return typeof content === "string" ? content : "";
+  })();
+
+  return { response, json, text, inputTokens, outputTokens, totalTokens };
+}
+
 export async function generateProviderModelDraftFromSource(input: {
   sourceText: string;
   sourceLabel?: string;
@@ -2996,21 +3032,19 @@ export async function generateProviderModelDraftFromSource(input: {
 
     let deepseekRes: Response;
     try {
-      deepseekRes = await fetch(
-        "https://api.deepseek.com/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${apiKey}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "deepseek-chat",
-            temperature: 0.1,
-            messages: [{ role: "user", content: prompt }],
-          }),
-        }
-      );
+      deepseekRes = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          temperature: 0.1,
+          response_format: { type: "json_object" },
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
     } catch (error) {
       const msg = formatDeepSeekNetworkError(error);
       await supabase.from("internal_model_ai_usage_logs").insert({
@@ -3081,7 +3115,8 @@ export async function generateProviderModelDraftFromSource(input: {
       return { ok: false as const, error: detailedError };
     }
 
-    let result: z.infer<typeof providerModelAutofillResultSchema>;
+    let result: z.infer<typeof providerModelAutofillResultSchema> | null = null;
+    let parseError = false;
     try {
       const parsedResult = safeJsonParseObject(text);
       if (!parsedResult) {
@@ -3091,23 +3126,53 @@ export async function generateProviderModelDraftFromSource(input: {
         normalizeAutofillResultPayload(parsedResult)
       );
     } catch {
-      await supabase.from("internal_model_ai_usage_logs").insert({
-        workspace_id: workspaceId,
-        actor_user_id: actorUserId,
-        source_url: sourceLabel,
-        model: "deepseek-chat",
-        status: "failed",
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        total_tokens: totalTokens,
-        estimated_cost_usd: estimatedCostUsd,
-        latency_ms: Date.now() - startedAt,
-        error_message: "Failed to parse DeepSeek JSON output",
-        raw_response: deepseekJson,
-      });
+      parseError = true;
+    }
+
+    if (parseError) {
+      try {
+        const repairPrompt = [
+          "将下面内容修复为严格 JSON 对象，只输出 JSON，不要解释。",
+          "必须包含固定顶层键：upstreamModelSlug, executionTemplate, executionConfig, inputSchema, outputSchema, pricingSourceUrl, pricingSourceNote, requestExampleJson, submitResponseExampleJson, normalizedOutputExampleJson, summary。",
+          "若缺失则用空字符串或空对象/空数组补齐。",
+          "待修复内容：",
+          text || JSON.stringify(deepseekJson),
+        ].join("\n");
+
+        const repaired = await requestDeepSeekJsonObject({ apiKey, prompt: repairPrompt });
+        const repairedParsed = safeJsonParseObject(repaired.text);
+        if (!repaired.response.ok || !repairedParsed) {
+          throw new Error("repair-failed");
+        }
+        result = providerModelAutofillResultSchema.parse(
+          normalizeAutofillResultPayload(repairedParsed)
+        );
+      } catch {
+        await supabase.from("internal_model_ai_usage_logs").insert({
+          workspace_id: workspaceId,
+          actor_user_id: actorUserId,
+          source_url: sourceLabel,
+          model: "deepseek-chat",
+          status: "failed",
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          total_tokens: totalTokens,
+          estimated_cost_usd: estimatedCostUsd,
+          latency_ms: Date.now() - startedAt,
+          error_message: "Failed to parse DeepSeek JSON output (including repair pass)",
+          raw_response: deepseekJson,
+        });
+        return {
+          ok: false as const,
+          error: "DeepSeek 返回内容不是可解析 JSON。请重试，或拆小文档后再试。",
+        };
+      }
+    }
+
+    if (!result) {
       return {
         ok: false as const,
-        error: "DeepSeek 返回内容不是可解析 JSON。请重试，或减少粘贴内容长度后再试。",
+        error: "DeepSeek 识别结果为空，请重试。",
       };
     }
 
