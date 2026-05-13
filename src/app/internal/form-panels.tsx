@@ -875,6 +875,106 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
   return JSON.stringify(result);
 }
 
+function buildAutofillPreviewPayload(input: {
+  sourceLabel: string;
+  sourceText: string;
+  data: {
+    upstreamModelSlug?: string | null;
+    executionTemplate?: string | null;
+    executionConfigText?: string | null;
+    inputSchemaText?: string | null;
+    outputSchemaText?: string | null;
+    pricingSourceUrl?: string | null;
+    pricingSourceNote?: string | null;
+    requestExampleJson?: string | null;
+    submitResponseExampleJson?: string | null;
+    normalizedOutputExampleJson?: string | null;
+    summary?: string | null;
+  };
+}) {
+  const safeParse = (value?: string | null) => {
+    if (!value || !value.trim()) return {};
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const executionConfig = safeParse(input.data.executionConfigText) as Record<string, unknown>;
+  const inputSchema = safeParse(input.data.inputSchemaText) as Record<string, unknown>;
+  const outputSchema = safeParse(input.data.outputSchemaText) as Record<string, unknown>;
+
+  return {
+    source: {
+      label: input.sourceLabel || "",
+      contentLength: input.sourceText.length,
+    },
+    basic: {
+      supportedModelId: "",
+      providerId: "",
+      capability: "",
+      upstreamModelSlug: input.data.upstreamModelSlug ?? "",
+    },
+    protocol: {
+      executionTemplate: input.data.executionTemplate ?? "",
+      executionConfig: {
+        mode: typeof executionConfig.mode === "string" ? executionConfig.mode : "",
+        authType: typeof executionConfig.authType === "string" ? executionConfig.authType : "",
+        authHeaderName:
+          typeof executionConfig.authHeaderName === "string" ? executionConfig.authHeaderName : "",
+        authHeaderPrefix:
+          typeof executionConfig.authHeaderPrefix === "string" ? executionConfig.authHeaderPrefix : "",
+        authQueryParam:
+          typeof executionConfig.authQueryParam === "string" ? executionConfig.authQueryParam : "",
+        submitPath: typeof executionConfig.submitPath === "string" ? executionConfig.submitPath : "",
+        pollPath: typeof executionConfig.pollPath === "string" ? executionConfig.pollPath : "",
+        taskIdPath: typeof executionConfig.taskIdPath === "string" ? executionConfig.taskIdPath : "",
+        statusPath: typeof executionConfig.statusPath === "string" ? executionConfig.statusPath : "",
+        resultUrlPath:
+          typeof executionConfig.resultUrlPath === "string" ? executionConfig.resultUrlPath : "",
+        resultValueType:
+          typeof executionConfig.resultValueType === "string" ? executionConfig.resultValueType : "",
+        resultMimeType:
+          typeof executionConfig.resultMimeType === "string" ? executionConfig.resultMimeType : "",
+        submitBodyTemplate:
+          typeof executionConfig.submitBodyTemplate === "string"
+            ? executionConfig.submitBodyTemplate
+            : executionConfig.submitBodyTemplate ?? "",
+      },
+    },
+    inputParams: {
+      officialDocUrl:
+        typeof inputSchema.officialDocUrl === "string"
+          ? (inputSchema.officialDocUrl as string)
+          : "",
+      params: Array.isArray(inputSchema.params)
+        ? (inputSchema.params as unknown[])
+        : [],
+    },
+    outputParams: {
+      officialDocUrl:
+        typeof outputSchema.officialDocUrl === "string"
+          ? (outputSchema.officialDocUrl as string)
+          : "",
+      fields: Array.isArray(outputSchema.fields)
+        ? (outputSchema.fields as unknown[])
+        : [],
+    },
+    examples: {
+      requestExampleJson: input.data.requestExampleJson ?? "",
+      submitResponseExampleJson: input.data.submitResponseExampleJson ?? "",
+      normalizedOutputExampleJson: input.data.normalizedOutputExampleJson ?? "",
+      summary: input.data.summary ?? "",
+    },
+    cost: {
+      pricingSourceUrl: input.data.pricingSourceUrl ?? "",
+      pricingSourceNote: input.data.pricingSourceNote ?? "",
+    },
+  };
+}
+
 function FieldHint({
   help,
   example,
@@ -1169,6 +1269,7 @@ export function CreateProviderModelForm({
   const [autofillSourceLabel, setAutofillSourceLabel] = useState("");
   const [autofillSourceText, setAutofillSourceText] = useState("");
   const [autofillSummary, setAutofillSummary] = useState("");
+  const [autofillPreviewJson, setAutofillPreviewJson] = useState("");
   const [seedInputSchemaText, setSeedInputSchemaText] = useState("");
   const [seedOutputSchemaText, setSeedOutputSchemaText] = useState("");
   const [isAutofilling, startAutofillTransition] = useTransition();
@@ -1177,7 +1278,6 @@ export function CreateProviderModelForm({
     executionTemplate === "rest-async-poll-v1" || executionTemplate === "upload-async-poll-v1";
   const isAsyncMode = executionConfigState.mode === "async" || (executionConfigState.mode === "auto" && templateIsAsync);
   const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("ai-autofill");
-  const contentContainerRef = useRef<HTMLDivElement | null>(null);
   const sectionRefs = useRef<Record<ProviderModelFormTab, HTMLDivElement | null>>({
     "ai-autofill": null,
     basic: null,
@@ -1210,6 +1310,7 @@ export function CreateProviderModelForm({
     setAutofillSourceLabel("");
     setAutofillSourceText("");
     setAutofillSummary("");
+    setAutofillPreviewJson("");
     setSeedInputSchemaText("");
     setSeedOutputSchemaText("");
   }, [
@@ -1246,6 +1347,17 @@ export function CreateProviderModelForm({
       setPricingSourceUrlState(payload.pricingSourceUrl ?? "");
       setPricingSourceNoteState(payload.pricingSourceNote ?? "");
       setAutofillSummary(payload.summary ?? "");
+      setAutofillPreviewJson(
+        JSON.stringify(
+          buildAutofillPreviewPayload({
+            sourceLabel: autofillSourceLabel.trim(),
+            sourceText,
+            data: payload,
+          }),
+          null,
+          2
+        )
+      );
       toast.success("已完成自动解析并填充");
     });
   };
@@ -1319,7 +1431,7 @@ export function CreateProviderModelForm({
                     setActiveTab(tab.key);
                     const section = sectionRefs.current[tab.key];
                     if (section) {
-                      section.scrollIntoView({ behavior: "smooth", block: "start" });
+                      section.scrollIntoView({ behavior: "auto", block: "start" });
                     }
                   }}
                   className={`flex w-full cursor-pointer items-center rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${
@@ -1335,15 +1447,12 @@ export function CreateProviderModelForm({
           </nav>
         </aside>
 
-        <div
-          ref={contentContainerRef}
-          className="max-h-[72vh] space-y-4 overflow-y-auto pr-1"
-        >
+        <div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
         <div
           ref={(node) => {
             sectionRefs.current["ai-autofill"] = node;
           }}
-          className="grid gap-3"
+          className={activeTab === "ai-autofill" ? "grid gap-3" : "hidden"}
         >
         <label className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">文档内容自动填充</span>
@@ -1378,6 +1487,16 @@ export function CreateProviderModelForm({
               {autofillSummary}
             </p>
           ) : null}
+          {autofillPreviewJson ? (
+            <div className="mt-2 rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5">
+              <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">
+                识别结果完整 JSON（空字段表示未识别）
+              </p>
+              <pre className="max-h-[340px] overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-black/70">
+                {autofillPreviewJson}
+              </pre>
+            </div>
+          ) : null}
         </label>
         </div>
 
@@ -1385,7 +1504,7 @@ export function CreateProviderModelForm({
           ref={(node) => {
             sectionRefs.current.basic = node;
           }}
-          className="grid gap-3 md:grid-cols-2"
+          className={activeTab === "basic" ? "grid gap-3 md:grid-cols-2" : "hidden"}
         >
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">可售模型</span>
@@ -1470,7 +1589,7 @@ export function CreateProviderModelForm({
           ref={(node) => {
             sectionRefs.current.protocol = node;
           }}
-          className="grid gap-3 md:grid-cols-2"
+          className={activeTab === "protocol" ? "grid gap-3 md:grid-cols-2" : "hidden"}
         >
         <div className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">调用协议配置</span>
@@ -1761,7 +1880,7 @@ export function CreateProviderModelForm({
           ref={(node) => {
             sectionRefs.current.cost = node;
           }}
-          className="grid gap-3 md:grid-cols-2"
+          className={activeTab === "cost" ? "grid gap-3 md:grid-cols-2" : "hidden"}
         >
         <div className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">供应商成本配置</span>
@@ -1816,7 +1935,7 @@ export function CreateProviderModelForm({
           ref={(node) => {
             sectionRefs.current["input-params"] = node;
           }}
-          className=""
+          className={activeTab === "input-params" ? "" : "hidden"}
         >
           <div className="block">
             <SchemaFieldEditor
@@ -1850,7 +1969,7 @@ export function CreateProviderModelForm({
           ref={(node) => {
             sectionRefs.current["output-params"] = node;
           }}
-          className=""
+          className={activeTab === "output-params" ? "" : "hidden"}
         >
           <div className="block">
             <SchemaFieldEditor
@@ -1868,7 +1987,7 @@ export function CreateProviderModelForm({
           ref={(node) => {
             sectionRefs.current["doc-examples"] = node;
           }}
-          className=""
+          className={activeTab === "doc-examples" ? "" : "hidden"}
         >
           <div className="block rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
             <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">文档示例配置（用于 Dashboard API Quickstart）</p>
