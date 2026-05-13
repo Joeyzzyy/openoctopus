@@ -899,7 +899,7 @@ export function CreateProviderModelForm({
         <input type="hidden" name="providerModelId" value={providerModelId} />
       ) : null}
       <input type="hidden" name="pricingSourceEvidence" value={defaultPricingSourceEvidence} />
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="mb-1.5 flex flex-wrap gap-1.5">
         {[
           { key: "basic", label: "基本信息" },
           { key: "protocol", label: "调用协议配置" },
@@ -923,7 +923,7 @@ export function CreateProviderModelForm({
           );
         })}
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         <div className={activeTab === "basic" ? "contents" : "hidden"}>
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">可售模型</span>
@@ -1007,56 +1007,58 @@ export function CreateProviderModelForm({
         <div className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">调用协议配置</span>
           <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
-            <label className="block mb-3">
-              <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">API 调用格式配置</span>
-              <select
-                name="executionTemplate"
-                value={executionTemplate}
-                onChange={(event) => {
-                  const nextTemplate = event.target.value;
-                  setExecutionTemplate(nextTemplate);
-                  const preset = templateExecutionPreset(nextTemplate);
-                  setExecutionConfigState((current) => ({
-                    ...current,
-                    ...preset,
-                  }));
-                }}
-                disabled={disabled}
-                className={formSelectClassName}
-              >
-                {workerTemplateOptions.map((item) => (
-                  <option key={item.id} value={item.slug}>
-                    {item.displayName} ({item.slug})
-                  </option>
-                ))}
-              </select>
-            </label>
-            {executionConfigPresets.length > 0 ? (
-              <label className="block mb-3">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">快速填充（复制已有模型）</span>
+            <div className="mb-3 grid gap-3 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">API 调用格式配置</span>
                 <select
-                  value={selectedPresetId}
+                  name="executionTemplate"
+                  value={executionTemplate}
                   onChange={(event) => {
-                    const nextPresetId = event.target.value;
-                    setSelectedPresetId(nextPresetId);
-                    if (!nextPresetId) return;
-                    const preset = executionConfigPresets.find((item) => item.id === nextPresetId);
-                    if (!preset) return;
-                    setExecutionTemplate(preset.executionTemplate);
-                    setExecutionConfigState(parseExecutionConfigState(preset.executionConfigText));
+                    const nextTemplate = event.target.value;
+                    setExecutionTemplate(nextTemplate);
+                    const preset = templateExecutionPreset(nextTemplate);
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      ...preset,
+                    }));
                   }}
                   disabled={disabled}
                   className={formSelectClassName}
                 >
-                  <option value="">选择一个已配置模型并复制其调用协议</option>
-                  {executionConfigPresets.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.label}
+                  {workerTemplateOptions.map((item) => (
+                    <option key={item.id} value={item.slug}>
+                      {item.displayName} ({item.slug})
                     </option>
                   ))}
                 </select>
               </label>
-            ) : null}
+              {executionConfigPresets.length > 0 ? (
+                <label className="block">
+                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">快速填充（复制已有模型）</span>
+                  <select
+                    value={selectedPresetId}
+                    onChange={(event) => {
+                      const nextPresetId = event.target.value;
+                      setSelectedPresetId(nextPresetId);
+                      if (!nextPresetId) return;
+                      const preset = executionConfigPresets.find((item) => item.id === nextPresetId);
+                      if (!preset) return;
+                      setExecutionTemplate(preset.executionTemplate);
+                      setExecutionConfigState(parseExecutionConfigState(preset.executionConfigText));
+                    }}
+                    disabled={disabled}
+                    className={formSelectClassName}
+                  >
+                    <option value="">选择一个已配置模型并复制其调用协议</option>
+                    {executionConfigPresets.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+            </div>
             <input type="hidden" name="executionConfig" value={executionConfigValue} />
             <div className="grid gap-3 md:grid-cols-2">
               <label className="block">
@@ -1282,7 +1284,6 @@ export function CreateProviderModelForm({
                   {executionConfigValue}
                 </code>
               </div>
-              <FieldHint help="用表单填写后会自动组装成 JSON 入库，无需手写 JSON。这里配置的是调用协议参数，不是新增 worker 代码。" />
             </div>
           </div>
         </div>
