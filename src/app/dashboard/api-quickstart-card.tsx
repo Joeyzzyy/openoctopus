@@ -15,8 +15,6 @@ type ModelDocItem = {
   executionConfigText: string;
   requestExampleJson: string | null;
   submitResponseExampleJson: string | null;
-  pollProcessingExampleJson: string | null;
-  pollCompletedExampleJson: string | null;
   normalizedOutputExampleJson: string | null;
 };
 
@@ -287,8 +285,6 @@ export function ApiQuickstartCard({
             executionConfigText: "{}",
             requestExampleJson: null,
             submitResponseExampleJson: null,
-            pollProcessingExampleJson: null,
-            pollCompletedExampleJson: null,
             normalizedOutputExampleJson: null,
           },
         ];
@@ -485,32 +481,6 @@ export function ApiQuickstartCard({
                 <CodeBlock
                   code={selectedModel.submitResponseExampleJson}
                   copyId="doc-submit-response-example"
-                  copiedBlock={copiedBlock}
-                  onCopy={copyText}
-                />
-              </div>
-            </div>
-          ) : null}
-          {selectedModel?.pollCompletedExampleJson ? (
-            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Poll Completed Example</p>
-              <div className="mt-3">
-                <CodeBlock
-                  code={selectedModel.pollCompletedExampleJson}
-                  copyId="doc-poll-completed-example"
-                  copiedBlock={copiedBlock}
-                  onCopy={copyText}
-                />
-              </div>
-            </div>
-          ) : null}
-          {selectedModel?.pollProcessingExampleJson ? (
-            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Poll Processing Example</p>
-              <div className="mt-3">
-                <CodeBlock
-                  code={selectedModel.pollProcessingExampleJson}
-                  copyId="doc-poll-processing-example"
                   copiedBlock={copiedBlock}
                   onCopy={copyText}
                 />

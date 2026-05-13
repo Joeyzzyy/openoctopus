@@ -73,8 +73,6 @@ type ExecutionConfigFormState = {
   submitBodyTemplate: string;
   docRequestExampleJson: string;
   docSubmitResponseExampleJson: string;
-  docPollProcessingExampleJson: string;
-  docPollCompletedExampleJson: string;
   docNormalizedOutputExampleJson: string;
 };
 
@@ -105,8 +103,6 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
         '{\n  "contents": [\n    {\n      "parts": [\n        {\n          "text": "{{prompt}}"\n        }\n      ]\n    }\n  ],\n  "generationConfig": {\n    "responseModalities": ["IMAGE"]\n  }\n}',
       docRequestExampleJson: "",
       docSubmitResponseExampleJson: "",
-      docPollProcessingExampleJson: "",
-      docPollCompletedExampleJson: "",
       docNormalizedOutputExampleJson: "",
     };
   }
@@ -745,8 +741,6 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
     submitBodyTemplate: "",
     docRequestExampleJson: "",
     docSubmitResponseExampleJson: "",
-    docPollProcessingExampleJson: "",
-    docPollCompletedExampleJson: "",
     docNormalizedOutputExampleJson: "",
   };
 
@@ -821,14 +815,6 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
         parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).submitResponseExampleJson === "string"
           ? ((parsed.doc as Record<string, unknown>).submitResponseExampleJson as string)
           : fallback.docSubmitResponseExampleJson,
-      docPollProcessingExampleJson:
-        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).pollProcessingExampleJson === "string"
-          ? ((parsed.doc as Record<string, unknown>).pollProcessingExampleJson as string)
-          : fallback.docPollProcessingExampleJson,
-      docPollCompletedExampleJson:
-        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).pollCompletedExampleJson === "string"
-          ? ((parsed.doc as Record<string, unknown>).pollCompletedExampleJson as string)
-          : fallback.docPollCompletedExampleJson,
       docNormalizedOutputExampleJson:
         parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).normalizedOutputExampleJson === "string"
           ? ((parsed.doc as Record<string, unknown>).normalizedOutputExampleJson as string)
@@ -869,8 +855,6 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
   const doc: Record<string, unknown> = {
     requestExampleJson: state.docRequestExampleJson.trim() || undefined,
     submitResponseExampleJson: state.docSubmitResponseExampleJson.trim() || undefined,
-    pollProcessingExampleJson: state.docPollProcessingExampleJson.trim() || undefined,
-    pollCompletedExampleJson: state.docPollCompletedExampleJson.trim() || undefined,
     normalizedOutputExampleJson: state.docNormalizedOutputExampleJson.trim() || undefined,
   };
   result.doc = doc;
@@ -1731,36 +1715,6 @@ export function CreateProviderModelForm({
                     setExecutionConfigState((current) => ({
                       ...current,
                       docSubmitResponseExampleJson: event.target.value,
-                    }))
-                  }
-                  disabled={disabled}
-                  className={formTextAreaClassName}
-                  rows={4}
-                />
-              </label>
-              <label className="block md:col-span-2">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">轮询进行中示例 JSON</span>
-                <textarea
-                  value={executionConfigState.docPollProcessingExampleJson}
-                  onChange={(event) =>
-                    setExecutionConfigState((current) => ({
-                      ...current,
-                      docPollProcessingExampleJson: event.target.value,
-                    }))
-                  }
-                  disabled={disabled}
-                  className={formTextAreaClassName}
-                  rows={4}
-                />
-              </label>
-              <label className="block md:col-span-2">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">轮询完成示例 JSON</span>
-                <textarea
-                  value={executionConfigState.docPollCompletedExampleJson}
-                  onChange={(event) =>
-                    setExecutionConfigState((current) => ({
-                      ...current,
-                      docPollCompletedExampleJson: event.target.value,
                     }))
                   }
                   disabled={disabled}

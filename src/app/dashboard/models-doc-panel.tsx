@@ -19,8 +19,6 @@ type ModelRow = {
   executionConfigText: string;
   requestExampleJson: string | null;
   submitResponseExampleJson: string | null;
-  pollProcessingExampleJson: string | null;
-  pollCompletedExampleJson: string | null;
   normalizedOutputExampleJson: string | null;
 };
 

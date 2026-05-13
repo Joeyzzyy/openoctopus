@@ -140,8 +140,6 @@ export type DashboardData = {
     executionConfigText: string;
     requestExampleJson: string | null;
     submitResponseExampleJson: string | null;
-    pollProcessingExampleJson: string | null;
-    pollCompletedExampleJson: string | null;
     normalizedOutputExampleJson: string | null;
   }>;
   requestFilters: {
@@ -764,26 +762,6 @@ export async function getDashboardData({
             !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
             typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).submitResponseExampleJson === "string"
               ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).submitResponseExampleJson as string)
-              : null,
-          pollProcessingExampleJson:
-            primaryProviderModel?.execution_config &&
-            typeof primaryProviderModel.execution_config === "object" &&
-            !Array.isArray(primaryProviderModel.execution_config) &&
-            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
-            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
-            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
-            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollProcessingExampleJson === "string"
-              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollProcessingExampleJson as string)
-              : null,
-          pollCompletedExampleJson:
-            primaryProviderModel?.execution_config &&
-            typeof primaryProviderModel.execution_config === "object" &&
-            !Array.isArray(primaryProviderModel.execution_config) &&
-            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
-            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
-            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
-            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollCompletedExampleJson === "string"
-              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollCompletedExampleJson as string)
               : null,
           normalizedOutputExampleJson:
             primaryProviderModel?.execution_config &&
