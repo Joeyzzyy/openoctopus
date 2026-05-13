@@ -1,6 +1,6 @@
 "use client";
 import { Fragment, useEffect, useState } from "react";
-import { BadgeCheck, CircleAlert } from "lucide-react";
+import { BadgeCheck, CircleAlert, X } from "lucide-react";
 import { deriveLegacyBillingFields, parseBillingConfig } from "@/lib/billing-config";
 import {
   createModelVendor,
@@ -673,7 +673,7 @@ function ManagementDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger disabled={disabled}>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-5xl">
+      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] [&>button]:hidden sm:max-w-5xl">
         <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -684,7 +684,20 @@ function ManagementDialog({
                 </DialogDescription>
               ) : null}
             </div>
-            {headerActions ? <div className="shrink-0">{headerActions}</div> : null}
+            <div className="shrink-0">
+              <div className="flex items-center gap-2">
+                {headerActions}
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-black/[0.12] bg-white text-black transition-colors hover:bg-black/[0.04]"
+                  aria-label="Close dialog"
+                  title="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           </div>
         </DialogHeader>
         <div className="px-5 pb-5 pt-5">
@@ -1084,6 +1097,15 @@ export function PublicModelsPanel({
                                     trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                                     title={`编辑映射 ${mapping.supportedModelName} / ${mapping.providerName}`}
                                     description=" "
+                                    headerActions={
+                                      <button
+                                        type="submit"
+                                        form={`provider-model-form-${mapping.id}`}
+                                        className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
+                                      >
+                                        保存供应商模型
+                                      </button>
+                                    }
                                   >
                                     {({ close }) => (
                                       <CreateProviderModelForm
@@ -1111,7 +1133,8 @@ export function PublicModelsPanel({
                                         defaultExecutionTemplate={mapping.executionTemplate}
                                         defaultExecutionConfig={mapping.executionConfigText}
                                         defaultActive={mapping.active}
-                                        submitLabel="保存供应商模型"
+                                        formId={`provider-model-form-${mapping.id}`}
+                                        showSubmitButton={false}
                                         className="grid gap-4"
                                         onSuccess={close}
                                         disabled={false}
@@ -1575,6 +1598,15 @@ export function EconomicsPanel({
                                 trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                                 title={`编辑 ${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
                                 description=" "
+                                headerActions={
+                                  <button
+                                    type="submit"
+                                    form={`provider-model-form-${row.providerModel.id}`}
+                                    className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
+                                  >
+                                    保存供应商模型
+                                  </button>
+                                }
                               >
                                 {({ close }) => (
                                   <CreateProviderModelForm
@@ -1600,7 +1632,8 @@ export function EconomicsPanel({
                                     defaultExecutionTemplate={row.providerModel.executionTemplate}
                                     defaultExecutionConfig={row.providerModel.executionConfigText}
                                     defaultActive={row.providerModel.active}
-                                    submitLabel="保存供应商模型"
+                                    formId={`provider-model-form-${row.providerModel.id}`}
+                                    showSubmitButton={false}
                                     className="grid gap-4"
                                     onSuccess={close}
                                     disabled={false}
@@ -1807,6 +1840,15 @@ export function CreateProviderModelMappingButton({
       disabled={!hasProviders || !hasSupportedModels}
       title="新建供应商供应模型"
       description="先选择可售模型与供应商，再填写执行协议配置和成本配置。"
+      headerActions={
+        <button
+          type="submit"
+          form="provider-model-form-create-vendor"
+          className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
+        >
+          保存供应商模型
+        </button>
+      }
     >
       {({ close }) => (
         <CreateProviderModelForm
@@ -1815,6 +1857,8 @@ export function CreateProviderModelMappingButton({
           providers={providerOptions}
           workerTemplates={workerTemplateOptions}
           executionConfigPresets={executionConfigPresets}
+          formId="provider-model-form-create-vendor"
+          showSubmitButton={false}
           disabled={!hasProviders || !hasSupportedModels}
           className="grid gap-4"
           onSuccess={close}
@@ -2209,6 +2253,15 @@ export function ModelsPanel({
           disabled={!hasProviders || !hasSupportedModels}
           title="新建供应商模型"
           description="在独立弹窗中，把可售模型映射到某个供应商的具体模型。"
+          headerActions={
+            <button
+              type="submit"
+              form="provider-model-form-create-models"
+              className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
+            >
+              保存供应商模型
+            </button>
+          }
         >
           {({ close }) => (
             <CreateProviderModelForm
@@ -2219,6 +2272,8 @@ export function ModelsPanel({
               defaultSupportedModelSlug="openoctopus/gemini-2.5-flash-image"
               defaultUpstreamModelSlug={selectedTemplate?.providerModel.upstreamModelSlug}
               defaultPricing={selectedTemplate?.providerModel.pricing}
+              formId="provider-model-form-create-models"
+              showSubmitButton={false}
               disabled={!hasProviders || !hasSupportedModels}
               className="grid gap-4"
               onSuccess={close}
@@ -2254,6 +2309,15 @@ export function ModelsPanel({
                 trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                 title={`编辑 ${item.upstream_model_slug}`}
                 description="在独立弹窗中编辑这个供应商模型。"
+                headerActions={
+                  <button
+                    type="submit"
+                    form={`provider-model-form-models-${item.id}`}
+                    className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
+                  >
+                    保存供应商模型
+                  </button>
+                }
               >
                 {({ close }) => (
                   <CreateProviderModelForm
@@ -2275,8 +2339,9 @@ export function ModelsPanel({
                     defaultExecutionTemplate={item.executionTemplate}
                     defaultExecutionConfig={item.executionConfigText}
                     defaultActive={item.active}
+                    formId={`provider-model-form-models-${item.id}`}
+                    showSubmitButton={false}
                     disabled={!hasProviders || !hasSupportedModels}
-                    submitLabel="保存供应商模型"
                     className="grid gap-4"
                     onSuccess={close}
                   />

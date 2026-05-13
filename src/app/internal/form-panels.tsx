@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 import { createProviderModel, createRoutingRule } from "./actions";
@@ -1091,6 +1091,8 @@ export function CreateProviderModelForm({
   onSuccess,
   submitLabel = "添加供应商模型",
   className = panelSurfaceClassName,
+  formId,
+  showSubmitButton = true,
 }: {
   action?: (formData: FormData) => void | Promise<void>;
   supportedModels: SupportedModelOption[];
@@ -1114,6 +1116,8 @@ export function CreateProviderModelForm({
   onSuccess?: () => void;
   submitLabel?: string;
   className?: string;
+  formId?: string;
+  showSubmitButton?: boolean;
 }) {
   type ProviderModelFormTab =
     | "basic"
@@ -1149,6 +1153,26 @@ export function CreateProviderModelForm({
     executionTemplate === "rest-async-poll-v1" || executionTemplate === "upload-async-poll-v1";
   const isAsyncMode = executionConfigState.mode === "async" || (executionConfigState.mode === "auto" && templateIsAsync);
   const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("basic");
+  const contentContainerRef = useRef<HTMLDivElement | null>(null);
+  const sectionRefs = useRef<Record<ProviderModelFormTab, HTMLDivElement | null>>({
+    basic: null,
+    protocol: null,
+    "input-params": null,
+    "output-params": null,
+    "doc-examples": null,
+    cost: null,
+  });
+  const tabItems = useMemo(
+    () => [
+      { key: "basic" as const, label: "基本信息" },
+      { key: "protocol" as const, label: "调用协议配置" },
+      { key: "input-params" as const, label: "输入参数" },
+      { key: "output-params" as const, label: "输出参数" },
+      { key: "doc-examples" as const, label: "示例配置" },
+      { key: "cost" as const, label: "供应商成本配置" },
+    ],
+    []
+  );
 
   useEffect(() => {
     setExecutionTemplate(defaultExecutionTemplate);
@@ -1158,6 +1182,7 @@ export function CreateProviderModelForm({
 
   return (
     <form
+      id={formId}
       action={action}
       className={className}
       onSubmit={(event) => {
@@ -1211,34 +1236,45 @@ export function CreateProviderModelForm({
         <input type="hidden" name="providerModelId" value={providerModelId} />
       ) : null}
       <input type="hidden" name="pricingSourceEvidence" value={defaultPricingSourceEvidence} />
-      <div className="mb-1.5 flex flex-wrap gap-1.5">
-        {[
-          { key: "basic", label: "基本信息" },
-          { key: "protocol", label: "调用协议配置" },
-          { key: "input-params", label: "输入参数" },
-          { key: "output-params", label: "输出参数" },
-          { key: "doc-examples", label: "示例配置" },
-          { key: "cost", label: "供应商成本配置" },
-        ].map((tab) => {
-          const active = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key as ProviderModelFormTab)}
-              className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
-                active
-                  ? "border-black bg-black text-white"
-                  : "border-black/[0.12] bg-white text-black/70 hover:bg-black/[0.03]"
-              }`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className={activeTab === "basic" ? "contents" : "hidden"}>
+      <div className="grid gap-4 lg:grid-cols-[210px_minmax(0,1fr)]">
+        <aside className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-2">
+          <nav className="space-y-1">
+            {tabItems.map((tab) => {
+              const active = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.key);
+                    const section = sectionRefs.current[tab.key];
+                    if (section) {
+                      section.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                  }}
+                  className={`flex w-full cursor-pointer items-center rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${
+                    active
+                      ? "bg-black text-white"
+                      : "text-black/68 hover:bg-black/[0.05]"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        <div
+          ref={contentContainerRef}
+          className="max-h-[72vh] space-y-4 overflow-y-auto pr-1"
+        >
+        <div
+          ref={(node) => {
+            sectionRefs.current.basic = node;
+          }}
+          className="grid gap-3 md:grid-cols-2"
+        >
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">可售模型</span>
           <select
@@ -1317,7 +1353,12 @@ export function CreateProviderModelForm({
         <input type="hidden" name="active" value="true" />
         </div>
 
-        <div className={activeTab === "protocol" ? "contents" : "hidden"}>
+        <div
+          ref={(node) => {
+            sectionRefs.current.protocol = node;
+          }}
+          className="grid gap-3 md:grid-cols-2"
+        >
         <div className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">调用协议配置</span>
           <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
@@ -1603,7 +1644,12 @@ export function CreateProviderModelForm({
         </div>
         </div>
 
-        <div className={activeTab === "cost" ? "contents" : "hidden"}>
+        <div
+          ref={(node) => {
+            sectionRefs.current.cost = node;
+          }}
+          className="grid gap-3 md:grid-cols-2"
+        >
         <div className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">供应商成本配置</span>
           <BillingConfigEditor
@@ -1651,8 +1697,13 @@ export function CreateProviderModelForm({
         </label>
         </div>
 
-        <div className={activeTab === "input-params" ? "contents" : "hidden"}>
-          <div className="block md:col-span-2">
+        <div
+          ref={(node) => {
+            sectionRefs.current["input-params"] = node;
+          }}
+          className=""
+        >
+          <div className="block">
             <SchemaFieldEditor
               name="inputSchema"
               keyName="params"
@@ -1679,8 +1730,13 @@ export function CreateProviderModelForm({
           </div>
         </div>
 
-        <div className={activeTab === "output-params" ? "contents" : "hidden"}>
-          <div className="block md:col-span-2">
+        <div
+          ref={(node) => {
+            sectionRefs.current["output-params"] = node;
+          }}
+          className=""
+        >
+          <div className="block">
             <SchemaFieldEditor
               name="outputSchema"
               keyName="fields"
@@ -1691,8 +1747,13 @@ export function CreateProviderModelForm({
           </div>
         </div>
 
-        <div className={activeTab === "doc-examples" ? "contents" : "hidden"}>
-          <div className="block md:col-span-2 rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+        <div
+          ref={(node) => {
+            sectionRefs.current["doc-examples"] = node;
+          }}
+          className=""
+        >
+          <div className="block rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
             <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">文档示例配置（用于 Dashboard API Quickstart）</p>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="block md:col-span-2">
@@ -1740,14 +1801,16 @@ export function CreateProviderModelForm({
             </div>
           </div>
         </div>
+        </div>
       </div>
-
-      <div className="mt-4">
-        <SubmitButton
-          label={submitLabel}
-          disabled={disabled || !selectedSupportedModel?.capability}
-        />
-      </div>
+      {showSubmitButton ? (
+        <div className="mt-4">
+          <SubmitButton
+            label={submitLabel}
+            disabled={disabled || !selectedSupportedModel?.capability}
+          />
+        </div>
+      ) : null}
     </form>
   );
 }
