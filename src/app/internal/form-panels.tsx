@@ -1175,7 +1175,13 @@ export function CreateProviderModelForm({
   submitLabel?: string;
   className?: string;
 }) {
-  type ProviderModelFormTab = "basic" | "protocol" | "input-params" | "output-params" | "cost";
+  type ProviderModelFormTab =
+    | "basic"
+    | "protocol"
+    | "input-params"
+    | "output-params"
+    | "doc-examples"
+    | "cost";
   const fallbackSupportedModelId = supportedModels[0]?.id ?? "";
   const templateSupportedModelId =
     supportedModels.find((item) => item.modelSlug === defaultSupportedModelSlug)?.id ??
@@ -1271,6 +1277,7 @@ export function CreateProviderModelForm({
           { key: "protocol", label: "调用协议配置" },
           { key: "input-params", label: "输入参数" },
           { key: "output-params", label: "输出参数" },
+          { key: "doc-examples", label: "示例与错误" },
           { key: "cost", label: "供应商成本配置" },
         ].map((tab) => {
           const active = activeTab === tab.key;
@@ -1651,126 +1658,6 @@ export function CreateProviderModelForm({
                   {executionConfigValue}
                 </code>
               </div>
-              <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3 md:col-span-2">
-                <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">文档增强配置（用于 Dashboard API Quickstart）</p>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">流程模式</span>
-                    <select
-                      value={executionConfigState.docFlowMode}
-                      onChange={(event) =>
-                        setExecutionConfigState((current) => ({ ...current, docFlowMode: event.target.value }))
-                      }
-                      disabled={disabled}
-                      className={formSelectClassName}
-                    >
-                      <option value="async_poll">异步轮询</option>
-                      <option value="sync">同步返回</option>
-                      <option value="webhook">Webhook</option>
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">建议轮询间隔（秒）</span>
-                    <input
-                      value={executionConfigState.docRecommendedPollIntervalSeconds}
-                      onChange={(event) =>
-                        setExecutionConfigState((current) => ({
-                          ...current,
-                          docRecommendedPollIntervalSeconds: event.target.value,
-                        }))
-                      }
-                      disabled={disabled}
-                      className={formInputClassName}
-                      placeholder="2"
-                    />
-                  </label>
-                  <label className="block md:col-span-2">
-                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">状态流转说明</span>
-                    <input
-                      value={executionConfigState.docStatusLifecycle}
-                      onChange={(event) =>
-                        setExecutionConfigState((current) => ({ ...current, docStatusLifecycle: event.target.value }))
-                      }
-                      disabled={disabled}
-                      className={formInputClassName}
-                      placeholder="pending -> processing -> completed | failed"
-                    />
-                  </label>
-                  <label className="block md:col-span-2">
-                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">请求示例 JSON</span>
-                    <textarea
-                      value={executionConfigState.docRequestExampleJson}
-                      onChange={(event) =>
-                        setExecutionConfigState((current) => ({ ...current, docRequestExampleJson: event.target.value }))
-                      }
-                      disabled={disabled}
-                      className={formTextAreaClassName}
-                      rows={5}
-                    />
-                  </label>
-                  <label className="block md:col-span-2">
-                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提交响应示例 JSON</span>
-                    <textarea
-                      value={executionConfigState.docSubmitResponseExampleJson}
-                      onChange={(event) =>
-                        setExecutionConfigState((current) => ({
-                          ...current,
-                          docSubmitResponseExampleJson: event.target.value,
-                        }))
-                      }
-                      disabled={disabled}
-                      className={formTextAreaClassName}
-                      rows={4}
-                    />
-                  </label>
-                  <label className="block md:col-span-2">
-                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">轮询完成示例 JSON</span>
-                    <textarea
-                      value={executionConfigState.docPollCompletedExampleJson}
-                      onChange={(event) =>
-                        setExecutionConfigState((current) => ({
-                          ...current,
-                          docPollCompletedExampleJson: event.target.value,
-                        }))
-                      }
-                      disabled={disabled}
-                      className={formTextAreaClassName}
-                      rows={4}
-                    />
-                  </label>
-                  <label className="block md:col-span-2">
-                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">统一输出示例 JSON</span>
-                    <textarea
-                      value={executionConfigState.docNormalizedOutputExampleJson}
-                      onChange={(event) =>
-                        setExecutionConfigState((current) => ({
-                          ...current,
-                          docNormalizedOutputExampleJson: event.target.value,
-                        }))
-                      }
-                      disabled={disabled}
-                      className={formTextAreaClassName}
-                      rows={4}
-                    />
-                  </label>
-                  <label className="block md:col-span-2">
-                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">错误处理说明</span>
-                    <textarea
-                      value={executionConfigState.docErrorPlaybookText}
-                      onChange={(event) =>
-                        setExecutionConfigState((current) => ({
-                          ...current,
-                          docErrorPlaybookText: event.target.value,
-                        }))
-                      }
-                      disabled={disabled}
-                      className={formTextAreaClassName}
-                      rows={5}
-                      placeholder="429: Retry with exponential backoff..."
-                    />
-                  </label>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -1861,6 +1748,159 @@ export function CreateProviderModelForm({
               includeRequired={false}
               disabled={disabled}
             />
+          </div>
+        </div>
+
+        <div className={activeTab === "doc-examples" ? "contents" : "hidden"}>
+          <div className="block md:col-span-2 rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+            <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">文档增强配置（用于 Dashboard API Quickstart）</p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">流程模式</span>
+                <select
+                  value={executionConfigState.docFlowMode}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({ ...current, docFlowMode: event.target.value }))
+                  }
+                  disabled={disabled}
+                  className={formSelectClassName}
+                >
+                  <option value="async_poll">异步轮询</option>
+                  <option value="sync">同步返回</option>
+                  <option value="webhook">Webhook</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">建议轮询间隔（秒）</span>
+                <input
+                  value={executionConfigState.docRecommendedPollIntervalSeconds}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      docRecommendedPollIntervalSeconds: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formInputClassName}
+                  placeholder="2"
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">状态流转说明</span>
+                <input
+                  value={executionConfigState.docStatusLifecycle}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({ ...current, docStatusLifecycle: event.target.value }))
+                  }
+                  disabled={disabled}
+                  className={formInputClassName}
+                  placeholder="pending -> processing -> completed | failed"
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">请求示例 JSON</span>
+                <textarea
+                  value={executionConfigState.docRequestExampleJson}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({ ...current, docRequestExampleJson: event.target.value }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={5}
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提交响应示例 JSON</span>
+                <textarea
+                  value={executionConfigState.docSubmitResponseExampleJson}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      docSubmitResponseExampleJson: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={4}
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">轮询进行中示例 JSON</span>
+                <textarea
+                  value={executionConfigState.docPollProcessingExampleJson}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      docPollProcessingExampleJson: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={4}
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">轮询完成示例 JSON</span>
+                <textarea
+                  value={executionConfigState.docPollCompletedExampleJson}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      docPollCompletedExampleJson: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={4}
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">轮询失败示例 JSON</span>
+                <textarea
+                  value={executionConfigState.docPollFailedExampleJson}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      docPollFailedExampleJson: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={4}
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">统一输出示例 JSON</span>
+                <textarea
+                  value={executionConfigState.docNormalizedOutputExampleJson}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      docNormalizedOutputExampleJson: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={4}
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">错误处理说明</span>
+                <textarea
+                  value={executionConfigState.docErrorPlaybookText}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      docErrorPlaybookText: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={5}
+                  placeholder="429: Retry with exponential backoff..."
+                />
+              </label>
+            </div>
           </div>
         </div>
       </div>
