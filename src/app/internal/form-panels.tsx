@@ -210,6 +210,7 @@ function SchemaFieldEditor({
   const [rows, setRows] = useState<SchemaFieldState[]>(() =>
     parseSchemaFieldsFromText(defaultSchemaText, keyName)
   );
+  const [importJsonText, setImportJsonText] = useState("");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<SchemaFieldState>({
@@ -262,6 +263,59 @@ function SchemaFieldEditor({
 
   const removeRow = (id: string) => {
     setRows((current) => current.filter((row) => row.id !== id));
+  };
+
+  const importFromJson = () => {
+    const raw = importJsonText.trim();
+    if (!raw) {
+      toast.error("请先粘贴 JSON");
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const importedUrl =
+        typeof parsed.officialDocUrl === "string" ? parsed.officialDocUrl.trim() : "";
+      const targetRows = parsed[keyName];
+      if (!Array.isArray(targetRows)) {
+        toast.error(`JSON 格式不正确，缺少 ${keyName} 数组`);
+        return;
+      }
+
+      const normalized = targetRows
+        .map((item) => {
+          if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+          const row = item as Record<string, unknown>;
+          const name = typeof row.name === "string" ? row.name.trim() : "";
+          if (!name) return null;
+          return {
+            id: randomFieldId(),
+            name,
+            type: typeof row.type === "string" ? row.type : "string",
+            required: Boolean(row.required),
+            description: typeof row.description === "string" ? row.description : "",
+            example: row.example !== undefined && row.example !== null ? String(row.example) : "",
+            exposedToCustomer:
+              typeof row.exposedToCustomer === "boolean"
+                ? row.exposedToCustomer
+                : typeof row.customerVisible === "boolean"
+                  ? row.customerVisible
+                  : true,
+          } satisfies SchemaFieldState;
+        })
+        .filter((row): row is SchemaFieldState => Boolean(row));
+
+      if (normalized.length === 0) {
+        toast.error("没有可导入的字段，请检查 name 是否填写");
+        return;
+      }
+
+      setRows(normalized);
+      if (importedUrl) setOfficialDocUrl(importedUrl);
+      toast.success(`已导入 ${normalized.length} 个字段`);
+    } catch {
+      toast.error("JSON 解析失败，请检查格式");
+    }
   };
 
   const normalizedRows = rows
@@ -317,6 +371,28 @@ function SchemaFieldEditor({
           placeholder="https://provider-docs.example.com/..."
         />
       </label>
+
+      <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5">
+        <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">粘贴 JSON 一键导入字段</p>
+        <textarea
+          value={importJsonText}
+          onChange={(event) => setImportJsonText(event.target.value)}
+          disabled={disabled}
+          rows={5}
+          className={formTextAreaClassName}
+          placeholder={`{\n  "officialDocUrl": "https://example.com/docs",\n  "${keyName}": [\n    { "name": "prompt", "type": "string", "description": "...", "example": "...", "exposedToCustomer": true }\n  ]\n}`}
+        />
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={importFromJson}
+            disabled={disabled}
+            className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-black/[0.03] disabled:opacity-50"
+          >
+            导入 JSON
+          </button>
+        </div>
+      </div>
 
       <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2 py-1.5 text-[11px] text-black/55">
         建议填写：参数名、类型、说明、示例。`必填` 表示调用时必须提供；`对外开放` 表示该字段会展示给客户。
