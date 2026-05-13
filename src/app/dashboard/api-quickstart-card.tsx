@@ -531,6 +531,32 @@ export function ApiQuickstartCard({
               </div>
             </div>
           ) : null}
+          {selectedModel?.pollProcessingExampleJson ? (
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Poll Processing Example</p>
+              <div className="mt-3">
+                <CodeBlock
+                  code={selectedModel.pollProcessingExampleJson}
+                  copyId="doc-poll-processing-example"
+                  copiedBlock={copiedBlock}
+                  onCopy={copyText}
+                />
+              </div>
+            </div>
+          ) : null}
+          {selectedModel?.pollFailedExampleJson ? (
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Poll Failed Example</p>
+              <div className="mt-3">
+                <CodeBlock
+                  code={selectedModel.pollFailedExampleJson}
+                  copyId="doc-poll-failed-example"
+                  copiedBlock={copiedBlock}
+                  onCopy={copyText}
+                />
+              </div>
+            </div>
+          ) : null}
           {selectedModel?.errorPlaybookText ? (
             <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
               <p className="text-[10px] uppercase tracking-[1px] text-black/45">Error Handling</p>
