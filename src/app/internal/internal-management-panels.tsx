@@ -753,6 +753,7 @@ function FormField({
   disabled = false,
   help,
   type = "text",
+  className,
 }: {
   label: string;
   name: string;
@@ -762,9 +763,10 @@ function FormField({
   disabled?: boolean;
   help?: string;
   type?: "text" | "password";
+  className?: string;
 }) {
   return (
-    <label className="block">
+    <label className={`block ${className ?? ""}`}>
       <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">{label}</span>
       <input
         type={type}
@@ -787,6 +789,7 @@ function FormTextArea({
   placeholder,
   disabled = false,
   help,
+  className,
 }: {
   label: string;
   name: string;
@@ -794,9 +797,10 @@ function FormTextArea({
   placeholder?: string;
   disabled?: boolean;
   help?: string;
+  className?: string;
 }) {
   return (
-    <label className="block">
+    <label className={`block ${className ?? ""}`}>
       <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">{label}</span>
       <textarea
         name={name}
@@ -818,6 +822,7 @@ function FormSelect({
   defaultValue,
   disabled = false,
   help,
+  className,
 }: {
   label: string;
   name: string;
@@ -825,9 +830,10 @@ function FormSelect({
   defaultValue?: string;
   disabled?: boolean;
   help?: string;
+  className?: string;
 }) {
   return (
-    <label className="block">
+    <label className={`block ${className ?? ""}`}>
       <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">{label}</span>
       <select
         name={name}
@@ -989,7 +995,7 @@ export function PublicModelsPanel({
                       description="在独立弹窗中编辑这个可售模型。"
                     >
                       {({ close }) => (
-                        <ManagedDialogForm action={updateSupportedModelDetails} close={close}>
+                        <ManagedDialogForm action={updateSupportedModelDetails} close={close} className="grid gap-4 md:grid-cols-2">
                           <input type="hidden" name="supportedModelId" value={model.id} />
                           <input type="hidden" name="active" value="true" />
                           <FormSelect label="模型厂商（内部分类）" name="provider" defaultValue={model.provider} options={vendorOptions} />
@@ -1001,6 +1007,7 @@ export function PublicModelsPanel({
                             defaultValue={readModelDescriptionFromBillingConfig(model.billingConfigText)}
                             placeholder="用于对外展示的模型简介，例如适用场景、风格、速度与质量特点。"
                             help="可选。会随模型配置保存。"
+                            className="md:col-span-2"
                           />
                           <FormSelect
                             label="类型"
@@ -1019,8 +1026,10 @@ export function PublicModelsPanel({
                             ]}
                           />
                           <FormSelect label="能力类型" name="capability" defaultValue={model.capability ?? "image_generation"} options={[...capabilityOptions]} />
-                          <BillingConfigEditor initialValue={model.billingConfigText} />
-                          <div className="flex justify-end">
+                          <div className="md:col-span-2">
+                            <BillingConfigEditor initialValue={model.billingConfigText} />
+                          </div>
+                          <div className="flex justify-end md:col-span-2">
                             <SubmitButton label="保存可售模型" />
                           </div>
                         </ManagedDialogForm>
@@ -1304,7 +1313,7 @@ export function CreateSupportedModelButton({
       description="在独立弹窗中创建新的客户侧模型定义。"
     >
       {({ close }) => (
-      <ManagedDialogForm action={createSupportedModel} close={close}>
+      <ManagedDialogForm action={createSupportedModel} close={close} className="grid gap-4 md:grid-cols-2">
         <FormSelect
           label="模型厂商（内部分类）"
           name="provider"
@@ -1319,6 +1328,7 @@ export function CreateSupportedModelButton({
           name="modelDescription"
           placeholder="用于对外展示的模型简介，例如适用场景、风格、速度与质量特点。"
           help="可选。会随模型配置保存。"
+          className="md:col-span-2"
         />
         <FormSelect
           label="类型"
@@ -1341,11 +1351,13 @@ export function CreateSupportedModelButton({
           options={[...capabilityOptions]}
           defaultValue="image_generation"
         />
-        <BillingConfigEditor
-          initialValue={'{"billingMode":"hybrid","currency":"USD","charges":{"perImage":0.039,"inputTextTokensPerMillion":0.30}}'}
-        />
+        <div className="md:col-span-2">
+          <BillingConfigEditor
+            initialValue={'{"billingMode":"hybrid","currency":"USD","charges":{"perImage":0.039,"inputTextTokensPerMillion":0.30}}'}
+          />
+        </div>
         <input type="hidden" name="active" value="true" />
-        <div className="flex justify-end">
+        <div className="flex justify-end md:col-span-2">
           <SubmitButton label="创建可售模型" />
         </div>
       </ManagedDialogForm>
