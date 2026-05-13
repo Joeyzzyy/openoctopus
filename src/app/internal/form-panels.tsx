@@ -879,16 +879,10 @@ function buildAutofillPreviewPayload(input: {
   sourceLabel: string;
   sourceText: string;
   data: {
-    upstreamModelSlug?: string | null;
     executionTemplate?: string | null;
     executionConfigText?: string | null;
     inputSchemaText?: string | null;
     outputSchemaText?: string | null;
-    pricingSourceUrl?: string | null;
-    pricingSourceNote?: string | null;
-    requestExampleJson?: string | null;
-    submitResponseExampleJson?: string | null;
-    normalizedOutputExampleJson?: string | null;
     summary?: string | null;
   };
 }) {
@@ -905,17 +899,67 @@ function buildAutofillPreviewPayload(input: {
   const executionConfig = safeParse(input.data.executionConfigText) as Record<string, unknown>;
   const inputSchema = safeParse(input.data.inputSchemaText) as Record<string, unknown>;
   const outputSchema = safeParse(input.data.outputSchemaText) as Record<string, unknown>;
+  const inputParams = Array.isArray(inputSchema.params) ? (inputSchema.params as unknown[]) : [];
+  const outputFields = Array.isArray(outputSchema.fields) ? (outputSchema.fields as unknown[]) : [];
+
+  const protocolWarnings: string[] = [];
+  const requiredProtocolFields = [
+    "mode",
+    "authType",
+    "submitPath",
+    "taskIdPath",
+    "resultUrlPath",
+  ] as const;
+  for (const field of requiredProtocolFields) {
+    const value = executionConfig[field];
+    if (typeof value !== "string" || !value.trim()) {
+      protocolWarnings.push(`缺少字段: protocol.executionConfig.${field}`);
+    }
+  }
+  const mode = typeof executionConfig.mode === "string" ? executionConfig.mode.trim() : "";
+  if (mode === "async") {
+    const pollPath = executionConfig.pollPath;
+    const statusPath = executionConfig.statusPath;
+    if (typeof pollPath !== "string" || !pollPath.trim()) {
+      protocolWarnings.push("异步模式缺少字段: protocol.executionConfig.pollPath");
+    }
+    if (typeof statusPath !== "string" || !statusPath.trim()) {
+      protocolWarnings.push("异步模式缺少字段: protocol.executionConfig.statusPath");
+    }
+  }
+  if (
+    typeof input.data.executionTemplate !== "string" ||
+    !input.data.executionTemplate.trim()
+  ) {
+    protocolWarnings.push("缺少字段: protocol.executionTemplate");
+  }
+
+  const inputWarnings: string[] = [];
+  if (
+    typeof inputSchema.officialDocUrl !== "string" ||
+    !inputSchema.officialDocUrl.trim()
+  ) {
+    inputWarnings.push("缺少字段: inputParams.officialDocUrl");
+  }
+  if (inputParams.length === 0) {
+    inputWarnings.push("未识别到任何输入参数: inputParams.params");
+  }
+
+  const outputWarnings: string[] = [];
+  if (
+    typeof outputSchema.officialDocUrl !== "string" ||
+    !outputSchema.officialDocUrl.trim()
+  ) {
+    outputWarnings.push("缺少字段: outputParams.officialDocUrl");
+  }
+  if (outputFields.length === 0) {
+    outputWarnings.push("未识别到任何输出参数: outputParams.fields");
+  }
 
   return {
     source: {
       label: input.sourceLabel || "",
       contentLength: input.sourceText.length,
-    },
-    basic: {
-      supportedModelId: "",
-      providerId: "",
-      capability: "",
-      upstreamModelSlug: input.data.upstreamModelSlug ?? "",
     },
     protocol: {
       executionTemplate: input.data.executionTemplate ?? "",
@@ -949,31 +993,43 @@ function buildAutofillPreviewPayload(input: {
         typeof inputSchema.officialDocUrl === "string"
           ? (inputSchema.officialDocUrl as string)
           : "",
-      params: Array.isArray(inputSchema.params)
-        ? (inputSchema.params as unknown[])
-        : [],
+      params: inputParams,
     },
     outputParams: {
       officialDocUrl:
         typeof outputSchema.officialDocUrl === "string"
           ? (outputSchema.officialDocUrl as string)
           : "",
-      fields: Array.isArray(outputSchema.fields)
-        ? (outputSchema.fields as unknown[])
-        : [],
+      fields: outputFields,
     },
-    examples: {
-      requestExampleJson: input.data.requestExampleJson ?? "",
-      submitResponseExampleJson: input.data.submitResponseExampleJson ?? "",
-      normalizedOutputExampleJson: input.data.normalizedOutputExampleJson ?? "",
-      summary: input.data.summary ?? "",
+    review: {
+      protocol: {
+        status: protocolWarnings.length === 0 ? "ok" : "needs_manual_check",
+        warnings: protocolWarnings,
+      },
+      inputParams: {
+        status: inputWarnings.length === 0 ? "ok" : "needs_manual_check",
+        warnings: inputWarnings,
+      },
+      outputParams: {
+        status: outputWarnings.length === 0 ? "ok" : "needs_manual_check",
+        warnings: outputWarnings,
+      },
     },
-    cost: {
-      pricingSourceUrl: input.data.pricingSourceUrl ?? "",
-      pricingSourceNote: input.data.pricingSourceNote ?? "",
-    },
+    summary: input.data.summary ?? "",
   };
 }
+
+type AutofillReviewBlock = {
+  status: "ok" | "needs_manual_check";
+  warnings: string[];
+};
+
+type AutofillReviewPayload = {
+  protocol: AutofillReviewBlock;
+  inputParams: AutofillReviewBlock;
+  outputParams: AutofillReviewBlock;
+};
 
 function FieldHint({
   help,
@@ -1343,13 +1399,10 @@ export function CreateProviderModelForm({
       setAutofillDebugRawOutput("");
 
       const payload = result.data;
-      setUpstreamModelSlug(payload.upstreamModelSlug ?? "");
       setExecutionTemplate(payload.executionTemplate || "rest-async-poll-v1");
       setExecutionConfigState(parseExecutionConfigState(payload.executionConfigText || "{}"));
       setSeedInputSchemaText(payload.inputSchemaText || "{}");
       setSeedOutputSchemaText(payload.outputSchemaText || "{}");
-      setPricingSourceUrlState(payload.pricingSourceUrl ?? "");
-      setPricingSourceNoteState(payload.pricingSourceNote ?? "");
       setAutofillSummary(payload.summary ?? "");
       setAutofillPreviewJson(
         JSON.stringify(
@@ -1366,6 +1419,38 @@ export function CreateProviderModelForm({
       setActiveTab("protocol");
     });
   };
+
+  const autofillReview = useMemo<AutofillReviewPayload | null>(() => {
+    if (!autofillPreviewJson.trim()) return null;
+    try {
+      const parsed = JSON.parse(autofillPreviewJson) as Record<string, unknown>;
+      const reviewRaw =
+        parsed.review && typeof parsed.review === "object" && !Array.isArray(parsed.review)
+          ? (parsed.review as Record<string, unknown>)
+          : null;
+      if (!reviewRaw) return null;
+
+      const normalizeBlock = (value: unknown): AutofillReviewBlock => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+          return { status: "needs_manual_check", warnings: ["缺少风险检查结果"] };
+        }
+        const block = value as Record<string, unknown>;
+        const status = block.status === "ok" ? "ok" : "needs_manual_check";
+        const warnings = Array.isArray(block.warnings)
+          ? (block.warnings.filter((item): item is string => typeof item === "string") as string[])
+          : [];
+        return { status, warnings };
+      };
+
+      return {
+        protocol: normalizeBlock(reviewRaw.protocol),
+        inputParams: normalizeBlock(reviewRaw.inputParams),
+        outputParams: normalizeBlock(reviewRaw.outputParams),
+      };
+    } catch {
+      return null;
+    }
+  }, [autofillPreviewJson]);
 
   return (
     <form
@@ -1486,7 +1571,7 @@ export function CreateProviderModelForm({
               {isAutofilling ? "解析中..." : "AI 自动填充"}
             </button>
           </div>
-          <FieldHint help="粘贴文档全文后自动填充调用协议、入参/出参、示例与来源说明（仅 internal 使用）。" />
+          <FieldHint help="粘贴文档全文后自动填充调用协议、入参、出参，并在识别结果里标注三大区域的人工检查建议。" />
           {autofillSummary ? (
             <p className="mt-2 rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2.5 py-2 text-xs text-black/65">
               {autofillSummary}
@@ -1518,11 +1603,74 @@ export function CreateProviderModelForm({
               </pre>
             </div>
           ) : null}
+          {autofillReview ? (
+            <div className="mt-2 rounded-md border border-black/[0.08] bg-white p-2.5">
+              <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">风险检查结果（建议人工检查）</p>
+              <div className="grid gap-2 md:grid-cols-3">
+                {([
+                  ["protocol", "调用协议配置"],
+                  ["inputParams", "输入参数"],
+                  ["outputParams", "输出参数"],
+                ] as const).map(([key, label]) => {
+                  const block = autofillReview[key];
+                  const ok = block.status === "ok";
+                  return (
+                    <div
+                      key={key}
+                      className={`rounded-md border p-2 ${
+                        ok
+                          ? "border-[#CFE7D4] bg-[#F3FBF5]"
+                          : "border-[#F1D2CC] bg-[#FFF7F5]"
+                      }`}
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-medium text-black/75">{label}</p>
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] ${
+                            ok ? "bg-[#D9F2DF] text-[#245C31]" : "bg-[#FDE2DC] text-[#8D4336]"
+                          }`}
+                        >
+                          {ok ? "OK" : "需人工检查"}
+                        </span>
+                      </div>
+                      {block.warnings.length > 0 ? (
+                        <div className="space-y-1">
+                          {block.warnings.map((warning) => (
+                            <p key={warning} className="text-[11px] leading-4 text-black/70">
+                              {warning}
+                            </p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] leading-4 text-black/55">未发现缺失项</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           {autofillDebugRawOutput ? (
             <div className="mt-2 rounded-md border border-[#F1D2CC] bg-[#FFF7F5] p-2.5">
-              <p className="mb-2 text-[11px] tracking-[0.35px] text-[#8D4336]">
-                原始返回内容（调试）
-              </p>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[11px] tracking-[0.35px] text-[#8D4336]">
+                  原始返回内容（调试）
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(autofillDebugRawOutput);
+                      toast.success("已复制原始调试内容");
+                    } catch {
+                      toast.error("复制失败，请重试");
+                    }
+                  }}
+                  className="inline-flex h-7 cursor-pointer items-center rounded border border-black/[0.1] bg-white px-2 text-[11px] text-black/65 hover:bg-black/[0.03]"
+                >
+                  复制调试内容
+                </button>
+              </div>
               <pre className="max-h-[280px] overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-[#8D4336]">
                 {autofillDebugRawOutput}
               </pre>

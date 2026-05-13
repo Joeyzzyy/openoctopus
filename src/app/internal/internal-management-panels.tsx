@@ -922,6 +922,7 @@ export function PublicModelsPanel({
   modelVendors?: ModelVendorSummary[];
   capabilityOptions: readonly CapabilityOption[];
 }) {
+  const [activeModelTypeFilter, setActiveModelTypeFilter] = useState<string>("all");
   const safeModelVendors = Array.isArray(modelVendors) ? modelVendors : [];
   const safeProviderModels = Array.isArray(providerModels) ? providerModels : [];
   const safeProviders = Array.isArray(providers) ? providers : [];
@@ -979,67 +980,106 @@ export function PublicModelsPanel({
     if (value === "video_generation") return "视频生成";
     return "未设置";
   };
+  const groupedSupportedModels = models.reduce((map, model) => {
+    const modelType = readModelTypeFromBillingConfig(model.billingConfigText).trim() || "uncategorized";
+    const list = map.get(modelType) ?? [];
+    list.push(model);
+    map.set(modelType, list);
+    return map;
+  }, new Map<string, SupportedModelSummary[]>());
+  const orderedCategories = [
+    ...SUPPORTED_MODEL_TYPE_OPTIONS,
+    ...Array.from(groupedSupportedModels.keys()).filter(
+      (key) =>
+        key !== "uncategorized" &&
+        !SUPPORTED_MODEL_TYPE_OPTIONS.includes(key as (typeof SUPPORTED_MODEL_TYPE_OPTIONS)[number])
+    ),
+    "uncategorized",
+  ].filter((key, index, arr) => arr.indexOf(key) === index);
+  const modelGroups = orderedCategories
+    .map((category) => ({
+      category,
+      models: groupedSupportedModels.get(category) ?? [],
+    }))
+    .filter((entry) => entry.models.length > 0);
+  const modelCategoryLabel = (value: string) => (value === "uncategorized" ? "未分类" : value);
+  const modelTypeFilterOptions = [
+    { value: "all", label: "全部类型" },
+    ...modelGroups.map((group) => ({
+      value: group.category,
+      label: modelCategoryLabel(group.category),
+    })),
+  ];
+  const visibleModelGroups =
+    activeModelTypeFilter === "all"
+      ? modelGroups
+      : modelGroups.filter((group) => group.category === activeModelTypeFilter);
 
   return (
     <div className="space-y-4">
       {models.length > 0 ? (
-        <div className="space-y-4">
-          {models.map((model) => {
+        <div className="space-y-5">
+          <div className="rounded-xl border border-black/[0.08] bg-white p-3">
+            <p className="mb-2 text-[11px] tracking-[0.25px] text-black/55">按类型筛选</p>
+            <div className="flex flex-wrap gap-2">
+              {modelTypeFilterOptions.map((option) => {
+                const active = activeModelTypeFilter === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setActiveModelTypeFilter(option.value)}
+                    className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                      active
+                        ? "border-black bg-black text-white"
+                        : "border-black/[0.12] bg-[#FCFCFA] text-black/70 hover:bg-black/[0.04]"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {visibleModelGroups.map((group) => (
+            <section key={group.category} className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="inline-flex rounded-full border border-black/[0.08] bg-white px-2.5 py-1 text-xs font-medium text-black/75">
+                  {modelCategoryLabel(group.category)}
+                </span>
+                <span className="text-[11px] text-black/50">{group.models.length} models</span>
+              </div>
+              <div className="space-y-4">
+          {group.models.map((model) => {
             const mappings = providerModelsBySupportedModelId.get(model.id) ?? [];
+            const modelType = readModelTypeFromBillingConfig(model.billingConfigText);
             return (
-              <section key={model.id} className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-mono text-xs text-black/55">{model.model_slug}</p>
-                    <h3 className="mt-1 text-base font-semibold text-black">{model.display_name}</h3>
-                    <p className="mt-1 text-xs text-black/55">
+              <section key={model.id} className="rounded-2xl border border-black/[0.06] bg-white p-3 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <h3 className="text-sm font-semibold text-black">{model.display_name}</h3>
+                      <span className="font-mono text-[11px] text-black/45">{model.model_slug}</span>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-black/58">
                       {model.provider} · {modalityLabel(model.modality)} ·{" "}
                       {model.capability ? capabilityLabel(model.capability) : "-"}
                     </p>
-                    {readModelTypeFromBillingConfig(model.billingConfigText) ? (
-                      <p className="mt-1 text-xs text-black/50">
-                        类型：{readModelTypeFromBillingConfig(model.billingConfigText)}
-                      </p>
-                    ) : null}
-                    <p className="mt-1 text-xs text-black/45">添加时间：{model.createdLabel}</p>
-                    <p className="mt-2 text-xs text-black/65">{model.billingSummary}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                      {modelType ? (
+                        <span className="rounded border border-black/[0.1] bg-[#FCFCFA] px-1.5 py-0.5 text-black/62">
+                          类型：{modelType}
+                        </span>
+                      ) : null}
+                      <span className="rounded border border-black/[0.1] bg-[#FCFCFA] px-1.5 py-0.5 text-black/58">
+                        添加时间：{model.createdLabel}
+                      </span>
+                      <span className="rounded border border-black/[0.1] bg-[#FCFCFA] px-1.5 py-0.5 text-black/65">
+                        {model.billingSummary}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ManagementDialog
-                      trigger={<ModalButton tone="secondary">新建模型映射</ModalButton>}
-                      disabled={!safeProviders.length}
-                      title={`新建映射：${model.display_name}`}
-                      description="为当前可售模型新增供应商供应模型映射。"
-                      headerActions={
-                        <button
-                          type="submit"
-                          form={`provider-model-form-create-for-${model.id}`}
-                          className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
-                        >
-                          保存供应商模型
-                        </button>
-                      }
-                    >
-                      {({ close }) => (
-                        <CreateProviderModelForm
-                          action={createProviderModel}
-                          supportedModels={supportedModelOptions}
-                          providers={providerOptions}
-                          workerTemplates={workerTemplateOptions.map((item) => ({
-                            id: item.slug,
-                            displayName: item.displayName,
-                            slug: item.slug,
-                          }))}
-                          executionConfigPresets={executionConfigPresets}
-                          defaultSupportedModelSlug={model.model_slug}
-                          formId={`provider-model-form-create-for-${model.id}`}
-                          showSubmitButton={false}
-                          className="grid gap-4"
-                          onSuccess={close}
-                          disabled={false}
-                        />
-                      )}
-                    </ManagementDialog>
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <form action={updateSupportedModelState}>
                       <input type="hidden" name="supportedModelId" value={model.id} />
                       <input type="hidden" name="active" value={model.active ? "false" : "true"} />
@@ -1121,7 +1161,44 @@ export function PublicModelsPanel({
                 </div>
 
                 <div className="mt-4 rounded-lg border border-black/[0.06] bg-[#FAFAF9] p-3">
-                  <p className="mb-2 text-[11px] font-medium tracking-[0.25px] text-black/55">供应商供应模型列表</p>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-medium tracking-[0.25px] text-black/55">供应商供应模型列表</p>
+                    <ManagementDialog
+                      trigger={<ModalButton tone="secondary">新建模型映射</ModalButton>}
+                      disabled={!safeProviders.length}
+                      title={`新建映射：${model.display_name}`}
+                      description="为当前可售模型新增供应商供应模型映射。"
+                      headerActions={
+                        <button
+                          type="submit"
+                          form={`provider-model-form-create-for-${model.id}`}
+                          className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
+                        >
+                          保存供应商模型
+                        </button>
+                      }
+                    >
+                      {({ close }) => (
+                        <CreateProviderModelForm
+                          action={createProviderModel}
+                          supportedModels={supportedModelOptions}
+                          providers={providerOptions}
+                          workerTemplates={workerTemplateOptions.map((item) => ({
+                            id: item.slug,
+                            displayName: item.displayName,
+                            slug: item.slug,
+                          }))}
+                          executionConfigPresets={executionConfigPresets}
+                          defaultSupportedModelSlug={model.model_slug}
+                          formId={`provider-model-form-create-for-${model.id}`}
+                          showSubmitButton={false}
+                          className="grid gap-4"
+                          onSuccess={close}
+                          disabled={false}
+                        />
+                      )}
+                    </ManagementDialog>
+                  </div>
                   {mappings.length === 0 ? (
                     <p className="text-xs text-black/45">暂无映射</p>
                   ) : (
@@ -1222,6 +1299,14 @@ export function PublicModelsPanel({
               </section>
             );
           })}
+              </div>
+            </section>
+          ))}
+          {visibleModelGroups.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6 text-sm text-black/55">
+              当前筛选下没有可售模型。
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">

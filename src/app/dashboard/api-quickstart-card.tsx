@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { buildTaskStatusCurl, PUBLIC_API_BASE_URL } from "@/lib/api-docs";
@@ -18,7 +18,6 @@ type ModelDocItem = {
   normalizedOutputExampleJson: string | null;
 };
 
-type MainTab = "quickstart" | "input" | "output";
 type LanguageTab = "curl" | "nodejs" | "python" | "go" | "ruby";
 
 function safeParseJsonObject(value: string | null | undefined) {
@@ -299,8 +298,11 @@ export function ApiQuickstartCard({
   );
 
   const [selectedModelSlug, setSelectedModelSlug] = useState(resolvedModel);
-  const [mainTab, setMainTab] = useState<MainTab>("quickstart");
   const [languageTab, setLanguageTab] = useState<LanguageTab>("curl");
+  const [activeSection, setActiveSection] = useState<"quickstart" | "input" | "output">("quickstart");
+  const quickstartRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLDivElement | null>(null);
+  const outputRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setSelectedModelSlug(resolvedModel);
@@ -340,6 +342,17 @@ export function ApiQuickstartCard({
       ? "border-black bg-black text-white"
       : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]";
 
+  const jumpToSection = (section: "quickstart" | "input" | "output") => {
+    setActiveSection(section);
+    const target =
+      section === "quickstart"
+        ? quickstartRef.current
+        : section === "input"
+          ? inputRef.current
+          : outputRef.current;
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const embeddedInputSchema = JSON.stringify(
     {
       standard: {
@@ -375,176 +388,171 @@ export function ApiQuickstartCard({
 
   return (
     <section className="rounded-[28px] border border-black/[0.08] bg-white p-4 shadow-[0_24px_70px_rgba(17,24,39,0.08)] sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[10px] uppercase tracking-[1px] text-black/45">API Quickstart</p>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setMainTab("quickstart")}
-          className={`inline-flex h-8 cursor-pointer items-center rounded-md border px-3 text-xs font-medium transition-colors ${tabClass(mainTab === "quickstart")}`}
-        >
-          Quickstart
-        </button>
-        <button
-          type="button"
-          onClick={() => setMainTab("input")}
-          className={`inline-flex h-8 cursor-pointer items-center rounded-md border px-3 text-xs font-medium transition-colors ${tabClass(mainTab === "input")}`}
-        >
-          Input Params
-        </button>
-        <button
-          type="button"
-          onClick={() => setMainTab("output")}
-          className={`inline-flex h-8 cursor-pointer items-center rounded-md border px-3 text-xs font-medium transition-colors ${tabClass(mainTab === "output")}`}
-        >
-          Output Params
-        </button>
-      </div>
-
-      {mainTab === "quickstart" ? (
-        <div className="mt-4 space-y-3">
-          <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-            <p className="text-[10px] uppercase tracking-[1px] text-black/45">How This Flow Works</p>
-            <ol className="mt-2 space-y-1.5 text-xs leading-5 text-black/70">
-              <li>1. Request style: <code className="font-mono">{protocolModeLabel}</code></li>
-              <li>2. Send Create Request with your API key and selected model input.</li>
-              <li>3. Poll task status until completion.</li>
-              <li>4. Parse the unified output payload for image/video asset URLs.</li>
-            </ol>
-          </div>
-
-          <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] uppercase tracking-[1px] text-black/45">Create Request</p>
-                <p className="mt-1 text-xs leading-5 text-black/55">
-                  Submit generation input. Choose a backend language example below.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {(["curl", "nodejs", "python", "go", "ruby"] as const).map((lang) => (
-                  <button
-                    key={lang}
-                    type="button"
-                    onClick={() => setLanguageTab(lang)}
-                    className={`inline-flex h-8 cursor-pointer items-center rounded-md border px-3 text-[11px] font-medium transition-colors ${tabClass(languageTab === lang)}`}
-                  >
-                    {lang === "nodejs" ? "Node.js" : lang === "python" ? "Python" : lang === "go" ? "Go" : lang === "ruby" ? "Ruby" : "cURL"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-2">
-              <CodeBlock
-                code={currentCreateExample}
-                copyId={`create-${languageTab}`}
-                copiedBlock={copiedBlock}
-                onCopy={copyText}
-              />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-            <div>
-              <div>
-                <p className="text-[10px] uppercase tracking-[1px] text-black/45">Check Task Status</p>
-                <p className="mt-1 text-xs leading-5 text-black/55">
-                  Use the task ID from create response to poll execution status.
-                </p>
-              </div>
-            </div>
-            <div className="mt-3">
-              <CodeBlock code={taskExample} copyId="task" copiedBlock={copiedBlock} onCopy={copyText} />
-            </div>
-          </div>
-
-          {selectedModel?.requestExampleJson ? (
+      <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
+        <aside className="sticky top-20 self-start rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-2 max-lg:static">
+          <nav className="space-y-1">
+            <button
+              type="button"
+              onClick={() => jumpToSection("quickstart")}
+              className={`flex w-full cursor-pointer items-center rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${tabClass(activeSection === "quickstart")}`}
+            >
+              Quickstart
+            </button>
+            <button
+              type="button"
+              onClick={() => jumpToSection("input")}
+              className={`flex w-full cursor-pointer items-center rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${tabClass(activeSection === "input")}`}
+            >
+              Input Params
+            </button>
+            <button
+              type="button"
+              onClick={() => jumpToSection("output")}
+              className={`flex w-full cursor-pointer items-center rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${tabClass(activeSection === "output")}`}
+            >
+              Output Params
+            </button>
+          </nav>
+        </aside>
+        <div className="space-y-3">
+          <div ref={quickstartRef} className="space-y-3">
             <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Request Example (From Internal)</p>
-              <div className="mt-3">
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">How This Flow Works</p>
+              <ol className="mt-2 space-y-1.5 text-xs leading-5 text-black/70">
+                <li>1. Request style: <code className="font-mono">{protocolModeLabel}</code></li>
+                <li>2. Send Create Request with your API key and selected model input.</li>
+                <li>3. Poll task status until completion.</li>
+                <li>4. Parse the unified output payload for image/video asset URLs.</li>
+              </ol>
+            </div>
+
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">Create Request</p>
+                  <p className="mt-1 text-xs leading-5 text-black/55">
+                    Submit generation input. Choose a backend language example below.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(["curl", "nodejs", "python", "go", "ruby"] as const).map((lang) => (
+                    <button
+                      key={lang}
+                      type="button"
+                      onClick={() => setLanguageTab(lang)}
+                      className={`inline-flex h-8 cursor-pointer items-center rounded-md border px-3 text-[11px] font-medium transition-colors ${tabClass(languageTab === lang)}`}
+                    >
+                      {lang === "nodejs" ? "Node.js" : lang === "python" ? "Python" : lang === "go" ? "Go" : lang === "ruby" ? "Ruby" : "cURL"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-2">
                 <CodeBlock
-                  code={selectedModel.requestExampleJson}
-                  copyId="doc-request-example"
+                  code={currentCreateExample}
+                  copyId={`create-${languageTab}`}
                   copiedBlock={copiedBlock}
                   onCopy={copyText}
                 />
               </div>
             </div>
-          ) : null}
-          {selectedModel?.submitResponseExampleJson ? (
+
             <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Submit Response Example</p>
+              <div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">Check Task Status</p>
+                  <p className="mt-1 text-xs leading-5 text-black/55">
+                    Use the task ID from create response to poll execution status.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <CodeBlock code={taskExample} copyId="task" copiedBlock={copiedBlock} onCopy={copyText} />
+              </div>
+            </div>
+
+            {selectedModel?.requestExampleJson ? (
+              <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+                <p className="text-[10px] uppercase tracking-[1px] text-black/45">Request Example (From Internal)</p>
+                <div className="mt-3">
+                  <CodeBlock
+                    code={selectedModel.requestExampleJson}
+                    copyId="doc-request-example"
+                    copiedBlock={copiedBlock}
+                    onCopy={copyText}
+                  />
+                </div>
+              </div>
+            ) : null}
+            {selectedModel?.submitResponseExampleJson ? (
+              <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+                <p className="text-[10px] uppercase tracking-[1px] text-black/45">Submit Response Example</p>
+                <div className="mt-3">
+                  <CodeBlock
+                    code={selectedModel.submitResponseExampleJson}
+                    copyId="doc-submit-response-example"
+                    copiedBlock={copiedBlock}
+                    onCopy={copyText}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div ref={inputRef} className="space-y-3">
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div>
+                <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                  Input Schema (Standard + Provider Extension)
+                </p>
+                <p className="mt-1 text-xs leading-5 text-black/55">
+                  Standard request contract merged with this model&apos;s upstream input parameters.
+                </p>
+              </div>
+              {inputFieldDocs.length > 0 ? (
+                <div className="mt-3">
+                  <FieldDocTable rows={inputFieldDocs} kind="input" />
+                </div>
+              ) : null}
               <div className="mt-3">
                 <CodeBlock
-                  code={selectedModel.submitResponseExampleJson}
-                  copyId="doc-submit-response-example"
+                  code={embeddedInputSchema}
+                  copyId="input-schema"
                   copiedBlock={copiedBlock}
                   onCopy={copyText}
                 />
               </div>
             </div>
-          ) : null}
-        </div>
-      ) : null}
+          </div>
 
-      {mainTab === "input" ? (
-        <div className="mt-4 space-y-3">
-          <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-            <div>
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">
-                Input Schema (Standard + Provider Extension)
-              </p>
-              <p className="mt-1 text-xs leading-5 text-black/55">
-                Standard request contract merged with this model's upstream input parameters.
-              </p>
-            </div>
-            {inputFieldDocs.length > 0 ? (
-              <div className="mt-3">
-                <FieldDocTable rows={inputFieldDocs} kind="input" />
+          <div ref={outputRef} className="space-y-3">
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div>
+                <p className="text-[10px] uppercase tracking-[1px] text-black/45">
+                  Output Schema (Standard + Provider Extension)
+                </p>
+                <p className="mt-1 text-xs leading-5 text-black/55">
+                  Standard output contract merged with this model&apos;s upstream raw output structure.
+                </p>
               </div>
-            ) : null}
-            <div className="mt-3">
-              <CodeBlock
-                code={embeddedInputSchema}
-                copyId="input-schema"
-                copiedBlock={copiedBlock}
-                onCopy={copyText}
-              />
+              {outputFieldDocs.length > 0 ? (
+                <div className="mt-3">
+                  <FieldDocTable rows={outputFieldDocs} kind="output" />
+                </div>
+              ) : null}
+              <div className="mt-3">
+                <CodeBlock
+                  code={embeddedOutputSchema}
+                  copyId="output-schema"
+                  copiedBlock={copiedBlock}
+                  onCopy={copyText}
+                />
+              </div>
             </div>
           </div>
         </div>
-      ) : null}
-
-      {mainTab === "output" ? (
-        <div className="mt-4 space-y-3">
-          <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-            <div>
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">
-                Output Schema (Standard + Provider Extension)
-              </p>
-              <p className="mt-1 text-xs leading-5 text-black/55">
-                Standard output contract merged with this model's upstream raw output structure.
-              </p>
-            </div>
-            {outputFieldDocs.length > 0 ? (
-              <div className="mt-3">
-                <FieldDocTable rows={outputFieldDocs} kind="output" />
-              </div>
-            ) : null}
-            <div className="mt-3">
-              <CodeBlock
-                code={embeddedOutputSchema}
-                copyId="output-schema"
-                copiedBlock={copiedBlock}
-                onCopy={copyText}
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </div>
     </section>
   );
 }

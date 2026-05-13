@@ -2726,18 +2726,11 @@ const providerModelAutofillSchema = z.object({
 });
 
 const providerModelAutofillResultSchema = z.object({
-  upstreamModelSlug: z.string().trim().min(1).max(200),
   executionTemplate: z.string().trim().min(1).max(80).default("rest-async-poll-v1"),
   executionConfig: z.record(z.string(), z.unknown()).default({}),
   inputSchema: z.record(z.string(), z.unknown()).default({}),
   outputSchema: z.record(z.string(), z.unknown()).default({}),
-  submitBodyTemplate: z.string().optional(),
-  pricingSourceUrl: z.string().url().nullable().optional(),
-  pricingSourceNote: z.string().max(2000).nullable().optional(),
-  requestExampleJson: z.string().optional(),
-  submitResponseExampleJson: z.string().optional(),
-  normalizedOutputExampleJson: z.string().optional(),
-  summary: z.string().max(2000).optional(),
+  summary: z.string().max(2000).optional().default(""),
 });
 
 function normalizeAutofillResultPayload(raw: Record<string, unknown>) {
@@ -2746,20 +2739,10 @@ function normalizeAutofillResultPayload(raw: Record<string, unknown>) {
       ? (value as Record<string, unknown>)
       : {};
 
-  const basic = asObj(raw.basic);
   const protocol = asObj(raw.protocol);
   const protocolExecutionConfig = asObj(protocol.executionConfig);
   const inputParamsObj = asObj(raw.inputParams);
   const outputParamsObj = asObj(raw.outputParams);
-  const examplesObj = asObj(raw.examples);
-  const costObj = asObj(raw.cost);
-
-  const upstreamModelSlug =
-    typeof raw.upstreamModelSlug === "string"
-      ? raw.upstreamModelSlug
-      : typeof basic.upstreamModelSlug === "string"
-        ? basic.upstreamModelSlug
-        : "";
 
   const executionTemplate =
     typeof raw.executionTemplate === "string"
@@ -2783,59 +2766,16 @@ function normalizeAutofillResultPayload(raw: Record<string, unknown>) {
       ? (raw.outputSchema as Record<string, unknown>)
       : outputParamsObj;
 
-  const pricingSourceUrl =
-    typeof raw.pricingSourceUrl === "string"
-      ? raw.pricingSourceUrl
-      : typeof costObj.pricingSourceUrl === "string"
-        ? costObj.pricingSourceUrl
-        : null;
-
-  const pricingSourceNote =
-    typeof raw.pricingSourceNote === "string"
-      ? raw.pricingSourceNote
-      : typeof costObj.pricingSourceNote === "string"
-        ? costObj.pricingSourceNote
-        : null;
-
-  const requestExampleJson =
-    typeof raw.requestExampleJson === "string"
-      ? raw.requestExampleJson
-      : typeof examplesObj.requestExampleJson === "string"
-        ? examplesObj.requestExampleJson
-        : undefined;
-
-  const submitResponseExampleJson =
-    typeof raw.submitResponseExampleJson === "string"
-      ? raw.submitResponseExampleJson
-      : typeof examplesObj.submitResponseExampleJson === "string"
-        ? examplesObj.submitResponseExampleJson
-        : undefined;
-
-  const normalizedOutputExampleJson =
-    typeof raw.normalizedOutputExampleJson === "string"
-      ? raw.normalizedOutputExampleJson
-      : typeof examplesObj.normalizedOutputExampleJson === "string"
-        ? examplesObj.normalizedOutputExampleJson
-        : undefined;
-
   const summary =
     typeof raw.summary === "string"
       ? raw.summary
-      : typeof examplesObj.summary === "string"
-        ? examplesObj.summary
-        : undefined;
+      : undefined;
 
   return {
-    upstreamModelSlug,
     executionTemplate,
     executionConfig,
     inputSchema,
     outputSchema,
-    pricingSourceUrl,
-    pricingSourceNote,
-    requestExampleJson,
-    submitResponseExampleJson,
-    normalizedOutputExampleJson,
     summary,
   };
 }
@@ -3013,32 +2953,22 @@ export async function generateProviderModelDraftFromSource(input: {
     "You are an API integration analyst for an internal admin console.",
     "You MUST return valid json only.",
     "Return ONLY a strict JSON object. Do not include markdown, code fences, or explanations.",
-    "Task: read upstream model API documentation and output a provider model mapping draft.",
+    "Task: read upstream model API documentation and output ONLY protocol + input schema + output schema draft.",
     "Output keys must be EXACTLY these top-level keys:",
-    "[upstreamModelSlug, executionTemplate, executionConfig, inputSchema, outputSchema, pricingSourceUrl, pricingSourceNote, requestExampleJson, submitResponseExampleJson, normalizedOutputExampleJson, summary]",
+    "[executionTemplate, executionConfig, inputSchema, outputSchema]",
     "Do NOT output nested shapes like basic/protocol/inputParams/outputParams.",
     "Constraints:",
-    "1) upstreamModelSlug: real upstream model slug string.",
-    "2) executionTemplate: one of rest-async-poll-v1, upload-async-poll-v1, sync-json-v1.",
-    "3) executionConfig: object with inferred fields: mode, authType, authHeaderName, authHeaderPrefix, authQueryParam, submitPath, pollPath, taskIdPath, statusPath, resultUrlPath, resultValueType, resultMimeType, submitBodyTemplate.",
-    "4) inputSchema format: { officialDocUrl, params: [{ name, type, required, description, example, exposedToCustomer }] }.",
-    "5) outputSchema format: { officialDocUrl, fields: [{ name, type, description, example, exposedToCustomer }] }.",
-    "6) If unknown, return empty string or empty array/object. Never omit required top-level keys.",
-    "7) pricingSourceUrl/pricingSourceNote fill if pricing clues exist; otherwise empty string.",
-    "8) summary: short chinese summary for what was recognized and what is missing.",
+    "1) executionTemplate: one of rest-async-poll-v1, upload-async-poll-v1, sync-json-v1.",
+    "2) executionConfig: object with inferred fields: mode, authType, authHeaderName, authHeaderPrefix, authQueryParam, submitPath, pollPath, taskIdPath, statusPath, resultUrlPath, resultValueType, resultMimeType, submitBodyTemplate.",
+    "3) inputSchema format: { officialDocUrl, params: [{ name, type, required, description, example, exposedToCustomer }] }.",
+    "4) outputSchema format: { officialDocUrl, fields: [{ name, type, description, example, exposedToCustomer }] }.",
+    "5) If unknown, return empty string or empty array/object. Never omit required top-level keys.",
     "JSON OUTPUT EXAMPLE:",
     "{",
-    '  "upstreamModelSlug": "google/imagen3-fast",',
     '  "executionTemplate": "rest-async-poll-v1",',
     '  "executionConfig": {"mode":"async","authType":"bearer","submitPath":"","pollPath":"","taskIdPath":"","statusPath":"","resultUrlPath":"","resultValueType":"url","resultMimeType":"image/png","submitBodyTemplate":""},',
     '  "inputSchema": {"officialDocUrl":"","params":[]},',
-    '  "outputSchema": {"officialDocUrl":"","fields":[]},',
-    '  "pricingSourceUrl": "",',
-    '  "pricingSourceNote": "",',
-    '  "requestExampleJson": "",',
-    '  "submitResponseExampleJson": "",',
-    '  "normalizedOutputExampleJson": "",',
-    '  "summary": ""',
+    '  "outputSchema": {"officialDocUrl":"","fields":[]}',
     "}",
     "",
       `Source Label: ${sourceLabel}`,
@@ -3171,7 +3101,7 @@ export async function generateProviderModelDraftFromSource(input: {
       try {
         const repairPrompt = [
           "将下面内容修复为严格 JSON 对象，只输出 JSON，不要解释。",
-          "必须包含固定顶层键：upstreamModelSlug, executionTemplate, executionConfig, inputSchema, outputSchema, pricingSourceUrl, pricingSourceNote, requestExampleJson, submitResponseExampleJson, normalizedOutputExampleJson, summary。",
+          "必须包含固定顶层键：executionTemplate, executionConfig, inputSchema, outputSchema。",
           "若缺失则用空字符串或空对象/空数组补齐。",
           "待修复内容：",
           text || JSON.stringify(deepseekJson),
@@ -3244,7 +3174,6 @@ export async function generateProviderModelDraftFromSource(input: {
         outputTokens,
         totalTokens,
         estimatedCostUsd,
-        upstreamModelSlug: result.upstreamModelSlug,
       },
     });
 

@@ -14,6 +14,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
+import { HomeMobileMenu } from "@/components/marketing/home-mobile-menu";
 import { createClient } from "@/lib/supabase/server";
 
 const HEADER_NAV_ITEMS = [
@@ -165,8 +166,8 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-[#FCFCFA] text-[#111827]" style={{ colorScheme: "light" }}>
       <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 w-full max-w-7xl items-center px-6">
-          <div className="relative flex w-full items-center text-sm md:text-base">
+        <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
+          <div className="relative flex h-14 w-full items-center justify-start text-sm md:text-base">
             <Link
               href="/"
               className="-ml-2 rounded-md px-2 py-1.5 text-[#6B7280] transition-colors hover:bg-black/[0.03] hover:text-[#111827]"
@@ -174,7 +175,7 @@ export default async function Home() {
               <Logo className="text-[#111827]" />
             </Link>
 
-            <nav className="ml-4 hidden items-center gap-1 lg:flex">
+            <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 lg:flex">
               {HEADER_NAV_ITEMS.map((item) => (
                 <Link
                   key={item.label}
@@ -186,12 +187,13 @@ export default async function Home() {
               ))}
             </nav>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="absolute right-0 flex items-center gap-2 lg:static lg:ml-auto">
               {user ? (
                 <span className="hidden max-w-[260px] truncate text-[13px] text-[#6B7280] md:inline">
                   Hi, {user.email ?? user.user_metadata?.name ?? "there"}
                 </span>
               ) : null}
+              <HomeMobileMenu items={HEADER_NAV_ITEMS.map((item) => ({ ...item }))} />
               <Link
                 href={destination}
                 className="inline-flex h-9 items-center justify-center rounded-md bg-[#111827] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0B1220]"
