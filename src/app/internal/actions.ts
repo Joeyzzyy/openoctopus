@@ -2966,6 +2966,7 @@ async function requestDeepSeekJsonObject(input: {
     body: JSON.stringify({
       model: "deepseek-chat",
       temperature: 0.1,
+      max_tokens: 4000,
       response_format: { type: "json_object" },
       messages: [{ role: "user", content: input.prompt }],
     }),
@@ -3010,6 +3011,7 @@ export async function generateProviderModelDraftFromSource(input: {
 
     const prompt = [
     "You are an API integration analyst for an internal admin console.",
+    "You MUST return valid json only.",
     "Return ONLY a strict JSON object. Do not include markdown, code fences, or explanations.",
     "Task: read upstream model API documentation and output a provider model mapping draft.",
     "Output keys must be EXACTLY these top-level keys:",
@@ -3024,6 +3026,20 @@ export async function generateProviderModelDraftFromSource(input: {
     "6) If unknown, return empty string or empty array/object. Never omit required top-level keys.",
     "7) pricingSourceUrl/pricingSourceNote fill if pricing clues exist; otherwise empty string.",
     "8) summary: short chinese summary for what was recognized and what is missing.",
+    "JSON OUTPUT EXAMPLE:",
+    "{",
+    '  "upstreamModelSlug": "google/imagen3-fast",',
+    '  "executionTemplate": "rest-async-poll-v1",',
+    '  "executionConfig": {"mode":"async","authType":"bearer","submitPath":"","pollPath":"","taskIdPath":"","statusPath":"","resultUrlPath":"","resultValueType":"url","resultMimeType":"image/png","submitBodyTemplate":""},',
+    '  "inputSchema": {"officialDocUrl":"","params":[]},',
+    '  "outputSchema": {"officialDocUrl":"","fields":[]},',
+    '  "pricingSourceUrl": "",',
+    '  "pricingSourceNote": "",',
+    '  "requestExampleJson": "",',
+    '  "submitResponseExampleJson": "",',
+    '  "normalizedOutputExampleJson": "",',
+    '  "summary": ""',
+    "}",
     "",
       `Source Label: ${sourceLabel}`,
       "Source document content:",
@@ -3041,6 +3057,7 @@ export async function generateProviderModelDraftFromSource(input: {
         body: JSON.stringify({
           model: "deepseek-chat",
           temperature: 0.1,
+          max_tokens: 4000,
           response_format: { type: "json_object" },
           messages: [{ role: "user", content: prompt }],
         }),
@@ -3083,6 +3100,27 @@ export async function generateProviderModelDraftFromSource(input: {
               : "";
           })()
         : "";
+    if (!text.trim()) {
+      await supabase.from("internal_model_ai_usage_logs").insert({
+        workspace_id: workspaceId,
+        actor_user_id: actorUserId,
+        source_url: sourceLabel,
+        model: "deepseek-chat",
+        status: "failed",
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        total_tokens: totalTokens,
+        estimated_cost_usd: estimatedCostUsd,
+        latency_ms: Date.now() - startedAt,
+        error_message: "DeepSeek returned empty content in JSON mode",
+        raw_response: deepseekJson,
+      });
+      return {
+        ok: false as const,
+        error: "DeepSeek JSON 模式返回空内容，请重试一次（文档已说明该模式偶发空 content）。",
+        debugRawOutput: JSON.stringify(deepseekJson).slice(0, 8000),
+      };
+    }
 
     if (!deepseekRes.ok) {
       const errorMessage =
@@ -3165,6 +3203,7 @@ export async function generateProviderModelDraftFromSource(input: {
         return {
           ok: false as const,
           error: "DeepSeek 返回内容不是可解析 JSON。请重试，或拆小文档后再试。",
+          debugRawOutput: (text || JSON.stringify(deepseekJson)).slice(0, 8000),
         };
       }
     }
@@ -3173,6 +3212,7 @@ export async function generateProviderModelDraftFromSource(input: {
       return {
         ok: false as const,
         error: "DeepSeek 识别结果为空，请重试。",
+        debugRawOutput: (text || JSON.stringify(deepseekJson)).slice(0, 8000),
       };
     }
 

@@ -1270,6 +1270,7 @@ export function CreateProviderModelForm({
   const [autofillSourceText, setAutofillSourceText] = useState("");
   const [autofillSummary, setAutofillSummary] = useState("");
   const [autofillPreviewJson, setAutofillPreviewJson] = useState("");
+  const [autofillDebugRawOutput, setAutofillDebugRawOutput] = useState("");
   const [seedInputSchemaText, setSeedInputSchemaText] = useState("");
   const [seedOutputSchemaText, setSeedOutputSchemaText] = useState("");
   const [isAutofilling, startAutofillTransition] = useTransition();
@@ -1311,6 +1312,7 @@ export function CreateProviderModelForm({
     setAutofillSourceText("");
     setAutofillSummary("");
     setAutofillPreviewJson("");
+    setAutofillDebugRawOutput("");
     setSeedInputSchemaText("");
     setSeedOutputSchemaText("");
   }, [
@@ -1335,8 +1337,10 @@ export function CreateProviderModelForm({
       });
       if (!result.ok) {
         toast.error(result.error || "自动填充失败");
+        setAutofillDebugRawOutput("debugRawOutput" in result && typeof result.debugRawOutput === "string" ? result.debugRawOutput : "");
         return;
       }
+      setAutofillDebugRawOutput("");
 
       const payload = result.data;
       setUpstreamModelSlug(payload.upstreamModelSlug ?? "");
@@ -1511,6 +1515,16 @@ export function CreateProviderModelForm({
               </div>
               <pre className="max-h-[340px] overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-black/70">
                 {autofillPreviewJson}
+              </pre>
+            </div>
+          ) : null}
+          {autofillDebugRawOutput ? (
+            <div className="mt-2 rounded-md border border-[#F1D2CC] bg-[#FFF7F5] p-2.5">
+              <p className="mb-2 text-[11px] tracking-[0.35px] text-[#8D4336]">
+                原始返回内容（调试）
+              </p>
+              <pre className="max-h-[280px] overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-[#8D4336]">
+                {autofillDebugRawOutput}
               </pre>
             </div>
           ) : null}
