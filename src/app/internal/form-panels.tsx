@@ -1359,6 +1359,7 @@ export function CreateProviderModelForm({
         )
       );
       toast.success("已完成自动解析并填充");
+      setActiveTab("protocol");
     });
   };
 

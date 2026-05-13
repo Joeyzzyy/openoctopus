@@ -2740,6 +2740,106 @@ const providerModelAutofillResultSchema = z.object({
   summary: z.string().max(2000).optional(),
 });
 
+function normalizeAutofillResultPayload(raw: Record<string, unknown>) {
+  const asObj = (value: unknown) =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+
+  const basic = asObj(raw.basic);
+  const protocol = asObj(raw.protocol);
+  const protocolExecutionConfig = asObj(protocol.executionConfig);
+  const inputParamsObj = asObj(raw.inputParams);
+  const outputParamsObj = asObj(raw.outputParams);
+  const examplesObj = asObj(raw.examples);
+  const costObj = asObj(raw.cost);
+
+  const upstreamModelSlug =
+    typeof raw.upstreamModelSlug === "string"
+      ? raw.upstreamModelSlug
+      : typeof basic.upstreamModelSlug === "string"
+        ? basic.upstreamModelSlug
+        : "";
+
+  const executionTemplate =
+    typeof raw.executionTemplate === "string"
+      ? raw.executionTemplate
+      : typeof protocol.executionTemplate === "string"
+        ? protocol.executionTemplate
+        : "rest-async-poll-v1";
+
+  const executionConfig =
+    raw.executionConfig && typeof raw.executionConfig === "object" && !Array.isArray(raw.executionConfig)
+      ? (raw.executionConfig as Record<string, unknown>)
+      : protocolExecutionConfig;
+
+  const inputSchema =
+    raw.inputSchema && typeof raw.inputSchema === "object" && !Array.isArray(raw.inputSchema)
+      ? (raw.inputSchema as Record<string, unknown>)
+      : inputParamsObj;
+
+  const outputSchema =
+    raw.outputSchema && typeof raw.outputSchema === "object" && !Array.isArray(raw.outputSchema)
+      ? (raw.outputSchema as Record<string, unknown>)
+      : outputParamsObj;
+
+  const pricingSourceUrl =
+    typeof raw.pricingSourceUrl === "string"
+      ? raw.pricingSourceUrl
+      : typeof costObj.pricingSourceUrl === "string"
+        ? costObj.pricingSourceUrl
+        : null;
+
+  const pricingSourceNote =
+    typeof raw.pricingSourceNote === "string"
+      ? raw.pricingSourceNote
+      : typeof costObj.pricingSourceNote === "string"
+        ? costObj.pricingSourceNote
+        : null;
+
+  const requestExampleJson =
+    typeof raw.requestExampleJson === "string"
+      ? raw.requestExampleJson
+      : typeof examplesObj.requestExampleJson === "string"
+        ? examplesObj.requestExampleJson
+        : undefined;
+
+  const submitResponseExampleJson =
+    typeof raw.submitResponseExampleJson === "string"
+      ? raw.submitResponseExampleJson
+      : typeof examplesObj.submitResponseExampleJson === "string"
+        ? examplesObj.submitResponseExampleJson
+        : undefined;
+
+  const normalizedOutputExampleJson =
+    typeof raw.normalizedOutputExampleJson === "string"
+      ? raw.normalizedOutputExampleJson
+      : typeof examplesObj.normalizedOutputExampleJson === "string"
+        ? examplesObj.normalizedOutputExampleJson
+        : undefined;
+
+  const summary =
+    typeof raw.summary === "string"
+      ? raw.summary
+      : typeof examplesObj.summary === "string"
+        ? examplesObj.summary
+        : undefined;
+
+  return {
+    upstreamModelSlug,
+    executionTemplate,
+    executionConfig,
+    inputSchema,
+    outputSchema,
+    pricingSourceUrl,
+    pricingSourceNote,
+    requestExampleJson,
+    submitResponseExampleJson,
+    normalizedOutputExampleJson,
+    summary,
+  };
+}
+
 function stripHtmlToText(input: string) {
   return input
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -2873,17 +2973,21 @@ export async function generateProviderModelDraftFromSource(input: {
     const sourceLabel = parsedInput.sourceLabel?.trim() || "manual://pasted-content";
 
     const prompt = [
-    "You are an API integration analyst.",
-    "Return ONLY valid JSON. No markdown.",
-    "Task: read upstream model API documentation and output a provider model mapping draft for OpenOctopus internal console.",
+    "You are an API integration analyst for an internal admin console.",
+    "Return ONLY a strict JSON object. Do not include markdown, code fences, or explanations.",
+    "Task: read upstream model API documentation and output a provider model mapping draft.",
+    "Output keys must be EXACTLY these top-level keys:",
+    "[upstreamModelSlug, executionTemplate, executionConfig, inputSchema, outputSchema, pricingSourceUrl, pricingSourceNote, requestExampleJson, submitResponseExampleJson, normalizedOutputExampleJson, summary]",
+    "Do NOT output nested shapes like basic/protocol/inputParams/outputParams.",
     "Constraints:",
-    "1) upstreamModelSlug must be the real upstream model slug.",
-    "2) executionTemplate must be one of: rest-async-poll-v1, upload-async-poll-v1, sync-json-v1.",
-    "3) executionConfig must include protocol fields that can be inferred: mode, authType, authHeaderName/authQueryParam, submitPath, pollPath, taskIdPath, statusPath, resultUrlPath, resultValueType, resultMimeType, submitBodyTemplate.",
+    "1) upstreamModelSlug: real upstream model slug string.",
+    "2) executionTemplate: one of rest-async-poll-v1, upload-async-poll-v1, sync-json-v1.",
+    "3) executionConfig: object with inferred fields: mode, authType, authHeaderName, authHeaderPrefix, authQueryParam, submitPath, pollPath, taskIdPath, statusPath, resultUrlPath, resultValueType, resultMimeType, submitBodyTemplate.",
     "4) inputSchema format: { officialDocUrl, params: [{ name, type, required, description, example, exposedToCustomer }] }.",
     "5) outputSchema format: { officialDocUrl, fields: [{ name, type, description, example, exposedToCustomer }] }.",
-    "6) requestExampleJson / submitResponseExampleJson / normalizedOutputExampleJson should be JSON string examples when available.",
-    "7) pricingSourceUrl and pricingSourceNote should be filled when pricing clues exist; otherwise null/empty.",
+    "6) If unknown, return empty string or empty array/object. Never omit required top-level keys.",
+    "7) pricingSourceUrl/pricingSourceNote fill if pricing clues exist; otherwise empty string.",
+    "8) summary: short chinese summary for what was recognized and what is missing.",
     "",
       `Source Label: ${sourceLabel}`,
       "Source document content:",
@@ -2983,7 +3087,9 @@ export async function generateProviderModelDraftFromSource(input: {
       if (!parsedResult) {
         throw new Error("invalid-json");
       }
-      result = providerModelAutofillResultSchema.parse(parsedResult);
+      result = providerModelAutofillResultSchema.parse(
+        normalizeAutofillResultPayload(parsedResult)
+      );
     } catch {
       await supabase.from("internal_model_ai_usage_logs").insert({
         workspace_id: workspaceId,
