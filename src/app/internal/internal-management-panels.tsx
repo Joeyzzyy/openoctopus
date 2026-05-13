@@ -1005,6 +1005,41 @@ export function PublicModelsPanel({
                     <p className="mt-2 text-xs text-black/65">{model.billingSummary}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <ManagementDialog
+                      trigger={<ModalButton tone="secondary">新建模型映射</ModalButton>}
+                      disabled={!safeProviders.length}
+                      title={`新建映射：${model.display_name}`}
+                      description="为当前可售模型新增供应商供应模型映射。"
+                      headerActions={
+                        <button
+                          type="submit"
+                          form={`provider-model-form-create-for-${model.id}`}
+                          className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
+                        >
+                          保存供应商模型
+                        </button>
+                      }
+                    >
+                      {({ close }) => (
+                        <CreateProviderModelForm
+                          action={createProviderModel}
+                          supportedModels={supportedModelOptions}
+                          providers={providerOptions}
+                          workerTemplates={workerTemplateOptions.map((item) => ({
+                            id: item.slug,
+                            displayName: item.displayName,
+                            slug: item.slug,
+                          }))}
+                          executionConfigPresets={executionConfigPresets}
+                          defaultSupportedModelSlug={model.model_slug}
+                          formId={`provider-model-form-create-for-${model.id}`}
+                          showSubmitButton={false}
+                          className="grid gap-4"
+                          onSuccess={close}
+                          disabled={false}
+                        />
+                      )}
+                    </ManagementDialog>
                     <form action={updateSupportedModelState}>
                       <input type="hidden" name="supportedModelId" value={model.id} />
                       <input type="hidden" name="active" value={model.active ? "false" : "true"} />

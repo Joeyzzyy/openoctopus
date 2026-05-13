@@ -18,7 +18,6 @@ import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
 import {
   CreateProviderButton,
   CreateModelVendorButton,
-  CreateProviderModelMappingButton,
   CreateSupportedModelButton,
   CreateRoutingRuleButton,
   ModelVendorsPanel,
@@ -1140,12 +1139,6 @@ export default async function InternalPage({
                       capabilityOptions={capabilityOptions}
                       modelVendors={data.modelVendors}
                       models={data.supportedModels}
-                    />
-                    <CreateProviderModelMappingButton
-                      supportedModels={data.supportedModels}
-                      providers={data.providers}
-                      workerTemplates={data.workerTemplates ?? []}
-                      providerModels={data.providerModels}
                     />
                   </div>
                 }
