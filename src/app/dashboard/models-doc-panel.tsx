@@ -26,7 +26,6 @@ type ModelRow = {
   pollCompletedExampleJson: string | null;
   pollFailedExampleJson: string | null;
   normalizedOutputExampleJson: string | null;
-  errorPlaybookText: string | null;
 };
 
 function LoadingSkeleton() {

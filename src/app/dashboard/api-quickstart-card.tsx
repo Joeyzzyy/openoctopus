@@ -22,7 +22,6 @@ type ModelDocItem = {
   pollCompletedExampleJson: string | null;
   pollFailedExampleJson: string | null;
   normalizedOutputExampleJson: string | null;
-  errorPlaybookText: string | null;
 };
 
 type MainTab = "quickstart" | "input" | "output";
@@ -299,7 +298,6 @@ export function ApiQuickstartCard({
             pollCompletedExampleJson: null,
             pollFailedExampleJson: null,
             normalizedOutputExampleJson: null,
-            errorPlaybookText: null,
           },
         ];
 
@@ -545,12 +543,6 @@ export function ApiQuickstartCard({
                   onCopy={copyText}
                 />
               </div>
-            </div>
-          ) : null}
-          {selectedModel?.errorPlaybookText ? (
-            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Error Handling</p>
-              <pre className="mt-2 whitespace-pre-wrap text-xs leading-6 text-black/70">{selectedModel.errorPlaybookText}</pre>
             </div>
           ) : null}
         </div>

@@ -80,7 +80,6 @@ type ExecutionConfigFormState = {
   docPollCompletedExampleJson: string;
   docPollFailedExampleJson: string;
   docNormalizedOutputExampleJson: string;
-  docErrorPlaybookText: string;
 };
 
 type SchemaFieldState = {
@@ -117,7 +116,6 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
       docPollCompletedExampleJson: "",
       docPollFailedExampleJson: "",
       docNormalizedOutputExampleJson: "",
-      docErrorPlaybookText: "",
     };
   }
   if (slug === "upload-async-poll-v1") {
@@ -764,7 +762,6 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
     docPollCompletedExampleJson: "",
     docPollFailedExampleJson: "",
     docNormalizedOutputExampleJson: "",
-    docErrorPlaybookText: "",
   };
 
   if (!initialValue) {
@@ -866,10 +863,6 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
         parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).normalizedOutputExampleJson === "string"
           ? ((parsed.doc as Record<string, unknown>).normalizedOutputExampleJson as string)
           : fallback.docNormalizedOutputExampleJson,
-      docErrorPlaybookText:
-        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).errorPlaybookText === "string"
-          ? ((parsed.doc as Record<string, unknown>).errorPlaybookText as string)
-          : fallback.docErrorPlaybookText,
     };
   } catch {
     return fallback;
@@ -912,7 +905,6 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
     pollCompletedExampleJson: state.docPollCompletedExampleJson.trim() || undefined,
     pollFailedExampleJson: state.docPollFailedExampleJson.trim() || undefined,
     normalizedOutputExampleJson: state.docNormalizedOutputExampleJson.trim() || undefined,
-    errorPlaybookText: state.docErrorPlaybookText.trim() || undefined,
   };
   if (state.docRecommendedPollIntervalSeconds.trim()) {
     doc.recommendedPollIntervalSeconds = Number(state.docRecommendedPollIntervalSeconds);
@@ -1882,22 +1874,6 @@ export function CreateProviderModelForm({
                   disabled={disabled}
                   className={formTextAreaClassName}
                   rows={4}
-                />
-              </label>
-              <label className="block md:col-span-2">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">错误处理说明</span>
-                <textarea
-                  value={executionConfigState.docErrorPlaybookText}
-                  onChange={(event) =>
-                    setExecutionConfigState((current) => ({
-                      ...current,
-                      docErrorPlaybookText: event.target.value,
-                    }))
-                  }
-                  disabled={disabled}
-                  className={formTextAreaClassName}
-                  rows={5}
-                  placeholder="429: Retry with exponential backoff..."
                 />
               </label>
             </div>

@@ -147,7 +147,6 @@ export type DashboardData = {
     pollCompletedExampleJson: string | null;
     pollFailedExampleJson: string | null;
     normalizedOutputExampleJson: string | null;
-    errorPlaybookText: string | null;
   }>;
   requestFilters: {
     apiKeys: Array<{
@@ -839,16 +838,6 @@ export async function getDashboardData({
             !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
             typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).normalizedOutputExampleJson === "string"
               ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).normalizedOutputExampleJson as string)
-              : null,
-          errorPlaybookText:
-            primaryProviderModel?.execution_config &&
-            typeof primaryProviderModel.execution_config === "object" &&
-            !Array.isArray(primaryProviderModel.execution_config) &&
-            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
-            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
-            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
-            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).errorPlaybookText === "string"
-              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).errorPlaybookText as string)
               : null,
         };
       });
