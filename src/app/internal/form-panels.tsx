@@ -1134,6 +1134,7 @@ export function CreateProviderModelForm({
   showSubmitButton?: boolean;
 }) {
   type ProviderModelFormTab =
+    | "ai-autofill"
     | "basic"
     | "protocol"
     | "input-params"
@@ -1175,9 +1176,10 @@ export function CreateProviderModelForm({
   const templateIsAsync =
     executionTemplate === "rest-async-poll-v1" || executionTemplate === "upload-async-poll-v1";
   const isAsyncMode = executionConfigState.mode === "async" || (executionConfigState.mode === "auto" && templateIsAsync);
-  const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("basic");
+  const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("ai-autofill");
   const contentContainerRef = useRef<HTMLDivElement | null>(null);
   const sectionRefs = useRef<Record<ProviderModelFormTab, HTMLDivElement | null>>({
+    "ai-autofill": null,
     basic: null,
     protocol: null,
     "input-params": null,
@@ -1187,6 +1189,7 @@ export function CreateProviderModelForm({
   });
   const tabItems = useMemo(
     () => [
+      { key: "ai-autofill" as const, label: "AI 模型请求识别" },
       { key: "basic" as const, label: "基本信息" },
       { key: "protocol" as const, label: "调用协议配置" },
       { key: "input-params" as const, label: "输入参数" },
@@ -1338,9 +1341,9 @@ export function CreateProviderModelForm({
         >
         <div
           ref={(node) => {
-            sectionRefs.current.basic = node;
+            sectionRefs.current["ai-autofill"] = node;
           }}
-          className="grid gap-3 md:grid-cols-2"
+          className="grid gap-3"
         >
         <label className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">文档内容自动填充</span>
@@ -1376,7 +1379,14 @@ export function CreateProviderModelForm({
             </p>
           ) : null}
         </label>
+        </div>
 
+        <div
+          ref={(node) => {
+            sectionRefs.current.basic = node;
+          }}
+          className="grid gap-3 md:grid-cols-2"
+        >
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">可售模型</span>
           <select
