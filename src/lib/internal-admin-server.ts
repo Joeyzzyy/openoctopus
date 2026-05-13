@@ -248,6 +248,22 @@ type AdminAuditLogRow = {
   created_at: string;
 };
 
+type InternalModelAiUsageLogRow = {
+  id: string;
+  workspace_id: string | null;
+  actor_user_id: string | null;
+  source_url: string;
+  model: string;
+  status: "succeeded" | "failed";
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  estimated_cost_usd: number | null;
+  latency_ms: number | null;
+  error_message: string | null;
+  created_at: string;
+};
+
 type InternalAdminDataOptions = {
   monitoringLookbackMs?: number;
   bypassAuth?: boolean;
@@ -659,6 +675,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     usageEventsResponse,
     attemptsResponse,
     adminAuditLogsResponse,
+    internalModelAiUsageLogsResponse,
   ] =
     await Promise.all([
       supabase
@@ -765,6 +782,22 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
             .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
             .order("created_at", { ascending: false })
             .limit(40),
+      bypassAuth
+        ? supabase
+            .from("internal_model_ai_usage_logs")
+            .select(
+              "id, workspace_id, actor_user_id, source_url, model, status, input_tokens, output_tokens, total_tokens, estimated_cost_usd, latency_ms, error_message, created_at"
+            )
+            .order("created_at", { ascending: false })
+            .limit(200)
+        : supabase
+            .from("internal_model_ai_usage_logs")
+            .select(
+              "id, workspace_id, actor_user_id, source_url, model, status, input_tokens, output_tokens, total_tokens, estimated_cost_usd, latency_ms, error_message, created_at"
+            )
+            .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
+            .order("created_at", { ascending: false })
+            .limit(200),
     ]);
 
   const providers = (providersResponse.error ? [] : providersResponse.data ?? []) as ProviderRow[];
@@ -824,6 +857,9 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const adminAuditLogs = (adminAuditLogsResponse.error
     ? []
     : adminAuditLogsResponse.data ?? []) as AdminAuditLogRow[];
+  const internalModelAiUsageLogs = (internalModelAiUsageLogsResponse.error
+    ? []
+    : internalModelAiUsageLogsResponse.data ?? []) as InternalModelAiUsageLogRow[];
   const monitoringRequests = await fetchMonitoringRequests(supabase, monitoringLookbackMs);
 
   const providerById = new Map(providers.map((row) => [row.id, row]));
@@ -1113,6 +1149,16 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     createdLabel: formatRelativeTimestamp(log.created_at),
   }));
 
+  const internalModelAiUsageLogSummaries = internalModelAiUsageLogs.map((log) => ({
+    ...log,
+    createdLabel: formatRelativeTimestamp(log.created_at),
+    estimatedCostUsd: Number(log.estimated_cost_usd ?? 0),
+    inputTokens: Number(log.input_tokens ?? 0),
+    outputTokens: Number(log.output_tokens ?? 0),
+    totalTokens: Number(log.total_tokens ?? 0),
+    latencyMs: Number(log.latency_ms ?? 0),
+  }));
+
   const supportedModelSummaries = supportedModels.map((model) => {
     const linkedProviderModels = providerModels.filter(
       (item) => item.supported_model_id === model.id
@@ -1219,6 +1265,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     monitoringRequests,
     globalMonitoring,
     auditLogs: auditLogSummaries,
+    internalModelAiUsageLogs: internalModelAiUsageLogSummaries,
     requestFilters: {
       customers: Array.from(
         recentRequestSummaries.reduce((map, request) => {

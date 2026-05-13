@@ -2719,3 +2719,220 @@ export async function updateModelEconomicsBundle(formData: FormData) {
 
   revalidatePath("/internal");
 }
+
+const providerModelAutofillSchema = z.object({
+  sourceUrl: z.string().url(),
+});
+
+const providerModelAutofillResultSchema = z.object({
+  upstreamModelSlug: z.string().trim().min(1).max(200),
+  executionTemplate: z.string().trim().min(1).max(80).default("rest-async-poll-v1"),
+  executionConfig: z.record(z.string(), z.unknown()).default({}),
+  inputSchema: z.record(z.string(), z.unknown()).default({}),
+  outputSchema: z.record(z.string(), z.unknown()).default({}),
+  submitBodyTemplate: z.string().optional(),
+  pricingSourceUrl: z.string().url().nullable().optional(),
+  pricingSourceNote: z.string().max(2000).nullable().optional(),
+  requestExampleJson: z.string().optional(),
+  submitResponseExampleJson: z.string().optional(),
+  normalizedOutputExampleJson: z.string().optional(),
+  summary: z.string().max(2000).optional(),
+});
+
+function stripHtmlToText(input: string) {
+  return input
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function estimateGeminiCostUsd(inputTokens: number, outputTokens: number) {
+  const inputRatePerMillion = 1.25;
+  const outputRatePerMillion = 10;
+  const inputCost = (Math.max(0, inputTokens) / 1_000_000) * inputRatePerMillion;
+  const outputCost = (Math.max(0, outputTokens) / 1_000_000) * outputRatePerMillion;
+  return Number((inputCost + outputCost).toFixed(8));
+}
+
+export async function generateProviderModelDraftFromUrl(input: {
+  sourceUrl: string;
+}) {
+  const startedAt = Date.now();
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsedInput = providerModelAutofillSchema.parse(input);
+  const apiKey = process.env.INTERNAL_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Missing INTERNAL_GEMINI_API_KEY");
+  }
+
+  const sourceResponse = await fetch(parsedInput.sourceUrl, {
+    method: "GET",
+    headers: {
+      "user-agent": "OpenOctopusInternalModelAutofill/1.0",
+      accept: "text/html,application/json,text/plain,*/*",
+    },
+    cache: "no-store",
+  });
+
+  if (!sourceResponse.ok) {
+    throw new Error(`Failed to fetch source URL: ${sourceResponse.status}`);
+  }
+
+  const contentType = sourceResponse.headers.get("content-type") ?? "";
+  const rawBody = await sourceResponse.text();
+  const sourceText =
+    contentType.includes("text/html") ? stripHtmlToText(rawBody) : rawBody;
+  const compactSourceText = sourceText.slice(0, 120_000);
+
+  const prompt = [
+    "You are an API integration analyst.",
+    "Return ONLY valid JSON. No markdown.",
+    "Task: read upstream model API documentation and output a provider model mapping draft for OpenOctopus internal console.",
+    "Constraints:",
+    "1) upstreamModelSlug must be the real upstream model slug.",
+    "2) executionTemplate must be one of: rest-async-poll-v1, upload-async-poll-v1, sync-json-v1.",
+    "3) executionConfig must include protocol fields that can be inferred: mode, authType, authHeaderName/authQueryParam, submitPath, pollPath, taskIdPath, statusPath, resultUrlPath, resultValueType, resultMimeType, submitBodyTemplate.",
+    "4) inputSchema format: { officialDocUrl, params: [{ name, type, required, description, example, exposedToCustomer }] }.",
+    "5) outputSchema format: { officialDocUrl, fields: [{ name, type, description, example, exposedToCustomer }] }.",
+    "6) requestExampleJson / submitResponseExampleJson / normalizedOutputExampleJson should be JSON string examples when available.",
+    "7) pricingSourceUrl and pricingSourceNote should be filled when pricing clues exist; otherwise null/empty.",
+    "",
+    `Source URL: ${parsedInput.sourceUrl}`,
+    "Source document content:",
+    compactSourceText,
+  ].join("\n");
+
+  const geminiRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: "application/json",
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+      }),
+    }
+  );
+
+  const geminiJson = (await geminiRes.json()) as Record<string, unknown>;
+  const usage = (geminiJson.usageMetadata ?? {}) as Record<string, unknown>;
+  const inputTokens = Number(usage.promptTokenCount ?? usage.inputTokenCount ?? 0);
+  const outputTokens = Number(usage.candidatesTokenCount ?? usage.outputTokenCount ?? 0);
+  const totalTokens = Number(usage.totalTokenCount ?? inputTokens + outputTokens);
+  const estimatedCostUsd = estimateGeminiCostUsd(inputTokens, outputTokens);
+
+  const candidates = Array.isArray(geminiJson.candidates)
+    ? (geminiJson.candidates as Array<Record<string, unknown>>)
+    : [];
+  const text = candidates[0]?.content &&
+    typeof candidates[0].content === "object" &&
+    !Array.isArray(candidates[0].content)
+      ? (() => {
+          const parts = (candidates[0].content as Record<string, unknown>).parts;
+          if (!Array.isArray(parts)) return "";
+          const first = parts[0];
+          if (!first || typeof first !== "object" || Array.isArray(first)) return "";
+          return typeof (first as Record<string, unknown>).text === "string"
+            ? ((first as Record<string, unknown>).text as string)
+            : "";
+        })()
+      : "";
+
+  if (!geminiRes.ok) {
+    const errorMessage =
+      typeof (geminiJson.error as Record<string, unknown> | undefined)?.message === "string"
+        ? ((geminiJson.error as Record<string, unknown>).message as string)
+        : `Gemini request failed with ${geminiRes.status}`;
+    await supabase.from("internal_model_ai_usage_logs").insert({
+      workspace_id: workspaceId,
+      actor_user_id: /^[0-9a-f-]{36}$/i.test(userId) ? userId : null,
+      source_url: parsedInput.sourceUrl,
+      model: "gemini-2.5-pro",
+      status: "failed",
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: totalTokens,
+      estimated_cost_usd: estimatedCostUsd,
+      latency_ms: Date.now() - startedAt,
+      error_message: errorMessage.slice(0, 4000),
+    });
+    throw new Error(errorMessage);
+  }
+
+  let result: z.infer<typeof providerModelAutofillResultSchema>;
+  try {
+    const parsedResult = JSON.parse(text) as Record<string, unknown>;
+    result = providerModelAutofillResultSchema.parse(parsedResult);
+  } catch {
+    await supabase.from("internal_model_ai_usage_logs").insert({
+      workspace_id: workspaceId,
+      actor_user_id: /^[0-9a-f-]{36}$/i.test(userId) ? userId : null,
+      source_url: parsedInput.sourceUrl,
+      model: "gemini-2.5-pro",
+      status: "failed",
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: totalTokens,
+      estimated_cost_usd: estimatedCostUsd,
+      latency_ms: Date.now() - startedAt,
+      error_message: "Failed to parse Gemini JSON output",
+      raw_response: geminiJson,
+    });
+    throw new Error("Gemini returned invalid JSON for autofill");
+  }
+
+  await supabase.from("internal_model_ai_usage_logs").insert({
+    workspace_id: workspaceId,
+    actor_user_id: /^[0-9a-f-]{36}$/i.test(userId) ? userId : null,
+    source_url: parsedInput.sourceUrl,
+    model: "gemini-2.5-pro",
+    status: "succeeded",
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    total_tokens: totalTokens,
+    estimated_cost_usd: estimatedCostUsd,
+    latency_ms: Date.now() - startedAt,
+    result_payload: result,
+  });
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_model.autofill.generate",
+    targetType: "provider_model",
+    summary: `Generated provider model draft from URL`,
+    details: {
+      sourceUrl: parsedInput.sourceUrl,
+      model: "gemini-2.5-pro",
+      inputTokens,
+      outputTokens,
+      totalTokens,
+      estimatedCostUsd,
+      upstreamModelSlug: result.upstreamModelSlug,
+    },
+  });
+
+  revalidatePath("/internal");
+  return {
+    ...result,
+    inputSchemaText: JSON.stringify(result.inputSchema ?? {}, null, 2),
+    outputSchemaText: JSON.stringify(result.outputSchema ?? {}, null, 2),
+    executionConfigText: JSON.stringify(result.executionConfig ?? {}, null, 2),
+  };
+}

@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
-import { createProviderModel, createRoutingRule } from "./actions";
+import {
+  createProviderModel,
+  createRoutingRule,
+  generateProviderModelDraftFromUrl,
+} from "./actions";
 import { SubmitButton } from "./submit-button";
 
 type SupportedModelOption = {
@@ -259,12 +263,14 @@ function SchemaFieldEditor({
   name,
   keyName,
   defaultSchemaText,
+  seedSchemaText,
   includeRequired,
   disabled,
 }: {
   name: "inputSchema" | "outputSchema";
   keyName: "params" | "fields";
   defaultSchemaText: string;
+  seedSchemaText?: string;
   includeRequired: boolean;
   disabled: boolean;
 }) {
@@ -289,6 +295,14 @@ function SchemaFieldEditor({
     setOfficialDocUrl(parseOfficialDocUrl(defaultSchemaText));
     setRows(parseSchemaFieldsFromText(defaultSchemaText, keyName));
   }, [defaultSchemaText, keyName]);
+
+  useEffect(() => {
+    if (!seedSchemaText || !seedSchemaText.trim()) {
+      return;
+    }
+    setOfficialDocUrl(parseOfficialDocUrl(seedSchemaText));
+    setRows(parseSchemaFieldsFromText(seedSchemaText, keyName));
+  }, [keyName, seedSchemaText]);
 
   const openCreateEditor = () => {
     setEditingId(null);
@@ -1148,6 +1162,14 @@ export function CreateProviderModelForm({
   const [executionConfigState, setExecutionConfigState] = useState(() =>
     parseExecutionConfigState(defaultExecutionConfig)
   );
+  const [upstreamModelSlug, setUpstreamModelSlug] = useState(defaultUpstreamModelSlug ?? "");
+  const [pricingSourceUrlState, setPricingSourceUrlState] = useState(defaultPricingSourceUrl ?? "");
+  const [pricingSourceNoteState, setPricingSourceNoteState] = useState(defaultPricingSourceNote ?? "");
+  const [autofillSourceUrl, setAutofillSourceUrl] = useState("");
+  const [autofillSummary, setAutofillSummary] = useState("");
+  const [seedInputSchemaText, setSeedInputSchemaText] = useState("");
+  const [seedOutputSchemaText, setSeedOutputSchemaText] = useState("");
+  const [isAutofilling, startAutofillTransition] = useTransition();
   const executionConfigValue = buildExecutionConfigValue(executionConfigState);
   const templateIsAsync =
     executionTemplate === "rest-async-poll-v1" || executionTemplate === "upload-async-poll-v1";
@@ -1178,7 +1200,45 @@ export function CreateProviderModelForm({
     setExecutionTemplate(defaultExecutionTemplate);
     setSelectedPresetId("");
     setExecutionConfigState(parseExecutionConfigState(defaultExecutionConfig));
-  }, [defaultExecutionConfig, defaultExecutionTemplate]);
+    setUpstreamModelSlug(defaultUpstreamModelSlug ?? "");
+    setPricingSourceUrlState(defaultPricingSourceUrl ?? "");
+    setPricingSourceNoteState(defaultPricingSourceNote ?? "");
+    setAutofillSourceUrl("");
+    setAutofillSummary("");
+    setSeedInputSchemaText("");
+    setSeedOutputSchemaText("");
+  }, [
+    defaultExecutionConfig,
+    defaultExecutionTemplate,
+    defaultPricingSourceNote,
+    defaultPricingSourceUrl,
+    defaultUpstreamModelSlug,
+  ]);
+
+  const runAutofillFromUrl = () => {
+    const sourceUrl = autofillSourceUrl.trim();
+    if (!sourceUrl) {
+      toast.error("请先输入文档 URL");
+      return;
+    }
+
+    startAutofillTransition(async () => {
+      try {
+        const result = await generateProviderModelDraftFromUrl({ sourceUrl });
+        setUpstreamModelSlug(result.upstreamModelSlug ?? "");
+        setExecutionTemplate(result.executionTemplate || "rest-async-poll-v1");
+        setExecutionConfigState(parseExecutionConfigState(result.executionConfigText || "{}"));
+        setSeedInputSchemaText(result.inputSchemaText || "{}");
+        setSeedOutputSchemaText(result.outputSchemaText || "{}");
+        setPricingSourceUrlState(result.pricingSourceUrl ?? "");
+        setPricingSourceNoteState(result.pricingSourceNote ?? "");
+        setAutofillSummary(result.summary ?? "");
+        toast.success("已完成自动解析并填充");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "自动填充失败");
+      }
+    });
+  };
 
   return (
     <form
@@ -1275,6 +1335,33 @@ export function CreateProviderModelForm({
           }}
           className="grid gap-3 md:grid-cols-2"
         >
+        <label className="block md:col-span-2">
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">文档 URL 自动填充</span>
+          <div className="flex items-center gap-2">
+            <input
+              value={autofillSourceUrl}
+              onChange={(event) => setAutofillSourceUrl(event.target.value)}
+              placeholder="https://provider-docs.example.com/model-api"
+              disabled={disabled || isAutofilling}
+              className={formInputClassName}
+            />
+            <button
+              type="button"
+              onClick={runAutofillFromUrl}
+              disabled={disabled || isAutofilling}
+              className="inline-flex h-10 shrink-0 cursor-pointer items-center rounded-md bg-black px-3 text-xs font-medium text-white transition-colors hover:bg-black/90 disabled:cursor-not-allowed disabled:bg-black/20 disabled:text-black/45"
+            >
+              {isAutofilling ? "解析中..." : "AI 自动填充"}
+            </button>
+          </div>
+          <FieldHint help="读取文档并自动填充调用协议、入参/出参、示例与来源说明（仅 internal 使用）。" />
+          {autofillSummary ? (
+            <p className="mt-2 rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2.5 py-2 text-xs text-black/65">
+              {autofillSummary}
+            </p>
+          ) : null}
+        </label>
+
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">可售模型</span>
           <select
@@ -1339,7 +1426,8 @@ export function CreateProviderModelForm({
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上游模型标识</span>
           <input
             name="upstreamModelSlug"
-            defaultValue={defaultUpstreamModelSlug}
+            value={upstreamModelSlug}
+            onChange={(event) => setUpstreamModelSlug(event.target.value)}
             placeholder="gemini-2.5-flash-image"
             required
             disabled={disabled}
@@ -1664,7 +1752,8 @@ export function CreateProviderModelForm({
           <input
             name="pricingSourceUrl"
             type="url"
-            defaultValue={defaultPricingSourceUrl}
+            value={pricingSourceUrlState}
+            onChange={(event) => setPricingSourceUrlState(event.target.value)}
             placeholder="https://ai.google.dev/gemini-api/docs/pricing"
             disabled={disabled}
             className={formInputClassName}
@@ -1677,7 +1766,8 @@ export function CreateProviderModelForm({
           <textarea
             name="pricingSourceNote"
             rows={3}
-            defaultValue={defaultPricingSourceNote}
+            value={pricingSourceNoteState}
+            onChange={(event) => setPricingSourceNoteState(event.target.value)}
             disabled={disabled}
             className={formTextAreaClassName}
             placeholder="例如：Google 官方写明 image output 按 $30 / 1M output tokens，1024x1024 约等于 1290 output tokens。"
@@ -1708,6 +1798,7 @@ export function CreateProviderModelForm({
               name="inputSchema"
               keyName="params"
               defaultSchemaText={defaultInputSchema}
+              seedSchemaText={seedInputSchemaText}
               includeRequired
               disabled={disabled}
             />
@@ -1741,6 +1832,7 @@ export function CreateProviderModelForm({
               name="outputSchema"
               keyName="fields"
               defaultSchemaText={defaultOutputSchema}
+              seedSchemaText={seedOutputSchemaText}
               includeRequired={false}
               disabled={disabled}
             />

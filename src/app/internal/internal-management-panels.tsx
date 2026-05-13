@@ -152,6 +152,23 @@ type RoutingRuleSummary = {
   runtimeDiagnostics: string[];
 };
 
+type InternalModelAiUsageLogSummary = {
+  id: string;
+  workspace_id: string | null;
+  actor_user_id: string | null;
+  source_url: string;
+  model: string;
+  status: "succeeded" | "failed";
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  latencyMs: number;
+  error_message: string | null;
+  created_at: string;
+  createdLabel: string;
+};
+
 const formInputClassName =
   "h-10 w-full rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
 
@@ -2416,6 +2433,99 @@ export function ModelsPanel({
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+export function InternalModelAiUsageLogsPanel({
+  logs,
+}: {
+  logs: InternalModelAiUsageLogSummary[];
+}) {
+  const totalCost = logs.reduce((sum, row) => sum + Number(row.estimatedCostUsd ?? 0), 0);
+  const succeeded = logs.filter((row) => row.status === "succeeded").length;
+  const failed = logs.filter((row) => row.status === "failed").length;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-black/[0.08] bg-white p-3">
+          <p className="text-[11px] tracking-[0.35px] text-black/45">总调用次数</p>
+          <p className="mt-1 text-lg font-semibold text-black">{logs.length}</p>
+        </div>
+        <div className="rounded-xl border border-black/[0.08] bg-white p-3">
+          <p className="text-[11px] tracking-[0.35px] text-black/45">成功 / 失败</p>
+          <p className="mt-1 text-lg font-semibold text-black">{succeeded} / {failed}</p>
+        </div>
+        <div className="rounded-xl border border-black/[0.08] bg-white p-3">
+          <p className="text-[11px] tracking-[0.35px] text-black/45">估算成本（USD）</p>
+          <p className="mt-1 text-lg font-semibold text-black">${totalCost.toFixed(6)}</p>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+        <table className="min-w-[1180px] border-separate border-spacing-0 text-left text-sm">
+          <thead>
+            <tr className="text-xs text-black/50">
+              <th className="border-b border-black/[0.08] px-3 py-2.5">时间</th>
+              <th className="border-b border-black/[0.08] px-3 py-2.5">状态</th>
+              <th className="border-b border-black/[0.08] px-3 py-2.5">模型</th>
+              <th className="border-b border-black/[0.08] px-3 py-2.5">来源 URL</th>
+              <th className="border-b border-black/[0.08] px-3 py-2.5">Tokens (In/Out/Total)</th>
+              <th className="border-b border-black/[0.08] px-3 py-2.5">延迟</th>
+              <th className="border-b border-black/[0.08] px-3 py-2.5">估算成本</th>
+              <th className="border-b border-black/[0.08] px-3 py-2.5">错误信息</th>
+            </tr>
+          </thead>
+          <tbody>
+            {logs.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-3 py-8 text-center text-sm text-black/45">
+                  暂无 AI 功能消费记录
+                </td>
+              </tr>
+            ) : (
+              logs.map((row) => (
+                <tr key={row.id}>
+                  <td className="border-b border-black/[0.06] px-3 py-2.5 text-xs text-black/65">{row.createdLabel}</td>
+                  <td className="border-b border-black/[0.06] px-3 py-2.5">
+                    <span
+                      className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
+                        row.status === "succeeded"
+                          ? "border-[#D7EADB] bg-[#EDF8F0] text-[#335D2D]"
+                          : "border-[#F1D2CC] bg-[#FFF7F5] text-[#8D4336]"
+                      }`}
+                    >
+                      {row.status === "succeeded" ? "成功" : "失败"}
+                    </span>
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-2.5 text-xs text-black/65">{row.model}</td>
+                  <td className="max-w-[360px] border-b border-black/[0.06] px-3 py-2.5">
+                    <a
+                      href={row.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="line-clamp-2 text-xs text-[#355fb4] underline-offset-2 hover:underline"
+                    >
+                      {row.source_url}
+                    </a>
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-2.5 font-mono text-xs text-black/65">
+                    {row.inputTokens} / {row.outputTokens} / {row.totalTokens}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-2.5 text-xs text-black/65">{row.latencyMs} ms</td>
+                  <td className="border-b border-black/[0.06] px-3 py-2.5 text-xs text-black/65">
+                    ${Number(row.estimatedCostUsd ?? 0).toFixed(6)}
+                  </td>
+                  <td className="max-w-[340px] border-b border-black/[0.06] px-3 py-2.5 text-xs text-[#8D4336]">
+                    {row.error_message ?? "-"}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

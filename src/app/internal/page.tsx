@@ -22,6 +22,7 @@ import {
   CreateSupportedModelButton,
   CreateRoutingRuleButton,
   ModelVendorsPanel,
+  InternalModelAiUsageLogsPanel,
   ProvidersPanel,
   PublicModelsPanel,
   RoutesPanel,
@@ -49,6 +50,12 @@ const tabs = [
     group: "overview",
     label: "视频模型操作手册",
     description: "新增视频模型的标准上线流程与验收清单。",
+  },
+  {
+    key: "internal-model-ai-usage-logs",
+    group: "overview",
+    label: "内部模型录入 AI 功能使用消费记录",
+    description: "记录 URL 自动填充能力的调用、token 与估算成本。",
   },
   {
     key: "worker-templates",
@@ -974,6 +981,8 @@ export default async function InternalPage({
             ? modelVendorCount
             : tab.key === "worker-templates"
               ? workerTemplateCount
+            : tab.key === "internal-model-ai-usage-logs"
+              ? data.internalModelAiUsageLogs.length
             : tab.key === "routes"
                 ? data.metrics.activeRoutes
               : undefined,
@@ -1225,6 +1234,18 @@ export default async function InternalPage({
                 />
               </SectionShell>
             </>
+          ) : null}
+
+          {activeTab === "internal-model-ai-usage-logs" ? (
+            <section>
+              <SectionShell
+                id="internal-model-ai-usage-logs-panel"
+                title="内部模型录入 AI 功能使用消费记录"
+                description="仅 internal 使用：记录文档 URL 自动解析的调用轨迹、token 与估算成本。"
+              >
+                <InternalModelAiUsageLogsPanel logs={data.internalModelAiUsageLogs} />
+              </SectionShell>
+            </section>
           ) : null}
 
           {activeTab === "image-model-playbook" ? (
