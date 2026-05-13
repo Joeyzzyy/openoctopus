@@ -2751,28 +2751,28 @@ function stripHtmlToText(input: string) {
     .trim();
 }
 
-function estimateGeminiCostUsd(inputTokens: number, outputTokens: number) {
-  const inputRatePerMillion = 1.25;
-  const outputRatePerMillion = 10;
+function estimateDeepSeekCostUsd(inputTokens: number, outputTokens: number) {
+  const inputRatePerMillion = 0.27;
+  const outputRatePerMillion = 1.1;
   const inputCost = (Math.max(0, inputTokens) / 1_000_000) * inputRatePerMillion;
   const outputCost = (Math.max(0, outputTokens) / 1_000_000) * outputRatePerMillion;
   return Number((inputCost + outputCost).toFixed(8));
 }
 
-function formatGeminiNetworkError(error: unknown) {
+function formatDeepSeekNetworkError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? "unknown");
   const lower = message.toLowerCase();
 
   if (lower.includes("connect timeout") || lower.includes("timeout")) {
-    return "Gemini network timeout: 与 Google API 建立连接超时，请检查本机/服务器外网连通性或代理设置后重试。";
+    return "DeepSeek network timeout: 与 DeepSeek API 建立连接超时，请检查本机/服务器外网连通性或代理设置后重试。";
   }
   if (lower.includes("enotfound") || lower.includes("dns")) {
-    return "Gemini DNS error: 无法解析 Google API 域名，请检查 DNS 或网络环境。";
+    return "DeepSeek DNS error: 无法解析 DeepSeek API 域名，请检查 DNS 或网络环境。";
   }
   if (lower.includes("fetch failed")) {
-    return "Gemini network failed: 当前环境无法访问 Google API（可能是网络受限/被墙/代理未配置）。";
+    return "DeepSeek network failed: 当前环境无法访问 DeepSeek API（可能是网络受限/代理未配置）。";
   }
-  return `Gemini request failed: ${message}`;
+  return `DeepSeek request failed: ${message}`;
 }
 
 function resolveProxyUrl() {
@@ -2785,7 +2785,7 @@ function resolveProxyUrl() {
   );
 }
 
-function ensureProxyEnvForGemini() {
+function ensureProxyEnvForDeepSeek() {
   const proxyUrl = resolveProxyUrl();
   if (!process.env.HTTPS_PROXY && proxyUrl) {
     process.env.HTTPS_PROXY = proxyUrl;
@@ -2863,11 +2863,11 @@ export async function generateProviderModelDraftFromSource(input: {
 
   try {
     const parsedInput = providerModelAutofillSchema.parse(input);
-    const apiKey = process.env.INTERNAL_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
-    ensureProxyEnvForGemini();
+    const apiKey = process.env.INTERNAL_DEEPSEEK_API_KEY ?? process.env.DEEPSEEK_API_KEY;
+    ensureProxyEnvForDeepSeek();
 
     if (!apiKey) {
-      return { ok: false as const, error: "Missing INTERNAL_GEMINI_API_KEY" };
+      return { ok: false as const, error: "Missing INTERNAL_DEEPSEEK_API_KEY" };
     }
     const compactSourceText = stripHtmlToText(parsedInput.sourceText).slice(0, 120_000);
     const sourceLabel = parsedInput.sourceLabel?.trim() || "manual://pasted-content";
@@ -2890,36 +2890,30 @@ export async function generateProviderModelDraftFromSource(input: {
       compactSourceText,
     ].join("\n");
 
-    let geminiRes: Response;
+    let deepseekRes: Response;
     try {
-      geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${encodeURIComponent(apiKey)}`,
+      deepseekRes = await fetch(
+        "https://api.deepseek.com/chat/completions",
         {
           method: "POST",
           headers: {
+            authorization: `Bearer ${apiKey}`,
             "content-type": "application/json",
           },
           body: JSON.stringify({
-            generationConfig: {
-              temperature: 0.1,
-              responseMimeType: "application/json",
-            },
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: prompt }],
-              },
-            ],
+            model: "deepseek-chat",
+            temperature: 0.1,
+            messages: [{ role: "user", content: prompt }],
           }),
         }
       );
     } catch (error) {
-      const msg = formatGeminiNetworkError(error);
+      const msg = formatDeepSeekNetworkError(error);
       await supabase.from("internal_model_ai_usage_logs").insert({
         workspace_id: workspaceId,
         actor_user_id: actorUserId,
         source_url: sourceLabel,
-        model: "gemini-2.5-pro",
+        model: "deepseek-chat",
         status: "failed",
         input_tokens: 0,
         output_tokens: 0,
@@ -2931,50 +2925,47 @@ export async function generateProviderModelDraftFromSource(input: {
       return { ok: false as const, error: msg };
     }
 
-    const geminiJson = (await geminiRes.json()) as Record<string, unknown>;
-    const usage = (geminiJson.usageMetadata ?? {}) as Record<string, unknown>;
-    const inputTokens = Number(usage.promptTokenCount ?? usage.inputTokenCount ?? 0);
-    const outputTokens = Number(usage.candidatesTokenCount ?? usage.outputTokenCount ?? 0);
-    const totalTokens = Number(usage.totalTokenCount ?? inputTokens + outputTokens);
-    const estimatedCostUsd = estimateGeminiCostUsd(inputTokens, outputTokens);
+    const deepseekJson = (await deepseekRes.json()) as Record<string, unknown>;
+    const usage = (deepseekJson.usage ?? {}) as Record<string, unknown>;
+    const inputTokens = Number(usage.prompt_tokens ?? 0);
+    const outputTokens = Number(usage.completion_tokens ?? 0);
+    const totalTokens = Number(usage.total_tokens ?? inputTokens + outputTokens);
+    const estimatedCostUsd = estimateDeepSeekCostUsd(inputTokens, outputTokens);
 
-    const candidates = Array.isArray(geminiJson.candidates)
-      ? (geminiJson.candidates as Array<Record<string, unknown>>)
+    const choices = Array.isArray(deepseekJson.choices)
+      ? (deepseekJson.choices as Array<Record<string, unknown>>)
       : [];
-    const text = candidates[0]?.content &&
-      typeof candidates[0].content === "object" &&
-      !Array.isArray(candidates[0].content)
+    const text = choices[0]?.message &&
+      typeof choices[0].message === "object" &&
+      !Array.isArray(choices[0].message)
         ? (() => {
-            const parts = (candidates[0].content as Record<string, unknown>).parts;
-            if (!Array.isArray(parts)) return "";
-            const first = parts[0];
-            if (!first || typeof first !== "object" || Array.isArray(first)) return "";
-            return typeof (first as Record<string, unknown>).text === "string"
-              ? ((first as Record<string, unknown>).text as string)
+            const content = (choices[0].message as Record<string, unknown>).content;
+            return typeof content === "string"
+              ? content
               : "";
           })()
         : "";
 
-    if (!geminiRes.ok) {
+    if (!deepseekRes.ok) {
       const errorMessage =
-        typeof (geminiJson.error as Record<string, unknown> | undefined)?.message === "string"
-          ? ((geminiJson.error as Record<string, unknown>).message as string)
-          : `Gemini request failed with ${geminiRes.status}`;
+        typeof ((deepseekJson.error as Record<string, unknown> | undefined)?.message) === "string"
+          ? ((deepseekJson.error as Record<string, unknown>).message as string)
+          : `DeepSeek request failed with ${deepseekRes.status}`;
       const detailedError =
-        geminiRes.status === 400
-          ? `Gemini 400: 请求参数错误。${errorMessage}`
-          : geminiRes.status === 401 || geminiRes.status === 403
-            ? `Gemini 鉴权失败（${geminiRes.status}）：请检查 INTERNAL_GEMINI_API_KEY 是否正确、是否有权限访问 gemini-2.5-pro。`
-            : geminiRes.status === 429
-              ? `Gemini 限流（429）：当前请求频率或配额超限，请稍后重试。`
-              : geminiRes.status >= 500
-                ? `Gemini 服务异常（${geminiRes.status}）：上游暂时不可用，请稍后重试。`
-                : `Gemini 请求失败（${geminiRes.status}）：${errorMessage}`;
+        deepseekRes.status === 400
+          ? `DeepSeek 400: 请求参数错误。${errorMessage}`
+          : deepseekRes.status === 401 || deepseekRes.status === 403
+            ? `DeepSeek 鉴权失败（${deepseekRes.status}）：请检查 INTERNAL_DEEPSEEK_API_KEY 是否正确。`
+            : deepseekRes.status === 429
+              ? `DeepSeek 限流（429）：当前请求频率或配额超限，请稍后重试。`
+              : deepseekRes.status >= 500
+                ? `DeepSeek 服务异常（${deepseekRes.status}）：上游暂时不可用，请稍后重试。`
+                : `DeepSeek 请求失败（${deepseekRes.status}）：${errorMessage}`;
       await supabase.from("internal_model_ai_usage_logs").insert({
         workspace_id: workspaceId,
         actor_user_id: actorUserId,
         source_url: sourceLabel,
-        model: "gemini-2.5-pro",
+        model: "deepseek-chat",
         status: "failed",
         input_tokens: inputTokens,
         output_tokens: outputTokens,
@@ -2998,19 +2989,19 @@ export async function generateProviderModelDraftFromSource(input: {
         workspace_id: workspaceId,
         actor_user_id: actorUserId,
         source_url: sourceLabel,
-        model: "gemini-2.5-pro",
+        model: "deepseek-chat",
         status: "failed",
         input_tokens: inputTokens,
         output_tokens: outputTokens,
         total_tokens: totalTokens,
         estimated_cost_usd: estimatedCostUsd,
         latency_ms: Date.now() - startedAt,
-        error_message: "Failed to parse Gemini JSON output",
-        raw_response: geminiJson,
+        error_message: "Failed to parse DeepSeek JSON output",
+        raw_response: deepseekJson,
       });
       return {
         ok: false as const,
-        error: "Gemini 返回内容不是可解析 JSON。请重试，或减少粘贴内容长度后再试。",
+        error: "DeepSeek 返回内容不是可解析 JSON。请重试，或减少粘贴内容长度后再试。",
       };
     }
 
@@ -3018,7 +3009,7 @@ export async function generateProviderModelDraftFromSource(input: {
       workspace_id: workspaceId,
       actor_user_id: actorUserId,
       source_url: sourceLabel,
-      model: "gemini-2.5-pro",
+      model: "deepseek-chat",
       status: "succeeded",
       input_tokens: inputTokens,
       output_tokens: outputTokens,
@@ -3034,10 +3025,10 @@ export async function generateProviderModelDraftFromSource(input: {
       workspaceId,
       action: "provider_model.autofill.generate",
       targetType: "provider_model",
-      summary: `Generated provider model draft from URL`,
+      summary: `Generated provider model draft from pasted doc`,
       details: {
         sourceLabel,
-        model: "gemini-2.5-pro",
+        model: "deepseek-chat",
         inputTokens,
         outputTokens,
         totalTokens,
