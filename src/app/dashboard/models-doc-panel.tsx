@@ -17,14 +17,10 @@ type ModelRow = {
   outputSchemaText: string;
   officialDocUrl: string | null;
   executionConfigText: string;
-  flowMode: string | null;
-  statusLifecycle: string | null;
-  recommendedPollIntervalSeconds: number | null;
   requestExampleJson: string | null;
   submitResponseExampleJson: string | null;
   pollProcessingExampleJson: string | null;
   pollCompletedExampleJson: string | null;
-  pollFailedExampleJson: string | null;
   normalizedOutputExampleJson: string | null;
 };
 

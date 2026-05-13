@@ -13,14 +13,10 @@ type ModelDocItem = {
   outputSchemaText: string;
   officialDocUrl: string | null;
   executionConfigText: string;
-  flowMode: string | null;
-  statusLifecycle: string | null;
-  recommendedPollIntervalSeconds: number | null;
   requestExampleJson: string | null;
   submitResponseExampleJson: string | null;
   pollProcessingExampleJson: string | null;
   pollCompletedExampleJson: string | null;
-  pollFailedExampleJson: string | null;
   normalizedOutputExampleJson: string | null;
 };
 
@@ -289,14 +285,10 @@ export function ApiQuickstartCard({
             outputSchemaText: "{}",
             officialDocUrl: null,
             executionConfigText: "{}",
-            flowMode: null,
-            statusLifecycle: null,
-            recommendedPollIntervalSeconds: null,
             requestExampleJson: null,
             submitResponseExampleJson: null,
             pollProcessingExampleJson: null,
             pollCompletedExampleJson: null,
-            pollFailedExampleJson: null,
             normalizedOutputExampleJson: null,
           },
         ];
@@ -328,12 +320,15 @@ export function ApiQuickstartCard({
   const outputFieldDocs = extractFieldDocs(providerOutputSchema, "fields");
   const createExamples = buildCreateExamples(selectedModel?.publicModel ?? fallbackModel, capability);
   const taskExample = buildTaskStatusCurl();
-  const flowModeLabel =
-    selectedModel?.flowMode === "sync"
+  const executionConfig = safeParseJsonObject(selectedModel?.executionConfigText);
+  const protocolModeRaw =
+    typeof executionConfig.mode === "string" ? executionConfig.mode.trim().toLowerCase() : "";
+  const protocolModeLabel =
+    protocolModeRaw === "sync"
       ? "Synchronous"
-      : selectedModel?.flowMode === "webhook"
-        ? "Webhook"
-        : "Asynchronous Polling";
+      : protocolModeRaw === "async"
+        ? "Asynchronous Polling"
+        : "Auto";
 
   const [copiedBlock, setCopiedBlock] = useState<string | null>(null);
 
@@ -417,21 +412,11 @@ export function ApiQuickstartCard({
           <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
             <p className="text-[10px] uppercase tracking-[1px] text-black/45">How This Flow Works</p>
             <ol className="mt-2 space-y-1.5 text-xs leading-5 text-black/70">
-              <li>1. Request style: <code className="font-mono">{flowModeLabel}</code></li>
+              <li>1. Request style: <code className="font-mono">{protocolModeLabel}</code></li>
               <li>2. Send Create Request with your API key and selected model input.</li>
-              <li>
-                3. Poll task status until completion
-                {selectedModel?.recommendedPollIntervalSeconds
-                  ? ` (every ${selectedModel.recommendedPollIntervalSeconds}s)`
-                  : ""}.
-              </li>
+              <li>3. Poll task status until completion.</li>
               <li>4. Parse the unified output payload for image/video asset URLs.</li>
             </ol>
-            {selectedModel?.statusLifecycle ? (
-              <p className="mt-2 text-xs text-black/60">
-                Status lifecycle: <code className="font-mono">{selectedModel.statusLifecycle}</code>
-              </p>
-            ) : null}
           </div>
 
           <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
@@ -526,19 +511,6 @@ export function ApiQuickstartCard({
                 <CodeBlock
                   code={selectedModel.pollProcessingExampleJson}
                   copyId="doc-poll-processing-example"
-                  copiedBlock={copiedBlock}
-                  onCopy={copyText}
-                />
-              </div>
-            </div>
-          ) : null}
-          {selectedModel?.pollFailedExampleJson ? (
-            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Poll Failed Example</p>
-              <div className="mt-3">
-                <CodeBlock
-                  code={selectedModel.pollFailedExampleJson}
-                  copyId="doc-poll-failed-example"
                   copiedBlock={copiedBlock}
                   onCopy={copyText}
                 />

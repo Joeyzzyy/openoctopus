@@ -138,14 +138,10 @@ export type DashboardData = {
     outputSchemaText: string;
     officialDocUrl: string | null;
     executionConfigText: string;
-    flowMode: string | null;
-    statusLifecycle: string | null;
-    recommendedPollIntervalSeconds: number | null;
     requestExampleJson: string | null;
     submitResponseExampleJson: string | null;
     pollProcessingExampleJson: string | null;
     pollCompletedExampleJson: string | null;
-    pollFailedExampleJson: string | null;
     normalizedOutputExampleJson: string | null;
   }>;
   requestFilters: {
@@ -749,36 +745,6 @@ export async function getDashboardData({
             typeof (primaryProviderModel.input_schema as Record<string, unknown>).officialDocUrl === "string"
               ? ((primaryProviderModel.input_schema as Record<string, unknown>).officialDocUrl as string)
               : null,
-          flowMode:
-            primaryProviderModel?.execution_config &&
-            typeof primaryProviderModel.execution_config === "object" &&
-            !Array.isArray(primaryProviderModel.execution_config) &&
-            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
-            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
-            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
-            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).flowMode === "string"
-              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).flowMode as string)
-              : null,
-          statusLifecycle:
-            primaryProviderModel?.execution_config &&
-            typeof primaryProviderModel.execution_config === "object" &&
-            !Array.isArray(primaryProviderModel.execution_config) &&
-            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
-            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
-            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
-            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).statusLifecycle === "string"
-              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).statusLifecycle as string)
-              : null,
-          recommendedPollIntervalSeconds:
-            primaryProviderModel?.execution_config &&
-            typeof primaryProviderModel.execution_config === "object" &&
-            !Array.isArray(primaryProviderModel.execution_config) &&
-            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
-            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
-            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
-            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).recommendedPollIntervalSeconds === "number"
-              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).recommendedPollIntervalSeconds as number)
-              : null,
           requestExampleJson:
             primaryProviderModel?.execution_config &&
             typeof primaryProviderModel.execution_config === "object" &&
@@ -818,16 +784,6 @@ export async function getDashboardData({
             !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
             typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollCompletedExampleJson === "string"
               ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollCompletedExampleJson as string)
-              : null,
-          pollFailedExampleJson:
-            primaryProviderModel?.execution_config &&
-            typeof primaryProviderModel.execution_config === "object" &&
-            !Array.isArray(primaryProviderModel.execution_config) &&
-            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
-            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
-            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
-            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollFailedExampleJson === "string"
-              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollFailedExampleJson as string)
               : null,
           normalizedOutputExampleJson:
             primaryProviderModel?.execution_config &&
