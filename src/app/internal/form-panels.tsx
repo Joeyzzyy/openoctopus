@@ -735,6 +735,38 @@ export function BillingConfigEditor({
 }) {
   const [state, setState] = useState(() => parseBillingFormState(initialValue));
   const hiddenValue = buildBillingConfigValue(state);
+  const inputMethod = state.chargeInputTokens
+    ? "input_tokens"
+    : state.chargePerRequest
+      ? "per_request"
+      : "none";
+  const outputMethod = state.chargeOutputTokens
+    ? "output_tokens"
+    : state.chargePerImage
+      ? "per_image"
+      : state.chargePerVideo
+        ? "per_video"
+        : state.chargePerSecond
+          ? "per_second"
+          : "none";
+
+  const applyInputMethod = (method: string) => {
+    setState((current) => ({
+      ...current,
+      chargeInputTokens: method === "input_tokens",
+      chargePerRequest: method === "per_request",
+    }));
+  };
+
+  const applyOutputMethod = (method: string) => {
+    setState((current) => ({
+      ...current,
+      chargeOutputTokens: method === "output_tokens",
+      chargePerImage: method === "per_image",
+      chargePerVideo: method === "per_video",
+      chargePerSecond: method === "per_second",
+    }));
+  };
 
   return (
     <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
@@ -756,81 +788,79 @@ export function BillingConfigEditor({
         </label>
 
         <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-          <p className="text-[11px] tracking-[0.35px] text-black/45">计费组件</p>
-          <div className="mt-2 grid gap-2 md:grid-cols-3">
-            {[
-              ["chargePerRequest", "按请求"],
-              ["chargePerImage", "按图片"],
-              ["chargePerVideo", "按视频"],
-              ["chargePerSecond", "按秒"],
-              ["chargeInputTokens", "输入 Token"],
-              ["chargeOutputTokens", "输出 Token"],
-            ].map(([key, label]) => (
-              <label
-                key={key}
-                className="flex items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 py-2 text-sm text-black/72"
+          <p className="text-[11px] tracking-[0.35px] text-black/45">成本计费维度</p>
+          <div className="mt-2 grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-black/[0.08] bg-white p-2.5">
+              <p className="mb-2 text-[11px] font-medium text-black/55">输入成本</p>
+              <select
+                value={inputMethod}
+                onChange={(event) => applyInputMethod(event.target.value)}
+                className={formSelectClassName}
               >
-                <input
-                  type="checkbox"
-                  checked={Boolean(state[key as keyof BillingFormState])}
-                  onChange={(event) =>
-                    setState((current) => ({
-                      ...current,
-                      [key]: event.target.checked,
-                    }))
-                  }
-                  className="size-4 rounded border-black/20 bg-white accent-black"
-                />
-                {label}
-              </label>
-            ))}
+                <option value="none">不计费</option>
+                <option value="per_request">按请求</option>
+                <option value="input_tokens">按输入 Token（每百万）</option>
+              </select>
+            </div>
+            <div className="rounded-lg border border-black/[0.08] bg-white p-2.5">
+              <p className="mb-2 text-[11px] font-medium text-black/55">输出成本</p>
+              <select
+                value={outputMethod}
+                onChange={(event) => applyOutputMethod(event.target.value)}
+                className={formSelectClassName}
+              >
+                <option value="none">不计费</option>
+                <option value="per_image">按图片</option>
+                <option value="per_video">按视频</option>
+                <option value="per_second">按秒</option>
+                <option value="output_tokens">按输出 Token（每百万）</option>
+              </select>
+            </div>
           </div>
           <FieldHint help={componentHint} />
         </div>
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
-        {state.chargePerRequest ? (
+        {inputMethod === "per_request" ? (
           <BillingNumberField
-            label="每次请求成本"
+            label="输入成本金额（每次请求）"
             value={state.costPerRequest}
             onChange={(value) => setState((current) => ({ ...current, costPerRequest: value }))}
           />
         ) : null}
-        {state.chargePerImage ? (
+        {inputMethod === "input_tokens" ? (
           <BillingNumberField
-            label="每张图片成本"
+            label="输入成本金额（每百万输入 Token）"
+            value={state.inputCostPerMillion}
+            onChange={(value) => setState((current) => ({ ...current, inputCostPerMillion: value }))}
+          />
+        ) : null}
+        {outputMethod === "per_image" ? (
+          <BillingNumberField
+            label="输出成本金额（每张图片）"
             value={state.costPerImage}
             onChange={(value) => setState((current) => ({ ...current, costPerImage: value }))}
           />
         ) : null}
-        {state.chargePerVideo ? (
+        {outputMethod === "per_video" ? (
           <BillingNumberField
-            label="每个视频成本"
+            label="输出成本金额（每个视频）"
             value={state.costPerVideo}
             onChange={(value) => setState((current) => ({ ...current, costPerVideo: value }))}
           />
         ) : null}
-        {state.chargePerSecond ? (
+        {outputMethod === "per_second" ? (
           <BillingNumberField
-            label="每秒成本"
+            label="输出成本金额（每秒）"
             value={state.costPerSecond}
             onChange={(value) => setState((current) => ({ ...current, costPerSecond: value }))}
             help="后台任务会从请求参数或供应商返回结果中读取时长。"
           />
         ) : null}
-        {state.chargeInputTokens ? (
-          <>
-            <BillingNumberField
-              label="每百万输入 Token 成本"
-              value={state.inputCostPerMillion}
-              onChange={(value) => setState((current) => ({ ...current, inputCostPerMillion: value }))}
-            />
-          </>
-        ) : null}
-        {state.chargeOutputTokens ? (
+        {outputMethod === "output_tokens" ? (
           <BillingNumberField
-            label="每百万输出 Token 成本"
+            label="输出成本金额（每百万输出 Token）"
             value={state.outputCostPerMillion}
             onChange={(value) => setState((current) => ({ ...current, outputCostPerMillion: value }))}
           />
