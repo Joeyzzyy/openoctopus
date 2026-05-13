@@ -71,6 +71,16 @@ type ExecutionConfigFormState = {
   statusPath: string;
   resultUrlPath: string;
   submitBodyTemplate: string;
+  docFlowMode: string;
+  docStatusLifecycle: string;
+  docRecommendedPollIntervalSeconds: string;
+  docRequestExampleJson: string;
+  docSubmitResponseExampleJson: string;
+  docPollProcessingExampleJson: string;
+  docPollCompletedExampleJson: string;
+  docPollFailedExampleJson: string;
+  docNormalizedOutputExampleJson: string;
+  docErrorPlaybookText: string;
 };
 
 type SchemaFieldState = {
@@ -96,8 +106,18 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
       resultMimeType: "image/png",
       authType: "query",
       authQueryParam: "key",
-      submitBodyTemplate:
+    submitBodyTemplate:
         '{\n  "contents": [\n    {\n      "parts": [\n        {\n          "text": "{{prompt}}"\n        }\n      ]\n    }\n  ],\n  "generationConfig": {\n    "responseModalities": ["IMAGE"]\n  }\n}',
+      docFlowMode: "async_poll",
+      docStatusLifecycle: "",
+      docRecommendedPollIntervalSeconds: "",
+      docRequestExampleJson: "",
+      docSubmitResponseExampleJson: "",
+      docPollProcessingExampleJson: "",
+      docPollCompletedExampleJson: "",
+      docPollFailedExampleJson: "",
+      docNormalizedOutputExampleJson: "",
+      docErrorPlaybookText: "",
     };
   }
   if (slug === "upload-async-poll-v1") {
@@ -110,6 +130,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
       resultUrlPath: "response.outputUrl",
       resultValueType: "url",
       resultMimeType: "image/png",
+      docFlowMode: "async_poll",
     };
   }
   return {
@@ -121,6 +142,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
     resultUrlPath: "response.outputUrl",
     resultValueType: "url",
     resultMimeType: "image/png",
+    docFlowMode: "async_poll",
   };
 }
 
@@ -733,6 +755,16 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
     statusPath: "done",
     resultUrlPath: "response.outputUrl",
     submitBodyTemplate: "",
+    docFlowMode: "async_poll",
+    docStatusLifecycle: "",
+    docRecommendedPollIntervalSeconds: "",
+    docRequestExampleJson: "",
+    docSubmitResponseExampleJson: "",
+    docPollProcessingExampleJson: "",
+    docPollCompletedExampleJson: "",
+    docPollFailedExampleJson: "",
+    docNormalizedOutputExampleJson: "",
+    docErrorPlaybookText: "",
   };
 
   if (!initialValue) {
@@ -798,6 +830,46 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
               !Array.isArray(parsed.submitBodyTemplate)
             ? JSON.stringify(parsed.submitBodyTemplate, null, 2)
             : fallback.submitBodyTemplate,
+      docFlowMode:
+        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).flowMode === "string"
+          ? ((parsed.doc as Record<string, unknown>).flowMode as string)
+          : fallback.docFlowMode,
+      docStatusLifecycle:
+        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).statusLifecycle === "string"
+          ? ((parsed.doc as Record<string, unknown>).statusLifecycle as string)
+          : fallback.docStatusLifecycle,
+      docRecommendedPollIntervalSeconds:
+        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && (parsed.doc as Record<string, unknown>).recommendedPollIntervalSeconds !== undefined
+          ? String((parsed.doc as Record<string, unknown>).recommendedPollIntervalSeconds ?? "")
+          : fallback.docRecommendedPollIntervalSeconds,
+      docRequestExampleJson:
+        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).requestExampleJson === "string"
+          ? ((parsed.doc as Record<string, unknown>).requestExampleJson as string)
+          : fallback.docRequestExampleJson,
+      docSubmitResponseExampleJson:
+        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).submitResponseExampleJson === "string"
+          ? ((parsed.doc as Record<string, unknown>).submitResponseExampleJson as string)
+          : fallback.docSubmitResponseExampleJson,
+      docPollProcessingExampleJson:
+        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).pollProcessingExampleJson === "string"
+          ? ((parsed.doc as Record<string, unknown>).pollProcessingExampleJson as string)
+          : fallback.docPollProcessingExampleJson,
+      docPollCompletedExampleJson:
+        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).pollCompletedExampleJson === "string"
+          ? ((parsed.doc as Record<string, unknown>).pollCompletedExampleJson as string)
+          : fallback.docPollCompletedExampleJson,
+      docPollFailedExampleJson:
+        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).pollFailedExampleJson === "string"
+          ? ((parsed.doc as Record<string, unknown>).pollFailedExampleJson as string)
+          : fallback.docPollFailedExampleJson,
+      docNormalizedOutputExampleJson:
+        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).normalizedOutputExampleJson === "string"
+          ? ((parsed.doc as Record<string, unknown>).normalizedOutputExampleJson as string)
+          : fallback.docNormalizedOutputExampleJson,
+      docErrorPlaybookText:
+        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).errorPlaybookText === "string"
+          ? ((parsed.doc as Record<string, unknown>).errorPlaybookText as string)
+          : fallback.docErrorPlaybookText,
     };
   } catch {
     return fallback;
@@ -831,6 +903,21 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
       result.submitBodyTemplate = submitBodyTemplateText;
     }
   }
+  const doc: Record<string, unknown> = {
+    flowMode: state.docFlowMode.trim() || "async_poll",
+    statusLifecycle: state.docStatusLifecycle.trim() || undefined,
+    requestExampleJson: state.docRequestExampleJson.trim() || undefined,
+    submitResponseExampleJson: state.docSubmitResponseExampleJson.trim() || undefined,
+    pollProcessingExampleJson: state.docPollProcessingExampleJson.trim() || undefined,
+    pollCompletedExampleJson: state.docPollCompletedExampleJson.trim() || undefined,
+    pollFailedExampleJson: state.docPollFailedExampleJson.trim() || undefined,
+    normalizedOutputExampleJson: state.docNormalizedOutputExampleJson.trim() || undefined,
+    errorPlaybookText: state.docErrorPlaybookText.trim() || undefined,
+  };
+  if (state.docRecommendedPollIntervalSeconds.trim()) {
+    doc.recommendedPollIntervalSeconds = Number(state.docRecommendedPollIntervalSeconds);
+  }
+  result.doc = doc;
   return JSON.stringify(result);
 }
 
@@ -1563,6 +1650,126 @@ export function CreateProviderModelForm({
                 <code className="mt-1 block break-all text-xs leading-5 text-black/55">
                   {executionConfigValue}
                 </code>
+              </div>
+              <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3 md:col-span-2">
+                <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">文档增强配置（用于 Dashboard API Quickstart）</p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">流程模式</span>
+                    <select
+                      value={executionConfigState.docFlowMode}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({ ...current, docFlowMode: event.target.value }))
+                      }
+                      disabled={disabled}
+                      className={formSelectClassName}
+                    >
+                      <option value="async_poll">异步轮询</option>
+                      <option value="sync">同步返回</option>
+                      <option value="webhook">Webhook</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">建议轮询间隔（秒）</span>
+                    <input
+                      value={executionConfigState.docRecommendedPollIntervalSeconds}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          docRecommendedPollIntervalSeconds: event.target.value,
+                        }))
+                      }
+                      disabled={disabled}
+                      className={formInputClassName}
+                      placeholder="2"
+                    />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">状态流转说明</span>
+                    <input
+                      value={executionConfigState.docStatusLifecycle}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({ ...current, docStatusLifecycle: event.target.value }))
+                      }
+                      disabled={disabled}
+                      className={formInputClassName}
+                      placeholder="pending -> processing -> completed | failed"
+                    />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">请求示例 JSON</span>
+                    <textarea
+                      value={executionConfigState.docRequestExampleJson}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({ ...current, docRequestExampleJson: event.target.value }))
+                      }
+                      disabled={disabled}
+                      className={formTextAreaClassName}
+                      rows={5}
+                    />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提交响应示例 JSON</span>
+                    <textarea
+                      value={executionConfigState.docSubmitResponseExampleJson}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          docSubmitResponseExampleJson: event.target.value,
+                        }))
+                      }
+                      disabled={disabled}
+                      className={formTextAreaClassName}
+                      rows={4}
+                    />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">轮询完成示例 JSON</span>
+                    <textarea
+                      value={executionConfigState.docPollCompletedExampleJson}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          docPollCompletedExampleJson: event.target.value,
+                        }))
+                      }
+                      disabled={disabled}
+                      className={formTextAreaClassName}
+                      rows={4}
+                    />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">统一输出示例 JSON</span>
+                    <textarea
+                      value={executionConfigState.docNormalizedOutputExampleJson}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          docNormalizedOutputExampleJson: event.target.value,
+                        }))
+                      }
+                      disabled={disabled}
+                      className={formTextAreaClassName}
+                      rows={4}
+                    />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">错误处理说明</span>
+                    <textarea
+                      value={executionConfigState.docErrorPlaybookText}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          docErrorPlaybookText: event.target.value,
+                        }))
+                      }
+                      disabled={disabled}
+                      className={formTextAreaClassName}
+                      rows={5}
+                      placeholder="429: Retry with exponential backoff..."
+                    />
+                  </label>
+                </div>
               </div>
             </div>
           </div>

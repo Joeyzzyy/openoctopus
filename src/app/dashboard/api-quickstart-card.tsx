@@ -12,6 +12,17 @@ type ModelDocItem = {
   inputSchemaText: string;
   outputSchemaText: string;
   officialDocUrl: string | null;
+  executionConfigText: string;
+  flowMode: string | null;
+  statusLifecycle: string | null;
+  recommendedPollIntervalSeconds: number | null;
+  requestExampleJson: string | null;
+  submitResponseExampleJson: string | null;
+  pollProcessingExampleJson: string | null;
+  pollCompletedExampleJson: string | null;
+  pollFailedExampleJson: string | null;
+  normalizedOutputExampleJson: string | null;
+  errorPlaybookText: string | null;
 };
 
 type MainTab = "quickstart" | "input" | "output";
@@ -278,6 +289,17 @@ export function ApiQuickstartCard({
             inputSchemaText: "{}",
             outputSchemaText: "{}",
             officialDocUrl: null,
+            executionConfigText: "{}",
+            flowMode: null,
+            statusLifecycle: null,
+            recommendedPollIntervalSeconds: null,
+            requestExampleJson: null,
+            submitResponseExampleJson: null,
+            pollProcessingExampleJson: null,
+            pollCompletedExampleJson: null,
+            pollFailedExampleJson: null,
+            normalizedOutputExampleJson: null,
+            errorPlaybookText: null,
           },
         ];
 
@@ -308,6 +330,12 @@ export function ApiQuickstartCard({
   const outputFieldDocs = extractFieldDocs(providerOutputSchema, "fields");
   const createExamples = buildCreateExamples(selectedModel?.publicModel ?? fallbackModel, capability);
   const taskExample = buildTaskStatusCurl();
+  const flowModeLabel =
+    selectedModel?.flowMode === "sync"
+      ? "Synchronous"
+      : selectedModel?.flowMode === "webhook"
+        ? "Webhook"
+        : "Asynchronous Polling";
 
   const [copiedBlock, setCopiedBlock] = useState<string | null>(null);
 
@@ -401,11 +429,21 @@ export function ApiQuickstartCard({
           <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
             <p className="text-[10px] uppercase tracking-[1px] text-black/45">How This Flow Works</p>
             <ol className="mt-2 space-y-1.5 text-xs leading-5 text-black/70">
-              <li>1. Use Base URL as your API host for all generation endpoints.</li>
-              <li>1. Send Create Request with your API key and selected model input.</li>
-              <li>2. Poll Check Task Status until status becomes <code className="font-mono">succeeded</code>.</li>
-              <li>3. Parse the unified output payload for image/video asset URLs.</li>
+              <li>1. Request style: <code className="font-mono">{flowModeLabel}</code></li>
+              <li>2. Send Create Request with your API key and selected model input.</li>
+              <li>
+                3. Poll task status until completion
+                {selectedModel?.recommendedPollIntervalSeconds
+                  ? ` (every ${selectedModel.recommendedPollIntervalSeconds}s)`
+                  : ""}.
+              </li>
+              <li>4. Parse the unified output payload for image/video asset URLs.</li>
             </ol>
+            {selectedModel?.statusLifecycle ? (
+              <p className="mt-2 text-xs text-black/60">
+                Status lifecycle: <code className="font-mono">{selectedModel.statusLifecycle}</code>
+              </p>
+            ) : null}
           </div>
 
           <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
@@ -453,6 +491,52 @@ export function ApiQuickstartCard({
               <CodeBlock code={taskExample} copyId="task" copiedBlock={copiedBlock} onCopy={copyText} />
             </div>
           </div>
+
+          {selectedModel?.requestExampleJson ? (
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Request Example (From Internal)</p>
+              <div className="mt-3">
+                <CodeBlock
+                  code={selectedModel.requestExampleJson}
+                  copyId="doc-request-example"
+                  copiedBlock={copiedBlock}
+                  onCopy={copyText}
+                />
+              </div>
+            </div>
+          ) : null}
+          {selectedModel?.submitResponseExampleJson ? (
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Submit Response Example</p>
+              <div className="mt-3">
+                <CodeBlock
+                  code={selectedModel.submitResponseExampleJson}
+                  copyId="doc-submit-response-example"
+                  copiedBlock={copiedBlock}
+                  onCopy={copyText}
+                />
+              </div>
+            </div>
+          ) : null}
+          {selectedModel?.pollCompletedExampleJson ? (
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Poll Completed Example</p>
+              <div className="mt-3">
+                <CodeBlock
+                  code={selectedModel.pollCompletedExampleJson}
+                  copyId="doc-poll-completed-example"
+                  copiedBlock={copiedBlock}
+                  onCopy={copyText}
+                />
+              </div>
+            </div>
+          ) : null}
+          {selectedModel?.errorPlaybookText ? (
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Error Handling</p>
+              <pre className="mt-2 whitespace-pre-wrap text-xs leading-6 text-black/70">{selectedModel.errorPlaybookText}</pre>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

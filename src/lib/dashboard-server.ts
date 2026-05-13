@@ -137,6 +137,17 @@ export type DashboardData = {
     inputSchemaText: string;
     outputSchemaText: string;
     officialDocUrl: string | null;
+    executionConfigText: string;
+    flowMode: string | null;
+    statusLifecycle: string | null;
+    recommendedPollIntervalSeconds: number | null;
+    requestExampleJson: string | null;
+    submitResponseExampleJson: string | null;
+    pollProcessingExampleJson: string | null;
+    pollCompletedExampleJson: string | null;
+    pollFailedExampleJson: string | null;
+    normalizedOutputExampleJson: string | null;
+    errorPlaybookText: string | null;
   }>;
   requestFilters: {
     apiKeys: Array<{
@@ -520,7 +531,7 @@ export async function getDashboardData({
       supabaseAdmin.from("providers").select("id, name, regions, status"),
       supabaseAdmin
         .from("provider_models")
-        .select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id, capability, active, input_schema, output_schema"),
+        .select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id, capability, active, input_schema, output_schema, execution_config"),
       supabaseAdmin
         .from("supported_models")
         .select("id, model_slug, display_name, capability, active"),
@@ -731,12 +742,113 @@ export async function getDashboardData({
           fallback: route ? route.fallback : "manual failover only",
           inputSchemaText: JSON.stringify(primaryProviderModel?.input_schema ?? {}, null, 2),
           outputSchemaText: JSON.stringify(primaryProviderModel?.output_schema ?? {}, null, 2),
+          executionConfigText: JSON.stringify(primaryProviderModel?.execution_config ?? {}, null, 2),
           officialDocUrl:
             typeof primaryProviderModel?.input_schema === "object" &&
             primaryProviderModel?.input_schema !== null &&
             !Array.isArray(primaryProviderModel?.input_schema) &&
             typeof (primaryProviderModel.input_schema as Record<string, unknown>).officialDocUrl === "string"
               ? ((primaryProviderModel.input_schema as Record<string, unknown>).officialDocUrl as string)
+              : null,
+          flowMode:
+            primaryProviderModel?.execution_config &&
+            typeof primaryProviderModel.execution_config === "object" &&
+            !Array.isArray(primaryProviderModel.execution_config) &&
+            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
+            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
+            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
+            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).flowMode === "string"
+              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).flowMode as string)
+              : null,
+          statusLifecycle:
+            primaryProviderModel?.execution_config &&
+            typeof primaryProviderModel.execution_config === "object" &&
+            !Array.isArray(primaryProviderModel.execution_config) &&
+            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
+            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
+            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
+            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).statusLifecycle === "string"
+              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).statusLifecycle as string)
+              : null,
+          recommendedPollIntervalSeconds:
+            primaryProviderModel?.execution_config &&
+            typeof primaryProviderModel.execution_config === "object" &&
+            !Array.isArray(primaryProviderModel.execution_config) &&
+            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
+            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
+            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
+            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).recommendedPollIntervalSeconds === "number"
+              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).recommendedPollIntervalSeconds as number)
+              : null,
+          requestExampleJson:
+            primaryProviderModel?.execution_config &&
+            typeof primaryProviderModel.execution_config === "object" &&
+            !Array.isArray(primaryProviderModel.execution_config) &&
+            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
+            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
+            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
+            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).requestExampleJson === "string"
+              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).requestExampleJson as string)
+              : null,
+          submitResponseExampleJson:
+            primaryProviderModel?.execution_config &&
+            typeof primaryProviderModel.execution_config === "object" &&
+            !Array.isArray(primaryProviderModel.execution_config) &&
+            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
+            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
+            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
+            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).submitResponseExampleJson === "string"
+              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).submitResponseExampleJson as string)
+              : null,
+          pollProcessingExampleJson:
+            primaryProviderModel?.execution_config &&
+            typeof primaryProviderModel.execution_config === "object" &&
+            !Array.isArray(primaryProviderModel.execution_config) &&
+            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
+            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
+            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
+            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollProcessingExampleJson === "string"
+              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollProcessingExampleJson as string)
+              : null,
+          pollCompletedExampleJson:
+            primaryProviderModel?.execution_config &&
+            typeof primaryProviderModel.execution_config === "object" &&
+            !Array.isArray(primaryProviderModel.execution_config) &&
+            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
+            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
+            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
+            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollCompletedExampleJson === "string"
+              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollCompletedExampleJson as string)
+              : null,
+          pollFailedExampleJson:
+            primaryProviderModel?.execution_config &&
+            typeof primaryProviderModel.execution_config === "object" &&
+            !Array.isArray(primaryProviderModel.execution_config) &&
+            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
+            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
+            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
+            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollFailedExampleJson === "string"
+              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).pollFailedExampleJson as string)
+              : null,
+          normalizedOutputExampleJson:
+            primaryProviderModel?.execution_config &&
+            typeof primaryProviderModel.execution_config === "object" &&
+            !Array.isArray(primaryProviderModel.execution_config) &&
+            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
+            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
+            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
+            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).normalizedOutputExampleJson === "string"
+              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).normalizedOutputExampleJson as string)
+              : null,
+          errorPlaybookText:
+            primaryProviderModel?.execution_config &&
+            typeof primaryProviderModel.execution_config === "object" &&
+            !Array.isArray(primaryProviderModel.execution_config) &&
+            (primaryProviderModel.execution_config as Record<string, unknown>).doc &&
+            typeof (primaryProviderModel.execution_config as Record<string, unknown>).doc === "object" &&
+            !Array.isArray((primaryProviderModel.execution_config as Record<string, unknown>).doc) &&
+            typeof ((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).errorPlaybookText === "string"
+              ? (((primaryProviderModel.execution_config as Record<string, unknown>).doc as Record<string, unknown>).errorPlaybookText as string)
               : null,
         };
       });
