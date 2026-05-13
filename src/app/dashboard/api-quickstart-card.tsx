@@ -388,16 +388,6 @@ export function ApiQuickstartCard({
     <section className="rounded-[28px] border border-black/[0.08] bg-white p-4 shadow-[0_24px_70px_rgba(17,24,39,0.08)] sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[10px] uppercase tracking-[1px] text-black/45">API Quickstart</p>
-        {selectedModel?.officialDocUrl ? (
-          <a
-            href={selectedModel.officialDocUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-9 cursor-pointer items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs text-black/75 transition-colors hover:bg-black/[0.03]"
-          >
-            Official Upstream Docs
-          </a>
-        ) : null}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
