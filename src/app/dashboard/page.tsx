@@ -501,7 +501,7 @@ export default async function DashboardPage({
     <main className="relative min-h-screen overflow-x-hidden bg-[#FCFCFA] text-[#111111]">
       <AutoRefreshOnReturn />
       <TopUpCelebration />
-      <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
+      <header className="fixed left-0 right-0 top-0 z-50 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center px-6">
           <div className="relative flex w-full items-center text-sm md:text-base">
             <Link
@@ -545,7 +545,7 @@ export default async function DashboardPage({
         }}
       />
 
-      <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-4 sm:px-5 xl:px-0">
+      <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-[72px] sm:px-5 xl:px-0">
         <div className="mt-4 grid gap-5 xl:mt-6 xl:grid-cols-[220px_minmax(0,1fr)] xl:gap-6">
           <aside className="hidden xl:block">
             <DashboardSidebar items={sidebarItems} userLabel={user.email ?? user.name} activeHref={activeHref} />
