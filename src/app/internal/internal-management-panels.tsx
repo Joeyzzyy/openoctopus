@@ -228,6 +228,48 @@ function readModelDescriptionFromBillingConfig(configText: string) {
   }
 }
 
+function readModelTypeFromBillingConfig(configText: string) {
+  try {
+    const parsed = JSON.parse(configText) as Record<string, unknown>;
+    const metadata =
+      parsed.metadata && typeof parsed.metadata === "object" && !Array.isArray(parsed.metadata)
+        ? (parsed.metadata as Record<string, unknown>)
+        : null;
+    return typeof metadata?.modelType === "string" ? metadata.modelType : "";
+  } catch {
+    return "";
+  }
+}
+
+const SUPPORTED_MODEL_TYPE_OPTIONS = [
+  "text-to-video",
+  "text-to-image",
+  "lora-support",
+  "image-to-video",
+  "image-to-image",
+  "image-to-3d",
+  "video-dubbing",
+  "training",
+  "video-to-video",
+  "upscaler",
+  "video-effects",
+  "image-effects",
+  "portrait-transfer",
+  "text-to-audio",
+  "ai-remover",
+  "digital-human",
+  "motion-control",
+  "content-moderation",
+  "llm",
+  "video-to-text",
+  "image-to-text",
+  "speech-to-text",
+  "audio-to-audio",
+  "video-extend",
+  "text-to-3d",
+  "video-to-audio",
+] as const;
+
 function readTemplateMode(config: Record<string, unknown> | null) {
   const mode = typeof config?.mode === "string" ? config.mode.trim() : "";
   if (mode === "sync" || mode === "sync-json-v1") {
@@ -615,12 +657,14 @@ function ManagementDialog({
   trigger,
   title,
   description,
+  headerActions,
   disabled = false,
   children,
 }: {
   trigger: React.ReactNode;
   title: string;
   description?: string;
+  headerActions?: React.ReactNode;
   disabled?: boolean;
   children: React.ReactNode | ((controls: { close: () => void }) => React.ReactNode);
 }) {
@@ -631,12 +675,17 @@ function ManagementDialog({
       <DialogTrigger disabled={disabled}>{trigger}</DialogTrigger>
       <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-5xl">
         <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5">
-          <DialogTitle className="font-medium text-black">{title}</DialogTitle>
-          {description ? (
-            <DialogDescription className="text-black/55">
-              {description}
-            </DialogDescription>
-          ) : null}
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle className="font-medium text-black">{title}</DialogTitle>
+              {description ? (
+                <DialogDescription className="text-black/55">
+                  {description}
+                </DialogDescription>
+              ) : null}
+            </div>
+            {headerActions ? <div className="shrink-0">{headerActions}</div> : null}
+          </div>
         </DialogHeader>
         <div className="px-5 pb-5 pt-5">
           {typeof children === "function"
@@ -911,6 +960,11 @@ export function PublicModelsPanel({
                       {model.provider} · {modalityLabel(model.modality)} ·{" "}
                       {model.capability ? capabilityLabel(model.capability) : "-"}
                     </p>
+                    {readModelTypeFromBillingConfig(model.billingConfigText) ? (
+                      <p className="mt-1 text-xs text-black/50">
+                        类型：{readModelTypeFromBillingConfig(model.billingConfigText)}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-xs text-black/45">添加时间：{model.createdLabel}</p>
                     <p className="mt-2 text-xs text-black/65">{model.billingSummary}</p>
                   </div>
@@ -947,6 +1001,12 @@ export function PublicModelsPanel({
                             defaultValue={readModelDescriptionFromBillingConfig(model.billingConfigText)}
                             placeholder="用于对外展示的模型简介，例如适用场景、风格、速度与质量特点。"
                             help="可选。会随模型配置保存。"
+                          />
+                          <FormSelect
+                            label="类型"
+                            name="modelType"
+                            defaultValue={readModelTypeFromBillingConfig(model.billingConfigText)}
+                            options={SUPPORTED_MODEL_TYPE_OPTIONS.map((item) => ({ value: item, label: item }))}
                           />
                           <FormSelect
                             label="模态"
@@ -1259,6 +1319,12 @@ export function CreateSupportedModelButton({
           name="modelDescription"
           placeholder="用于对外展示的模型简介，例如适用场景、风格、速度与质量特点。"
           help="可选。会随模型配置保存。"
+        />
+        <FormSelect
+          label="类型"
+          name="modelType"
+          options={SUPPORTED_MODEL_TYPE_OPTIONS.map((item) => ({ value: item, label: item }))}
+          defaultValue="text-to-image"
         />
         <FormSelect
           label="模态"

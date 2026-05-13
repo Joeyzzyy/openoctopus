@@ -1453,6 +1453,7 @@ const createSupportedModelSchema = z.object({
   modelSlug: z.string().min(3).max(160),
   displayName: z.string().min(2).max(120),
   modelDescription: z.string().trim().max(2000).nullable(),
+  modelType: z.string().trim().max(80).nullable(),
   modality: modalitySchema,
   capability: capabilitySchema,
   billingConfig: z.unknown(),
@@ -1466,6 +1467,7 @@ export async function createSupportedModel(formData: FormData) {
     modelSlug: formData.get("modelSlug"),
     displayName: formData.get("displayName"),
     modelDescription: normalizeOptionalText(formData.get("modelDescription")),
+    modelType: normalizeOptionalText(formData.get("modelType")),
     modality: formData.get("modality"),
     capability: formData.get("capability"),
     billingConfig: parseBillingConfigField(formData.get("billingConfig")).config,
@@ -1477,6 +1479,7 @@ export async function createSupportedModel(formData: FormData) {
     metadata: {
       ...(((billingConfig as Record<string, unknown>).metadata as Record<string, unknown> | undefined) ?? {}),
       modelDescription: parsed.modelDescription,
+      modelType: parsed.modelType,
     },
   };
   const legacyBillingFields = deriveLegacyBillingFields(billingConfigWithMeta);
@@ -1630,6 +1633,7 @@ const updateSupportedModelDetailsSchema = z.object({
   modelSlug: z.string().min(3).max(160),
   displayName: z.string().min(2).max(120),
   modelDescription: z.string().trim().max(2000).nullable(),
+  modelType: z.string().trim().max(80).nullable(),
   modality: modalitySchema,
   capability: capabilitySchema,
   billingConfig: z.unknown(),
@@ -1644,6 +1648,7 @@ export async function updateSupportedModelDetails(formData: FormData) {
     modelSlug: formData.get("modelSlug"),
     displayName: formData.get("displayName"),
     modelDescription: normalizeOptionalText(formData.get("modelDescription")),
+    modelType: normalizeOptionalText(formData.get("modelType")),
     modality: formData.get("modality"),
     capability: formData.get("capability"),
     billingConfig: parseBillingConfigField(formData.get("billingConfig")).config,
@@ -1655,6 +1660,7 @@ export async function updateSupportedModelDetails(formData: FormData) {
     metadata: {
       ...(((billingConfig as Record<string, unknown>).metadata as Record<string, unknown> | undefined) ?? {}),
       modelDescription: parsed.modelDescription,
+      modelType: parsed.modelType,
     },
   };
   const legacyBillingFields = deriveLegacyBillingFields(billingConfigWithMeta);

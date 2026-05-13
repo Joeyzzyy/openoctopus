@@ -92,7 +92,7 @@ export default async function PricingPage() {
               <th className="min-w-[140px] border-b border-black/[0.08] px-3 py-2.5">Provider</th>
               <th className="min-w-[100px] border-b border-black/[0.08] px-3 py-2.5">Modality</th>
               <th className="min-w-[150px] border-b border-black/[0.08] px-3 py-2.5">Capability</th>
-              <th className="min-w-[320px] border-b border-black/[0.08] px-3 py-2.5">Pricing Rule</th>
+              <th className="min-w-[320px] border-b border-black/[0.08] px-3 py-2.5">Price</th>
             </tr>
           </thead>
           <tbody>
