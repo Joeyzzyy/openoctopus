@@ -4,19 +4,17 @@ import {
   CircleAlert,
   KeyRound,
   LineChart,
-  LogOut,
   ReceiptText,
   Wallet,
 } from "lucide-react";
-import { Logo } from "@/components/layout/Logo";
+import { MarketingHeader } from "@/components/marketing/site-chrome";
+import { ProductTopTabs } from "@/components/marketing/product-top-tabs";
 import { getDashboardData } from "@/lib/dashboard-server";
 import { cn } from "@/lib/utils";
 import { CreateKeyButton } from "./dashboard-actions";
 import { DashboardMobileNav, DashboardSidebar } from "./dashboard-sidebar";
 import { ApiKeysTable } from "./api-keys-table";
-import { ApiQuickstartCard } from "./api-quickstart-card";
 import { ModelCatalogTable } from "./model-catalog-table";
-import { ModelsDocPanel } from "./models-doc-panel";
 import { TopUpForm } from "./top-up-form";
 import { AutoRefreshOnReturn } from "./auto-refresh-on-return";
 import { TopUpCelebration } from "./top-up-celebration";
@@ -26,7 +24,6 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 type DashboardView =
   | "dashboard"
   | "request-details"
-  | "models"
   | "api-keys";
 type RequestInterval = "minute" | "hour" | "day";
 type RequestRange = "60m" | "6h" | "24h" | "7d" | "30d" | "90d";
@@ -36,7 +33,6 @@ type BillingFlow = "incoming" | "outgoing";
 const pageNav = [
   { label: "Top-up Balance", view: "dashboard" },
   { label: "API Keys", view: "api-keys" },
-  { label: "Models & API Doc", view: "models" },
   { label: "Request Details", view: "request-details" },
 ] as const;
 
@@ -501,52 +497,16 @@ export default async function DashboardPage({
     <main className="relative min-h-screen overflow-x-hidden bg-[#FCFCFA] text-[#111111]">
       <AutoRefreshOnReturn />
       <TopUpCelebration />
-      <header className="fixed left-0 right-0 top-0 z-50 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 w-full max-w-7xl items-center px-6">
-          <div className="relative flex w-full items-center text-sm md:text-base">
-            <Link
-              href="/"
-              className="-ml-2 rounded-md px-2 py-1.5 text-[#6B7280] transition-colors hover:bg-black/[0.03] hover:text-[#111827]"
-            >
-              <Logo className="text-[#111827]" />
-            </Link>
-
-            <form action="/auth/sign-out" method="post" className="ml-auto">
-              <div className="flex items-center gap-2">
-                <span className="hidden max-w-[280px] truncate text-[13px] text-[#6B7280] md:inline">
-                  Hi, {user.email ?? user.name}
-                </span>
-                <button
-                  type="submit"
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[#111827] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0B1220]"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign out
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </header>
-      <div
-        className="pointer-events-none fixed inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at top, rgba(243, 226, 201, 0.52), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(252,252,250,1) 46%)",
-        }}
-      />
-      <div
-        className="pointer-events-none fixed inset-x-0 top-0 h-[360px] opacity-45"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(17,24,39,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(17,24,39,0.035) 1px, transparent 1px)",
-          backgroundSize: "44px 44px",
-          maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)",
-        }}
+      <MarketingHeader
+        isLoggedIn
+        userLabel={user.email ?? user.name}
+        userAvatarUrl={user.avatarUrl ?? null}
+        walletBalanceLabel={walletMetric?.value ?? "$0.00"}
       />
 
-      <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-[72px] sm:px-5 xl:px-0">
-        <div className="mt-4 grid gap-5 xl:mt-6 xl:grid-cols-[220px_minmax(0,1fr)] xl:gap-6">
+      <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-4 sm:px-5 xl:px-0">
+        <ProductTopTabs />
+        <div className="mt-2 grid gap-5 xl:mt-4 xl:grid-cols-[220px_minmax(0,1fr)] xl:gap-6">
           <aside className="hidden xl:block">
             <DashboardSidebar items={sidebarItems} userLabel={user.email ?? user.name} activeHref={activeHref} />
           </aside>
@@ -1119,25 +1079,6 @@ export default async function DashboardPage({
                     </span>
                   </div>
                 ) : null}
-              </section>
-            ) : null}
-
-            {view === "models" ? (
-              <section className="p-0">
-                <ModelsDocPanel
-                  selectedType={selectedModelType}
-                  selectedModelSlug={selectedModelSlug}
-                  allRows={modelCatalogRows}
-                  filteredRows={modelCatalogRowsFiltered}
-                  baseParams={{
-                    view: "models",
-                    requestsPage: "1",
-                    billingPage: "1",
-                    analyticsInterval,
-                    analyticsRange,
-                    apiKey: selectedApiKeyId,
-                  }}
-                />
               </section>
             ) : null}
 

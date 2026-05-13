@@ -15,7 +15,7 @@ export function DashboardSidebar({
   activeHref,
 }: DashboardSidebarProps) {
   return (
-    <div className="fixed left-[max(1rem,calc(50%-40rem))] top-[94px] z-30 w-[208px] rounded-xl border border-black/[0.08] bg-white/90 p-2.5 backdrop-blur-sm">
+    <div className="sticky top-[124px] z-30 w-[208px] rounded-xl border border-black/[0.08] bg-white/90 p-2.5 backdrop-blur-sm">
       <nav className="space-y-0.5">
         {items.map((item) => {
           const isActive = item.href === activeHref;

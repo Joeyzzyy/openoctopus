@@ -130,12 +130,18 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const parsed = imageRequestSchema.parse(request.body);
     const authHeader = request.headers.authorization;
     const apiKey = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
+    const sourceHeader =
+      typeof request.headers["x-openoctopus-request-source"] === "string"
+        ? request.headers["x-openoctopus-request-source"]
+        : "";
+    const requestSource = sourceHeader === "playground" ? "playground" : "api";
 
     try {
       const queued = await createQueuedRequest({
         apiKey,
         endpoint: "/v1/images/generations",
         capability: "image_generation",
+        requestSource,
         model: parsed.model,
         prompt: parsed.prompt,
         input: parsed.input,
@@ -171,6 +177,11 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const parsed = videoRequestSchema.parse(request.body);
     const authHeader = request.headers.authorization;
     const apiKey = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
+    const sourceHeader =
+      typeof request.headers["x-openoctopus-request-source"] === "string"
+        ? request.headers["x-openoctopus-request-source"]
+        : "";
+    const requestSource = sourceHeader === "playground" ? "playground" : "api";
     const normalizedInput: Record<string, unknown> = {
       ...parsed.input,
     };
@@ -201,6 +212,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         apiKey,
         endpoint: "/v1/videos/generations",
         capability: "video_generation",
+        requestSource,
         model: parsed.model,
         prompt: parsed.prompt,
         input: normalizedInput,

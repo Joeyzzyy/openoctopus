@@ -33,6 +33,7 @@ export type DashboardData = {
     id: string;
     email: string | null;
     name: string;
+    avatarUrl?: string | null;
   };
   workspace: {
     id: string;
@@ -462,6 +463,10 @@ export async function getDashboardData({
       user.user_metadata?.name ??
       user.email?.split("@")[0] ??
       "OpenOctopus User",
+    avatarUrl:
+      (user.user_metadata?.avatar_url as string | undefined) ??
+      (user.user_metadata?.picture as string | undefined) ??
+      null,
   };
 
   try {

@@ -71,19 +71,6 @@ export function ModelsDocPanel({
 
   return (
     <>
-      <div className="mb-4">
-        <ModelCatalogFilters
-          selectedType={selectedType}
-          selectedModelSlug={selectedModelSlug}
-          modelOptions={allRows.map((row) => ({
-            slug: row.publicModel,
-            label: row.displayName,
-            capability: row.capability,
-          }))}
-          onNavigate={handleNavigate}
-        />
-      </div>
-
       {isPending ? (
         <div className="space-y-4">
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900/80">
@@ -94,7 +81,22 @@ export function ModelsDocPanel({
       ) : (
         <>
           <div className="mb-4">
-            <ApiQuickstartCard models={filteredRows} initialModel={selectedModelSlug} />
+            <ApiQuickstartCard
+              models={filteredRows}
+              initialModel={selectedModelSlug}
+              headerControls={
+                <ModelCatalogFilters
+                  selectedType={selectedType}
+                  selectedModelSlug={selectedModelSlug}
+                  modelOptions={allRows.map((row) => ({
+                    slug: row.publicModel,
+                    label: row.displayName,
+                    capability: row.capability,
+                  }))}
+                  onNavigate={handleNavigate}
+                />
+              }
+            />
           </div>
         </>
       )}

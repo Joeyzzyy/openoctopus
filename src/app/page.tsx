@@ -19,12 +19,11 @@ import { createClient } from "@/lib/supabase/server";
 
 const HEADER_NAV_ITEMS = [
   { label: "Pricing", href: "/pricing" },
-  { label: "Docs", href: "/docs" },
   { label: "Learn More", href: "/resource" },
-  { label: "Tools", href: "/tools" },
 ];
 
 const FOOTER_NAV_ITEMS = [
+  { label: "Models", href: "/models" },
   { label: "Pricing", href: "/pricing" },
   { label: "Docs", href: "/docs" },
   { label: "Learn More", href: "/resource" },
@@ -180,6 +179,8 @@ export default async function Home() {
                 <Link
                   key={item.label}
                   href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="rounded-md px-3 py-2 text-[14px] font-medium text-[#6B7280] transition-colors hover:bg-black/[0.03] hover:text-[#111827]"
                 >
                   {item.label}
@@ -235,7 +236,7 @@ export default async function Home() {
                   </h1>
                   <p className="text-md text-[#6B7280] md:pt-2 md:text-xl">
                     Better{" "}
-                    <Link href="/pricing" className="text-[#111827] underline decoration-black/20 underline-offset-4">
+                    <Link href="/models" className="text-[#111827] underline decoration-black/20 underline-offset-4">
                       prices
                     </Link>
                     , better{" "}
@@ -253,7 +254,7 @@ export default async function Home() {
                     {destinationLabel}
                   </Link>
                   <Link
-                    href="/pricing"
+                    href="/models"
                     className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-black/[0.08] bg-transparent px-10 py-4 text-[14px] font-medium text-[#111827] shadow-sm transition-colors hover:bg-black/[0.03]"
                   >
                     <span>Explore Models</span>

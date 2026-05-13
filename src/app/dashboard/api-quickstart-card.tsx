@@ -266,9 +266,11 @@ puts response.body`;
 export function ApiQuickstartCard({
   models,
   initialModel,
+  headerControls,
 }: {
   models?: ModelDocItem[];
   initialModel?: string | null;
+  headerControls?: React.ReactNode;
 }) {
   const safeModels =
     models && models.length > 0
@@ -388,8 +390,13 @@ export function ApiQuickstartCard({
 
   return (
     <section className="rounded-[28px] border border-black/[0.08] bg-white p-4 shadow-[0_24px_70px_rgba(17,24,39,0.08)] sm:p-6">
-      <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
-        <aside className="sticky top-20 self-start rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-2 max-lg:static">
+      {headerControls ? (
+        <div className="-mx-4 mb-4 border-b border-black/[0.06] bg-white px-4 pb-3 pt-1 sm:-mx-6 sm:px-6">
+          {headerControls}
+        </div>
+      ) : null}
+      <div className="grid items-start gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
+        <aside className="h-fit rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-2 md:sticky md:top-24 md:self-start max-md:static">
           <nav className="space-y-1">
             <button
               type="button"

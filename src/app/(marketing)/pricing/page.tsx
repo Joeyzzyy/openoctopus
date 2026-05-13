@@ -1,61 +1,23 @@
+import Link from "next/link";
 import { normalizeBillingConfig, parseBillingConfig } from "@/lib/billing-config";
-import { createClient } from "@/lib/supabase/server";
-
-type SupportedModelRow = {
-  id: string;
-  provider: string;
-  model_slug: string;
-  display_name: string;
-  modality: "image" | "video" | "audio";
-  capability: "image_generation" | "image_edit" | "video_generation" | null;
-  billing_config: unknown;
-  active: boolean;
-  created_at: string;
-};
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata = {
   title: "Pricing — OpenOctopus",
-  description: "Live pricing table sourced from internal model configuration.",
+  description: "Simple pricing list for active supported models.",
 };
-
-function capabilityLabel(value: SupportedModelRow["capability"]) {
-  if (value === "image_generation") return "Image Generation";
-  if (value === "image_edit") return "Image Editing";
-  if (value === "video_generation") return "Video Generation";
-  return "Not Set";
-}
-
-function modalityLabel(value: SupportedModelRow["modality"]) {
-  if (value === "image") return "Image";
-  if (value === "video") return "Video";
-  return "Audio";
-}
 
 function billingSummary(value: unknown) {
   try {
     const normalized = normalizeBillingConfig(parseBillingConfig(value));
     const parts: string[] = [];
     const { charges, currency } = normalized;
-
-    if (charges.perRequest) {
-      parts.push(`per request ${charges.perRequest}`);
-    }
-    if (charges.perImage) {
-      parts.push(`per image ${charges.perImage}`);
-    }
-    if (charges.perVideo) {
-      parts.push(`per video ${charges.perVideo}`);
-    }
-    if (charges.perSecond) {
-      parts.push(`per second ${charges.perSecond}`);
-    }
-    if (charges.inputTextTokensPerMillion) {
-      parts.push(`per 1M input tokens ${charges.inputTextTokensPerMillion}`);
-    }
-    if (charges.outputTextTokensPerMillion) {
-      parts.push(`per 1M output tokens ${charges.outputTextTokensPerMillion}`);
-    }
-
+    if (charges.perRequest) parts.push(`per request ${charges.perRequest}`);
+    if (charges.perImage) parts.push(`per image ${charges.perImage}`);
+    if (charges.perVideo) parts.push(`per video ${charges.perVideo}`);
+    if (charges.perSecond) parts.push(`per second ${charges.perSecond}`);
+    if (charges.inputTextTokensPerMillion) parts.push(`per 1M input tokens ${charges.inputTextTokensPerMillion}`);
+    if (charges.outputTextTokensPerMillion) parts.push(`per 1M output tokens ${charges.outputTextTokensPerMillion}`);
     return `${currency} ${parts.join(" + ")}`;
   } catch {
     return "Invalid pricing configuration";
@@ -63,51 +25,45 @@ function billingSummary(value: unknown) {
 }
 
 export default async function PricingPage() {
-  const supabase = await createClient();
-
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("supported_models")
-    .select("id, provider, model_slug, display_name, modality, capability, billing_config, active, created_at")
+    .select("model_slug, display_name, billing_config, active")
     .eq("active", true)
     .order("created_at", { ascending: false });
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
-  const models = (data ?? []) as SupportedModelRow[];
+  const rows = (data ?? []).map((row) => ({
+    model: row.display_name || row.model_slug,
+    price: billingSummary(row.billing_config),
+  }));
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-6 py-12 md:px-10 md:py-16">
-      <header className="mb-6">
-        <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[#111827]">Pricing</h1>
-        <p className="mt-3 text-sm text-black/60">Live model prices from active public catalog entries.</p>
-      </header>
-
-      <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
-        <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
-          <thead>
-            <tr className="text-xs text-black/50">
-              <th className="min-w-[180px] border-b border-black/[0.08] px-3 py-2.5">Model</th>
-              <th className="min-w-[140px] border-b border-black/[0.08] px-3 py-2.5">Provider</th>
-              <th className="min-w-[100px] border-b border-black/[0.08] px-3 py-2.5">Modality</th>
-              <th className="min-w-[150px] border-b border-black/[0.08] px-3 py-2.5">Capability</th>
-              <th className="min-w-[320px] border-b border-black/[0.08] px-3 py-2.5">Price</th>
-            </tr>
-          </thead>
-          <tbody>
-            {models.map((model) => (
-              <tr key={model.id}>
-                <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-sm font-medium text-black">{model.display_name}</td>
-                <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{model.provider}</td>
-                <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{modalityLabel(model.modality)}</td>
-                <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{capabilityLabel(model.capability)}</td>
-                <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{billingSummary(model.billing_config)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
+      <div className="mb-5 flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-black">Pricing</h1>
+          <p className="mt-1 text-sm text-black/55">Active sellable models and their pricing rules.</p>
+        </div>
+        <Link href="/models" className="text-sm font-medium text-black/70 underline underline-offset-4 hover:text-black">
+          Go to Models
+        </Link>
       </div>
+      <section className="overflow-hidden rounded-xl border border-black/[0.08] bg-white">
+        <div className="grid grid-cols-2 border-b border-black/[0.08] bg-[#FAFAFA] px-4 py-2 text-xs font-medium tracking-[0.3px] text-black/60">
+          <span>Model</span>
+          <span>Price</span>
+        </div>
+        <div>
+          {rows.map((row) => (
+            <div key={row.model} className="grid grid-cols-2 border-b border-black/[0.05] px-4 py-3 text-sm text-black last:border-b-0">
+              <span className="truncate pr-3">{row.model}</span>
+              <span className="text-black/70">{row.price}</span>
+            </div>
+          ))}
+        </div>
+      </section>
     </main>
   );
 }

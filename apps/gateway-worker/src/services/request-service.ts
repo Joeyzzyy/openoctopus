@@ -21,6 +21,7 @@ export type UnifiedRequestInput = {
   apiKey: string;
   endpoint: "/v1/images/generations" | "/v1/videos/generations";
   capability: "image_generation" | "video_generation";
+  requestSource?: "api" | "playground";
   model: string;
   prompt?: string;
   input: Record<string, unknown>;
@@ -287,6 +288,7 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     normalized_params: {
       prompt: input.prompt ?? null,
     },
+    request_source: input.requestSource ?? "api",
     status: "queued",
   });
 

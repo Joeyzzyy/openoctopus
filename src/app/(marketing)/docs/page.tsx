@@ -25,7 +25,7 @@ export default async function DocsPage() {
         title="Build against the OpenOctopus API"
         description="Unified image and video API docs. This page uses the same source as the dashboard API Calling Doc, so updates stay in sync automatically."
         primaryAction={{ href: destination, label: destinationLabel }}
-        secondaryAction={{ href: "/pricing", label: "View pricing" }}
+        secondaryAction={{ href: "/models", label: "View models" }}
       />
 
       <div className="px-6 pb-14 md:px-8 md:pb-20">

@@ -70,7 +70,7 @@ export default async function CollectionPage({
             Explore Models
           </Link>
           <Link
-            href="/pricing"
+            href="/models"
             className="inline-flex h-10 items-center gap-2 rounded-lg border border-black/10 bg-white px-5 text-[11px] font-bold uppercase tracking-[1.1px] text-[#1C1917] transition-colors hover:bg-black/[0.03]"
           >
             View Pricing
