@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
+import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
 
 type ModelDocRow = {
   id: string;
@@ -27,6 +28,8 @@ type JsonSchemaField = {
   label: string;
   type: "string" | "number" | "boolean";
   required: boolean;
+  description?: string;
+  exposedToCustomer: boolean;
   enumValues?: string[];
 };
 
@@ -37,6 +40,55 @@ type TaskStatus =
   | "processing"
   | "succeeded"
   | "failed";
+
+function formatPlaygroundError(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return "Submit failed";
+  }
+  const record = payload as Record<string, unknown>;
+  const error =
+    record.error && typeof record.error === "object" && !Array.isArray(record.error)
+      ? (record.error as Record<string, unknown>)
+      : null;
+  const code = typeof error?.code === "string" ? error.code : "";
+  const message =
+    typeof error?.message === "string"
+      ? error.message
+      : typeof record.error === "string"
+        ? record.error
+        : "Submit failed";
+  const upstreamStatus =
+    typeof record.upstreamStatus === "number" ? String(record.upstreamStatus) : "";
+  const upstreamBody =
+    record.upstreamBody && typeof record.upstreamBody === "object"
+      ? JSON.stringify(record.upstreamBody)
+      : typeof record.upstreamBody === "string"
+        ? record.upstreamBody
+        : "";
+
+  return [code ? `[${code}]` : "", message, upstreamStatus ? `(status: ${upstreamStatus})` : "", upstreamBody ? `| upstream: ${upstreamBody}` : ""]
+    .filter((part) => part.length > 0)
+    .join(" ");
+}
+
+function formatDetailText(detail: unknown) {
+  if (detail === null || detail === undefined) return "No detail";
+  if (typeof detail === "string") return detail;
+  try {
+    return JSON.stringify(detail, null, 2);
+  } catch {
+    return String(detail);
+  }
+}
+
+function taskStatusLabel(status: TaskStatus) {
+  if (status === "submitting") return "Submitting";
+  if (status === "queued") return "Queued";
+  if (status === "processing") return "Processing";
+  if (status === "succeeded") return "Succeeded";
+  if (status === "failed") return "Failed";
+  return "Idle";
+}
 
 function parseInputSchemaText(schemaText: string): JsonSchemaField[] {
   try {
@@ -78,6 +130,13 @@ function parseInputSchemaText(schemaText: string): JsonSchemaField[] {
           label: key,
           type: normalizedType,
           required: Boolean(row.required),
+          description: typeof row.description === "string" ? row.description : "",
+          exposedToCustomer:
+            typeof row.exposedToCustomer === "boolean"
+              ? row.exposedToCustomer
+              : typeof row.customerVisible === "boolean"
+                ? row.customerVisible
+                : true,
           enumValues: enumValues && enumValues.length > 0 ? enumValues : undefined,
         });
       }
@@ -118,6 +177,14 @@ function parseInputSchemaText(schemaText: string): JsonSchemaField[] {
         label: key,
         type: normalizedType,
         required: requiredList.has(key),
+        description:
+          typeof propertySchema.description === "string" ? propertySchema.description : "",
+        exposedToCustomer:
+          typeof propertySchema.exposedToCustomer === "boolean"
+            ? propertySchema.exposedToCustomer
+            : typeof propertySchema.customerVisible === "boolean"
+              ? propertySchema.customerVisible
+              : true,
         enumValues: enumValues && enumValues.length > 0 ? enumValues : undefined,
       });
     }
@@ -219,6 +286,9 @@ export function ModelsBrowser({
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const [taskId, setTaskId] = useState<string | null>(null);
   const [playgroundError, setPlaygroundError] = useState<string | null>(null);
+  const [playgroundErrorDetail, setPlaygroundErrorDetail] = useState<unknown>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailCopied, setDetailCopied] = useState(false);
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
   const handleProviderChange = (nextProvider: string) => {
@@ -245,7 +315,10 @@ export function ModelsBrowser({
   const priceTag = selectedModel?.priceLabel || "";
   const modelSlugTail = selectedModel?.upstreamModelSlug || selectedModel?.publicModel || "model";
   const parsedFields = useMemo(
-    () => parseInputSchemaText(selectedModel?.inputSchemaText ?? ""),
+    () =>
+      parseInputSchemaText(selectedModel?.inputSchemaText ?? "").filter(
+        (field) => field.exposedToCustomer
+      ),
     [selectedModel?.inputSchemaText]
   );
   const isSubmitting = taskStatus === "submitting" || taskStatus === "queued" || taskStatus === "processing";
@@ -257,8 +330,12 @@ export function ModelsBrowser({
     if (!selectedModel) return;
     setTaskStatus("submitting");
     setPlaygroundError(null);
+    setPlaygroundErrorDetail(null);
+    setDetailCopied(false);
     setPlaygroundOutput(null);
     setTaskId(null);
+
+    let capturedErrorDetail: unknown = null;
 
     try {
       const inputPayload: Record<string, unknown> = {};
@@ -298,11 +375,52 @@ export function ModelsBrowser({
       const submitJson = (await submitRes.json()) as {
         id?: string;
         status?: string;
-        error?: { message?: string; code?: string };
+        error?: { message?: string; code?: string } | string;
+        upstreamStatus?: number;
+        upstreamBody?: unknown;
+        apiBase?: string;
+        requestUrl?: string;
       };
 
       if (!submitRes.ok || !submitJson.id) {
-        throw new Error(submitJson?.error?.message || "Submit failed");
+        const hasPromptField = parsedFields.some((field) => field.key === "prompt");
+        const browserProxyUrl =
+          typeof window !== "undefined"
+            ? `${window.location.origin}/api/playground`
+            : "/api/playground";
+        const inferredEndpoint = inferEndpoint(selectedModel.capability);
+        const inferredApiBase =
+          typeof submitJson.apiBase === "string" && submitJson.apiBase.length > 0
+            ? submitJson.apiBase
+            : PUBLIC_API_BASE_URL;
+        const inferredRequestUrl =
+          typeof submitJson.requestUrl === "string" && submitJson.requestUrl.length > 0
+            ? submitJson.requestUrl
+            : `${inferredApiBase}${inferredEndpoint}`;
+        capturedErrorDetail = {
+          stage: "submit",
+          chain: {
+            browserToProxy: {
+              method: "POST",
+              url: browserProxyUrl,
+            },
+            proxyToGateway: {
+              method: "POST",
+              apiBase: inferredApiBase,
+              requestUrl: inferredRequestUrl,
+            },
+          },
+          request: {
+            endpoint: inferredEndpoint,
+            model: selectedModel.publicModel,
+            prompt: promptValue ?? "",
+            hasPromptField,
+            input: inputPayload,
+          },
+          submitHttpStatus: submitRes.status,
+          response: submitJson,
+        };
+        throw new Error(formatPlaygroundError(submitJson));
       }
 
       setTaskId(submitJson.id);
@@ -323,10 +441,18 @@ export function ModelsBrowser({
           status?: string;
           output_payload?: unknown;
           error_message?: string;
+          error?: { message?: string; code?: string } | string;
+          upstreamStatus?: number;
+          upstreamBody?: unknown;
         };
 
         if (!statusRes.ok) {
-          throw new Error("Failed to query task status");
+          capturedErrorDetail = {
+            stage: "status",
+            taskId: submitJson.id,
+            response: statusJson,
+          };
+          throw new Error(formatPlaygroundError(statusJson));
         }
 
         if (statusJson.status === "queued" || statusJson.status === "processing") {
@@ -341,15 +467,41 @@ export function ModelsBrowser({
         if (statusJson.status === "failed") {
           setTaskStatus("failed");
           setPlaygroundError(statusJson.error_message || "Generation failed");
+          setPlaygroundErrorDetail({
+            stage: "task_failed",
+            taskId: submitJson.id,
+            response: statusJson,
+          });
           return;
         }
       }
 
       setTaskStatus("failed");
       setPlaygroundError("Playground request timeout, please retry.");
+      setPlaygroundErrorDetail({
+        stage: "timeout",
+        taskId: submitJson.id,
+      });
     } catch (error) {
       setTaskStatus("failed");
       setPlaygroundError(error instanceof Error ? error.message : "Submit failed");
+      setPlaygroundErrorDetail(
+        capturedErrorDetail ?? {
+          stage: "client_exception",
+          message: error instanceof Error ? error.message : "Submit failed",
+        }
+      );
+    }
+  };
+
+  const copyErrorDetail = async () => {
+    const text = formatDetailText(playgroundErrorDetail);
+    try {
+      await navigator.clipboard.writeText(text);
+      setDetailCopied(true);
+      setTimeout(() => setDetailCopied(false), 1500);
+    } catch {
+      setDetailCopied(false);
     }
   };
 
@@ -441,6 +593,11 @@ export function ModelsBrowser({
                         {field.label}
                         {field.required ? <span className="pl-1 text-red-500">*</span> : null}
                       </span>
+                      {field.description ? (
+                        <p className="mb-1.5 text-[11px] leading-5 text-black/50">
+                          {field.description}
+                        </p>
+                      ) : null}
                       {field.key === "aspect_ratio" || isAspectRatioEnum(field.enumValues) ? (
                         <select
                           disabled={isSubmitting}
@@ -528,26 +685,46 @@ export function ModelsBrowser({
               </div>
             </section>
 
-            <section className="rounded-xl border border-black/[0.08] bg-[#FAFAFA] p-4">
+            <section className="flex min-h-[360px] flex-col rounded-xl border border-black/[0.08] bg-[#FAFAFA] p-4">
               <div className="mb-3 flex items-center justify-between">
                 <div className="text-sm font-medium text-black">Output</div>
-                <div className="text-xs capitalize text-black/60">Status: {taskStatus}</div>
+                <div className="text-xs capitalize text-black/60">Status: {taskStatusLabel(taskStatus)}</div>
               </div>
               {playgroundError ? (
-                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {playgroundError}
-                </p>
-              ) : null}
-              {!playgroundOutput ? (
-                <p className="text-sm text-black/55">
-                  {isSubmitting
-                    ? "Request is running. Controls are locked until completion."
-                    : `Submit ${modelSlugTail} to preview result here.`}
-                </p>
-              ) : (
+                <div className="flex min-h-[280px] flex-1 items-center">
+                  <div className="w-full">
+                    <p className="w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      {playgroundError}
+                    </p>
+                    {playgroundErrorDetail ? (
+                      <div className="mt-2 flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setDetailModalOpen(true)}
+                          className="text-xs text-black/55 underline underline-offset-2 hover:text-black"
+                        >
+                          Error Detail
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : isSubmitting ? (
+                <div className="flex min-h-[280px] flex-1 flex-col items-center justify-center rounded-md border border-black/[0.08] bg-white">
+                  <span className="inline-flex size-7 animate-spin rounded-full border-2 border-black/20 border-t-black" />
+                  <p className="mt-3 text-sm font-medium text-black">Generating...</p>
+                  <p className="mt-1 text-xs text-black/55">{taskStatusLabel(taskStatus)}</p>
+                </div>
+              ) : playgroundOutput ? (
                 <pre className="max-h-[560px] overflow-auto rounded-md bg-white p-3 text-xs text-black/80">
                   {JSON.stringify(playgroundOutput, null, 2)}
                 </pre>
+              ) : (
+                <div className="flex min-h-[280px] flex-1 items-center justify-center rounded-md border border-black/[0.08] bg-white px-4">
+                  <p className="text-center text-sm text-black/55">
+                    {`Submit ${modelSlugTail} to preview result here.`}
+                  </p>
+                </div>
               )}
             </section>
           </div>
@@ -555,6 +732,35 @@ export function ModelsBrowser({
           <ApiQuickstartCard models={visibleRows} initialModel={effectiveModelSlug} />
         )}
       </section>
+
+      {detailModalOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-2xl rounded-xl border border-black/[0.1] bg-white p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-black">Error Detail</h4>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={copyErrorDetail}
+                  className="h-7 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
+                >
+                  {detailCopied ? "Copied" : "Copy"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetailModalOpen(false)}
+                  className="h-7 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <pre className="max-h-[65vh] overflow-auto rounded-md border border-black/[0.08] bg-[#FAFAFA] p-3 text-xs text-black/80">
+              {formatDetailText(playgroundErrorDetail)}
+            </pre>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -348,6 +348,7 @@ type WorkerTemplateConfigState = {
   resultMimeType: string;
   submitPath: string;
   pollPath: string;
+  resultPath: string;
   taskIdPath: string;
   statusPath: string;
   resultUrlPath: string;
@@ -364,6 +365,7 @@ function buildWorkerTemplateConfigState(config: Record<string, unknown> | null):
     resultMimeType: typeof config?.resultMimeType === "string" ? config.resultMimeType : "image/png",
     submitPath: typeof config?.submitPath === "string" ? config.submitPath : "",
     pollPath: typeof config?.pollPath === "string" ? config.pollPath : "",
+    resultPath: typeof config?.resultPath === "string" ? config.resultPath : "",
     taskIdPath: typeof config?.taskIdPath === "string" ? config.taskIdPath : "id",
     statusPath: typeof config?.statusPath === "string" ? config.statusPath : "",
     resultUrlPath: typeof config?.resultUrlPath === "string" ? config.resultUrlPath : "result.url",
@@ -381,6 +383,7 @@ function buildWorkerTemplateConfigValue(state: WorkerTemplateConfigState) {
   if (state.resultMimeType.trim()) result.resultMimeType = state.resultMimeType.trim();
   if (state.submitPath.trim()) result.submitPath = state.submitPath.trim();
   if (state.pollPath.trim()) result.pollPath = state.pollPath.trim();
+  if (state.resultPath.trim()) result.resultPath = state.resultPath.trim();
   if (state.taskIdPath.trim()) result.taskIdPath = state.taskIdPath.trim();
   if (state.statusPath.trim()) result.statusPath = state.statusPath.trim();
   if (state.resultUrlPath.trim()) result.resultUrlPath = state.resultUrlPath.trim();
@@ -541,11 +544,25 @@ function WorkerTemplateConfigEditor({
               className={formInputClassName}
             />
           </label>
+          <label className="block md:col-span-2">
+            <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
+              结果查询路径 resultPath（可选）
+            </span>
+            <input
+              name="templateResultPath"
+              value={state.resultPath}
+              onChange={(event) =>
+                setState((current) => ({ ...current, resultPath: event.target.value }))
+              }
+              placeholder="/api/v3/predictions/{taskId}/result"
+              className={formInputClassName}
+            />
+          </label>
         </>
       ) : null}
       <label className="block">
         <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
-          结果 URL 路径 resultUrlPath
+          结果字段路径（JSON path）resultUrlPath
         </span>
         <input
           name="templateResultUrlPath"
@@ -553,7 +570,7 @@ function WorkerTemplateConfigEditor({
           onChange={(event) =>
             setState((current) => ({ ...current, resultUrlPath: event.target.value }))
           }
-          placeholder="result.url"
+          placeholder="例如 data.outputs.0 / response.outputUrl"
           className={formInputClassName}
         />
       </label>

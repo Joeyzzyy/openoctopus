@@ -36,6 +36,7 @@ export type SubmitRequestResult =
       upstreamTaskId: string;
       pollAfterSeconds: number;
       estimatedCost: number;
+      raw?: Record<string, unknown>;
     };
 
 export type PollRequestResult =

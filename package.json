@@ -6,8 +6,8 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "next dev",
-    "dev:web": "next dev",
+    "dev": "NODE_USE_ENV_PROXY=1 next dev",
+    "dev:web": "NODE_USE_ENV_PROXY=1 next dev",
     "dev:worker": "npm run dev --workspace @openoctopus/gateway-worker",
     "build": "next build",
     "build:web": "next build",

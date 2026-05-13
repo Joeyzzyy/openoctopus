@@ -963,6 +963,10 @@ export async function processNextInferenceJob() {
         status: "processing",
         upstream_request_id: result.upstreamRequestId,
         upstream_task_id: result.upstreamTaskId,
+        response_payload:
+          result.mode === "async" && result.raw && typeof result.raw === "object" && !Array.isArray(result.raw)
+            ? result.raw
+            : undefined,
         latency_ms: Date.now() - attemptStartedAt,
       })
       .eq("request_id", message.requestId)

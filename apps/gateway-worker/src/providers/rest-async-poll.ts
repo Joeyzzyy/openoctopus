@@ -48,6 +48,10 @@ function readString(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim().length > 0 ? value : fallback;
 }
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 function renderTemplateValue(value: unknown, variables: Record<string, unknown>): unknown {
   if (typeof value === "string") {
     return fillMustacheTemplate(value, variables);
@@ -247,6 +251,13 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
       };
     }
 
+    if (hasPollMode && !isNonEmptyString(taskId)) {
+      throw new Error(
+        `Upstream submit response is missing task id at path "${taskIdPath}". ` +
+          `Check executionConfig.taskIdPath. submitUrl=${submitUrl.toString()}`
+      );
+    }
+
     return {
       mode: "async",
       upstreamRequestId: String(taskId ?? input.requestId),
@@ -259,6 +270,10 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
   async poll(input: PollRequestInput): Promise<PollRequestResult> {
     const cfg = (input.provider.config?.executionConfig ?? {}) as Record<string, unknown>;
     const pollPath = readString(cfg.pollPath, "/v1/tasks/{taskId}");
+    const resultPath =
+      typeof cfg.resultPath === "string" && cfg.resultPath.trim().length > 0
+        ? cfg.resultPath
+        : null;
     const pollUrl = new URL(
       fillTemplate(pollPath, { taskId: input.upstreamTaskId }),
       input.provider.baseUrl ?? ""
@@ -296,6 +311,36 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
         actualCost: 0,
         raw: data,
       };
+    }
+    if (status.isSuccess && !asset && resultPath) {
+      const resultUrl = new URL(
+        fillTemplate(resultPath, { taskId: input.upstreamTaskId }),
+        input.provider.baseUrl ?? ""
+      );
+      auth.applyQuery(resultUrl);
+
+      const { data: resultData } = await getJson<Record<string, unknown>>(resultUrl.toString(), {
+        headers: auth.headers,
+      });
+      const resultAsset = buildAssetFromResult(
+        resultData,
+        resultUrlPath,
+        cfg,
+        input.requestId
+      );
+
+      if (resultAsset) {
+        return {
+          done: true,
+          success: true,
+          output: { raw: resultData, assets: [resultAsset] },
+          actualCost: 0,
+          raw: {
+            poll: data,
+            result: resultData,
+          },
+        };
+      }
     }
     if (status.isDone && !asset) {
       return {

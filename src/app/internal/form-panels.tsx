@@ -71,6 +71,7 @@ type ExecutionConfigFormState = {
   resultMimeType: string;
   submitPath: string;
   pollPath: string;
+  resultPath: string;
   taskIdPath: string;
   statusPath: string;
   resultUrlPath: string;
@@ -96,6 +97,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
       mode: "sync",
       submitPath: "/v1beta/models/{upstreamModel}:generateContent",
       pollPath: "",
+      resultPath: "",
       taskIdPath: "responseId",
       statusPath: "",
       resultUrlPath: "candidates.0.content.parts.0.inlineData.data",
@@ -115,6 +117,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
       mode: "async",
       submitPath: "/v1/models/{upstreamModel}:generate",
       pollPath: "/v1/operations/{taskId}",
+      resultPath: "",
       taskIdPath: "name",
       statusPath: "done",
       resultUrlPath: "response.outputUrl",
@@ -126,6 +129,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
     mode: "async",
     submitPath: "/v1/models/{upstreamModel}:generate",
     pollPath: "/v1/operations/{taskId}",
+    resultPath: "",
     taskIdPath: "name",
     statusPath: "done",
     resultUrlPath: "response.outputUrl",
@@ -151,62 +155,6 @@ const SCHEMA_FIELD_TYPE_OPTIONS = [
   "url",
   "base64",
 ];
-
-function buildSchemaAiPromptTemplate(keyName: "params" | "fields") {
-  if (keyName === "params") {
-    return [
-      "你是 API 文档结构化助手。请把我提供的模型文档整理为“输入参数导入 JSON”，严格按以下规则输出：",
-      "1) 只输出 JSON，不要任何解释、Markdown、代码块标记。",
-      "2) 顶层必须是对象，包含：officialDocUrl, params。",
-      "3) params 必须是数组；每个元素包含：name, type, required, description, example, exposedToCustomer。",
-      "4) required 必须是 true/false 布尔值。",
-      "5) exposedToCustomer 必须是 true/false 布尔值。",
-      "6) type 仅可使用：string, number, integer, boolean, array, object, url, base64。",
-      "7) example 统一输出为字符串。",
-      "8) 字段名保持上游原文，不要擅自改名。",
-      "",
-      "输出格式示例：",
-      '{',
-      '  "officialDocUrl": "https://example.com/docs",',
-      '  "params": [',
-      '    {',
-      '      "name": "prompt",',
-      '      "type": "string",',
-      '      "required": true,',
-      '      "description": "Text prompt for generation.",',
-      '      "example": "A cinematic portrait...",',
-      '      "exposedToCustomer": true',
-      "    }",
-      "  ]",
-      "}",
-    ].join("\n");
-  }
-
-  return [
-    "你是 API 文档结构化助手。请把我提供的模型文档整理为“输出参数导入 JSON”，严格按以下规则输出：",
-    "1) 只输出 JSON，不要任何解释、Markdown、代码块标记。",
-    "2) 顶层必须是对象，包含：officialDocUrl, fields。",
-    "3) fields 必须是数组；每个元素包含：name, type, description, example, exposedToCustomer。",
-    "4) exposedToCustomer 必须是 true/false 布尔值。",
-    "5) type 仅可使用：string, number, integer, boolean, array, object, url, base64。",
-    "6) example 统一输出为字符串。",
-    "7) 字段名保持上游原文，不要擅自改名。",
-    "",
-    "输出格式示例：",
-    "{",
-    '  "officialDocUrl": "https://example.com/docs",',
-    '  "fields": [',
-    "    {",
-    '      "name": "outputs",',
-    '      "type": "array",',
-    '      "description": "Generated asset URLs.",',
-    '      "example": "[\\"https://cdn.example.com/a.png\\"]",',
-    '      "exposedToCustomer": true',
-    "    }",
-    "  ]",
-    "}",
-  ].join("\n");
-}
 
 function randomFieldId() {
   return Math.random().toString(36).slice(2, 10);
@@ -278,7 +226,6 @@ function SchemaFieldEditor({
   const [rows, setRows] = useState<SchemaFieldState[]>(() =>
     parseSchemaFieldsFromText(defaultSchemaText, keyName)
   );
-  const [importJsonText, setImportJsonText] = useState("");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<SchemaFieldState>({
@@ -341,59 +288,6 @@ function SchemaFieldEditor({
     setRows((current) => current.filter((row) => row.id !== id));
   };
 
-  const importFromJson = () => {
-    const raw = importJsonText.trim();
-    if (!raw) {
-      toast.error("请先粘贴 JSON");
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const importedUrl =
-        typeof parsed.officialDocUrl === "string" ? parsed.officialDocUrl.trim() : "";
-      const targetRows = parsed[keyName];
-      if (!Array.isArray(targetRows)) {
-        toast.error(`JSON 格式不正确，缺少 ${keyName} 数组`);
-        return;
-      }
-
-      const normalized = targetRows
-        .map((item) => {
-          if (!item || typeof item !== "object" || Array.isArray(item)) return null;
-          const row = item as Record<string, unknown>;
-          const name = typeof row.name === "string" ? row.name.trim() : "";
-          if (!name) return null;
-          return {
-            id: randomFieldId(),
-            name,
-            type: typeof row.type === "string" ? row.type : "string",
-            required: Boolean(row.required),
-            description: typeof row.description === "string" ? row.description : "",
-            example: row.example !== undefined && row.example !== null ? String(row.example) : "",
-            exposedToCustomer:
-              typeof row.exposedToCustomer === "boolean"
-                ? row.exposedToCustomer
-                : typeof row.customerVisible === "boolean"
-                  ? row.customerVisible
-                  : true,
-          } satisfies SchemaFieldState;
-        })
-        .filter((row): row is SchemaFieldState => Boolean(row));
-
-      if (normalized.length === 0) {
-        toast.error("没有可导入的字段，请检查 name 是否填写");
-        return;
-      }
-
-      setRows(normalized);
-      if (importedUrl) setOfficialDocUrl(importedUrl);
-      toast.success(`已导入 ${normalized.length} 个字段`);
-    } catch {
-      toast.error("JSON 解析失败，请检查格式");
-    }
-  };
-
   const normalizedRows = rows
     .map((row) => ({
       name: row.name.trim(),
@@ -447,38 +341,6 @@ function SchemaFieldEditor({
           placeholder="https://provider-docs.example.com/..."
         />
       </label>
-
-      <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5">
-        <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">粘贴 JSON 一键导入字段</p>
-        <textarea
-          value={importJsonText}
-          onChange={(event) => setImportJsonText(event.target.value)}
-          disabled={disabled}
-          rows={5}
-          className={formTextAreaClassName}
-          placeholder={`{\n  "officialDocUrl": "https://example.com/docs",\n  "${keyName}": [\n    { "name": "prompt", "type": "string", "description": "...", "example": "...", "exposedToCustomer": true }\n  ]\n}`}
-        />
-        <div className="mt-2 flex justify-end">
-          <button
-            type="button"
-            onClick={importFromJson}
-            disabled={disabled}
-            className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-black/[0.03] disabled:opacity-50"
-          >
-            导入 JSON
-          </button>
-        </div>
-      </div>
-
-      <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5">
-        <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">AI 提示词模板（可复制给其他 AI）</p>
-        <textarea
-          value={buildSchemaAiPromptTemplate(keyName)}
-          readOnly
-          rows={10}
-          className={`${formTextAreaClassName} text-xs`}
-        />
-      </div>
 
       <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2 py-1.5 text-[11px] text-black/55">
         建议填写：参数名、类型、说明、示例。`必填` 表示调用时必须提供；`对外开放` 表示该字段会展示给客户。
@@ -597,7 +459,7 @@ function SchemaFieldEditor({
                   }
                   className="size-3.5"
                 />
-                对外开放（在 Dashboard 文档展示）
+                展示给用户填写（工具页表单可见）
               </label>
             </div>
             <div className="mt-4 flex justify-end gap-2">
@@ -749,6 +611,7 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
     resultMimeType: "image/png",
     submitPath: "/v1/models/{upstreamModel}:generate",
     pollPath: "/v1/operations/{taskId}",
+    resultPath: "",
     taskIdPath: "name",
     statusPath: "done",
     resultUrlPath: "response.outputUrl",
@@ -801,6 +664,10 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
         typeof parsed.pollPath === "string" && parsed.pollPath.trim().length > 0
           ? parsed.pollPath
           : fallback.pollPath,
+      resultPath:
+        typeof parsed.resultPath === "string" && parsed.resultPath.trim().length > 0
+          ? parsed.resultPath
+          : fallback.resultPath,
       taskIdPath:
         typeof parsed.taskIdPath === "string" && parsed.taskIdPath.trim().length > 0
           ? parsed.taskIdPath
@@ -857,6 +724,9 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
   if (shouldPersistAsyncFields) {
     result.pollPath = state.pollPath.trim();
     result.statusPath = state.statusPath.trim();
+    if (state.resultPath.trim()) {
+      result.resultPath = state.resultPath.trim();
+    }
   }
   const submitBodyTemplateText = state.submitBodyTemplate.trim();
   if (submitBodyTemplateText) {
@@ -974,6 +844,7 @@ function buildAutofillPreviewPayload(input: {
           typeof executionConfig.authQueryParam === "string" ? executionConfig.authQueryParam : "",
         submitPath: typeof executionConfig.submitPath === "string" ? executionConfig.submitPath : "",
         pollPath: typeof executionConfig.pollPath === "string" ? executionConfig.pollPath : "",
+        resultPath: typeof executionConfig.resultPath === "string" ? executionConfig.resultPath : "",
         taskIdPath: typeof executionConfig.taskIdPath === "string" ? executionConfig.taskIdPath : "",
         statusPath: typeof executionConfig.statusPath === "string" ? executionConfig.statusPath : "",
         resultUrlPath:
@@ -1839,6 +1710,7 @@ export function CreateProviderModelForm({
                           ...current,
                           mode: nextMode,
                           pollPath: "",
+                          resultPath: "",
                           statusPath: "",
                         };
                       }
@@ -1992,10 +1864,27 @@ export function CreateProviderModelForm({
                       placeholder="done"
                     />
                   </label>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">
+                      结果查询路径 resultPath（可选）
+                    </span>
+                    <input
+                      value={executionConfigState.resultPath}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          resultPath: event.target.value,
+                        }))
+                      }
+                      disabled={disabled}
+                      className={formInputClassName}
+                      placeholder="/api/v3/predictions/{taskId}/result"
+                    />
+                  </label>
                 </>
               ) : null}
               <label className="block md:col-span-2">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">结果 URL 路径 resultUrlPath</span>
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">结果字段路径（JSON path）resultUrlPath</span>
                 <input
                   value={executionConfigState.resultUrlPath}
                   onChange={(event) =>
@@ -2007,7 +1896,7 @@ export function CreateProviderModelForm({
                   required
                   disabled={disabled}
                   className={formInputClassName}
-                  placeholder="response.outputUrl"
+                  placeholder="例如 data.outputs.0 / response.outputUrl"
                 />
               </label>
               <label className="block">
