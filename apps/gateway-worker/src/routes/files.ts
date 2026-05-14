@@ -83,25 +83,6 @@ export async function registerFileRoutes(app: FastifyInstance) {
   app.get("/v1/files/:requestId/assets/:assetIndex", async (request, reply) => {
     const params = fileAssetParamsSchema.parse(request.params);
 
-    const { data: requestRow, error: requestError } = await supabaseAdmin
-      .from("inference_requests")
-      .select("id, provider_id, output_payload")
-      .eq("id", params.requestId)
-      .maybeSingle();
-
-    if (requestError) {
-      throw new Error(requestError.message);
-    }
-
-    if (!requestRow) {
-      return reply.code(404).send({
-        error: {
-          code: "file_not_found",
-          message: "Generated file not found",
-        },
-      });
-    }
-
     const { data: assetRows, error: assetError } = await supabaseAdmin
       .from("generated_assets")
       .select("storage_bucket, storage_path, mime_type")
@@ -135,6 +116,25 @@ export async function registerFileRoutes(app: FastifyInstance) {
       const contentType = cachedDownload.data.type || "application/octet-stream";
       setGeneratedAssetHeaders(reply, contentType, buffer.length);
       return reply.code(200).send(buffer);
+    }
+
+    const { data: requestRow, error: requestError } = await supabaseAdmin
+      .from("inference_requests")
+      .select("id, provider_id, output_payload")
+      .eq("id", params.requestId)
+      .maybeSingle();
+
+    if (requestError) {
+      throw new Error(requestError.message);
+    }
+
+    if (!requestRow) {
+      return reply.code(404).send({
+        error: {
+          code: "file_not_found",
+          message: "Generated file not found",
+        },
+      });
     }
 
     const sourceUrl = getAssetSourceUrl(requestRow.output_payload, params.assetIndex);
