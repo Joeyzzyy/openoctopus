@@ -16,7 +16,7 @@ export function ProductTopTabs({
   dashboardHref = "/dashboard",
   modelsHref = "/models",
   apiKeysHref = "/dashboard?view=api-keys",
-  requestDetailsHref = "/dashboard?view=request-details&requestsPage=1&billingPage=1&analyticsInterval=hour&analyticsRange=24h",
+  requestDetailsHref = "/dashboard?view=request-details&requestsPage=1&billingPage=1&analyticsInterval=minute&analyticsRange=24h",
   accountHref = "/dashboard?view=account",
 }: ProductTopTabsProps) {
   const router = useRouter();

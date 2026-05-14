@@ -96,7 +96,7 @@ function parseDashboardView(value: string | undefined): DashboardView {
 function parseRequestInterval(value: string | undefined): RequestInterval {
   return requestIntervalOptions.some((option) => option.value === value)
     ? (value as RequestInterval)
-    : "hour";
+    : "minute";
 }
 
 function parseRequestRange(value: string | undefined, interval: RequestInterval): RequestRange {
