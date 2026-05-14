@@ -138,7 +138,7 @@ export function ProductTopTabs({
         </div>
       </div>
       {showSpinner ? (
-        <div className="fixed inset-x-0 bottom-0 top-16 z-[20] flex items-center justify-center bg-[#FCFCFA]">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center overflow-hidden bg-[#FCFCFA] pt-16">
           <div className="flex flex-col items-center gap-3">
             <span className="inline-flex size-8 animate-spin rounded-full border-2 border-[#E7E0D3] border-t-[#E58A35]" />
             <span className="text-sm text-[#7B6A55]">Loading...</span>
