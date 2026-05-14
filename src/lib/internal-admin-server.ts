@@ -78,9 +78,6 @@ type ProviderModelRow = {
   capability: "image_generation" | "image_edit" | "video_generation";
   active: boolean;
   pricing: Record<string, unknown> | null;
-  pricing_source_url: string | null;
-  pricing_source_note: string | null;
-  pricing_source_evidence: unknown[] | null;
   input_schema: Record<string, unknown> | null;
   output_schema: Record<string, unknown> | null;
   execution_template: string | null;
@@ -326,45 +323,6 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
-}
-
-async function buildPricingEvidenceItems(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  value: unknown
-) {
-  if (!Array.isArray(value) || value.length === 0) {
-    return [];
-  }
-
-  return Promise.all(
-    value.map(async (item, index) => {
-      const record = asRecord(item);
-      const path =
-        typeof record?.path === "string" && record.path.trim().length > 0 ? record.path : null;
-
-      if (!path) {
-        return {
-          type: typeof record?.type === "string" ? record.type : undefined,
-          path: null,
-          label: typeof record?.label === "string" ? record.label : `证据 ${index + 1}`,
-          uploadedAt: typeof record?.uploadedAt === "string" ? record.uploadedAt : undefined,
-          signedUrl: null,
-        };
-      }
-
-      const { data } = await supabase.storage
-        .from("provider-pricing-evidence")
-        .createSignedUrl(path, 60 * 60);
-
-      return {
-        type: typeof record?.type === "string" ? record.type : undefined,
-        path,
-        label: typeof record?.label === "string" ? record.label : `证据 ${index + 1}`,
-        uploadedAt: typeof record?.uploadedAt === "string" ? record.uploadedAt : undefined,
-        signedUrl: data?.signedUrl ?? null,
-      };
-    })
-  );
 }
 
 function readNumber(value: unknown) {
@@ -719,7 +677,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       supabase
       .from("provider_models")
       .select(
-          "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, pricing_source_url, pricing_source_note, pricing_source_evidence, input_schema, output_schema, execution_template, execution_config, created_at"
+          "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, input_schema, output_schema, execution_template, execution_config, created_at"
         )
         .order("created_at", { ascending: true }),
       bypassAuth
@@ -938,12 +896,9 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       supportedModelName: supportedModel?.display_name ?? providerModel.public_model_slug,
       pricingText: formatJson(providerModel.pricing),
       pricingSummary: summarizeBilling(providerModel.pricing),
-      pricingSourceUrl: providerModel.pricing_source_url ?? null,
-      pricingSourceNote: providerModel.pricing_source_note ?? null,
-      pricingSourceEvidence: await buildPricingEvidenceItems(
-        supabase,
-        providerModel.pricing_source_evidence
-      ),
+      pricingSourceUrl: null,
+      pricingSourceNote: null,
+      pricingSourceEvidence: [],
       executionTemplate: providerModel.execution_template ?? "rest-async-poll-v1",
       executionConfigText: formatJson(providerModel.execution_config),
       inputSchemaText: formatJson(providerModel.input_schema),

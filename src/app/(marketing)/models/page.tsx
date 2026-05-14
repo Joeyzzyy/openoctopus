@@ -51,7 +51,7 @@ function readMetaField(value: unknown, key: "modelDescription" | "modelType") {
   }
 }
 
-export default async function ModelsPage() {
+async function loadModelsPageData() {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("supported_models")
@@ -114,12 +114,50 @@ export default async function ModelsPage() {
     .map((row) => row.name?.trim() ?? "")
     .filter((name) => name.length > 0);
 
+  return { modelDocRows, vendorOptions };
+}
+
+type ModelsPageShellProps = {
+  initialProvider?: string;
+  initialModelSlug?: string;
+};
+
+async function ModelsPageShell({ initialProvider, initialModelSlug }: ModelsPageShellProps) {
+  const { modelDocRows, vendorOptions } = await loadModelsPageData();
+
   return (
     <main className="relative mx-auto w-full max-w-7xl px-4 pb-10 pt-4 sm:px-5 xl:px-0">
       <ProductTopTabs />
       <div className="mb-2">
-        <ModelsBrowser rows={modelDocRows} vendorOptions={vendorOptions} />
+        <ModelsBrowser
+          rows={modelDocRows}
+          vendorOptions={vendorOptions}
+          initialProvider={initialProvider}
+          initialModelSlug={initialModelSlug}
+        />
       </div>
     </main>
+  );
+}
+
+export default async function ModelsPage() {
+  return <ModelsPageShell />;
+}
+
+export async function ModelsProviderModelPage({
+  params,
+}: {
+  params: Promise<{ provider: string; modelSlug: string[] }>;
+}) {
+  const resolved = await params;
+  const modelSlug = Array.isArray(resolved.modelSlug)
+    ? resolved.modelSlug.join("/")
+    : "";
+
+  return (
+    <ModelsPageShell
+      initialProvider={decodeURIComponent(resolved.provider)}
+      initialModelSlug={decodeURIComponent(modelSlug)}
+    />
   );
 }

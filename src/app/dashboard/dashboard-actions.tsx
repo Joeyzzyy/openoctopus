@@ -27,7 +27,7 @@ export function CreateKeyButton({
         disabled={disabled}
         title={disabled ? "Create API key is currently unavailable" : "Create API key"}
         className={cn(
-          "inline-flex h-9 cursor-pointer items-center gap-2 rounded-[14px] bg-[#111111] px-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#222222] disabled:cursor-not-allowed disabled:bg-[#111111]/35 disabled:text-white/75 sm:h-10 sm:px-4",
+          "inline-flex h-9 cursor-pointer items-center gap-2 rounded-[14px] bg-[#1F8A4C] px-3 font-mono text-[11px] font-semibold uppercase tracking-[1px] text-white shadow-sm transition-colors hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:bg-[#1F8A4C]/35 disabled:text-white/75 sm:h-10 sm:px-4",
           className
         )}
       >

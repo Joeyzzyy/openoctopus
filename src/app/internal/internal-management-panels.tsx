@@ -697,6 +697,7 @@ function DialogFormSubmitButton({
   pendingLabel?: string;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [resetTimer, setResetTimer] = useState<number | null>(null);
 
   return (
     <button
@@ -713,6 +714,14 @@ function DialogFormSubmitButton({
         }
         setSubmitting(true);
         form.requestSubmit();
+        if (resetTimer !== null) {
+          window.clearTimeout(resetTimer);
+        }
+        const timer = window.setTimeout(() => {
+          setSubmitting(false);
+          setResetTimer(null);
+        }, 2500);
+        setResetTimer(timer);
       }}
       className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220] disabled:cursor-not-allowed disabled:bg-black/15 disabled:text-black/35"
     >
@@ -1293,9 +1302,6 @@ export function PublicModelsPanel({
                                         defaultProviderId={mapping.provider_id}
                                         defaultUpstreamModelSlug={mapping.upstream_model_slug}
                                         defaultPricing={mapping.pricingText}
-                                        defaultPricingSourceUrl={mapping.pricingSourceUrl ?? undefined}
-                                        defaultPricingSourceNote={mapping.pricingSourceNote ?? undefined}
-                                        defaultPricingSourceEvidence={JSON.stringify(mapping.pricingSourceEvidence)}
                                         defaultInputSchema={mapping.inputSchemaText}
                                         defaultOutputSchema={mapping.outputSchemaText}
                                         defaultExecutionTemplate={mapping.executionTemplate}
@@ -1733,16 +1739,6 @@ export function EconomicsPanel({
                                 <td className="w-[240px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{row.supportedModel.billingSummary}</td>
                                 <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
                                   <p>{row.providerModel.pricingSummary}</p>
-                                  {row.providerModel.pricingSourceUrl ? (
-                                    <a
-                                      href={row.providerModel.pricingSourceUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="mt-1 inline-flex text-[11px] text-[#355FB4] underline-offset-2 hover:underline"
-                                    >
-                                      官方价格链接
-                                    </a>
-                                  ) : null}
                                 </td>
                                 <td className="w-[130px] border-b border-black/[0.06] px-3 py-3 align-top">
                                   {row.margin === null ? (
@@ -1754,8 +1750,7 @@ export function EconomicsPanel({
                                   )}
                                 </td>
                                 <td className="w-[130px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
-                                  <p>截图：{row.providerModel.pricingSourceEvidence.length}</p>
-                                  <p className="mt-1">备注：{row.providerModel.pricingSourceNote ? "有" : "无"}</p>
+                                  <p>来源字段已移除</p>
                                 </td>
                                 <td className="w-[110px] border-b border-black/[0.06] px-3 py-3 align-top">
                                   <span
@@ -1794,9 +1789,6 @@ export function EconomicsPanel({
                                     defaultProviderId={row.providerModel.provider_id}
                                     defaultUpstreamModelSlug={row.providerModel.upstream_model_slug}
                                     defaultPricing={row.providerModel.pricingText}
-                                    defaultPricingSourceUrl={row.providerModel.pricingSourceUrl ?? undefined}
-                                    defaultPricingSourceNote={row.providerModel.pricingSourceNote ?? undefined}
-                                    defaultPricingSourceEvidence={JSON.stringify(row.providerModel.pricingSourceEvidence)}
                                     defaultInputSchema={row.providerModel.inputSchemaText}
                                     defaultOutputSchema={row.providerModel.outputSchemaText}
                                     defaultExecutionTemplate={row.providerModel.executionTemplate}
@@ -2419,9 +2411,6 @@ export function ModelsPanel({
                     defaultProviderId={item.provider_id}
                     defaultUpstreamModelSlug={item.upstream_model_slug}
                     defaultPricing={item.pricingText}
-                    defaultPricingSourceUrl={item.pricingSourceUrl ?? undefined}
-                    defaultPricingSourceNote={item.pricingSourceNote ?? undefined}
-                    defaultPricingSourceEvidence={JSON.stringify(item.pricingSourceEvidence)}
                     defaultInputSchema={item.inputSchemaText}
                     defaultOutputSchema={item.outputSchemaText}
                     defaultExecutionTemplate={item.executionTemplate}
@@ -2444,53 +2433,12 @@ export function ModelsPanel({
                 <pre className="mt-3 overflow-x-auto whitespace-pre-wrap">{item.pricingText}</pre>
               </div>
               <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
-                <p className="text-[11px] tracking-[0.35px] text-black/45">官方成本来源</p>
-                {item.pricingSourceUrl ? (
-                  <a
-                    href={item.pricingSourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-2 block break-all text-sm text-[#355fb4] underline-offset-2 hover:underline"
-                  >
-                    {item.pricingSourceUrl}
-                  </a>
-                ) : (
-                  <p className="mt-2 text-sm text-black/45">未填写来源链接</p>
-                )}
-                {item.pricingSourceNote ? (
-                  <p className="mt-3 text-xs leading-5 text-black/58">{item.pricingSourceNote}</p>
-                ) : null}
+                <p className="text-[11px] tracking-[0.35px] text-black/45">成本来源字段</p>
+                <p className="mt-2 text-sm text-black/45">已移除</p>
               </div>
               <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
-                <p className="text-[11px] tracking-[0.35px] text-black/45">价格证据</p>
-                {item.pricingSourceEvidence.length > 0 ? (
-                  <div className="mt-2 grid gap-2">
-                    {item.pricingSourceEvidence.map((evidence, index) => (
-                      <div
-                        key={`${item.id}-evidence-${index}`}
-                        className="rounded-md border border-black/[0.06] bg-white px-3 py-2"
-                      >
-                        {evidence.signedUrl ? (
-                          <a
-                            href={evidence.signedUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-sm text-[#355fb4] underline-offset-2 hover:underline"
-                          >
-                            {evidence.label ?? `证据 ${index + 1}`}
-                          </a>
-                        ) : (
-                          <p className="text-sm text-black">{evidence.label ?? `证据 ${index + 1}`}</p>
-                        )}
-                        {evidence.path ? (
-                          <p className="mt-1 break-all text-xs text-black/50">{evidence.path}</p>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-2 text-sm text-black/45">未上传证据图片</p>
-                )}
+                <p className="text-[11px] tracking-[0.35px] text-black/45">证据字段</p>
+                <p className="mt-2 text-sm text-black/45">已移除</p>
               </div>
             </div>
             <RuntimeDiagnostics diagnostics={item.runtimeDiagnostics} />

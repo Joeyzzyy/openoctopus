@@ -1,11 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
-  CircleAlert,
   KeyRound,
   LineChart,
   ReceiptText,
-  Wallet,
 } from "lucide-react";
 import { MarketingHeader } from "@/components/marketing/site-chrome";
 import { ProductTopTabs } from "@/components/marketing/product-top-tabs";
@@ -17,6 +15,7 @@ import { ModelCatalogTable } from "./model-catalog-table";
 import { TopUpForm } from "./top-up-form";
 import { AutoRefreshOnReturn } from "./auto-refresh-on-return";
 import { TopUpCelebration } from "./top-up-celebration";
+import { InteractiveTrendChartCard, RequestDetailsFilters } from "./request-details-controls";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -42,6 +41,10 @@ const requestStatusStyles = {
   failed: "bg-[#ffe7e3] text-[#b54432]",
   cancelled: "bg-[#ececec] text-[#666666]",
 };
+
+const activePillClassName = "border-[#E58A35] bg-[#FFF1DD] text-[#9A4F18]";
+const inactivePillClassName =
+  "border-[#E7E0D3] bg-white text-[#6B5F4E] hover:bg-[#FFF7EA] hover:text-[#111827]";
 
 const requestIntervalOptions = [
   { value: "minute", label: "By minute" },
@@ -209,21 +212,6 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function buildLinePath(points: number[], width: number, height: number) {
-  if (points.length === 0) {
-    return "";
-  }
-
-  const maxValue = Math.max(...points, 1);
-  return points
-    .map((point, index) => {
-      const x = points.length === 1 ? width / 2 : (index / (points.length - 1)) * width;
-      const y = height - (point / maxValue) * height;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(" ");
-}
-
 function buildRequestTrendSeries(
   rows: Array<{ createdAt: string; costValue: number }>,
   interval: RequestInterval,
@@ -273,79 +261,15 @@ function MetricCard({
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] px-4 py-4 shadow-sm">
+    <div className="rounded-2xl border border-[#E7E0D3] bg-white px-4 py-4 shadow-sm">
       <div className="flex items-start gap-3">
-        <div className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-white text-black/55">
+        <div className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#FFF1DD] text-[#B7661F]">
           <Icon className="size-4" />
         </div>
         <div className="min-w-0">
           <p className="text-[11px] tracking-[0.35px] text-black/60">{title}</p>
           <p className="mt-1 text-2xl font-medium tracking-tight text-black">{value}</p>
           <p className="mt-2 text-xs leading-5 text-black/50">{note}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TrendChartCard({
-  title,
-  points,
-  labels,
-  valueLabel,
-}: {
-  title: string;
-  points: number[];
-  labels: string[];
-  valueLabel: string;
-}) {
-  const width = 560;
-  const height = 180;
-
-  return (
-    <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-black">{title}</p>
-          <p className="mt-1 text-xs text-black/45">{valueLabel}</p>
-        </div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-black/[0.08] bg-[#FCFCFA] px-2.5 py-1 text-[11px] text-black/60">
-          <LineChart className="size-3.5" />
-          <span>Trend</span>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="h-44 w-full"
-          role="img"
-          aria-label={title}
-        >
-          {[0.25, 0.5, 0.75, 1].map((ratio) => (
-            <line
-              key={ratio}
-              x1="0"
-              x2={width}
-              y1={height - height * ratio}
-              y2={height - height * ratio}
-              stroke="rgba(17,17,17,0.08)"
-              strokeDasharray="4 6"
-            />
-          ))}
-          <path
-            d={buildLinePath(points, width, height)}
-            fill="none"
-            stroke="#111111"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <div className="mt-3 flex items-center justify-between gap-4 text-[11px] text-black/45">
-          <span>{labels[0] ?? ""}</span>
-          <span>{labels[Math.floor(labels.length / 2)] ?? ""}</span>
-          <span>{labels[labels.length - 1] ?? ""}</span>
         </div>
       </div>
     </div>
@@ -441,25 +365,19 @@ export default async function DashboardPage({
 
   const overviewCards = [
     {
-      title: "Wallet balance",
-      value: walletMetric?.value ?? "$0.00",
-      note: walletMetric?.change ?? "No wallet top-ups yet",
-      icon: Wallet,
-    },
-    {
       title: "Total top-ups",
       value: topupMetric?.value ?? "$0.00",
       note: topupMetric?.change ?? "No recharge recorded",
       icon: ReceiptText,
     },
     {
-      title: "Filtered spend",
+      title: "Spend in view",
       value: formatCurrency(filteredSpend),
       note: selectedApiKey ? `${selectedApiKey.name} in ${analyticsRange}` : `All keys in ${analyticsRange}`,
       icon: LineChart,
     },
     {
-      title: "Filtered requests",
+      title: "Requests in view",
       value: filteredRequests,
       note: `${successfulRequests} succeeded in the selected window`,
       icon: KeyRound,
@@ -515,11 +433,11 @@ export default async function DashboardPage({
           <section className="min-h-[calc(100vh-108px)] min-w-0">
             {view === "dashboard" ? (
               <>
-                <section className="mb-4">
-                  <TopUpForm />
-                </section>
                 <article className="mb-6 space-y-3 md:mb-8">
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+                    <div className="xl:col-span-1">
+                      <TopUpForm balanceLabel={walletMetric?.value ?? "$0.00"} />
+                    </div>
                     {overviewCards.map((card) => (
                       <MetricCard
                         key={card.title}
@@ -536,125 +454,28 @@ export default async function DashboardPage({
 
             {view === "request-details" ? (
               <section className="p-0">
-                  <div className="mb-4 flex flex-col gap-3">
-                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                      <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                        <p className="text-[11px] tracking-[0.35px] text-black/45">API key filter</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Link
-                            href={buildDashboardHref({
-                              view: "request-details",
-                              requestsPage: 1,
-                              apiKeyId: null,
-                              analyticsInterval,
-                              analyticsRange,
-                            })}
-                            className={cn(
-                              "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
-                              selectedApiKeyId === null
-                                ? "border-black bg-black text-white"
-                                : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                            )}
-                          >
-                            All keys
-                          </Link>
-                          {requestFilters.apiKeys.map((item) => (
-                            <Link
-                              key={item.id}
-                              href={buildDashboardHref({
-                                view: "request-details",
-                                requestsPage: 1,
-                                apiKeyId: item.id,
-                                analyticsInterval,
-                                analyticsRange,
-                              })}
-                              className={cn(
-                                "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
-                                selectedApiKeyId === item.id
-                                  ? "border-black bg-black text-white"
-                                  : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                              )}
-                            >
-                              {item.name}
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                        <p className="text-[11px] tracking-[0.35px] text-black/45">Time granularity</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {requestIntervalOptions.map((option) => (
-                            <Link
-                              key={option.value}
-                              href={buildDashboardHref({
-                                view: "request-details",
-                                requestsPage: 1,
-                                apiKeyId: selectedApiKeyId,
-                                analyticsInterval: option.value,
-                                analyticsRange: parseRequestRange(undefined, option.value),
-                              })}
-                              className={cn(
-                                "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
-                                analyticsInterval === option.value
-                                  ? "border-black bg-black text-white"
-                                  : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                              )}
-                            >
-                              {option.label}
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                        <p className="text-[11px] tracking-[0.35px] text-black/45">Time range</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {getRequestRangeOptions(analyticsInterval).map((option) => (
-                            <Link
-                              key={option.value}
-                              href={buildDashboardHref({
-                                view: "request-details",
-                                requestsPage: 1,
-                                apiKeyId: selectedApiKeyId,
-                                analyticsInterval,
-                                analyticsRange: option.value,
-                              })}
-                              className={cn(
-                                "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
-                                analyticsRange === option.value
-                                  ? "border-black bg-black text-white"
-                                  : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                              )}
-                            >
-                              {option.label}
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-4 flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-                    <CircleAlert className="size-3.5 shrink-0 text-amber-600" />
-                    <p className="text-xs leading-[1.35] text-amber-900/70">
-                      Your outputs are stored for 7 days only. Download anything you need to keep.
-                    </p>
-                  </div>
+                  <RequestDetailsFilters
+                    apiKeys={requestFilters.apiKeys}
+                    selectedApiKeyId={selectedApiKeyId}
+                    analyticsInterval={analyticsInterval}
+                    analyticsRange={analyticsRange}
+                  />
 
                   {analyticsRequests.length > 0 ? (
                     <div className="grid gap-4 xl:grid-cols-2">
-                      <TrendChartCard
+                      <InteractiveTrendChartCard
                         title="Request count"
                         points={trendSeries.requestPoints}
                         labels={trendSeries.labels}
                         valueLabel={`${filteredRequests} requests in the selected window`}
+                        valueKind="count"
                       />
-                      <TrendChartCard
+                      <InteractiveTrendChartCard
                         title="Spend"
                         points={trendSeries.spendPoints}
                         labels={trendSeries.labels}
                         valueLabel={`${formatCurrency(filteredSpend)} billed in the selected window`}
+                        valueKind="currency"
                       />
                     </div>
                   ) : null}
@@ -662,16 +483,13 @@ export default async function DashboardPage({
                   <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="min-w-0">
                       <h3 className="text-lg font-semibold text-black">Request list</h3>
-                      <p className="mt-1 text-sm text-black/55">
-                        Filtered request history with pagination and API key context.
-                      </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="inline-flex h-8 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/80">
                         <span>{requestPagination.total} total</span>
                       </div>
                       <div className="inline-flex h-8 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/80">
-                        <span>10 per page</span>
+                        <span>{requestPagination.pageSize} per page</span>
                       </div>
                     </div>
                   </div>
@@ -787,7 +605,7 @@ export default async function DashboardPage({
                           })}
                           aria-disabled={requestPagination.page <= 1}
                           className={cn(
-                            "inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
+                            "inline-flex h-8 items-center rounded-md border border-[#E7E0D3] bg-white px-3 text-xs font-medium text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]",
                             requestPagination.page <= 1 && "pointer-events-none opacity-40"
                           )}
                         >
@@ -811,8 +629,8 @@ export default async function DashboardPage({
                                   className={cn(
                                     "inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors",
                                     page === requestPagination.page
-                                      ? "border-black bg-black text-white"
-                                      : "border-black/10 bg-white text-black/70 hover:bg-black/[0.03]"
+                                      ? activePillClassName
+                                      : inactivePillClassName
                                   )}
                                 >
                                   {page}
@@ -831,7 +649,7 @@ export default async function DashboardPage({
                           })}
                           aria-disabled={requestPagination.page >= requestPagination.totalPages}
                           className={cn(
-                            "inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
+                            "inline-flex h-8 items-center rounded-md border border-[#E7E0D3] bg-white px-3 text-xs font-medium text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]",
                             requestPagination.page >= requestPagination.totalPages &&
                               "pointer-events-none opacity-40"
                           )}
@@ -898,13 +716,16 @@ export default async function DashboardPage({
                                     href={row.invoiceUrl ?? row.receiptUrl ?? "#"}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]"
+                                    className="inline-flex h-8 items-center rounded-md border border-[#E7E0D3] bg-white px-3 text-xs font-medium text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]"
                                   >
                                     Open Billing Document
                                   </a>
                                 ) : (
-                                  <span className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/40">
-                                    No document
+                                  <span
+                                    title="Requires matching Stripe credentials for this billing record."
+                                    className="inline-flex h-8 items-center rounded-md border border-[#E7E0D3] bg-white px-3 text-xs font-medium text-[#9A8B78]"
+                                  >
+                                    Document unavailable
                                   </span>
                                 )}
                               </div>
@@ -939,7 +760,7 @@ export default async function DashboardPage({
                         })}
                         aria-disabled={normalizedBillingPage <= 1}
                         className={cn(
-                          "inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
+                          "inline-flex h-8 items-center rounded-md border border-[#E7E0D3] bg-white px-3 text-xs font-medium text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]",
                           normalizedBillingPage <= 1 && "pointer-events-none opacity-40"
                         )}
                       >
@@ -967,8 +788,8 @@ export default async function DashboardPage({
                                 className={cn(
                                   "inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors",
                                   page === normalizedBillingPage
-                                    ? "border-black bg-black text-white"
-                                    : "border-black/10 bg-white text-black/70 hover:bg-black/[0.03]"
+                                    ? activePillClassName
+                                    : inactivePillClassName
                                 )}
                               >
                                 {page}
@@ -991,7 +812,7 @@ export default async function DashboardPage({
                         })}
                         aria-disabled={normalizedBillingPage >= billingTotalPages}
                         className={cn(
-                          "inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]",
+                          "inline-flex h-8 items-center rounded-md border border-[#E7E0D3] bg-white px-3 text-xs font-medium text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]",
                           normalizedBillingPage >= billingTotalPages &&
                             "pointer-events-none opacity-40"
                         )}

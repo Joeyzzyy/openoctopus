@@ -341,8 +341,8 @@ export function ApiQuickstartCard({
 
   const tabClass = (active: boolean) =>
     active
-      ? "border-black bg-black text-white"
-      : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]";
+      ? "border-[#E58A35] bg-[#FFF1DD] text-[#9A4F18]"
+      : "border-[#E7E0D3] bg-white text-[#6B5F4E] hover:bg-[#FFF7EA]";
 
   const jumpToSection = (section: "quickstart" | "input" | "output") => {
     setActiveSection(section);

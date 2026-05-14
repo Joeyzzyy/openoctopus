@@ -1,5 +1,11 @@
--- Atomic update for internal model economics matrix editing.
--- Run this in Supabase SQL editor before using updateModelEconomicsBundle action.
+alter table if exists public.provider_models
+  drop column if exists pricing_source_url,
+  drop column if exists pricing_source_note,
+  drop column if exists pricing_source_evidence;
+
+drop function if exists public.admin_update_model_economics_bundle(
+  uuid, uuid, jsonb, text, numeric, jsonb, text, text, jsonb
+);
 
 create or replace function public.admin_update_model_economics_bundle(
   p_supported_model_id uuid,
@@ -42,8 +48,7 @@ begin
   end if;
 
   update public.provider_models
-  set
-    pricing = p_provider_pricing
+  set pricing = p_provider_pricing
   where id = p_provider_model_id;
 
   if not found then

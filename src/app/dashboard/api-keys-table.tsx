@@ -38,7 +38,7 @@ const inputClassName =
   "h-8 rounded-md border-black/[0.08] bg-white font-mono text-sm text-[#111827]";
 
 const secondaryButtonClassName =
-  "inline-flex cursor-pointer items-center gap-1 rounded-md border border-black/[0.08] bg-white text-[#4B5563] transition-colors hover:bg-black/[0.03]";
+  "inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#E7E0D3] bg-white text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA] hover:text-[#111827]";
 
 export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -194,7 +194,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                     <button
                       onClick={() => saveEdit(key.id)}
                       disabled={isPending}
-                      className="inline-flex h-9 flex-1 cursor-pointer items-center justify-center gap-1 rounded-md bg-[#111827] px-3 text-[10px] uppercase tracking-[0.5px] text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-9 flex-1 cursor-pointer items-center justify-center gap-1 rounded-md bg-[#1F8A4C] px-3 text-[10px] uppercase tracking-[0.5px] text-white transition-colors hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Check className="h-3 w-3" /> Save
                     </button>
@@ -331,14 +331,14 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                           <button
                             onClick={() => saveEdit(key.id)}
                             disabled={isPending}
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-[#111827] text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-[#1F8A4C] text-white transition-colors hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-50"
                             title="Save"
                           >
                             <Check className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={cancelEdit}
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white text-[#4B5563] transition-colors hover:bg-black/[0.03]"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]"
                             title="Cancel"
                           >
                             <X className="h-3.5 w-3.5" />
@@ -348,7 +348,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                         <>
                           <button
                             onClick={() => startEdit(key)}
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white text-[#4B5563] transition-colors hover:bg-black/[0.03]"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]"
                             title="Edit name & budget"
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -356,7 +356,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                           <button
                             onClick={() => handleToggle(key.id, key.rawStatus)}
                             disabled={isPending}
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white text-[#4B5563] transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA] disabled:cursor-not-allowed disabled:opacity-50"
                             title={key.rawStatus === "paused" ? "Resume key" : "Pause key"}
                           >
                             {key.rawStatus === "paused" ? (
@@ -409,7 +409,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
               <button
                 type="button"
                 onClick={() => setDeleteTarget(null)}
-                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white px-4 text-[11px] font-semibold uppercase tracking-[1px] text-[#111827] transition-colors hover:bg-black/[0.03]"
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white px-4 text-[11px] font-semibold uppercase tracking-[1px] text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]"
               >
                 Cancel
               </button>

@@ -109,7 +109,7 @@ export function CreateKeySheet({
                 <button
                   type="button"
                   onClick={copySecret}
-                  className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white transition-colors hover:bg-black/[0.03]"
+                  className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white transition-colors hover:bg-[#FFF7EA]"
                 >
                   {copied ? (
                     <Check className="h-4 w-4 text-[#15803D]" />
@@ -143,14 +143,14 @@ export function CreateKeySheet({
               <Link
                 href="#quickstart"
                 onClick={() => handleClose(false)}
-                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white px-4 text-[11px] font-semibold uppercase tracking-[1px] text-[#111827] transition-colors hover:bg-black/[0.03] sm:flex-1"
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white px-4 text-[11px] font-semibold uppercase tracking-[1px] text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA] sm:flex-1"
               >
                 Open Quickstart
               </Link>
               <button
                 type="button"
                 onClick={() => handleClose(false)}
-                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-4 text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#0B1220] sm:flex-1"
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md bg-[#1F8A4C] px-4 text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#176D3D] sm:flex-1"
               >
                 Done
               </button>
@@ -193,7 +193,7 @@ export function CreateKeySheet({
                     <SelectItem
                       key={e}
                       value={e}
-                      className="cursor-pointer text-[#111827] focus:bg-black/[0.03] focus:text-[#111827]"
+                      className="cursor-pointer text-[#111827] focus:bg-[#FFF7EA] focus:text-[#111827]"
                     >
                       {e}
                     </SelectItem>
@@ -229,7 +229,7 @@ export function CreateKeySheet({
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-[#111827] px-4 py-3 text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#0B1220] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-[#1F8A4C] px-4 py-3 text-[11px] font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <KeyRound className="h-4 w-4" />
               {isPending ? "Creating..." : "Create Key"}

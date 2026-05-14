@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
 
@@ -216,6 +217,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function slugifyPathPart(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function pickImageUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const text = value.trim();
@@ -258,10 +267,16 @@ function extractImageUrls(output: unknown): string[] {
 export function ModelsBrowser({
   rows,
   vendorOptions,
+  initialProvider,
+  initialModelSlug,
 }: {
   rows: ModelDocRow[];
   vendorOptions: string[];
+  initialProvider?: string;
+  initialModelSlug?: string;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const safeRows = rows.length > 0 ? rows : [];
   const providerModelCountMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -306,7 +321,17 @@ export function ModelsBrowser({
       ),
     [providerOptions, providerModelCountMap]
   );
-  const [selectedProvider, setSelectedProvider] = useState<string>(selectableProviderOptions[0] ?? "");
+  const [selectedProvider, setSelectedProvider] = useState<string>(() => {
+    const normalizedInitialProvider = slugifyPathPart(initialProvider ?? "");
+    if (!normalizedInitialProvider) {
+      return selectableProviderOptions[0] ?? "";
+    }
+    const matched =
+      selectableProviderOptions.find(
+        (provider) => slugifyPathPart(provider) === normalizedInitialProvider
+      ) ?? selectableProviderOptions[0];
+    return matched ?? "";
+  });
   const visibleRows = useMemo(
     () =>
       safeRows.filter(
@@ -316,9 +341,22 @@ export function ModelsBrowser({
       ),
     [safeRows, selectedProvider]
   );
-  const [selectedModelSlug, setSelectedModelSlug] = useState<string | null>(
-    visibleRows[0]?.publicModel ?? null
-  );
+
+  const findModelByRouteSlug = (routeSlug: string | undefined, rows: ModelDocRow[]) => {
+    const normalized = (routeSlug ?? "").trim();
+    if (!normalized) return null;
+    const exact = rows.find((row) => row.publicModel === normalized);
+    if (exact) return exact.publicModel;
+    const normalizedSlug = slugifyPathPart(normalized);
+    const bySlug = rows.find((row) => slugifyPathPart(row.publicModel) === normalizedSlug);
+    return bySlug?.publicModel ?? null;
+  };
+
+  const [selectedModelSlug, setSelectedModelSlug] = useState<string | null>(() => {
+    const fromRoute = findModelByRouteSlug(initialModelSlug, visibleRows);
+    if (fromRoute) return fromRoute;
+    return visibleRows[0]?.publicModel ?? null;
+  });
   const effectiveModelSlug =
     selectedModelSlug && visibleRows.some((row) => row.publicModel === selectedModelSlug)
       ? selectedModelSlug
@@ -359,6 +397,36 @@ export function ModelsBrowser({
   const handleModelChange = (nextModelSlug: string | null) => {
     setSelectedModelSlug(nextModelSlug);
   };
+
+  useEffect(() => {
+    const normalizedInitialProvider = slugifyPathPart(initialProvider ?? "");
+    if (!normalizedInitialProvider) return;
+    const matched =
+      selectableProviderOptions.find(
+        (provider) => slugifyPathPart(provider) === normalizedInitialProvider
+      ) ?? null;
+    if (matched && matched !== selectedProvider) {
+      setSelectedProvider(matched);
+    }
+  }, [initialProvider, selectableProviderOptions, selectedProvider]);
+
+  useEffect(() => {
+    if (!initialModelSlug) return;
+    const resolved = findModelByRouteSlug(initialModelSlug, visibleRows);
+    if (!resolved) return;
+    if (selectedModelSlug !== resolved) {
+      setSelectedModelSlug(resolved);
+    }
+  }, [initialModelSlug, visibleRows, selectedModelSlug]);
+
+  useEffect(() => {
+    if (!selectedModel || !selectedProvider) return;
+    const providerSlug = slugifyPathPart(selectedProvider) || encodeURIComponent(selectedProvider);
+    const modelSlug = slugifyPathPart(selectedModel.publicModel) || encodeURIComponent(selectedModel.publicModel);
+    const nextHref = `/models/${providerSlug}/${modelSlug}`;
+    if (pathname === nextHref) return;
+    router.replace(nextHref, { scroll: false });
+  }, [pathname, router, selectedModel, selectedProvider]);
 
   const handleMainTabChange = (tab: "playground" | "api") => {
     if (tab === mainTab) return;
@@ -638,13 +706,13 @@ export function ModelsBrowser({
   return (
     <section className="space-y-4">
       <div className="space-y-2.5">
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 rounded-2xl border border-[#F0DFC3] bg-[#FFFBF4] p-3 md:grid-cols-2">
           <label className="block">
             <span className="mb-1.5 block text-xs font-medium tracking-[0.2px] text-black/55">Model Vendor</span>
             <select
               value={selectedProvider}
               onChange={(event) => handleProviderChange(event.target.value)}
-              className="h-11 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80"
+              className="h-11 w-full rounded-md border border-[#E7E0D3] bg-white px-3 text-sm text-black/80 focus:border-[#E58A35]"
             >
               {selectableProviderOptions.map((provider) => (
                 <option key={provider} value={provider}>
@@ -658,7 +726,7 @@ export function ModelsBrowser({
             <select
               value={effectiveModelSlug ?? visibleRows[0]?.publicModel ?? ""}
               onChange={(event) => handleModelChange(event.target.value || null)}
-              className="h-11 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/85"
+              className="h-11 w-full rounded-md border border-[#E7E0D3] bg-white px-3 text-sm text-black/85 focus:border-[#E58A35]"
             >
               {modelsByCapability.map(([capability, models]) => (
                 <optgroup key={capability} label={capability}>
@@ -697,8 +765,8 @@ export function ModelsBrowser({
                 onClick={() => handleMainTabChange(tab)}
                 className={`h-10 cursor-pointer rounded-none border-b-2 px-3 text-sm font-medium ${
                   tab === mainTab
-                    ? "border-black text-black"
-                    : "border-transparent text-black/55 hover:text-black"
+                    ? "border-[#E58A35] text-[#9A4F18]"
+                    : "border-transparent text-[#6B7280] hover:text-[#111827]"
                 }`}
               >
                 {tab === "api" ? "API" : "playground"}
@@ -826,7 +894,7 @@ export function ModelsBrowser({
                   type="button"
                   disabled={isSubmitting || !selectedModel}
                   onClick={submitPlayground}
-                  className="h-10 rounded-md bg-black px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-45"
+                  className="h-10 rounded-md bg-[#1F8A4C] px-4 text-sm font-medium text-white transition-colors hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {isSubmitting ? "Generating..." : `Generate ${priceTag ? `(${priceTag})` : ""}`}
                 </button>
@@ -871,7 +939,7 @@ export function ModelsBrowser({
                 </div>
               ) : isSubmitting ? (
                 <div className="flex min-h-[280px] flex-1 flex-col items-center justify-center rounded-md border border-black/[0.08] bg-white">
-                  <span className="inline-flex size-7 animate-spin rounded-full border-2 border-black/20 border-t-black" />
+                  <span className="inline-flex size-7 animate-spin rounded-full border-2 border-[#E7E0D3] border-t-[#E58A35]" />
                   <p className="mt-3 text-sm font-medium text-black">Generating...</p>
                   <p className="mt-1 text-xs text-black/55">{taskStatusLabel(taskStatus)}</p>
                 </div>

@@ -98,29 +98,6 @@ function formatRuntimeDiagnosticsForError(summary: string, diagnostics: string[]
   return `${summary}\n- ${diagnostics.join("\n- ")}`;
 }
 
-function normalizeOptionalUrl(value: FormDataEntryValue | null) {
-  const normalized = normalizeOptionalText(value);
-  if (!normalized) {
-    return null;
-  }
-
-  return z.string().url().parse(normalized);
-}
-
-function parseJsonArrayField(value: FormDataEntryValue | null) {
-  const raw = normalizeOptionalText(value);
-  if (!raw) {
-    return [];
-  }
-
-  const parsed = JSON.parse(raw);
-  if (!Array.isArray(parsed)) {
-    throw new Error("JSON field must contain an array");
-  }
-
-  return parsed as Array<Record<string, unknown>>;
-}
-
 function buildInternalAlertHref(input: {
   tab: "public-models" | "economics";
   message: string;
@@ -245,42 +222,6 @@ async function loadProviderRuntimeContext(
       ((workerTemplatesResponse.data ?? []) as Array<{ slug: string; config: Record<string, unknown> | null }>)
         .map((worker) => [worker.slug, worker] as const)
     ),
-  };
-}
-
-async function uploadPricingEvidenceFile(input: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
-  providerId: string;
-  upstreamModelSlug: string;
-  file: File | null;
-}) {
-  const { supabase, providerId, upstreamModelSlug, file } = input;
-
-  if (!file || file.size === 0) {
-    return null;
-  }
-
-  const sanitizedSlug = upstreamModelSlug.toLowerCase().replace(/[^a-z0-9._-]+/g, "-");
-  const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : null;
-  const fileExt = extension && /^[a-z0-9]+$/.test(extension) ? extension : "bin";
-  const path = `${providerId}/${sanitizedSlug}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
-
-  const { error } = await supabase.storage
-    .from("provider-pricing-evidence")
-    .upload(path, file, {
-      contentType: file.type || undefined,
-      upsert: false,
-    });
-
-  if (error) {
-    throw new Error(`Failed to upload pricing evidence: ${error.message}`);
-  }
-
-  return {
-    type: "image",
-    path,
-    label: file.name || "pricing evidence",
-    uploadedAt: new Date().toISOString(),
   };
 }
 
@@ -1844,9 +1785,6 @@ const createProviderModelSchema = z.object({
   capability: capabilitySchema,
   active: z.boolean(),
   pricing: z.record(z.string(), z.unknown()).default({}),
-  pricingSourceUrl: z.string().url().nullable(),
-  pricingSourceNote: z.string().trim().max(2000).nullable(),
-  pricingSourceEvidence: z.array(z.record(z.string(), z.unknown())).default([]),
   inputSchema: z.record(z.string(), z.unknown()).default({}),
   outputSchema: z.record(z.string(), z.unknown()).default({}),
   executionTemplate: z.string().trim().min(1).max(80).default("rest-async-poll-v1"),
@@ -1863,9 +1801,6 @@ export async function createProviderModel(formData: FormData) {
       capability: formData.get("capability"),
       active: parseBooleanField(formData.get("active")),
       pricing: parseJsonField(formData.get("pricing")),
-      pricingSourceUrl: normalizeOptionalUrl(formData.get("pricingSourceUrl")),
-      pricingSourceNote: normalizeOptionalText(formData.get("pricingSourceNote")),
-      pricingSourceEvidence: parseJsonArrayField(formData.get("pricingSourceEvidence")),
       inputSchema: parseJsonField(formData.get("inputSchema")),
       outputSchema: parseJsonField(formData.get("outputSchema")),
       executionTemplate: (formData.get("executionTemplate") as string) || "rest-async-poll-v1",
@@ -1930,17 +1865,6 @@ export async function createProviderModel(formData: FormData) {
     }
 
     const pricingConfig = parseBillingConfig(parsed.pricing);
-    const pricingEvidenceFile = formData.get("pricingSourceEvidenceFile");
-    const uploadedEvidence = await uploadPricingEvidenceFile({
-      supabase,
-      providerId: parsed.providerId,
-      upstreamModelSlug: parsed.upstreamModelSlug,
-      file: pricingEvidenceFile instanceof File ? pricingEvidenceFile : null,
-    });
-    const pricingSourceEvidence = uploadedEvidence
-      ? [...parsed.pricingSourceEvidence, uploadedEvidence]
-      : parsed.pricingSourceEvidence;
-
     const { data, error } = await supabase
       .from("provider_models")
       .insert({
@@ -1951,9 +1875,6 @@ export async function createProviderModel(formData: FormData) {
         capability: parsed.capability,
         active: parsed.active,
         pricing: pricingConfig,
-        pricing_source_url: parsed.pricingSourceUrl,
-        pricing_source_note: parsed.pricingSourceNote,
-        pricing_source_evidence: pricingSourceEvidence,
         input_schema: parsed.inputSchema,
         output_schema: parsed.outputSchema,
         execution_template: parsed.executionTemplate,
@@ -1977,7 +1898,6 @@ export async function createProviderModel(formData: FormData) {
       details: {
         ...parsed,
         pricing: pricingConfig,
-        pricingSourceEvidence,
         publicModelSlug: supportedModelRow.model_slug,
       },
     });
@@ -2086,9 +2006,6 @@ const updateProviderModelDetailsSchema = z.object({
   capability: capabilitySchema,
   active: z.boolean(),
   pricing: z.record(z.string(), z.unknown()).default({}),
-  pricingSourceUrl: z.string().url().nullable(),
-  pricingSourceNote: z.string().trim().max(2000).nullable(),
-  pricingSourceEvidence: z.array(z.record(z.string(), z.unknown())).default([]),
   inputSchema: z.record(z.string(), z.unknown()).default({}),
   outputSchema: z.record(z.string(), z.unknown()).default({}),
   executionTemplate: z.string().trim().min(1).max(80).default("rest-async-poll-v1"),
@@ -2105,9 +2022,6 @@ export async function updateProviderModelDetails(formData: FormData) {
     capability: formData.get("capability"),
     active: parseBooleanField(formData.get("active")),
     pricing: parseJsonField(formData.get("pricing")),
-    pricingSourceUrl: normalizeOptionalUrl(formData.get("pricingSourceUrl")),
-    pricingSourceNote: normalizeOptionalText(formData.get("pricingSourceNote")),
-    pricingSourceEvidence: parseJsonArrayField(formData.get("pricingSourceEvidence")),
     inputSchema: parseJsonField(formData.get("inputSchema")),
     outputSchema: parseJsonField(formData.get("outputSchema")),
     executionTemplate: (formData.get("executionTemplate") as string) || "rest-async-poll-v1",
@@ -2172,17 +2086,6 @@ export async function updateProviderModelDetails(formData: FormData) {
   }
 
   const pricingConfig = parseBillingConfig(parsed.pricing);
-  const pricingEvidenceFile = formData.get("pricingSourceEvidenceFile");
-  const uploadedEvidence = await uploadPricingEvidenceFile({
-    supabase,
-    providerId: parsed.providerId,
-    upstreamModelSlug: parsed.upstreamModelSlug,
-    file: pricingEvidenceFile instanceof File ? pricingEvidenceFile : null,
-  });
-  const pricingSourceEvidence = uploadedEvidence
-    ? [...parsed.pricingSourceEvidence, uploadedEvidence]
-    : parsed.pricingSourceEvidence;
-
   const { error } = await supabase
     .from("provider_models")
     .update({
@@ -2193,9 +2096,6 @@ export async function updateProviderModelDetails(formData: FormData) {
       capability: parsed.capability,
       active: parsed.active,
       pricing: pricingConfig,
-      pricing_source_url: parsed.pricingSourceUrl,
-      pricing_source_note: parsed.pricingSourceNote,
-      pricing_source_evidence: pricingSourceEvidence,
       input_schema: parsed.inputSchema,
       output_schema: parsed.outputSchema,
       execution_template: parsed.executionTemplate,
@@ -2218,7 +2118,6 @@ export async function updateProviderModelDetails(formData: FormData) {
     details: {
       ...parsed,
       pricing: pricingConfig,
-      pricingSourceEvidence,
       publicModelSlug: supportedModelRow.model_slug,
     },
   });
@@ -2608,9 +2507,6 @@ const updateModelEconomicsBundleSchema = z.object({
   executionTemplate: z.string().trim().min(1).max(80),
   supportedBillingConfig: z.unknown(),
   providerPricing: z.unknown(),
-  pricingSourceUrl: z.string().url().nullable(),
-  pricingSourceNote: z.string().trim().max(2000).nullable(),
-  pricingSourceEvidence: z.array(z.record(z.string(), z.unknown())).default([]),
 });
 
 export async function updateModelEconomicsBundle(formData: FormData) {
@@ -2622,9 +2518,6 @@ export async function updateModelEconomicsBundle(formData: FormData) {
     executionTemplate: formData.get("executionTemplate"),
     supportedBillingConfig: parseBillingConfigField(formData.get("supportedBillingConfig")).config,
     providerPricing: parseBillingConfigField(formData.get("providerPricing")).config,
-    pricingSourceUrl: normalizeOptionalUrl(formData.get("pricingSourceUrl")),
-    pricingSourceNote: normalizeOptionalText(formData.get("pricingSourceNote")),
-    pricingSourceEvidence: parseJsonArrayField(formData.get("pricingSourceEvidence")),
   });
 
   const supportedBillingConfig = parseBillingConfig(parsed.supportedBillingConfig);
@@ -2649,17 +2542,6 @@ export async function updateModelEconomicsBundle(formData: FormData) {
     throw new Error("Provider model does not belong to the selected supported model");
   }
 
-  const pricingEvidenceFile = formData.get("pricingSourceEvidenceFile");
-  const uploadedEvidence = await uploadPricingEvidenceFile({
-    supabase,
-    providerId: providerModel.provider_id,
-    upstreamModelSlug: providerModel.upstream_model_slug,
-    file: pricingEvidenceFile instanceof File ? pricingEvidenceFile : null,
-  });
-  const pricingSourceEvidence = uploadedEvidence
-    ? [...parsed.pricingSourceEvidence, uploadedEvidence]
-    : parsed.pricingSourceEvidence;
-
   await ensureWorkerTemplateExists({
     supabase,
     slug: parsed.executionTemplate,
@@ -2674,9 +2556,6 @@ export async function updateModelEconomicsBundle(formData: FormData) {
     p_supported_unit_label: supportedLegacyFields.unitLabel,
     p_supported_default_unit_cost: supportedLegacyFields.defaultUnitCost,
     p_provider_pricing: providerPricing,
-    p_pricing_source_url: parsed.pricingSourceUrl,
-    p_pricing_source_note: parsed.pricingSourceNote,
-    p_pricing_source_evidence: pricingSourceEvidence,
   });
 
   if (rpcError) {
@@ -2711,9 +2590,6 @@ export async function updateModelEconomicsBundle(formData: FormData) {
       executionTemplate: parsed.executionTemplate,
       supportedBillingConfig,
       providerPricing,
-      pricingSourceUrl: parsed.pricingSourceUrl,
-      pricingSourceNote: parsed.pricingSourceNote,
-      pricingSourceEvidence,
     },
   });
 
@@ -2726,8 +2602,7 @@ const providerModelAutofillSchema = z.object({
 });
 
 const providerModelAutofillResultSchema = z.object({
-  executionTemplate: z.string().trim().min(1).max(80).default("rest-async-poll-v1"),
-  executionConfig: z.record(z.string(), z.unknown()).default({}),
+  pricing: z.record(z.string(), z.unknown()).default({}),
   inputSchema: z.record(z.string(), z.unknown()).default({}),
   outputSchema: z.record(z.string(), z.unknown()).default({}),
   summary: z.string().max(2000).optional().default(""),
@@ -2739,22 +2614,15 @@ function normalizeAutofillResultPayload(raw: Record<string, unknown>) {
       ? (value as Record<string, unknown>)
       : {};
 
-  const protocol = asObj(raw.protocol);
-  const protocolExecutionConfig = asObj(protocol.executionConfig);
   const inputParamsObj = asObj(raw.inputParams);
   const outputParamsObj = asObj(raw.outputParams);
+  const pricingObj = asObj(raw.pricing);
+  const costObj = asObj(raw.cost);
 
-  const executionTemplate =
-    typeof raw.executionTemplate === "string"
-      ? raw.executionTemplate
-      : typeof protocol.executionTemplate === "string"
-        ? protocol.executionTemplate
-        : "rest-async-poll-v1";
-
-  const executionConfig =
-    raw.executionConfig && typeof raw.executionConfig === "object" && !Array.isArray(raw.executionConfig)
-      ? (raw.executionConfig as Record<string, unknown>)
-      : protocolExecutionConfig;
+  const pricing =
+    raw.pricing && typeof raw.pricing === "object" && !Array.isArray(raw.pricing)
+      ? (raw.pricing as Record<string, unknown>)
+      : pricingObj;
 
   const inputSchema =
     raw.inputSchema && typeof raw.inputSchema === "object" && !Array.isArray(raw.inputSchema)
@@ -2772,8 +2640,7 @@ function normalizeAutofillResultPayload(raw: Record<string, unknown>) {
       : undefined;
 
   return {
-    executionTemplate,
-    executionConfig,
+    pricing: Object.keys(pricing).length > 0 ? pricing : costObj,
     inputSchema,
     outputSchema,
     summary,
@@ -2953,22 +2820,24 @@ export async function generateProviderModelDraftFromSource(input: {
     "You are an API integration analyst for an internal admin console.",
     "You MUST return valid json only.",
     "Return ONLY a strict JSON object. Do not include markdown, code fences, or explanations.",
-    "Task: read upstream model API documentation and output ONLY protocol + input schema + output schema draft.",
+    "Task: read upstream model API documentation and output ONLY pricing + input schema + output schema draft.",
     "Output keys must be EXACTLY these top-level keys:",
-    "[executionTemplate, executionConfig, inputSchema, outputSchema]",
-    "Do NOT output nested shapes like basic/protocol/inputParams/outputParams.",
+    "[pricing, inputSchema, outputSchema, summary]",
+    "Do NOT output protocol/execution fields and do NOT output nested shapes like basic/protocol/inputParams/outputParams.",
     "Constraints:",
-    "1) executionTemplate: one of rest-async-poll-v1, upload-async-poll-v1, sync-json-v1.",
-    "2) executionConfig: object with inferred fields: mode, authType, authHeaderName, authHeaderPrefix, authQueryParam, submitPath, pollPath, taskIdPath, statusPath, resultUrlPath, resultValueType, resultMimeType, submitBodyTemplate.",
-    "3) inputSchema format: { officialDocUrl, params: [{ name, type, required, description, example, exposedToCustomer }] }.",
-    "4) outputSchema format: { officialDocUrl, fields: [{ name, type, description, example, exposedToCustomer }] }.",
-    "5) If unknown, return empty string or empty array/object. Never omit required top-level keys.",
+    "1) pricing must follow internal billing config format: { billingMode, currency, charges }.",
+    "2) billingMode should be \"hybrid\" whenever possible.",
+    "3) charges can include: perRequest, perImage, perVideo, perSecond, inputPerMillion, outputPerMillion; use number values.",
+    "4) inputSchema format: { officialDocUrl, params: [{ name, type, required, description, example, exposedToCustomer }] }.",
+    "5) outputSchema format: { officialDocUrl, fields: [{ name, type, description, example, exposedToCustomer }] }.",
+    "6) summary: short chinese text describing what was recognized and what needs manual check.",
+    "7) If unknown, return empty string or empty array/object. Never omit required top-level keys.",
     "JSON OUTPUT EXAMPLE:",
     "{",
-    '  "executionTemplate": "rest-async-poll-v1",',
-    '  "executionConfig": {"mode":"async","authType":"bearer","submitPath":"","pollPath":"","taskIdPath":"","statusPath":"","resultUrlPath":"","resultValueType":"url","resultMimeType":"image/png","submitBodyTemplate":""},',
+    '  "pricing": {"billingMode":"hybrid","currency":"USD","charges":{"perRequest":0}},',
     '  "inputSchema": {"officialDocUrl":"","params":[]},',
-    '  "outputSchema": {"officialDocUrl":"","fields":[]}',
+    '  "outputSchema": {"officialDocUrl":"","fields":[]},',
+    '  "summary": ""',
     "}",
     "",
       `Source Label: ${sourceLabel}`,
@@ -3101,7 +2970,7 @@ export async function generateProviderModelDraftFromSource(input: {
       try {
         const repairPrompt = [
           "将下面内容修复为严格 JSON 对象，只输出 JSON，不要解释。",
-          "必须包含固定顶层键：executionTemplate, executionConfig, inputSchema, outputSchema。",
+          "必须包含固定顶层键：pricing, inputSchema, outputSchema, summary。",
           "若缺失则用空字符串或空对象/空数组补齐。",
           "待修复内容：",
           text || JSON.stringify(deepseekJson),
@@ -3182,9 +3051,9 @@ export async function generateProviderModelDraftFromSource(input: {
       ok: true as const,
       data: {
         ...result,
+        pricingText: JSON.stringify(result.pricing ?? {}, null, 2),
         inputSchemaText: JSON.stringify(result.inputSchema ?? {}, null, 2),
         outputSchemaText: JSON.stringify(result.outputSchema ?? {}, null, 2),
-        executionConfigText: JSON.stringify(result.executionConfig ?? {}, null, 2),
       },
     };
   } catch (error) {

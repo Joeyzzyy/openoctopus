@@ -26,8 +26,8 @@ export function DashboardSidebar({
               className={cn(
                 "flex w-full items-center rounded-md px-2.5 py-2 text-left text-[13px] font-medium transition-colors",
                 isActive
-                  ? "bg-[#111111] text-white"
-                  : "text-black/62 hover:bg-black/[0.03] hover:text-black"
+                  ? "bg-[#FFF1DD] text-[#9A4F18]"
+                  : "text-[#6B5F4E] hover:bg-[#FFF7EA] hover:text-[#111827]"
               )}
             >
               {item.label}
@@ -63,8 +63,8 @@ export function DashboardMobileNav({
                 className={cn(
                   "inline-flex min-w-0 items-center justify-center rounded-md border px-2 py-2 text-center text-[12px] font-medium transition-colors",
                   isActive
-                    ? "border-[#111111] bg-[#111111] text-white"
-                    : "border-black/[0.08] bg-[#FCFCFA] text-black/65 hover:bg-black/[0.03] hover:text-black"
+                    ? "border-[#E58A35] bg-[#FFF1DD] text-[#9A4F18]"
+                    : "border-[#E7E0D3] bg-[#FCFCFA] text-[#6B5F4E] hover:bg-[#FFF7EA] hover:text-[#111827]"
                 )}
               >
                 <span className="truncate">{item.label}</span>

@@ -35,6 +35,7 @@ type ExecutionConfigPresetOption = {
   executionTemplate: string;
   executionConfigText: string;
 };
+type ProviderModelRootTab = "manage" | "source-doc";
 
 type ProviderModelOption = {
   id: string;
@@ -79,6 +80,7 @@ type ExecutionConfigFormState = {
   docRequestExampleJson: string;
   docSubmitResponseExampleJson: string;
   docNormalizedOutputExampleJson: string;
+  docSourceUrl: string;
 };
 
 type SchemaFieldState = {
@@ -111,6 +113,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
       docRequestExampleJson: "",
       docSubmitResponseExampleJson: "",
       docNormalizedOutputExampleJson: "",
+      docSourceUrl: "",
     };
   }
   if (slug === "upload-async-poll-v1") {
@@ -215,15 +218,6 @@ function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields")
   }
 }
 
-function parseOfficialDocUrl(schemaText: string) {
-  try {
-    const parsed = JSON.parse(schemaText) as Record<string, unknown>;
-    return typeof parsed.officialDocUrl === "string" ? parsed.officialDocUrl : "";
-  } catch {
-    return "";
-  }
-}
-
 function SchemaFieldEditor({
   name,
   keyName,
@@ -231,6 +225,7 @@ function SchemaFieldEditor({
   seedSchemaText,
   includeRequired,
   disabled,
+  onSchemaChange,
 }: {
   name: "inputSchema" | "outputSchema";
   keyName: "params" | "fields";
@@ -238,8 +233,8 @@ function SchemaFieldEditor({
   seedSchemaText?: string;
   includeRequired: boolean;
   disabled: boolean;
+  onSchemaChange?: (value: string) => void;
 }) {
-  const [officialDocUrl, setOfficialDocUrl] = useState(() => parseOfficialDocUrl(defaultSchemaText));
   const [rows, setRows] = useState<SchemaFieldState[]>(() =>
     parseSchemaFieldsFromText(defaultSchemaText, keyName)
   );
@@ -257,7 +252,6 @@ function SchemaFieldEditor({
   });
 
   useEffect(() => {
-    setOfficialDocUrl(parseOfficialDocUrl(defaultSchemaText));
     setRows(parseSchemaFieldsFromText(defaultSchemaText, keyName));
   }, [defaultSchemaText, keyName]);
 
@@ -265,7 +259,6 @@ function SchemaFieldEditor({
     if (!seedSchemaText || !seedSchemaText.trim()) {
       return;
     }
-    setOfficialDocUrl(parseOfficialDocUrl(seedSchemaText));
     setRows(parseSchemaFieldsFromText(seedSchemaText, keyName));
   }, [keyName, seedSchemaText]);
 
@@ -323,7 +316,6 @@ function SchemaFieldEditor({
 
   const schemaValue = JSON.stringify(
     {
-      officialDocUrl: officialDocUrl.trim(),
       [keyName]: normalizedRows.map((row) => ({
         name: row.name,
         type: row.type || undefined,
@@ -337,6 +329,9 @@ function SchemaFieldEditor({
     null,
     2
   );
+  useEffect(() => {
+    onSchemaChange?.(schemaValue);
+  }, [onSchemaChange, schemaValue]);
 
   return (
     <div className="space-y-3 rounded-xl border border-black/[0.08] bg-white p-3">
@@ -352,21 +347,6 @@ function SchemaFieldEditor({
           添加字段
         </button>
         <span className="text-[11px] text-black/45">{rows.length} 个字段</span>
-      </div>
-
-      <label className="block">
-        <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">官方文档链接</span>
-        <input
-          value={officialDocUrl}
-          onChange={(event) => setOfficialDocUrl(event.target.value)}
-          disabled={disabled}
-          className={formInputClassName}
-          placeholder="https://provider-docs.example.com/..."
-        />
-      </label>
-
-      <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2 py-1.5 text-[11px] text-black/55">
-        建议填写：参数名、类型、说明、示例。`必填` 表示调用时必须提供；`对外开放` 表示该字段会展示给客户。
       </div>
 
       <div className="space-y-2">
@@ -567,6 +547,75 @@ function SchemaFieldEditor({
   );
 }
 
+function buildDocExamplesFromSchemas(inputSchemaText: string, outputSchemaText: string) {
+  const parseObj = (text: string) => {
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  };
+  const inputObj = parseObj(inputSchemaText);
+  const outputObj = parseObj(outputSchemaText);
+  const inputParams = Array.isArray(inputObj.params) ? (inputObj.params as Array<Record<string, unknown>>) : [];
+  const outputFields = Array.isArray(outputObj.fields) ? (outputObj.fields as Array<Record<string, unknown>>) : [];
+  const requestInput: Record<string, unknown> = {};
+  for (const item of inputParams) {
+    const name = typeof item.name === "string" ? item.name : "";
+    if (!name || name === "model") continue;
+    const example = item.example;
+    if (example !== undefined) {
+      requestInput[name] = example;
+      continue;
+    }
+    const type = typeof item.type === "string" ? item.type : "string";
+    requestInput[name] = type === "number" || type === "integer" ? 1 : type === "boolean" ? true : "example";
+  }
+  const requestExample = {
+    model: "openoctopus/your-model",
+    input: requestInput,
+  };
+  const submitResponseExample = {
+    id: "00000000-0000-0000-0000-000000000000",
+    status: "queued",
+    model: "openoctopus/your-model",
+  };
+  const outputPayload: Record<string, unknown> = {
+    format: "openoctopus.image.output.v1",
+    assets: [
+      {
+        type: "image",
+        url: "https://example.com/result.png",
+        mimeType: "image/png",
+      },
+    ],
+  };
+  if (outputFields.length > 0) {
+    outputPayload.raw = Object.fromEntries(
+      outputFields
+        .map((field) => (typeof field.name === "string" ? field.name : ""))
+        .filter((name) => name.length > 0)
+        .map((name) => [name, "example"])
+    );
+  }
+  return {
+    requestExampleJson: JSON.stringify(requestExample, null, 2),
+    submitResponseExampleJson: JSON.stringify(submitResponseExample, null, 2),
+    normalizedOutputExampleJson: JSON.stringify(
+      {
+        capability: "image_generation",
+        status: "succeeded",
+        output_payload: outputPayload,
+      },
+      null,
+      2
+    ),
+  };
+}
+
 const formInputClassName =
   "h-10 w-full rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
 
@@ -694,6 +743,7 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
     docRequestExampleJson: "",
     docSubmitResponseExampleJson: "",
     docNormalizedOutputExampleJson: "",
+    docSourceUrl: "",
   };
 
   if (!initialValue) {
@@ -775,6 +825,10 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
         parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).normalizedOutputExampleJson === "string"
           ? ((parsed.doc as Record<string, unknown>).normalizedOutputExampleJson as string)
           : fallback.docNormalizedOutputExampleJson,
+      docSourceUrl:
+        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).sourceUrl === "string"
+          ? ((parsed.doc as Record<string, unknown>).sourceUrl as string)
+          : fallback.docSourceUrl,
     };
   } catch {
     return fallback;
@@ -812,6 +866,7 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
     }
   }
   const doc: Record<string, unknown> = {
+    sourceUrl: state.docSourceUrl.trim() || undefined,
     requestExampleJson: state.docRequestExampleJson.trim() || undefined,
     submitResponseExampleJson: state.docSubmitResponseExampleJson.trim() || undefined,
     normalizedOutputExampleJson: state.docNormalizedOutputExampleJson.trim() || undefined,
@@ -821,11 +876,9 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
 }
 
 function buildAutofillPreviewPayload(input: {
-  sourceLabel: string;
   sourceText: string;
   data: {
-    executionTemplate?: string | null;
-    executionConfigText?: string | null;
+    pricingText?: string | null;
     inputSchemaText?: string | null;
     outputSchemaText?: string | null;
     summary?: string | null;
@@ -841,117 +894,60 @@ function buildAutofillPreviewPayload(input: {
     }
   };
 
-  const executionConfig = safeParse(input.data.executionConfigText) as Record<string, unknown>;
+  const pricing = safeParse(input.data.pricingText) as Record<string, unknown>;
   const inputSchema = safeParse(input.data.inputSchemaText) as Record<string, unknown>;
   const outputSchema = safeParse(input.data.outputSchemaText) as Record<string, unknown>;
   const inputParams = Array.isArray(inputSchema.params) ? (inputSchema.params as unknown[]) : [];
   const outputFields = Array.isArray(outputSchema.fields) ? (outputSchema.fields as unknown[]) : [];
 
-  const protocolWarnings: string[] = [];
-  const requiredProtocolFields = [
-    "mode",
-    "authType",
-    "submitPath",
-    "taskIdPath",
-    "resultUrlPath",
-  ] as const;
-  for (const field of requiredProtocolFields) {
-    const value = executionConfig[field];
-    if (typeof value !== "string" || !value.trim()) {
-      protocolWarnings.push(`缺少字段: protocol.executionConfig.${field}`);
-    }
+  const pricingWarnings: string[] = [];
+  const billingMode =
+    typeof pricing.billingMode === "string" ? pricing.billingMode.trim() : "";
+  const currency = typeof pricing.currency === "string" ? pricing.currency.trim() : "";
+  const charges =
+    pricing.charges && typeof pricing.charges === "object" && !Array.isArray(pricing.charges)
+      ? (pricing.charges as Record<string, unknown>)
+      : {};
+  const hasChargeEntry = Object.keys(charges).some((key) => Number.isFinite(Number(charges[key])));
+  if (!billingMode) {
+    pricingWarnings.push("未识别到计费模式: pricing.billingMode");
   }
-  const mode = typeof executionConfig.mode === "string" ? executionConfig.mode.trim() : "";
-  if (mode === "async") {
-    const pollPath = executionConfig.pollPath;
-    const statusPath = executionConfig.statusPath;
-    if (typeof pollPath !== "string" || !pollPath.trim()) {
-      protocolWarnings.push("异步模式缺少字段: protocol.executionConfig.pollPath");
-    }
-    if (typeof statusPath !== "string" || !statusPath.trim()) {
-      protocolWarnings.push("异步模式缺少字段: protocol.executionConfig.statusPath");
-    }
+  if (!currency) {
+    pricingWarnings.push("未识别到币种: pricing.currency");
   }
-  if (
-    typeof input.data.executionTemplate !== "string" ||
-    !input.data.executionTemplate.trim()
-  ) {
-    protocolWarnings.push("缺少字段: protocol.executionTemplate");
+  if (!hasChargeEntry) {
+    pricingWarnings.push("未识别到任何成本项: pricing.charges");
   }
 
   const inputWarnings: string[] = [];
-  if (
-    typeof inputSchema.officialDocUrl !== "string" ||
-    !inputSchema.officialDocUrl.trim()
-  ) {
-    inputWarnings.push("缺少字段: inputParams.officialDocUrl");
-  }
   if (inputParams.length === 0) {
     inputWarnings.push("未识别到任何输入参数: inputParams.params");
   }
 
   const outputWarnings: string[] = [];
-  if (
-    typeof outputSchema.officialDocUrl !== "string" ||
-    !outputSchema.officialDocUrl.trim()
-  ) {
-    outputWarnings.push("缺少字段: outputParams.officialDocUrl");
-  }
   if (outputFields.length === 0) {
     outputWarnings.push("未识别到任何输出参数: outputParams.fields");
   }
 
   return {
     source: {
-      label: input.sourceLabel || "",
       contentLength: input.sourceText.length,
     },
-    protocol: {
-      executionTemplate: input.data.executionTemplate ?? "",
-      executionConfig: {
-        mode: typeof executionConfig.mode === "string" ? executionConfig.mode : "",
-        authType: typeof executionConfig.authType === "string" ? executionConfig.authType : "",
-        authHeaderName:
-          typeof executionConfig.authHeaderName === "string" ? executionConfig.authHeaderName : "",
-        authHeaderPrefix:
-          typeof executionConfig.authHeaderPrefix === "string" ? executionConfig.authHeaderPrefix : "",
-        authQueryParam:
-          typeof executionConfig.authQueryParam === "string" ? executionConfig.authQueryParam : "",
-        submitPath: typeof executionConfig.submitPath === "string" ? executionConfig.submitPath : "",
-        pollPath: typeof executionConfig.pollPath === "string" ? executionConfig.pollPath : "",
-        resultPath: typeof executionConfig.resultPath === "string" ? executionConfig.resultPath : "",
-        taskIdPath: typeof executionConfig.taskIdPath === "string" ? executionConfig.taskIdPath : "",
-        statusPath: typeof executionConfig.statusPath === "string" ? executionConfig.statusPath : "",
-        resultUrlPath:
-          typeof executionConfig.resultUrlPath === "string" ? executionConfig.resultUrlPath : "",
-        resultValueType:
-          typeof executionConfig.resultValueType === "string" ? executionConfig.resultValueType : "",
-        resultMimeType:
-          typeof executionConfig.resultMimeType === "string" ? executionConfig.resultMimeType : "",
-        submitBodyTemplate:
-          typeof executionConfig.submitBodyTemplate === "string"
-            ? executionConfig.submitBodyTemplate
-            : executionConfig.submitBodyTemplate ?? "",
-      },
+    pricing: {
+      billingMode,
+      currency,
+      charges,
     },
     inputParams: {
-      officialDocUrl:
-        typeof inputSchema.officialDocUrl === "string"
-          ? (inputSchema.officialDocUrl as string)
-          : "",
       params: inputParams,
     },
     outputParams: {
-      officialDocUrl:
-        typeof outputSchema.officialDocUrl === "string"
-          ? (outputSchema.officialDocUrl as string)
-          : "",
       fields: outputFields,
     },
     review: {
-      protocol: {
-        status: protocolWarnings.length === 0 ? "ok" : "needs_manual_check",
-        warnings: protocolWarnings,
+      pricing: {
+        status: pricingWarnings.length === 0 ? "ok" : "needs_manual_check",
+        warnings: pricingWarnings,
       },
       inputParams: {
         status: inputWarnings.length === 0 ? "ok" : "needs_manual_check",
@@ -972,7 +968,7 @@ type AutofillReviewBlock = {
 };
 
 type AutofillReviewPayload = {
-  protocol: AutofillReviewBlock;
+  pricing: AutofillReviewBlock;
   inputParams: AutofillReviewBlock;
   outputParams: AutofillReviewBlock;
 };
@@ -1043,6 +1039,9 @@ export function BillingConfigEditor({
   generatedLabel?: string;
 }) {
   const [state, setState] = useState(() => parseBillingFormState(initialValue));
+  useEffect(() => {
+    setState(parseBillingFormState(initialValue));
+  }, [initialValue]);
   const hiddenValue = buildBillingConfigValue(state);
   const inputMethod = state.chargeInputTokens
     ? "input_tokens"
@@ -1194,9 +1193,6 @@ export function CreateProviderModelForm({
   defaultProviderId,
   defaultUpstreamModelSlug,
   defaultPricing,
-  defaultPricingSourceUrl,
-  defaultPricingSourceNote,
-  defaultPricingSourceEvidence = "[]",
   defaultInputSchema = "{}",
   defaultOutputSchema = "{}",
   defaultExecutionTemplate = "rest-async-poll-v1",
@@ -1219,9 +1215,6 @@ export function CreateProviderModelForm({
   defaultProviderId?: string;
   defaultUpstreamModelSlug?: string;
   defaultPricing?: string;
-  defaultPricingSourceUrl?: string;
-  defaultPricingSourceNote?: string;
-  defaultPricingSourceEvidence?: string;
   defaultInputSchema?: string;
   defaultOutputSchema?: string;
   defaultExecutionTemplate?: string;
@@ -1248,10 +1241,27 @@ export function CreateProviderModelForm({
     supportedModels.find((item) => item.modelSlug === defaultSupportedModelSlug)?.id ??
     fallbackSupportedModelId;
   const [supportedModelId, setSupportedModelId] = useState(templateSupportedModelId);
+  const [providerId, setProviderId] = useState(
+    defaultProviderId && providers.some((item) => item.id === defaultProviderId)
+      ? defaultProviderId
+      : (providers[0]?.id ?? "")
+  );
 
   useEffect(() => {
     setSupportedModelId(templateSupportedModelId);
   }, [templateSupportedModelId]);
+  useEffect(() => {
+    if (defaultProviderId && providers.some((item) => item.id === defaultProviderId)) {
+      setProviderId(defaultProviderId);
+      return;
+    }
+    setProviderId((current) => {
+      if (current && providers.some((item) => item.id === current)) {
+        return current;
+      }
+      return providers[0]?.id ?? "";
+    });
+  }, [defaultProviderId, providers]);
 
   const selectedSupportedModel =
     supportedModels.find((item) => item.id === supportedModelId) ?? null;
@@ -1261,20 +1271,21 @@ export function CreateProviderModelForm({
       ? workerTemplates
       : [{ id: "fallback", displayName: "任务轮询（提交后查询）", slug: defaultExecutionTemplate }];
   const [executionTemplate, setExecutionTemplate] = useState(defaultExecutionTemplate);
+  const [rootTab, setRootTab] = useState<ProviderModelRootTab>("manage");
   const [selectedPresetId, setSelectedPresetId] = useState("");
   const [executionConfigState, setExecutionConfigState] = useState(() =>
     parseExecutionConfigState(defaultExecutionConfig)
   );
   const [upstreamModelSlug, setUpstreamModelSlug] = useState(defaultUpstreamModelSlug ?? "");
-  const [pricingSourceUrlState, setPricingSourceUrlState] = useState(defaultPricingSourceUrl ?? "");
-  const [pricingSourceNoteState, setPricingSourceNoteState] = useState(defaultPricingSourceNote ?? "");
-  const [autofillSourceLabel, setAutofillSourceLabel] = useState("");
   const [autofillSourceText, setAutofillSourceText] = useState("");
   const [autofillSummary, setAutofillSummary] = useState("");
   const [autofillPreviewJson, setAutofillPreviewJson] = useState("");
   const [autofillDebugRawOutput, setAutofillDebugRawOutput] = useState("");
   const [seedInputSchemaText, setSeedInputSchemaText] = useState("");
   const [seedOutputSchemaText, setSeedOutputSchemaText] = useState("");
+  const [seedPricingText, setSeedPricingText] = useState(defaultPricing ?? "");
+  const [currentInputSchemaText, setCurrentInputSchemaText] = useState(defaultInputSchema);
+  const [currentOutputSchemaText, setCurrentOutputSchemaText] = useState(defaultOutputSchema);
   const [isAutofilling, startAutofillTransition] = useTransition();
   const executionConfigValue = buildExecutionConfigValue(executionConfigState);
   const templateIsAsync =
@@ -1308,21 +1319,22 @@ export function CreateProviderModelForm({
     setSelectedPresetId("");
     setExecutionConfigState(parseExecutionConfigState(defaultExecutionConfig));
     setUpstreamModelSlug(defaultUpstreamModelSlug ?? "");
-    setPricingSourceUrlState(defaultPricingSourceUrl ?? "");
-    setPricingSourceNoteState(defaultPricingSourceNote ?? "");
-    setAutofillSourceLabel("");
     setAutofillSourceText("");
     setAutofillSummary("");
     setAutofillPreviewJson("");
     setAutofillDebugRawOutput("");
     setSeedInputSchemaText("");
     setSeedOutputSchemaText("");
+    setSeedPricingText(defaultPricing ?? "");
+    setCurrentInputSchemaText(defaultInputSchema);
+    setCurrentOutputSchemaText(defaultOutputSchema);
   }, [
     defaultExecutionConfig,
     defaultExecutionTemplate,
-    defaultPricingSourceNote,
-    defaultPricingSourceUrl,
     defaultUpstreamModelSlug,
+    defaultPricing,
+    defaultInputSchema,
+    defaultOutputSchema,
   ]);
 
   const runAutofillFromUrl = () => {
@@ -1335,7 +1347,6 @@ export function CreateProviderModelForm({
     startAutofillTransition(async () => {
       const result = await generateProviderModelDraftFromSource({
         sourceText,
-        sourceLabel: autofillSourceLabel.trim() || undefined,
       });
       if (!result.ok) {
         toast.error(result.error || "自动填充失败");
@@ -1345,15 +1356,15 @@ export function CreateProviderModelForm({
       setAutofillDebugRawOutput("");
 
       const payload = result.data;
-      setExecutionTemplate(payload.executionTemplate || "rest-async-poll-v1");
-      setExecutionConfigState(parseExecutionConfigState(payload.executionConfigText || "{}"));
+      if (payload.pricingText && payload.pricingText.trim()) {
+        setSeedPricingText(payload.pricingText);
+      }
       setSeedInputSchemaText(payload.inputSchemaText || "{}");
       setSeedOutputSchemaText(payload.outputSchemaText || "{}");
       setAutofillSummary(payload.summary ?? "");
       setAutofillPreviewJson(
         JSON.stringify(
           buildAutofillPreviewPayload({
-            sourceLabel: autofillSourceLabel.trim(),
             sourceText,
             data: payload,
           }),
@@ -1361,8 +1372,8 @@ export function CreateProviderModelForm({
           2
         )
       );
-      toast.success("已完成自动解析并填充");
-      setActiveTab("protocol");
+      toast.success("已完成自动识别并填充");
+      setActiveTab("cost");
     });
   };
 
@@ -1389,7 +1400,7 @@ export function CreateProviderModelForm({
       };
 
       return {
-        protocol: normalizeBlock(reviewRaw.protocol),
+        pricing: normalizeBlock(reviewRaw.pricing),
         inputParams: normalizeBlock(reviewRaw.inputParams),
         outputParams: normalizeBlock(reviewRaw.outputParams),
       };
@@ -1407,22 +1418,9 @@ export function CreateProviderModelForm({
         const formData = new FormData(event.currentTarget);
         const missing: string[] = [];
 
-        const supportedModelValue = String(formData.get("supportedModelId") ?? "").trim();
-        const providerValue = String(formData.get("providerId") ?? "").trim();
         const upstreamModelValue = String(formData.get("upstreamModelSlug") ?? "").trim();
-        const capabilityValue = String(formData.get("capability") ?? "").trim();
-
-        if (!supportedModelValue) {
-          missing.push("可售模型");
-        }
-        if (!providerValue) {
-          missing.push("供应商");
-        }
         if (!upstreamModelValue) {
           missing.push("上游模型标识");
-        }
-        if (!capabilityValue) {
-          missing.push("能力类型");
         }
         if (!executionConfigState.submitPath.trim()) {
           missing.push("submitPath");
@@ -1453,9 +1451,77 @@ export function CreateProviderModelForm({
       {providerModelId ? (
         <input type="hidden" name="providerModelId" value={providerModelId} />
       ) : null}
-      <input type="hidden" name="pricingSourceEvidence" value={defaultPricingSourceEvidence} />
-      <div className="grid items-start gap-4 lg:grid-cols-[210px_minmax(0,1fr)]">
-        <aside className="self-start rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-2">
+      <input type="hidden" name="supportedModelId" value={supportedModelId} />
+      <input type="hidden" name="providerId" value={providerId} />
+      <input
+        type="hidden"
+        name="capability"
+        value={selectedSupportedModel?.capability ?? ""}
+      />
+      <input type="hidden" name="upstreamModelSlug" value={upstreamModelSlug} />
+      {rootTab === "source-doc" ? (
+        <input
+          type="hidden"
+          name="pricing"
+          value={
+            defaultPricing && defaultPricing.trim()
+              ? defaultPricing
+              : '{"billingMode":"hybrid","currency":"USD","charges":{"perRequest":0}}'
+          }
+        />
+      ) : null}
+      <div className="mb-0.5 flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setRootTab("manage")}
+          className={`inline-flex h-[26px] items-center rounded-md border px-2 text-[11px] font-medium ${
+            rootTab === "manage" ? "border-black bg-black text-white" : "border-black/[0.1] bg-white text-black/70"
+          }`}
+        >
+          信息管理
+        </button>
+        <button
+          type="button"
+          onClick={() => setRootTab("source-doc")}
+          className={`inline-flex h-[26px] items-center rounded-md border px-2 text-[11px] font-medium ${
+            rootTab === "source-doc" ? "border-black bg-black text-white" : "border-black/[0.1] bg-white text-black/70"
+          }`}
+        >
+          原文档内容
+        </button>
+      </div>
+      {rootTab === "source-doc" ? (
+        <div className="space-y-1 rounded-xl border border-black/[0.08] bg-white p-1">
+          <label className="block">
+            <span className="mb-1 block text-[11px] tracking-[0.35px] text-black/60">文档 URL</span>
+            <input
+              value={executionConfigState.docSourceUrl}
+              onChange={(event) =>
+                setExecutionConfigState((current) => ({ ...current, docSourceUrl: event.target.value }))
+              }
+              disabled={disabled}
+              className={formInputClassName}
+              placeholder="https://provider-docs.example.com/model-doc"
+            />
+          </label>
+          <div className="h-[65vh] overflow-hidden rounded-lg border border-black/[0.08] bg-[#FCFCFA]">
+            {executionConfigState.docSourceUrl.trim() ? (
+              <iframe
+                src={executionConfigState.docSourceUrl.trim()}
+                title="Source documentation"
+                className="h-full w-full"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-black/45">
+                填写文档 URL 后可在这里直接查看原文档
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+      {rootTab === "manage" ? (
+      <div className="grid items-start gap-3 lg:grid-cols-[210px_minmax(0,1fr)]">
+        <aside className="self-start rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-1.5">
           <nav className="space-y-1">
             {tabItems.map((tab) => {
               const active = activeTab === tab.key;
@@ -1470,7 +1536,7 @@ export function CreateProviderModelForm({
                       section.scrollIntoView({ behavior: "auto", block: "start" });
                     }
                   }}
-                  className={`flex w-full cursor-pointer items-center rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${
+                  className={`flex w-full cursor-pointer items-center rounded-md px-2.5 py-1.5 text-left text-[11px] font-medium transition-colors ${
                     active
                       ? "bg-black text-white"
                       : "text-black/68 hover:bg-black/[0.05]"
@@ -1483,52 +1549,43 @@ export function CreateProviderModelForm({
           </nav>
         </aside>
 
-        <div className="space-y-4 overflow-y-auto pr-1 lg:max-h-[calc(100vh-12rem)]">
+        <div className="space-y-3 pr-1">
         <div
           ref={(node) => {
             sectionRefs.current["ai-autofill"] = node;
           }}
-          className={activeTab === "ai-autofill" ? "grid gap-3" : "hidden"}
+          className={activeTab === "ai-autofill" ? "grid gap-2" : "hidden"}
         >
         <label className="block md:col-span-2">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">文档内容自动填充</span>
-          <input
-            value={autofillSourceLabel}
-            onChange={(event) => setAutofillSourceLabel(event.target.value)}
-            placeholder="来源标识（可选），例如 wavespeed/imagen4-fast"
-            disabled={disabled || isAutofilling}
-            className={formInputClassName}
-          />
-          <div className="mt-2 flex items-start gap-2">
+          <span className="mb-1 block text-[11px] tracking-[0.35px] text-black/60">文档内容自动填充</span>
+          <div className="mt-1.5 flex items-start gap-1.5">
             <textarea
               value={autofillSourceText}
               onChange={(event) => setAutofillSourceText(event.target.value)}
               placeholder="把上游文档整页内容粘贴到这里..."
               disabled={disabled || isAutofilling}
               className={formTextAreaClassName}
-              rows={8}
+              rows={7}
             />
             <button
               type="button"
               onClick={runAutofillFromUrl}
               disabled={disabled || isAutofilling}
-              className="inline-flex h-10 shrink-0 cursor-pointer items-center rounded-md bg-black px-3 text-xs font-medium text-white transition-colors hover:bg-black/90 disabled:cursor-not-allowed disabled:bg-black/20 disabled:text-black/45"
+              className="inline-flex h-9 shrink-0 cursor-pointer items-center rounded-md bg-black px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-black/90 disabled:cursor-not-allowed disabled:bg-black/20 disabled:text-black/45"
             >
               {isAutofilling ? "解析中..." : "AI 自动填充"}
             </button>
           </div>
-          <FieldHint help="粘贴文档全文后自动填充调用协议、入参、出参，并在识别结果里标注三大区域的人工检查建议。" />
+          <FieldHint help="粘贴文档全文后自动填充输入参数、输出参数、供应商成本配置，并在识别结果里标注三大区域的人工检查建议。" />
           {autofillSummary ? (
-            <p className="mt-2 rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2.5 py-2 text-xs text-black/65">
+            <p className="mt-1.5 rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2 py-1.5 text-xs text-black/65">
               {autofillSummary}
             </p>
           ) : null}
           {autofillPreviewJson ? (
-            <div className="mt-2 rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-[11px] tracking-[0.35px] text-black/60">
-                  识别结果完整 JSON（空字段表示未识别）
-                </p>
+            <div className="mt-1.5 rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <p className="text-[11px] tracking-[0.35px] text-black/60">识别结果 JSON（空字段表示未识别）</p>
                 <button
                   type="button"
                   onClick={async () => {
@@ -1544,17 +1601,17 @@ export function CreateProviderModelForm({
                   复制 JSON
                 </button>
               </div>
-              <pre className="max-h-[340px] overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-black/70">
+              <pre className="max-h-[300px] overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-black/70">
                 {autofillPreviewJson}
               </pre>
             </div>
           ) : null}
           {autofillReview ? (
-            <div className="mt-2 rounded-md border border-black/[0.08] bg-white p-2.5">
-              <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">风险检查结果（建议人工检查）</p>
+            <div className="mt-1.5 rounded-md border border-black/[0.08] bg-white p-2">
+              <p className="mb-1.5 text-[11px] tracking-[0.35px] text-black/60">风险检查结果（建议人工检查）</p>
               <div className="grid gap-2 md:grid-cols-3">
                 {([
-                  ["protocol", "调用协议配置"],
+                  ["pricing", "供应商成本配置"],
                   ["inputParams", "输入参数"],
                   ["outputParams", "输出参数"],
                 ] as const).map(([key, label]) => {
@@ -1563,7 +1620,7 @@ export function CreateProviderModelForm({
                   return (
                     <div
                       key={key}
-                      className={`rounded-md border p-2 ${
+                      className={`rounded-md border p-1.5 ${
                         ok
                           ? "border-[#CFE7D4] bg-[#F3FBF5]"
                           : "border-[#F1D2CC] bg-[#FFF7F5]"
@@ -1597,8 +1654,8 @@ export function CreateProviderModelForm({
             </div>
           ) : null}
           {autofillDebugRawOutput ? (
-            <div className="mt-2 rounded-md border border-[#F1D2CC] bg-[#FFF7F5] p-2.5">
-              <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="mt-1.5 rounded-md border border-[#F1D2CC] bg-[#FFF7F5] p-2">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
                 <p className="text-[11px] tracking-[0.35px] text-[#8D4336]">
                   原始返回内容（调试）
                 </p>
@@ -1617,7 +1674,7 @@ export function CreateProviderModelForm({
                   复制调试内容
                 </button>
               </div>
-              <pre className="max-h-[280px] overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-[#8D4336]">
+              <pre className="max-h-[240px] overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-[#8D4336]">
                 {autofillDebugRawOutput}
               </pre>
             </div>
@@ -1634,7 +1691,6 @@ export function CreateProviderModelForm({
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">可售模型</span>
           <select
-            name="supportedModelId"
             value={supportedModelId}
             onChange={(event) => setSupportedModelId(event.target.value)}
             disabled={disabled}
@@ -1658,8 +1714,8 @@ export function CreateProviderModelForm({
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">供应商</span>
           <select
-            name="providerId"
-            defaultValue={defaultProviderId}
+            value={providerId}
+            onChange={(event) => setProviderId(event.target.value)}
             disabled={disabled}
             className={formSelectClassName}
           >
@@ -1683,22 +1739,15 @@ export function CreateProviderModelForm({
             readOnly
             className="h-10 w-full rounded-md border border-black/[0.08] bg-black/[0.03] px-3 text-sm text-black/60 outline-none"
           />
-          <input
-            type="hidden"
-            name="capability"
-            value={selectedSupportedModel?.capability ?? ""}
-          />
           <FieldHint help="这里跟随可售模型锁定，避免把图片和视频实现混在一起。" />
         </label>
 
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上游模型标识</span>
           <input
-            name="upstreamModelSlug"
             value={upstreamModelSlug}
             onChange={(event) => setUpstreamModelSlug(event.target.value)}
             placeholder="gemini-2.5-flash-image"
-            required
             disabled={disabled}
             className={formInputClassName}
           />
@@ -1720,30 +1769,6 @@ export function CreateProviderModelForm({
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">调用协议配置</span>
           <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
             <div className="mb-3 grid gap-3 md:grid-cols-2">
-              <label className="block">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">API 调用格式配置</span>
-                <select
-                  name="executionTemplate"
-                  value={executionTemplate}
-                  onChange={(event) => {
-                    const nextTemplate = event.target.value;
-                    setExecutionTemplate(nextTemplate);
-                    const preset = templateExecutionPreset(nextTemplate);
-                    setExecutionConfigState((current) => ({
-                      ...current,
-                      ...preset,
-                    }));
-                  }}
-                  disabled={disabled}
-                  className={formSelectClassName}
-                >
-                  {workerTemplateOptions.map((item) => (
-                    <option key={item.id} value={item.slug}>
-                      {executionTemplateLabelZh(item.slug)}
-                    </option>
-                  ))}
-                </select>
-              </label>
               {executionConfigPresets.length > 0 ? (
                 <label className="block">
                   <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">快速填充（复制已有模型）</span>
@@ -1770,6 +1795,30 @@ export function CreateProviderModelForm({
                   </select>
                 </label>
               ) : null}
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">API 调用格式配置</span>
+                <select
+                  name="executionTemplate"
+                  value={executionTemplate}
+                  onChange={(event) => {
+                    const nextTemplate = event.target.value;
+                    setExecutionTemplate(nextTemplate);
+                    const preset = templateExecutionPreset(nextTemplate);
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      ...preset,
+                    }));
+                  }}
+                  disabled={disabled}
+                  className={formSelectClassName}
+                >
+                  {workerTemplateOptions.map((item) => (
+                    <option key={item.id} value={item.slug}>
+                      {executionTemplateLabelZh(item.slug)}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             <input type="hidden" name="executionConfig" value={executionConfigValue} />
             <div className="grid gap-3 md:grid-cols-2">
@@ -2008,12 +2057,6 @@ export function CreateProviderModelForm({
                   />
                 </label>
               ) : null}
-              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 md:col-span-2">
-                <p className="text-[11px] tracking-[0.35px] text-black/45">将提交的协议参数 JSON</p>
-                <code className="mt-1 block break-all text-xs leading-5 text-black/55">
-                  {executionConfigValue}
-                </code>
-              </div>
             </div>
           </div>
         </div>
@@ -2023,55 +2066,18 @@ export function CreateProviderModelForm({
           ref={(node) => {
             sectionRefs.current.cost = node;
           }}
-          className={activeTab === "cost" ? "grid gap-3 md:grid-cols-2" : "hidden"}
+          className={activeTab === "cost" ? "grid gap-2.5" : "hidden"}
         >
-        <div className="block md:col-span-2">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">供应商成本配置</span>
+        <div className="block">
+          <span className="mb-1.5 block text-[11px] tracking-[0.35px] text-black/60">供应商成本配置</span>
           <BillingConfigEditor
             name="pricing"
-            initialValue={defaultPricing}
+            initialValue={seedPricingText || defaultPricing}
             componentHint="按供应商真实结算方式填写内部进货成本。这里决定 provider cost，不影响用户售价。"
             generatedLabel="生成的供应商计费配置"
           />
         </div>
-        <label className="block md:col-span-2">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">官方成本价格链接</span>
-          <input
-            name="pricingSourceUrl"
-            type="url"
-            value={pricingSourceUrlState}
-            onChange={(event) => setPricingSourceUrlState(event.target.value)}
-            placeholder="https://ai.google.dev/gemini-api/docs/pricing"
-            disabled={disabled}
-            className={formInputClassName}
-          />
-          <FieldHint help="填写官方价格页、模型文档或公开结算说明链接，便于后续溯源。" />
-        </label>
 
-        <label className="block md:col-span-2">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">成本说明备注</span>
-          <textarea
-            name="pricingSourceNote"
-            rows={3}
-            value={pricingSourceNoteState}
-            onChange={(event) => setPricingSourceNoteState(event.target.value)}
-            disabled={disabled}
-            className={formTextAreaClassName}
-            placeholder="例如：Google 官方写明 image output 按 $30 / 1M output tokens，1024x1024 约等于 1290 output tokens。"
-          />
-        </label>
-
-        <label className="block md:col-span-2">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">价格证据截图</span>
-          <input
-            type="file"
-            name="pricingSourceEvidenceFile"
-            accept="image/png,image/jpeg,image/webp"
-            disabled={disabled}
-            className="block w-full rounded-md border border-black/[0.08] bg-white px-3 py-2 text-sm text-black file:mr-3 file:rounded-md file:border-0 file:bg-[#111827] file:px-3 file:py-2 file:text-xs file:font-medium file:text-white"
-          />
-          <FieldHint help="可选，上传官方价格页截图。保存后会把文件路径记录到供应商模型里。" />
-        </label>
         </div>
 
         <div
@@ -2088,6 +2094,7 @@ export function CreateProviderModelForm({
               seedSchemaText={seedInputSchemaText}
               includeRequired
               disabled={disabled}
+              onSchemaChange={setCurrentInputSchemaText}
             />
             <label className="mt-3 block">
               <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提交 Body 模板（JSON）</span>
@@ -2122,6 +2129,7 @@ export function CreateProviderModelForm({
               seedSchemaText={seedOutputSchemaText}
               includeRequired={false}
               disabled={disabled}
+              onSchemaChange={setCurrentOutputSchemaText}
             />
           </div>
         </div>
@@ -2133,7 +2141,28 @@ export function CreateProviderModelForm({
           className={activeTab === "doc-examples" ? "" : "hidden"}
         >
           <div className="block rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
-            <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">文档示例配置（用于 Dashboard API Quickstart）</p>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-[11px] tracking-[0.35px] text-black/60">文档示例配置（用于 Dashboard API Quickstart）</p>
+              <button
+                type="button"
+                onClick={() => {
+                  const generated = buildDocExamplesFromSchemas(
+                    currentInputSchemaText,
+                    currentOutputSchemaText
+                  );
+                  setExecutionConfigState((current) => ({
+                    ...current,
+                    docRequestExampleJson: generated.requestExampleJson,
+                    docSubmitResponseExampleJson: generated.submitResponseExampleJson,
+                    docNormalizedOutputExampleJson: generated.normalizedOutputExampleJson,
+                  }));
+                  toast.success("已根据输入/输出参数生成示例 JSON");
+                }}
+                className="inline-flex h-7 items-center rounded border border-black/[0.12] bg-white px-2 text-[11px] text-black/70 hover:bg-black/[0.03]"
+              >
+                一键生成示例 JSON
+              </button>
+            </div>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="block md:col-span-2">
                 <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">请求示例 JSON</span>
@@ -2182,6 +2211,7 @@ export function CreateProviderModelForm({
         </div>
         </div>
       </div>
+      ) : null}
       {showSubmitButton ? (
         <div className="mt-4">
           <SubmitButton
@@ -2393,17 +2423,26 @@ export function CreateRoutingRuleForm({
 function FormAutoClose({
   submitted,
   onSuccess,
+  successMessage = "保存成功",
 }: {
   submitted: boolean;
   onSuccess?: () => void;
+  successMessage?: string;
 }) {
   const { pending } = useFormStatus();
+  const handledRef = useRef(false);
 
   useEffect(() => {
-    if (submitted && !pending && onSuccess) {
-      onSuccess();
+    if (pending) {
+      handledRef.current = false;
+      return;
     }
-  }, [onSuccess, pending, submitted]);
+    if (submitted && !handledRef.current) {
+      handledRef.current = true;
+      toast.success(successMessage);
+      onSuccess?.();
+    }
+  }, [onSuccess, pending, submitted, successMessage]);
 
   return null;
 }
