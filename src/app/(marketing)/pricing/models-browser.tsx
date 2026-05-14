@@ -246,6 +246,20 @@ function pickImageUrl(value: unknown): string | null {
   return null;
 }
 
+function buildDisplayImageUrl(src: string) {
+  if (src.startsWith("data:image/")) return src;
+  try {
+    const url = new URL(src);
+    if (url.pathname.startsWith("/v1/files/")) {
+      url.searchParams.set("display", "1");
+      return url.toString();
+    }
+  } catch {
+    return src;
+  }
+  return src;
+}
+
 function extractImageUrls(output: unknown): string[] {
   if (!isRecord(output)) return [];
   const urls: string[] = [];
@@ -983,7 +997,7 @@ export function ModelsBrowser({
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           key={`${src}-${index}`}
-                          src={src}
+                          src={buildDisplayImageUrl(src)}
                           alt={`Generated result ${index + 1}`}
                           className="h-auto w-full rounded-md border border-black/[0.08] bg-white object-contain"
                         />

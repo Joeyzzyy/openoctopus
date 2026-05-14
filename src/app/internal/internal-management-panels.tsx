@@ -2500,7 +2500,7 @@ export function InternalModelAiUsageLogsPanel({
             {logs.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-3 py-8 text-center text-sm text-black/45">
-                  暂无 AI 功能消费记录
+                  暂无内部 AI 消费记录
                 </td>
               </tr>
             ) : (

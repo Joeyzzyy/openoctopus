@@ -39,21 +39,9 @@ const tabs = [
     description: "系统监控与请求记录。",
   },
   {
-    key: "image-model-playbook",
-    group: "overview",
-    label: "图片模型操作手册",
-    description: "新增图片模型的标准上线流程与验收清单。",
-  },
-  {
-    key: "video-model-playbook",
-    group: "overview",
-    label: "视频模型操作手册",
-    description: "新增视频模型的标准上线流程与验收清单。",
-  },
-  {
     key: "internal-model-ai-usage-logs",
     group: "overview",
-    label: "内部模型录入 AI 功能使用消费记录",
+    label: "内部 AI 消费记录",
     description: "记录 URL 自动填充能力的调用、token 与估算成本。",
   },
   {
@@ -124,15 +112,6 @@ function getSearchValue(
 
 function getTabValue(value: string | undefined): InternalTabKey {
   return tabs.some((item) => item.key === value) ? (value as InternalTabKey) : "public-models";
-}
-
-function buildInternalHref(tab: InternalTabKey, template?: string) {
-  const params = new URLSearchParams();
-  params.set("tab", tab);
-  if (template) {
-    params.set("template", template);
-  }
-  return `/internal?${params.toString()}`;
 }
 
 function buildRequestsFilterHref(input: {
@@ -628,36 +607,6 @@ function RequestBreakdownSection({
   );
 }
 
-function ReadinessItem({
-  label,
-  detail,
-  ready,
-}: {
-  label: string;
-  detail: string;
-  ready: boolean;
-}) {
-  const Icon = ready ? ShieldCheck : ShieldAlert;
-
-  return (
-    <div className="rounded-xl border border-black/[0.06] bg-white px-3 py-3">
-      <div className="flex items-start gap-3">
-        <div
-          className={`inline-flex size-7 shrink-0 items-center justify-center rounded-md ${
-            ready ? "bg-[#e7f4ea] text-[#1f6b3b]" : "bg-[#fff1dc] text-[#9a5a00]"
-          }`}
-        >
-          <Icon className="size-4" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-black">{label}</p>
-          <p className="mt-1 text-xs leading-5 text-black/55">{detail}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MonitoringChartCard({
   title,
   points,
@@ -956,11 +905,6 @@ export default async function InternalPage({
   if (!data) redirect("/login");
   if (!data.authorized) redirect("/login");
 
-  const hasProviders = data.providers.length > 0;
-  const hasSupportedModels = data.supportedModels.length > 0;
-  const hasProviderModels = data.providerModels.length > 0;
-  const hasCredentials = data.providerCredentials.length > 0;
-  const hasRoutes = data.routingRules.length > 0;
   const selectedTemplateKey = getSearchValue(resolvedSearchParams, "template");
   const activeTab = getTabValue(getSearchValue(resolvedSearchParams, "tab"));
   const selectedRequestCustomer = getSearchValue(resolvedSearchParams, "requestCustomer") ?? "all";
@@ -1251,261 +1195,10 @@ export default async function InternalPage({
             <section>
               <SectionShell
                 id="internal-model-ai-usage-logs-panel"
-                title="内部模型录入 AI 功能使用消费记录"
+                title="内部 AI 消费记录"
                 description="仅 internal 使用：记录文档 URL 自动解析的调用轨迹、token 与估算成本。"
               >
                 <InternalModelAiUsageLogsPanel logs={data.internalModelAiUsageLogs} />
-              </SectionShell>
-            </section>
-          ) : null}
-
-          {activeTab === "image-model-playbook" ? (
-            <section>
-              <SectionShell
-                id="image-model-playbook-panel"
-                title="添加图片模型操作手册"
-                description="目标：任何图片模型上线后，都能稳定返回统一格式 output_payload.assets[]，并可被客户前端直接展示。"
-              >
-                <div className="grid gap-4">
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">0. 上线前确认</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>确认上游返回是哪一种结果：图片 URL 或 base64 字符串。</p>
-                      <p>确认鉴权方式：Bearer / x-api-key / query key。</p>
-                      <p>确认该模型 capability 为 image_generation（图片编辑则为 image_edit）。</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">1. 配置 API 调用格式模板</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>
-                        进入
-                        {" "}
-                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("worker-templates")}>
-                          API 调用格式配置
-                        </a>
-                        ，优先复用现有模板，避免手写配置漂移。
-                      </p>
-                      <p>URL 返回模型：resultValueType = url，resultUrlPath 指向实际图片 URL 字段。</p>
-                      <p>base64 返回模型：resultValueType = base64，resultUrlPath 指向 base64 字段，并配置 resultMimeType（建议 image/png）。</p>
-                      <p>Azure GPT Image（base64）推荐模板：azure-image-base64-v1。</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">2. 供应商与密钥准备</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>
-                        进入
-                        {" "}
-                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("providers")}>
-                          供应商管理
-                        </a>
-                        ，确认供应商状态为 healthy 或 degraded，且有可运行的 managed 密钥（internal_encrypted）。
-                      </p>
-                      <p>密钥环境优先使用 production；如无 production，确保至少有一个 active 的可解密密钥。</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">3. 创建可售模型与供应商供应模型列表</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>
-                        进入
-                        {" "}
-                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("public-models")}>
-                          可售模型管理
-                        </a>
-                        ，先创建 public model slug（例如 openoctopus/xxx）。
-                      </p>
-                      <p>
-                        再到
-                        {" "}
-                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href="/internal?tab=public-models#economics-panel">
-                          模型价格总表
-                        </a>
-                        ，创建 provider model 映射并绑定执行模板。
-                      </p>
-                      <p>确保 capability 一致：supported model / provider model / routing rule 必须同为 image_generation。</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">4. 配置路由并启用</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>
-                        进入
-                        {" "}
-                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("routes")}>
-                          路由配置
-                        </a>
-                        ，为 public model 绑定主路由，必要时设置 fallback。
-                      </p>
-                      <p>启用前检查 runtime diagnostics，无红色阻断项（模板缺字段、密钥不可运行、capability 不一致）。</p>
-                      <p>图片模型启用时有强校验：必须存在 resultUrlPath，且必须显式配置 resultValueType（url 或 base64）；base64 模式还需 resultMimeType。</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">5. 验收清单（必须全部通过）</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>发起一次 /v1/images/generations，请求返回 queued，并拿到 task id。</p>
-                      <p>轮询 /v1/tasks/:id 到 succeeded。</p>
-                      <p>返回中存在 output_payload.assets[0].url，且前端可直接显示。</p>
-                      <p>允许保留 output_payload.raw 作为上游原始数据，但客户展示统一读取 assets。</p>
-                      <p>如为代理 URL（/v1/files/:requestId/assets/:assetIndex），访问应返回 200。</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-[#EADFC8] bg-[#FFF9ED] p-4">
-                    <h3 className="text-base font-semibold text-black">统一返回契约（图片）</h3>
-                    <pre className="mt-3 overflow-x-auto rounded-lg border border-black/8 bg-[#1C1917] p-4 text-xs leading-6 text-[#f4f1ea]">
-{`{
-  "status": "succeeded",
-  "capability": "image_generation",
-  "output_payload": {
-    "format": "openoctopus.image.output.v1",
-    "raw": { "...": "provider specific payload" },
-    "assets": [
-      {
-        "type": "image",
-        "url": "data:image/...;base64,... | /v1/files/:requestId/assets/:assetIndex | https://...",
-        "sourceUrl": "optional"
-      }
-    ]
-  }
-}`}
-                    </pre>
-                  </div>
-                </div>
-              </SectionShell>
-            </section>
-          ) : null}
-
-          {activeTab === "video-model-playbook" ? (
-            <section>
-              <SectionShell
-                id="video-model-playbook-panel"
-                title="添加视频模型操作手册"
-                description="目标：任何视频模型上线后，都能稳定返回统一格式 output_payload.assets[]，并可被客户前端直接消费。"
-              >
-                <div className="grid gap-4">
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">0. 上线前确认</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>确认上游视频结果返回形式：直链 URL、平台代理 URL，或其他可下载地址。</p>
-                      <p>确认鉴权方式：Bearer / x-api-key / query key。</p>
-                      <p>确认 capability 为 video_generation。</p>
-                      <p>确认是否有时长字段（durationSeconds / duration_seconds），用于计费与展示。</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">1. 配置 API 调用格式模板</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>
-                        进入
-                        {" "}
-                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("worker-templates")}>
-                          API 调用格式配置
-                        </a>
-                        ，优先复用模板，避免手写配置漂移。
-                      </p>
-                      <p>必须配置 resultUrlPath，指向上游视频 URL 字段。</p>
-                      <p>必须显式配置 resultValueType（通常为 url）。</p>
-                      <p>如果是异步轮询模型，必须配置 pollPath + statusPath + taskIdPath。</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">2. 供应商与密钥准备</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>
-                        进入
-                        {" "}
-                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("providers")}>
-                          供应商管理
-                        </a>
-                        ，确认供应商状态为 healthy 或 degraded，且存在可运行 managed 密钥（internal_encrypted）。
-                      </p>
-                      <p>密钥环境优先 production；如无 production，确保至少一个 active 且可解密密钥。</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">3. 创建可售模型与供应商供应模型列表</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>
-                        进入
-                        {" "}
-                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("public-models")}>
-                          可售模型管理
-                        </a>
-                        ，先创建 public model slug（例如 openoctopus/xxx-video）。
-                      </p>
-                      <p>
-                        再到
-                        {" "}
-                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href="/internal?tab=public-models#economics-panel">
-                          模型价格总表
-                        </a>
-                        ，创建 provider model 映射并绑定执行模板。
-                      </p>
-                      <p>确保 capability 一致：supported model / provider model / routing rule 必须同为 video_generation。</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">4. 配置路由并启用</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>
-                        进入
-                        {" "}
-                        <a className="underline decoration-black/25 underline-offset-4 hover:decoration-black/50" href={buildInternalHref("routes")}>
-                          路由配置
-                        </a>
-                        ，为 public model 绑定主路由，必要时设置 fallback。
-                      </p>
-                      <p>启用前检查 runtime diagnostics，无阻断项（模板字段缺失、密钥不可运行、capability 不一致）。</p>
-                      <p>视频模型启用强校验：必须配置 resultUrlPath + resultValueType（url/base64）。</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-4">
-                    <h3 className="text-base font-semibold text-black">5. 验收清单（必须全部通过）</h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-black/60">
-                      <p>发起一次 /v1/videos/generations，请求返回 queued，并拿到 task id。</p>
-                      <p>轮询 /v1/tasks/:id 到 succeeded。</p>
-                      <p>返回中存在 output_payload.assets[0].url，且播放器可直接加载。</p>
-                      <p>允许保留 output_payload.raw 作为上游原始数据，但客户展示统一读取 assets。</p>
-                      <p>如返回 durationSeconds，确认值合理并与预期时长一致。</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-[#D8E5F5] bg-[#F4F8FF] p-4">
-                    <h3 className="text-base font-semibold text-black">统一返回契约（视频）</h3>
-                    <pre className="mt-3 overflow-x-auto rounded-lg border border-black/8 bg-[#1C1917] p-4 text-xs leading-6 text-[#f4f1ea]">
-{`{
-  "status": "succeeded",
-  "capability": "video_generation",
-  "output_payload": {
-    "format": "openoctopus.video.output.v1",
-    "raw": { "...": "provider specific payload" },
-    "assets": [
-      {
-        "type": "video",
-        "url": "https://... | /v1/files/:requestId/assets/:assetIndex",
-        "mimeType": "video/mp4",
-        "durationSeconds": 5,
-        "sourceUrl": "optional"
-      }
-    ]
-  }
-}`}
-                    </pre>
-                  </div>
-                </div>
               </SectionShell>
             </section>
           ) : null}

@@ -67,6 +67,18 @@ function readHeaderValue(
   return typeof value === "string" ? value : undefined;
 }
 
+function setGeneratedAssetHeaders(
+  reply: { header: (name: string, value: string) => unknown },
+  contentType: string,
+  contentLength: number
+) {
+  reply.header("content-type", contentType);
+  reply.header("content-length", String(contentLength));
+  reply.header("cache-control", "public, max-age=3600");
+  reply.header("access-control-allow-origin", "*");
+  reply.header("cross-origin-resource-policy", "cross-origin");
+}
+
 export async function registerFileRoutes(app: FastifyInstance) {
   app.get("/v1/files/:requestId/assets/:assetIndex", async (request, reply) => {
     const params = fileAssetParamsSchema.parse(request.params);
@@ -109,8 +121,7 @@ export async function registerFileRoutes(app: FastifyInstance) {
       if (storedDownload.data) {
         const buffer = Buffer.from(await storedDownload.data.arrayBuffer());
         const contentType = storedAsset.mime_type || storedDownload.data.type || "application/octet-stream";
-        reply.header("content-type", contentType);
-        reply.header("cache-control", "public, max-age=31536000, immutable");
+        setGeneratedAssetHeaders(reply, contentType, buffer.length);
         return reply.code(200).send(buffer);
       }
     }
@@ -122,8 +133,7 @@ export async function registerFileRoutes(app: FastifyInstance) {
     if (cachedDownload.data) {
       const buffer = Buffer.from(await cachedDownload.data.arrayBuffer());
       const contentType = cachedDownload.data.type || "application/octet-stream";
-      reply.header("content-type", contentType);
-      reply.header("cache-control", "public, max-age=31536000, immutable");
+      setGeneratedAssetHeaders(reply, contentType, buffer.length);
       return reply.code(200).send(buffer);
     }
 
@@ -186,10 +196,7 @@ export async function registerFileRoutes(app: FastifyInstance) {
           contentType,
           upsert: true,
         });
-      if (contentType) {
-        reply.header("content-type", contentType);
-      }
-      reply.header("cache-control", "public, max-age=31536000, immutable");
+      setGeneratedAssetHeaders(reply, contentType || "application/octet-stream", bodyBuffer.length);
       return reply.code(200).send(bodyBuffer);
     }
 
