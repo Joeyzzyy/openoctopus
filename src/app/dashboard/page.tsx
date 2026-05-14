@@ -937,15 +937,17 @@ export default async function DashboardPage({
                     <div className="rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-3 py-2">
                       <p className="text-xs text-black/45">Sign-in methods</p>
                       <p className="mt-1 text-black">
-                        {user.authProviders.length > 0
-                          ? user.authProviders.map((provider) => provider === "email" ? "Email password" : provider).join(", ")
+                        {Array.from(new Set([...user.authProviders, ...(user.hasPasswordSignIn ? ["email"] : [])])).length > 0
+                          ? Array.from(new Set([...user.authProviders, ...(user.hasPasswordSignIn ? ["email"] : [])]))
+                              .map((provider) => provider === "email" ? "Email password" : provider)
+                              .join(", ")
                           : "Google"}
                       </p>
                     </div>
                     <div className="rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-3 py-2">
                       <p className="text-xs text-black/45">Password sign-in</p>
                       <p className="mt-1 text-black">
-                        {user.authProviders.includes("email") ? "Enabled" : "Not set"}
+                        {user.hasPasswordSignIn ? "Enabled" : "Not set"}
                       </p>
                     </div>
                   </div>
@@ -954,15 +956,15 @@ export default async function DashboardPage({
                 <div className="rounded-xl border border-black/[0.08] bg-white p-5">
                   <div className="mb-4">
                     <h2 className="text-base font-semibold text-black">
-                      {user.authProviders.includes("email") ? "Update password" : "Set password"}
+                      {user.hasPasswordSignIn ? "Update password" : "Set password"}
                     </h2>
                     <p className="mt-1 text-sm leading-6 text-black/55">
-                      {user.authProviders.includes("email")
+                      {user.hasPasswordSignIn
                         ? "Update the password used for email sign-in."
                         : "Set a password for this Google account so you can also sign in with Gmail and password."}
                     </p>
                   </div>
-                  <AccountPasswordForm hasPassword={user.authProviders.includes("email")} />
+                  <AccountPasswordForm hasPassword={user.hasPasswordSignIn} />
                 </div>
               </section>
             ) : null}

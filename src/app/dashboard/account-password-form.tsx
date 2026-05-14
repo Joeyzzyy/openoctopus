@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { updateAccountPassword } from "./actions";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
@@ -13,6 +14,7 @@ export function AccountPasswordForm({
   const [state, formAction, isPending] = useActionState(updateAccountPassword, {
     success: false,
   });
+  const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -35,10 +37,11 @@ export function AccountPasswordForm({
         setPassword("");
         setConfirmPassword("");
       }, 0);
+      router.refresh();
     } else if (state.error) {
       toast.error(state.error);
     }
-  }, [hasPassword, state]);
+  }, [hasPassword, router, state]);
 
   return (
     <form ref={formRef} action={formAction} className="space-y-4">

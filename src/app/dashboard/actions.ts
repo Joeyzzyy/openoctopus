@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod/v4";
 import crypto from "crypto";
 import Stripe from "stripe";
@@ -279,8 +280,27 @@ export async function updateAccountPassword(
     });
 
     if (error) {
+      if (error.message.toLowerCase().includes("different from the old password")) {
+        const supabaseAdmin = createAdminClient();
+        await supabaseAdmin.auth.admin.updateUserById(user.id, {
+          app_metadata: {
+            ...user.app_metadata,
+            password_sign_in_enabled: true,
+          },
+        });
+        revalidatePath("/dashboard");
+        return { success: true, data: { alreadySet: true } };
+      }
       return { success: false, error: error.message };
     }
+
+    const supabaseAdmin = createAdminClient();
+    await supabaseAdmin.auth.admin.updateUserById(user.id, {
+      app_metadata: {
+        ...user.app_metadata,
+        password_sign_in_enabled: true,
+      },
+    });
 
     revalidatePath("/dashboard");
     return { success: true };

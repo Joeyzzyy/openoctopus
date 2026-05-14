@@ -78,6 +78,7 @@ export type DashboardData = {
     name: string;
     avatarUrl?: string | null;
     authProviders: string[];
+    hasPasswordSignIn: boolean;
   };
   workspace: {
     id: string;
@@ -504,6 +505,23 @@ export async function getDashboardData({
     return null;
   }
 
+  const authProviders = Array.isArray((user as { identities?: Array<{ provider?: string | null }> }).identities)
+    ? Array.from(
+        new Set(
+          (user as { identities?: Array<{ provider?: string | null }> }).identities
+            ?.map((identity) => identity.provider)
+            .filter((provider): provider is string => typeof provider === "string" && provider.length > 0) ?? []
+        )
+      )
+    : [];
+  const appProviders = Array.isArray(user.app_metadata?.providers)
+    ? user.app_metadata.providers.filter((provider): provider is string => typeof provider === "string")
+    : [];
+  const hasPasswordSignIn =
+    authProviders.includes("email") ||
+    appProviders.includes("email") ||
+    user.app_metadata?.password_sign_in_enabled === true;
+
   const userView = {
     id: user.id,
     email: user.email ?? null,
@@ -516,15 +534,8 @@ export async function getDashboardData({
       (user.user_metadata?.avatar_url as string | undefined) ??
       (user.user_metadata?.picture as string | undefined) ??
       null,
-    authProviders: Array.isArray((user as { identities?: Array<{ provider?: string | null }> }).identities)
-      ? Array.from(
-          new Set(
-            (user as { identities?: Array<{ provider?: string | null }> }).identities
-              ?.map((identity) => identity.provider)
-              .filter((provider): provider is string => typeof provider === "string" && provider.length > 0) ?? []
-          )
-        )
-      : [],
+    authProviders: Array.from(new Set([...appProviders, ...authProviders])),
+    hasPasswordSignIn,
   };
 
   try {
