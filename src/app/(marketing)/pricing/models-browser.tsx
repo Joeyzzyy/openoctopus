@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
@@ -981,13 +980,11 @@ export function ModelsBrowser({
                   {playgroundImageUrls.length > 0 ? (
                     <div className="grid gap-2">
                       {playgroundImageUrls.map((src, index) => (
-                        <Image
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
                           key={`${src}-${index}`}
                           src={src}
                           alt={`Generated result ${index + 1}`}
-                          width={1024}
-                          height={1024}
-                          unoptimized
                           className="h-auto w-full rounded-md border border-black/[0.08] bg-white object-contain"
                         />
                       ))}
