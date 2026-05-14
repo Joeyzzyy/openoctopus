@@ -31,6 +31,64 @@ function decryptSecret(payload: string) {
   return plain.toString("utf8");
 }
 
+async function createWorkspacePlaygroundKey(
+  workspaceId: string,
+  userId: string,
+  replacedApiKeyId?: string | null
+) {
+  const supabaseAdmin = createAdminClient();
+  const prefixRand = crypto.randomBytes(4).toString("hex");
+  const keyPrefix = `ooq_pg_${prefixRand}`;
+  const secret = `ooq_${crypto.randomBytes(32).toString("base64url")}`;
+  const secretHash = crypto.createHash("sha256").update(secret).digest("hex");
+
+  const { data: apiKeyRow, error: keyError } = await supabaseAdmin
+    .from("api_keys")
+    .insert({
+      workspace_id: workspaceId,
+      name: "Playground Key",
+      key_prefix: keyPrefix,
+      secret_hash: secretHash,
+      environment: "Production",
+      monthly_budget: 0,
+      status: "active",
+      created_by: userId,
+    })
+    .select("id")
+    .single();
+
+  if (keyError || !apiKeyRow?.id) {
+    throw new Error(keyError?.message ?? "Failed to create playground api key");
+  }
+
+  const encryptedSecret = encryptSecret(secret);
+  const { error: upsertPlaygroundKeyError } = await supabaseAdmin
+    .from("workspace_playground_keys")
+    .upsert(
+      {
+        workspace_id: workspaceId,
+        api_key_id: apiKeyRow.id,
+        encrypted_secret: encryptedSecret,
+        created_by: userId,
+      },
+      { onConflict: "workspace_id" }
+    );
+
+  if (upsertPlaygroundKeyError) {
+    throw new Error(upsertPlaygroundKeyError.message);
+  }
+
+  if (replacedApiKeyId) {
+    await supabaseAdmin
+      .from("api_keys")
+      .update({ status: "revoked" })
+      .eq("id", replacedApiKeyId)
+      .eq("workspace_id", workspaceId);
+  }
+
+  return { secret, apiKeyId: apiKeyRow.id as string };
+}
+
 export async function getAuthedWorkspaceForPlayground() {
   const supabase = await createClient();
   const {
@@ -71,49 +129,15 @@ export async function getOrCreateWorkspacePlaygroundKey(workspaceId: string, use
   }
 
   if (stored?.encrypted_secret) {
-    return {
-      secret: decryptSecret(stored.encrypted_secret),
-      apiKeyId: stored.api_key_id as string,
-    };
+    try {
+      return {
+        secret: decryptSecret(stored.encrypted_secret),
+        apiKeyId: stored.api_key_id as string,
+      };
+    } catch {
+      return createWorkspacePlaygroundKey(workspaceId, userId, stored.api_key_id as string | null);
+    }
   }
 
-  const prefixRand = crypto.randomBytes(4).toString("hex");
-  const keyPrefix = `ooq_pg_${prefixRand}`;
-  const secret = `ooq_${crypto.randomBytes(32).toString("base64url")}`;
-  const secretHash = crypto.createHash("sha256").update(secret).digest("hex");
-
-  const { data: apiKeyRow, error: keyError } = await supabaseAdmin
-    .from("api_keys")
-    .insert({
-      workspace_id: workspaceId,
-      name: "Playground Key",
-      key_prefix: keyPrefix,
-      secret_hash: secretHash,
-      environment: "Production",
-      monthly_budget: 0,
-      status: "active",
-      created_by: userId,
-    })
-    .select("id")
-    .single();
-
-  if (keyError || !apiKeyRow?.id) {
-    throw new Error(keyError?.message ?? "Failed to create playground api key");
-  }
-
-  const encryptedSecret = encryptSecret(secret);
-  const { error: insertPlaygroundKeyError } = await supabaseAdmin
-    .from("workspace_playground_keys")
-    .insert({
-      workspace_id: workspaceId,
-      api_key_id: apiKeyRow.id,
-      encrypted_secret: encryptedSecret,
-      created_by: userId,
-    });
-
-  if (insertPlaygroundKeyError) {
-    throw new Error(insertPlaygroundKeyError.message);
-  }
-
-  return { secret, apiKeyId: apiKeyRow.id as string };
+  return createWorkspacePlaygroundKey(workspaceId, userId);
 }
