@@ -89,6 +89,7 @@ type SchemaFieldState = {
   description: string;
   example: string;
   exposedToCustomer: boolean;
+  enumValues: string[];
 };
 
 function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormState> {
@@ -156,6 +157,19 @@ const SCHEMA_FIELD_TYPE_OPTIONS = [
   "base64",
 ];
 
+const ASPECT_RATIO_CANDIDATES = [
+  "1:1",
+  "16:9",
+  "9:16",
+  "4:3",
+  "3:4",
+  "3:2",
+  "2:3",
+  "5:4",
+  "4:5",
+  "21:9",
+];
+
 function randomFieldId() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -190,6 +204,9 @@ function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields")
               : typeof row.customerVisible === "boolean"
                 ? row.customerVisible
                 : true,
+          enumValues: Array.isArray(row.enum)
+            ? row.enum.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+            : [],
         } satisfies SchemaFieldState;
       })
       .filter((row): row is SchemaFieldState => Boolean(row));
@@ -236,6 +253,7 @@ function SchemaFieldEditor({
     description: "",
     example: "",
     exposedToCustomer: true,
+    enumValues: [],
   });
 
   useEffect(() => {
@@ -261,6 +279,7 @@ function SchemaFieldEditor({
       description: "",
       example: "",
       exposedToCustomer: true,
+      enumValues: [],
     });
     setEditorOpen(true);
   };
@@ -296,6 +315,9 @@ function SchemaFieldEditor({
       description: row.description.trim(),
       example: row.example.trim(),
       exposedToCustomer: row.exposedToCustomer,
+      enumValues: row.enumValues
+        .map((item) => item.trim())
+        .filter((item, index, list) => item.length > 0 && list.indexOf(item) === index),
     }))
     .filter((row) => row.name.length > 0);
 
@@ -309,6 +331,7 @@ function SchemaFieldEditor({
         description: row.description || undefined,
         example: row.example || undefined,
         exposedToCustomer: row.exposedToCustomer,
+        enum: row.enumValues.length > 0 ? row.enumValues : undefined,
       })),
     },
     null,
@@ -377,6 +400,9 @@ function SchemaFieldEditor({
             <p className="mt-2 text-xs leading-5 text-black/65">{row.description || "未填写说明"}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-black/55">
               <span className="rounded border border-black/[0.08] bg-white px-2 py-0.5">示例：{row.example || "-"}</span>
+              <span className="rounded border border-black/[0.08] bg-white px-2 py-0.5">
+                可选值：{row.enumValues.length > 0 ? row.enumValues.join(", ") : "-"}
+              </span>
               {includeRequired ? (
                 <span className="rounded border border-black/[0.08] bg-white px-2 py-0.5">
                   必填：{row.required ? "是" : "否"}
@@ -431,6 +457,55 @@ function SchemaFieldEditor({
                 className={`${formInputClassName} h-9 text-xs md:col-span-2`}
                 placeholder="示例值"
               />
+              <input
+                value={draft.enumValues.join(", ")}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    enumValues: event.target.value
+                      .split(",")
+                      .map((item) => item.trim())
+                      .filter((item) => item.length > 0),
+                  }))
+                }
+                disabled={disabled}
+                className={`${formInputClassName} h-9 text-xs md:col-span-2`}
+                placeholder='可选值（逗号分隔），如 1:1, 16:9, 9:16, 4:3, 3:4'
+              />
+              {draft.name.trim() === "aspect_ratio" ? (
+                <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
+                  <p className="mb-2 text-[11px] text-black/60">常用比例（可多选）</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {ASPECT_RATIO_CANDIDATES.map((ratio) => {
+                      const checked = draft.enumValues.includes(ratio);
+                      return (
+                        <label key={ratio} className="inline-flex items-center gap-2 text-xs text-black/75">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) =>
+                              setDraft((current) => {
+                                const set = new Set(current.enumValues);
+                                if (event.target.checked) {
+                                  set.add(ratio);
+                                } else {
+                                  set.delete(ratio);
+                                }
+                                return {
+                                  ...current,
+                                  enumValues: Array.from(set),
+                                };
+                              })
+                            }
+                            className="size-3.5"
+                          />
+                          {ratio}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
               <textarea
                 value={draft.description}
                 onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
@@ -1379,8 +1454,8 @@ export function CreateProviderModelForm({
         <input type="hidden" name="providerModelId" value={providerModelId} />
       ) : null}
       <input type="hidden" name="pricingSourceEvidence" value={defaultPricingSourceEvidence} />
-      <div className="grid gap-4 lg:grid-cols-[210px_minmax(0,1fr)]">
-        <aside className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-2">
+      <div className="grid items-start gap-4 lg:grid-cols-[210px_minmax(0,1fr)]">
+        <aside className="self-start rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-2">
           <nav className="space-y-1">
             {tabItems.map((tab) => {
               const active = activeTab === tab.key;
@@ -1408,7 +1483,7 @@ export function CreateProviderModelForm({
           </nav>
         </aside>
 
-        <div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
+        <div className="space-y-4 overflow-y-auto pr-1 lg:max-h-[calc(100vh-12rem)]">
         <div
           ref={(node) => {
             sectionRefs.current["ai-autofill"] = node;

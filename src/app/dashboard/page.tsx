@@ -12,7 +12,6 @@ import { ProductTopTabs } from "@/components/marketing/product-top-tabs";
 import { getDashboardData } from "@/lib/dashboard-server";
 import { cn } from "@/lib/utils";
 import { CreateKeyButton } from "./dashboard-actions";
-import { DashboardMobileNav, DashboardSidebar } from "./dashboard-sidebar";
 import { ApiKeysTable } from "./api-keys-table";
 import { ModelCatalogTable } from "./model-catalog-table";
 import { TopUpForm } from "./top-up-form";
@@ -31,9 +30,9 @@ type ModelType = "image" | "video" | "text-coding";
 type ModelCapabilityType = ModelType;
 type BillingFlow = "incoming" | "outgoing";
 const pageNav = [
-  { label: "Top-up Balance", view: "dashboard" },
-  { label: "API Keys", view: "api-keys" },
-  { label: "Request Details", view: "request-details" },
+  { view: "dashboard" },
+  { view: "api-keys" },
+  { view: "request-details" },
 ] as const;
 
 const requestStatusStyles = {
@@ -402,30 +401,6 @@ export default async function DashboardPage({
     redirect("/login");
   }
 
-  const sidebarItems = pageNav.map((item) => ({
-    label: item.label,
-    href: buildDashboardHref({
-      view: item.view,
-      requestsPage: 1,
-      apiKeyId: selectedApiKeyId,
-      analyticsInterval,
-      analyticsRange,
-      modelType: selectedModelType,
-      modelSlug: selectedModelSlug,
-      billingFlow: selectedBillingFlow,
-    }),
-  }));
-  const activeHref = buildDashboardHref({
-    view,
-    requestsPage: 1,
-    apiKeyId: selectedApiKeyId,
-    analyticsInterval,
-    analyticsRange,
-    modelType: selectedModelType,
-    modelSlug: selectedModelSlug,
-    billingFlow: selectedBillingFlow,
-  });
-
   const { apiKeys, metrics, modelCatalogRows, requestFilters, requestPagination, requestQueueRows, analyticsRequests, billingRows, user } =
     data;
 
@@ -457,9 +432,7 @@ export default async function DashboardPage({
   const modelCatalogRowsFiltered = selectedModelSlug
     ? modelCatalogRowsByType.filter((row) => row.publicModel === selectedModelSlug)
     : modelCatalogRowsByType;
-  const billingRowsFiltered = billingRows.filter((row) =>
-    selectedBillingFlow === "incoming" ? row.amountValue >= 0 : row.amountValue < 0
-  );
+  const billingRowsFiltered = billingRows.filter((row) => row.amountValue >= 0);
   const billingPageSize = 5;
   const billingTotalPages = Math.max(1, Math.ceil(billingRowsFiltered.length / billingPageSize));
   const normalizedBillingPage = Math.min(billingPage, billingTotalPages);
@@ -505,27 +478,41 @@ export default async function DashboardPage({
       />
 
       <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-4 sm:px-5 xl:px-0">
-        <ProductTopTabs />
-        <div className="mt-2 grid gap-5 xl:mt-4 xl:grid-cols-[220px_minmax(0,1fr)] xl:gap-6">
-          <aside className="hidden xl:block">
-            <DashboardSidebar items={sidebarItems} userLabel={user.email ?? user.name} activeHref={activeHref} />
-          </aside>
-
-          <aside className="xl:hidden">
-            <DashboardMobileNav
-              items={sidebarItems}
-              userLabel={user.email ?? user.name}
-              activeHref={activeHref}
-            />
-          </aside>
-
+        <ProductTopTabs
+          dashboardHref={buildDashboardHref({
+            view: "dashboard",
+            requestsPage: 1,
+            apiKeyId: selectedApiKeyId,
+            analyticsInterval,
+            analyticsRange,
+            modelType: selectedModelType,
+            modelSlug: selectedModelSlug,
+            billingFlow: selectedBillingFlow,
+          })}
+          modelsHref="/models"
+          apiKeysHref={buildDashboardHref({
+            view: "api-keys",
+            requestsPage: 1,
+            apiKeyId: selectedApiKeyId,
+            analyticsInterval,
+            analyticsRange,
+            modelType: selectedModelType,
+            modelSlug: selectedModelSlug,
+            billingFlow: selectedBillingFlow,
+          })}
+          requestDetailsHref={buildDashboardHref({
+            view: "request-details",
+            requestsPage: 1,
+            apiKeyId: selectedApiKeyId,
+            analyticsInterval,
+            analyticsRange,
+            modelType: selectedModelType,
+            modelSlug: selectedModelSlug,
+            billingFlow: selectedBillingFlow,
+          })}
+        />
+        <div className="mt-2 xl:mt-4">
           <section className="min-h-[calc(100vh-108px)] min-w-0">
-            {view === "api-keys" ? (
-              <div className="mb-4 flex justify-end md:mb-6">
-                <CreateKeyButton className="w-full justify-center sm:w-auto" />
-              </div>
-            ) : null}
-
             {view === "dashboard" ? (
               <>
                 <section className="mb-4">
@@ -550,18 +537,6 @@ export default async function DashboardPage({
             {view === "request-details" ? (
               <section className="p-0">
                   <div className="mb-4 flex flex-col gap-3">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <h2 className="text-xl font-semibold text-black">Request analytics</h2>
-                        <p className="mt-1 text-sm text-black/55">
-                          Requests and spend are combined here so you can inspect one API key at a time.
-                        </p>
-                      </div>
-                      <div className="inline-flex h-8 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/80">
-                        <span>{keyMetric?.value ?? apiKeys.length} active keys</span>
-                      </div>
-                    </div>
-
                     <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
                       <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
                         <p className="text-[11px] tracking-[0.35px] text-black/45">API key filter</p>
@@ -682,12 +657,7 @@ export default async function DashboardPage({
                         valueLabel={`${formatCurrency(filteredSpend)} billed in the selected window`}
                       />
                     </div>
-                  ) : (
-                    <EmptyState
-                      title="No requests in the selected window"
-                      detail="Try a broader time range or switch back to all API keys."
-                    />
-                  )}
+                  ) : null}
 
                   <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="min-w-0">
@@ -885,51 +855,6 @@ export default async function DashboardPage({
                     Top-up ledger and Stripe receipt/invoice download links for completed payments.
                   </p>
                 </div>
-                <div className="mb-4 flex flex-wrap gap-2">
-                  <Link
-                    href={buildDashboardHref({
-                      view: "dashboard",
-                      requestsPage: 1,
-                      billingPage: 1,
-                      apiKeyId: selectedApiKeyId,
-                      analyticsInterval,
-                      analyticsRange,
-                      modelType: selectedModelType,
-                      modelSlug: selectedModelSlug,
-                      billingFlow: "incoming",
-                    })}
-                    className={cn(
-                      "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
-                      selectedBillingFlow === "incoming"
-                        ? "border-black bg-black text-white"
-                        : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                    )}
-                  >
-                    Incoming
-                  </Link>
-                  <Link
-                    href={buildDashboardHref({
-                      view: "dashboard",
-                      requestsPage: 1,
-                      billingPage: 1,
-                      apiKeyId: selectedApiKeyId,
-                      analyticsInterval,
-                      analyticsRange,
-                      modelType: selectedModelType,
-                      modelSlug: selectedModelSlug,
-                      billingFlow: "outgoing",
-                    })}
-                    className={cn(
-                      "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors",
-                      selectedBillingFlow === "outgoing"
-                        ? "border-black bg-black text-white"
-                        : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                    )}
-                  >
-                    Outgoing
-                  </Link>
-                </div>
-
                 <div className="relative w-full overflow-auto">
                   <table className="w-full min-w-[860px] text-sm">
                     <thead>
@@ -968,20 +893,20 @@ export default async function DashboardPage({
                             </td>
                             <td className="sticky right-0 z-10 bg-white px-2 py-3 text-right text-sm">
                               <div className="flex items-center justify-end gap-2">
-                                <a
-                                  href={row.invoiceUrl ?? row.receiptUrl ?? "#"}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  aria-disabled={!row.invoiceUrl && !row.receiptUrl}
-                                  className={cn(
-                                    "inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium transition-colors",
-                                    row.invoiceUrl || row.receiptUrl
-                                      ? "text-black/70 hover:bg-black/[0.03]"
-                                      : "pointer-events-none text-black/35 opacity-60"
-                                  )}
-                                >
-                                  Open Billing Document
-                                </a>
+                                {row.invoiceUrl || row.receiptUrl ? (
+                                  <a
+                                    href={row.invoiceUrl ?? row.receiptUrl ?? "#"}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:bg-black/[0.03]"
+                                  >
+                                    Open Billing Document
+                                  </a>
+                                ) : (
+                                  <span className="inline-flex h-8 items-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/40">
+                                    No document
+                                  </span>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -989,7 +914,7 @@ export default async function DashboardPage({
                       ) : (
                         <tr>
                           <td className="px-2 py-20 text-center text-sm text-black/50" colSpan={5}>
-                            No {selectedBillingFlow} billing records yet
+                            No incoming billing records yet
                           </td>
                         </tr>
                       )}
@@ -1010,7 +935,7 @@ export default async function DashboardPage({
                           analyticsRange,
                           modelType: selectedModelType,
                           modelSlug: selectedModelSlug,
-                          billingFlow: selectedBillingFlow,
+                          billingFlow: "incoming",
                         })}
                         aria-disabled={normalizedBillingPage <= 1}
                         className={cn(
@@ -1037,7 +962,7 @@ export default async function DashboardPage({
                                   analyticsRange,
                                   modelType: selectedModelType,
                                   modelSlug: selectedModelSlug,
-                                  billingFlow: selectedBillingFlow,
+                                  billingFlow: "incoming",
                                 })}
                                 className={cn(
                                   "inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors",
@@ -1062,7 +987,7 @@ export default async function DashboardPage({
                           analyticsRange,
                           modelType: selectedModelType,
                           modelSlug: selectedModelSlug,
-                          billingFlow: selectedBillingFlow,
+                          billingFlow: "incoming",
                         })}
                         aria-disabled={normalizedBillingPage >= billingTotalPages}
                         className={cn(
@@ -1085,23 +1010,8 @@ export default async function DashboardPage({
             {view === "api-keys" ? (
               <>
                 <section className="p-0">
-                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h2 className="text-xl font-semibold text-black">API Keys</h2>
-                      <p className="mt-1 text-sm text-black/55">
-                        Create keys, control budgets, and manage active environments.
-                      </p>
-                    </div>
-                    <div className="inline-flex w-fit items-center gap-2 rounded-full border border-black/[0.08] bg-[#FCFCFA] px-3 py-1.5 text-xs text-black/55 md:hidden">
-                      <KeyRound className="size-4 text-black/45" />
-                      <span>{keyMetric?.value ?? apiKeys.length} active</span>
-                    </div>
-                    <div className="hidden items-center gap-2 md:flex">
-                      <KeyRound className="size-4 text-black/45" />
-                      <span className="text-xs text-black/55">
-                        {keyMetric?.value ?? apiKeys.length} active
-                      </span>
-                    </div>
+                  <div className="mb-4 flex items-center">
+                    <CreateKeyButton className="w-full justify-center sm:w-auto" />
                   </div>
 
                   <ApiKeysTable apiKeys={apiKeys} />

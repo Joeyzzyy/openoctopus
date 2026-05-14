@@ -958,6 +958,27 @@ export async function getDashboardData({
             ? metadata.stripe_invoice_id
             : null;
 
+        const amount = Number(row.amount_delta ?? 0);
+        const normalizedDescription = row.description?.trim() ?? "";
+        const legacyTopupText = /topup\s+through\s+stripe/i.test(normalizedDescription);
+        const isDebitUsage = row.entry_type === "usage" || (row.entry_type !== "topup" && amount < 0);
+        const description =
+          row.entry_type === "topup"
+            ? (normalizedDescription.length > 0 ? normalizedDescription : "Balance Top-up Through Stripe")
+            : row.entry_type === "refund"
+              ? (normalizedDescription.length > 0 ? normalizedDescription : "Refund")
+              : row.entry_type === "adjustment"
+                ? (normalizedDescription.length > 0
+                    ? normalizedDescription
+                    : amount < 0
+                      ? "Balance Adjustment (Debit)"
+                      : "Balance Adjustment (Credit)")
+                : isDebitUsage
+                  ? (normalizedDescription.length > 0 && !legacyTopupText
+                      ? normalizedDescription
+                      : "Usage charge")
+                  : (normalizedDescription.length > 0 ? normalizedDescription : "Settlement credit");
+
         return {
           id: row.id,
           createdAtLabel: formatTimestamp(row.created_at),
@@ -967,15 +988,15 @@ export async function getDashboardData({
               : row.entry_type === "refund"
                 ? "Refund"
               : row.entry_type === "adjustment"
-                  ? Number(row.amount_delta ?? 0) < 0
+                  ? amount < 0
                     ? "Adjustment (Debit)"
                     : "Adjustment (Credit)"
-                  : Number(row.amount_delta ?? 0) < 0
+                  : amount < 0
                     ? "Usage Charge"
                     : "Settlement Credit",
-          amountValue: Number(row.amount_delta ?? 0),
-          amountLabel: `${Number(row.amount_delta) >= 0 ? "+" : ""}${formatCurrency(Number(row.amount_delta ?? 0))}`,
-          description: "Balance Topup Through Stripe",
+          amountValue: amount,
+          amountLabel: `${amount >= 0 ? "+" : ""}${formatCurrency(amount)}`,
+          description,
           stripeSessionId,
           receiptUrl: stripePaymentIntentId
             ? (billingLinksByPaymentIntentId.get(stripePaymentIntentId)?.receiptUrl ?? null)

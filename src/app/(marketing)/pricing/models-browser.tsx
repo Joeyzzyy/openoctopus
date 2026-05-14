@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
 
@@ -211,6 +212,49 @@ function isAspectRatioEnum(values?: string[]) {
   return values.every((value) => /^\d+:\d+$/.test(value));
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function pickImageUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text) return null;
+  if (
+    text.startsWith("https://") ||
+    text.startsWith("http://") ||
+    text.startsWith("data:image/")
+  ) {
+    return text;
+  }
+  return null;
+}
+
+function extractImageUrls(output: unknown): string[] {
+  if (!isRecord(output)) return [];
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  const pushUrl = (candidate: unknown) => {
+    const resolved = pickImageUrl(candidate);
+    if (!resolved || seen.has(resolved)) return;
+    seen.add(resolved);
+    urls.push(resolved);
+  };
+
+  const assets = Array.isArray(output.assets) ? output.assets : [];
+  for (const item of assets) {
+    if (!isRecord(item)) continue;
+    if (item.type && item.type !== "image") continue;
+    pushUrl(item.url);
+  }
+
+  if (urls.length === 0) {
+    pushUrl(output.url);
+  }
+
+  return urls;
+}
+
 export function ModelsBrowser({
   rows,
   vendorOptions,
@@ -282,15 +326,30 @@ export function ModelsBrowser({
   const selectedModel =
     visibleRows.find((row) => row.publicModel === effectiveModelSlug) ?? visibleRows[0] ?? null;
 
-  const [mainTab, setMainTab] = useState<"playground" | "api">("api");
+  const [mainTab, setMainTab] = useState<"playground" | "api">("playground");
+  const [mountedTabs, setMountedTabs] = useState<Record<"playground" | "api", boolean>>({
+    playground: true,
+    api: false,
+  });
+  const [tabSkeleton, setTabSkeleton] = useState<"playground" | "api" | null>(null);
+  const mountTimerRef = useRef<number | null>(null);
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const [taskId, setTaskId] = useState<string | null>(null);
   const [playgroundError, setPlaygroundError] = useState<string | null>(null);
   const [playgroundErrorDetail, setPlaygroundErrorDetail] = useState<unknown>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailCopied, setDetailCopied] = useState(false);
+  const [resultModalOpen, setResultModalOpen] = useState(false);
+  const [resultCopied, setResultCopied] = useState(false);
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
+  const playgroundImageUrls = useMemo(
+    () => extractImageUrls(playgroundOutput),
+    [playgroundOutput]
+  );
+  useEffect(() => {
+    setPlaygroundForm({});
+  }, [effectiveModelSlug]);
   const handleProviderChange = (nextProvider: string) => {
     setSelectedProvider(nextProvider);
     const nextRows = rowsByProvider.find(([provider]) => provider === nextProvider)?.[1] ?? [];
@@ -300,6 +359,29 @@ export function ModelsBrowser({
   const handleModelChange = (nextModelSlug: string | null) => {
     setSelectedModelSlug(nextModelSlug);
   };
+
+  const handleMainTabChange = (tab: "playground" | "api") => {
+    if (tab === mainTab) return;
+    setMainTab(tab);
+    if (mountedTabs[tab]) return;
+    setTabSkeleton(tab);
+    if (mountTimerRef.current !== null) {
+      window.clearTimeout(mountTimerRef.current);
+    }
+    mountTimerRef.current = window.setTimeout(() => {
+      setMountedTabs((current) => ({ ...current, [tab]: true }));
+      setTabSkeleton((current) => (current === tab ? null : current));
+      mountTimerRef.current = null;
+    }, 30);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (mountTimerRef.current !== null) {
+        window.clearTimeout(mountTimerRef.current);
+      }
+    };
+  }, []);
 
   const modelsByCapability = useMemo(() => {
     const map = new Map<string, ModelDocRow[]>();
@@ -323,6 +405,41 @@ export function ModelsBrowser({
   );
   const isSubmitting = taskStatus === "submitting" || taskStatus === "queued" || taskStatus === "processing";
 
+  useEffect(() => {
+    setPlaygroundForm((current) => {
+      const next = { ...current };
+      let changed = false;
+
+      for (const field of parsedFields) {
+        const existing = next[field.key];
+        if (typeof existing === "string" && existing.trim().length > 0) continue;
+
+        if (field.key === "aspect_ratio") {
+          const defaultRatio =
+            field.enumValues && field.enumValues.length > 0
+              ? field.enumValues[0]
+              : ASPECT_RATIO_OPTIONS[0];
+          next[field.key] = defaultRatio;
+          changed = true;
+          continue;
+        }
+
+        if (field.enumValues && field.enumValues.length > 0) {
+          next[field.key] = field.enumValues[0];
+          changed = true;
+          continue;
+        }
+
+        if (field.type === "boolean") {
+          next[field.key] = "true";
+          changed = true;
+        }
+      }
+
+      return changed ? next : current;
+    });
+  }, [parsedFields]);
+
   const inferEndpoint = (capability: string | null | undefined) =>
     capability?.includes("video") ? "/v1/videos/generations" : "/v1/images/generations";
 
@@ -332,6 +449,8 @@ export function ModelsBrowser({
     setPlaygroundError(null);
     setPlaygroundErrorDetail(null);
     setDetailCopied(false);
+    setResultCopied(false);
+    setResultModalOpen(false);
     setPlaygroundOutput(null);
     setTaskId(null);
 
@@ -505,6 +624,17 @@ export function ModelsBrowser({
     }
   };
 
+  const copyResultJson = async () => {
+    const text = formatDetailText(playgroundOutput);
+    try {
+      await navigator.clipboard.writeText(text);
+      setResultCopied(true);
+      setTimeout(() => setResultCopied(false), 1500);
+    } catch {
+      setResultCopied(false);
+    }
+  };
+
   return (
     <section className="space-y-4">
       <div className="space-y-2.5">
@@ -564,20 +694,37 @@ export function ModelsBrowser({
               <button
                 key={tab}
                 type="button"
-                onClick={() => setMainTab(tab)}
-                className={`h-10 cursor-pointer rounded-none border-b-2 px-3 text-sm font-medium capitalize ${
+                onClick={() => handleMainTabChange(tab)}
+                className={`h-10 cursor-pointer rounded-none border-b-2 px-3 text-sm font-medium ${
                   tab === mainTab
                     ? "border-black text-black"
                     : "border-transparent text-black/55 hover:text-black"
                 }`}
               >
-                {tab}
+                {tab === "api" ? "API" : "playground"}
               </button>
             ))}
           </div>
         </div>
 
         {mainTab === "playground" ? (
+          tabSkeleton === "playground" || !mountedTabs.playground ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <section className="rounded-xl border border-black/[0.08] bg-white p-4">
+                <div className="mb-3 h-4 w-20 animate-pulse rounded bg-black/[0.08]" />
+                <div className="space-y-3">
+                  <div className="h-16 animate-pulse rounded-md bg-black/[0.06]" />
+                  <div className="h-16 animate-pulse rounded-md bg-black/[0.06]" />
+                  <div className="h-16 animate-pulse rounded-md bg-black/[0.06]" />
+                </div>
+                <div className="mt-4 h-10 w-36 animate-pulse rounded-md bg-black/[0.08]" />
+              </section>
+              <section className="rounded-xl border border-black/[0.08] bg-[#FAFAFA] p-4">
+                <div className="mb-3 h-4 w-28 animate-pulse rounded bg-black/[0.08]" />
+                <div className="min-h-[280px] animate-pulse rounded-md border border-black/[0.08] bg-white" />
+              </section>
+            </div>
+          ) : (
           <div className="grid gap-4 md:grid-cols-2">
             <section className="rounded-xl border border-black/[0.08] bg-white p-4">
               <div className="mb-3 text-sm font-medium text-black">Input</div>
@@ -601,13 +748,17 @@ export function ModelsBrowser({
                       {field.key === "aspect_ratio" || isAspectRatioEnum(field.enumValues) ? (
                         <select
                           disabled={isSubmitting}
-                          value={playgroundForm[field.key] ?? ""}
+                          value={
+                            playgroundForm[field.key] ??
+                            (field.enumValues && field.enumValues.length > 0
+                              ? field.enumValues[0]
+                              : ASPECT_RATIO_OPTIONS[0])
+                          }
                           onChange={(event) =>
                             setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
                           }
                           className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03]"
                         >
-                          <option value="">Select ratio</option>
                           {(field.enumValues && field.enumValues.length > 0
                             ? field.enumValues
                             : ASPECT_RATIO_OPTIONS
@@ -620,13 +771,12 @@ export function ModelsBrowser({
                       ) : field.enumValues && field.enumValues.length > 0 ? (
                         <select
                           disabled={isSubmitting}
-                          value={playgroundForm[field.key] ?? ""}
+                          value={playgroundForm[field.key] ?? field.enumValues[0]}
                           onChange={(event) =>
                             setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
                           }
                           className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03]"
                         >
-                          <option value="">Select {field.label}</option>
                           {field.enumValues.map((value) => (
                             <option key={value} value={value}>
                               {value}
@@ -636,13 +786,12 @@ export function ModelsBrowser({
                       ) : field.type === "boolean" ? (
                         <select
                           disabled={isSubmitting}
-                          value={playgroundForm[field.key] ?? ""}
+                          value={playgroundForm[field.key] ?? "true"}
                           onChange={(event) =>
                             setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
                           }
                           className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03]"
                         >
-                          <option value="">Select true / false</option>
                           <option value="true">true</option>
                           <option value="false">false</option>
                         </select>
@@ -688,7 +837,18 @@ export function ModelsBrowser({
             <section className="flex min-h-[360px] flex-col rounded-xl border border-black/[0.08] bg-[#FAFAFA] p-4">
               <div className="mb-3 flex items-center justify-between">
                 <div className="text-sm font-medium text-black">Output</div>
-                <div className="text-xs capitalize text-black/60">Status: {taskStatusLabel(taskStatus)}</div>
+                <div className="flex items-center gap-2">
+                  {playgroundOutput ? (
+                    <button
+                      type="button"
+                      onClick={() => setResultModalOpen(true)}
+                      className="h-7 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
+                    >
+                      View result JSON
+                    </button>
+                  ) : null}
+                  <div className="text-xs capitalize text-black/60">Status: {taskStatusLabel(taskStatus)}</div>
+                </div>
               </div>
               {playgroundError ? (
                 <div className="flex min-h-[280px] flex-1 items-center">
@@ -716,9 +876,23 @@ export function ModelsBrowser({
                   <p className="mt-1 text-xs text-black/55">{taskStatusLabel(taskStatus)}</p>
                 </div>
               ) : playgroundOutput ? (
-                <pre className="max-h-[560px] overflow-auto rounded-md bg-white p-3 text-xs text-black/80">
-                  {JSON.stringify(playgroundOutput, null, 2)}
-                </pre>
+                <div className="space-y-3">
+                  {playgroundImageUrls.length > 0 ? (
+                    <div className="grid gap-2">
+                      {playgroundImageUrls.map((src, index) => (
+                        <Image
+                          key={`${src}-${index}`}
+                          src={src}
+                          alt={`Generated result ${index + 1}`}
+                          width={1024}
+                          height={1024}
+                          unoptimized
+                          className="h-auto w-full rounded-md border border-black/[0.08] bg-white object-contain"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               ) : (
                 <div className="flex min-h-[280px] flex-1 items-center justify-center rounded-md border border-black/[0.08] bg-white px-4">
                   <p className="text-center text-sm text-black/55">
@@ -727,6 +901,14 @@ export function ModelsBrowser({
                 </div>
               )}
             </section>
+          </div>
+          )
+        ) : tabSkeleton === "api" || !mountedTabs.api ? (
+          <div className="space-y-3 rounded-xl border border-black/[0.08] bg-white p-4">
+            <div className="h-5 w-44 animate-pulse rounded bg-black/[0.08]" />
+            <div className="h-10 animate-pulse rounded-md bg-black/[0.06]" />
+            <div className="h-28 animate-pulse rounded-md bg-black/[0.06]" />
+            <div className="h-28 animate-pulse rounded-md bg-black/[0.06]" />
           </div>
         ) : (
           <ApiQuickstartCard models={visibleRows} initialModel={effectiveModelSlug} />
@@ -757,6 +939,35 @@ export function ModelsBrowser({
             </div>
             <pre className="max-h-[65vh] overflow-auto rounded-md border border-black/[0.08] bg-[#FAFAFA] p-3 text-xs text-black/80">
               {formatDetailText(playgroundErrorDetail)}
+            </pre>
+          </div>
+        </div>
+      ) : null}
+
+      {resultModalOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-2xl rounded-xl border border-black/[0.1] bg-white p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-black">Result JSON</h4>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={copyResultJson}
+                  className="h-7 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
+                >
+                  {resultCopied ? "Copied" : "Copy"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setResultModalOpen(false)}
+                  className="h-7 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <pre className="max-h-[65vh] overflow-auto rounded-md border border-black/[0.08] bg-[#FAFAFA] p-3 text-xs text-black/80">
+              {formatDetailText(playgroundOutput)}
             </pre>
           </div>
         </div>

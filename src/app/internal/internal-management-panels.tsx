@@ -687,6 +687,40 @@ function ModalButton({
   );
 }
 
+function DialogFormSubmitButton({
+  formId,
+  label = "保存供应商模型",
+  pendingLabel = "保存中...",
+}: {
+  formId: string;
+  label?: string;
+  pendingLabel?: string;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+
+  return (
+    <button
+      type="button"
+      disabled={submitting}
+      aria-busy={submitting}
+      onClick={() => {
+        const form = document.getElementById(formId);
+        if (!(form instanceof HTMLFormElement)) {
+          return;
+        }
+        if (!form.reportValidity()) {
+          return;
+        }
+        setSubmitting(true);
+        form.requestSubmit();
+      }}
+      className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220] disabled:cursor-not-allowed disabled:bg-black/15 disabled:text-black/35"
+    >
+      {submitting ? pendingLabel : label}
+    </button>
+  );
+}
+
 function ManagementDialog({
   trigger,
   title,
@@ -1186,13 +1220,7 @@ export function PublicModelsPanel({
                       title={`新建映射：${model.display_name}`}
                       description="为当前可售模型新增供应商供应模型映射。"
                       headerActions={
-                        <button
-                          type="submit"
-                          form={`provider-model-form-create-for-${model.id}`}
-                          className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
-                        >
-                          保存供应商模型
-                        </button>
+                        <DialogFormSubmitButton formId={`provider-model-form-create-for-${model.id}`} />
                       }
                     >
                       {({ close }) => (
@@ -1244,13 +1272,7 @@ export function PublicModelsPanel({
                                     title={`编辑映射 ${mapping.supportedModelName} / ${mapping.providerName}`}
                                     description=" "
                                     headerActions={
-                                      <button
-                                        type="submit"
-                                        form={`provider-model-form-${mapping.id}`}
-                                        className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
-                                      >
-                                        保存供应商模型
-                                      </button>
+                                      <DialogFormSubmitButton formId={`provider-model-form-${mapping.id}`} />
                                     }
                                   >
                                     {({ close }) => (
@@ -1753,13 +1775,7 @@ export function EconomicsPanel({
                                 title={`编辑 ${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
                                 description=" "
                                 headerActions={
-                                  <button
-                                    type="submit"
-                                    form={`provider-model-form-${row.providerModel.id}`}
-                                    className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
-                                  >
-                                    保存供应商模型
-                                  </button>
+                                  <DialogFormSubmitButton formId={`provider-model-form-${row.providerModel.id}`} />
                                 }
                               >
                                 {({ close }) => (
@@ -2338,13 +2354,7 @@ export function ModelsPanel({
           title="新建供应商模型"
           description="在独立弹窗中，把可售模型映射到某个供应商的具体模型。"
           headerActions={
-            <button
-              type="submit"
-              form="provider-model-form-create-models"
-              className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
-            >
-              保存供应商模型
-            </button>
+            <DialogFormSubmitButton formId="provider-model-form-create-models" />
           }
         >
           {({ close }) => (
@@ -2394,13 +2404,7 @@ export function ModelsPanel({
                 title={`编辑 ${item.upstream_model_slug}`}
                 description="在独立弹窗中编辑这个供应商模型。"
                 headerActions={
-                  <button
-                    type="submit"
-                    form={`provider-model-form-models-${item.id}`}
-                    className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
-                  >
-                    保存供应商模型
-                  </button>
+                  <DialogFormSubmitButton formId={`provider-model-form-models-${item.id}`} />
                 }
               >
                 {({ close }) => (
