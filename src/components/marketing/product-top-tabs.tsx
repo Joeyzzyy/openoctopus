@@ -8,14 +8,16 @@ type ProductTopTabsProps = {
   modelsHref?: string;
   apiKeysHref?: string;
   requestDetailsHref?: string;
+  accountHref?: string;
 };
-type ProductTopTabKey = "dashboard" | "models" | "api-keys" | "request-details";
+type ProductTopTabKey = "dashboard" | "models" | "api-keys" | "request-details" | "account";
 
 export function ProductTopTabs({
   dashboardHref = "/dashboard",
   modelsHref = "/models",
   apiKeysHref = "/dashboard?view=api-keys",
   requestDetailsHref = "/dashboard?view=request-details&requestsPage=1&billingPage=1&analyticsInterval=hour&analyticsRange=24h",
+  accountHref = "/dashboard?view=account",
 }: ProductTopTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -50,8 +52,15 @@ export function ProductTopTabs({
           href: requestDetailsHref,
           active: pathname === "/dashboard" && dashboardView === "request-details",
         },
+        {
+          key: "account",
+          label: "Account",
+          href: accountHref,
+          active: pathname === "/dashboard" && dashboardView === "account",
+        },
       ] as const,
     [
+      accountHref,
       apiKeysHref,
       dashboardHref,
       dashboardView,

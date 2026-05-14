@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { EmailPasswordSignInForm } from "@/components/auth/EmailPasswordSignInForm";
 
 export default function LoginPage() {
   return (
@@ -34,7 +35,13 @@ export default function LoginPage() {
               </p>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
+              <EmailPasswordSignInForm />
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-black/[0.08]" />
+                <span className="text-[11px] uppercase tracking-[0.8px] text-black/40">or</span>
+                <div className="h-px flex-1 bg-black/[0.08]" />
+              </div>
               <GoogleSignInButton />
             </div>
 

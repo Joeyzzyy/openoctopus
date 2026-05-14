@@ -77,6 +77,7 @@ export type DashboardData = {
     email: string | null;
     name: string;
     avatarUrl?: string | null;
+    authProviders: string[];
   };
   workspace: {
     id: string;
@@ -515,6 +516,15 @@ export async function getDashboardData({
       (user.user_metadata?.avatar_url as string | undefined) ??
       (user.user_metadata?.picture as string | undefined) ??
       null,
+    authProviders: Array.isArray((user as { identities?: Array<{ provider?: string | null }> }).identities)
+      ? Array.from(
+          new Set(
+            (user as { identities?: Array<{ provider?: string | null }> }).identities
+              ?.map((identity) => identity.provider)
+              .filter((provider): provider is string => typeof provider === "string" && provider.length > 0) ?? []
+          )
+        )
+      : [],
   };
 
   try {

@@ -4,6 +4,7 @@ import {
   KeyRound,
   LineChart,
   ReceiptText,
+  UserRound,
 } from "lucide-react";
 import { MarketingHeader } from "@/components/marketing/site-chrome";
 import { ProductTopTabs } from "@/components/marketing/product-top-tabs";
@@ -16,13 +17,15 @@ import { TopUpForm } from "./top-up-form";
 import { AutoRefreshOnReturn } from "./auto-refresh-on-return";
 import { TopUpCelebration } from "./top-up-celebration";
 import { InteractiveTrendChartCard, RequestDetailsFilters } from "./request-details-controls";
+import { AccountPasswordForm } from "./account-password-form";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 type DashboardView =
   | "dashboard"
   | "request-details"
-  | "api-keys";
+  | "api-keys"
+  | "account";
 type RequestInterval = "minute" | "hour" | "day";
 type RequestRange = "60m" | "6h" | "24h" | "7d" | "30d" | "90d";
 type ModelType = "image" | "video" | "text-coding";
@@ -32,6 +35,7 @@ const pageNav = [
   { view: "dashboard" },
   { view: "api-keys" },
   { view: "request-details" },
+  { view: "account" },
 ] as const;
 
 const requestStatusStyles = {
@@ -420,6 +424,16 @@ export default async function DashboardPage({
           })}
           requestDetailsHref={buildDashboardHref({
             view: "request-details",
+            requestsPage: 1,
+            apiKeyId: selectedApiKeyId,
+            analyticsInterval,
+            analyticsRange,
+            modelType: selectedModelType,
+            modelSlug: selectedModelSlug,
+            billingFlow: selectedBillingFlow,
+          })}
+          accountHref={buildDashboardHref({
+            view: "account",
             requestsPage: 1,
             apiKeyId: selectedApiKeyId,
             analyticsInterval,
@@ -899,6 +913,58 @@ export default async function DashboardPage({
                   <ApiKeysTable apiKeys={apiKeys} />
                 </section>
               </>
+            ) : null}
+
+            {view === "account" ? (
+              <section className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
+                <div className="rounded-xl border border-black/[0.08] bg-white p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="inline-flex size-10 items-center justify-center overflow-hidden rounded-full border border-black/[0.08] bg-[#FFF7EA] text-[#9A4F18]">
+                      {user.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <UserRound className="size-5" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold text-black">{user.name}</p>
+                      <p className="truncate text-sm text-black/55">{user.email ?? "No email on file"}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 text-sm">
+                    <div className="rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-3 py-2">
+                      <p className="text-xs text-black/45">Sign-in methods</p>
+                      <p className="mt-1 text-black">
+                        {user.authProviders.length > 0
+                          ? user.authProviders.map((provider) => provider === "email" ? "Email password" : provider).join(", ")
+                          : "Google"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-3 py-2">
+                      <p className="text-xs text-black/45">Password sign-in</p>
+                      <p className="mt-1 text-black">
+                        {user.authProviders.includes("email") ? "Enabled" : "Not set"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-black/[0.08] bg-white p-5">
+                  <div className="mb-4">
+                    <h2 className="text-base font-semibold text-black">
+                      {user.authProviders.includes("email") ? "Update password" : "Set password"}
+                    </h2>
+                    <p className="mt-1 text-sm leading-6 text-black/55">
+                      {user.authProviders.includes("email")
+                        ? "Update the password used for email sign-in."
+                        : "Set a password for this Google account so you can also sign in with Gmail and password."}
+                    </p>
+                  </div>
+                  <AccountPasswordForm hasPassword={user.authProviders.includes("email")} />
+                </div>
+              </section>
             ) : null}
 
           </section>

@@ -241,6 +241,57 @@ const createTopUpCheckoutSchema = z.object({
   amountUsd: z.coerce.number().int().min(1).max(10_000),
 });
 
+const updateAccountPasswordSchema = z
+  .object({
+    password: z.string().min(8, "Password must be at least 8 characters.").max(128),
+    confirmPassword: z.string().min(1, "Please confirm your password."),
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
+
+export async function updateAccountPassword(
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    const parsed = updateAccountPasswordSchema.safeParse({
+      password: formData.get("password"),
+      confirmPassword: formData.get("confirmPassword"),
+    });
+
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid password." };
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password: parsed.data.password,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update password.",
+    };
+  }
+}
+
 export async function createTopUpCheckoutSession(formData: FormData) {
   try {
     const parsed = createTopUpCheckoutSchema.safeParse({
