@@ -236,6 +236,14 @@ function pickImageUrl(value: unknown): string | null {
   ) {
     return text;
   }
+  if (
+    text.startsWith("iVBORw0KGgo") ||
+    text.startsWith("/9j/") ||
+    text.startsWith("R0lGOD") ||
+    text.startsWith("UklGR")
+  ) {
+    return `data:image/png;base64,${text}`;
+  }
   return null;
 }
 
@@ -381,6 +389,7 @@ export function ModelsBrowser({
   const [resultCopied, setResultCopied] = useState(false);
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const playgroundImageUrls = useMemo(
     () => extractImageUrls(playgroundOutput),
     [playgroundOutput]
@@ -513,7 +522,6 @@ export function ModelsBrowser({
 
   const submitPlayground = async () => {
     if (!selectedModel) return;
-    setTaskStatus("submitting");
     setPlaygroundError(null);
     setPlaygroundErrorDetail(null);
     setDetailCopied(false);
@@ -521,6 +529,24 @@ export function ModelsBrowser({
     setResultModalOpen(false);
     setPlaygroundOutput(null);
     setTaskId(null);
+    setTaskStatus("idle");
+
+    const nextValidationErrors: Record<string, string> = {};
+    for (const field of parsedFields) {
+      const value = playgroundForm[field.key]?.trim() ?? "";
+      if (field.required && value.length === 0) {
+        nextValidationErrors[field.key] = `${field.label} is required.`;
+      }
+      if (field.key === "prompt" && value.length === 0) {
+        nextValidationErrors[field.key] = "Prompt is required.";
+      }
+    }
+    if (Object.keys(nextValidationErrors).length > 0) {
+      setValidationErrors(nextValidationErrors);
+      return;
+    }
+    setValidationErrors({});
+    setTaskStatus("submitting");
 
     let capturedErrorDetail: unknown = null;
 
@@ -870,7 +896,9 @@ export function ModelsBrowser({
                           onChange={(event) =>
                             setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
                           }
-                          className="min-h-[120px] w-full rounded-md border border-black/[0.1] bg-white px-3 py-2 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03]"
+                          className={`min-h-[120px] w-full rounded-md border bg-white px-3 py-2 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03] ${
+                            validationErrors[field.key] ? "border-[#D94A38]" : "border-black/[0.1]"
+                          }`}
                           placeholder="Describe what to generate..."
                         />
                       ) : (
@@ -881,10 +909,15 @@ export function ModelsBrowser({
                           onChange={(event) =>
                             setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
                           }
-                          className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03]"
+                          className={`h-10 w-full rounded-md border bg-white px-3 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03] ${
+                            validationErrors[field.key] ? "border-[#D94A38]" : "border-black/[0.1]"
+                          }`}
                           placeholder={field.type === "number" ? "0" : `Enter ${field.label}`}
                         />
                       )}
+                      {validationErrors[field.key] ? (
+                        <p className="mt-1 text-[11px] text-[#B54432]">{validationErrors[field.key]}</p>
+                      ) : null}
                     </label>
                   ))
                 )}
@@ -921,7 +954,7 @@ export function ModelsBrowser({
               {playgroundError ? (
                 <div className="flex min-h-[280px] flex-1 items-center">
                   <div className="w-full">
-                    <p className="w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    <p className="w-full whitespace-pre-wrap break-all rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                       {playgroundError}
                     </p>
                     {playgroundErrorDetail ? (
@@ -1005,7 +1038,7 @@ export function ModelsBrowser({
                 </button>
               </div>
             </div>
-            <pre className="max-h-[65vh] overflow-auto rounded-md border border-black/[0.08] bg-[#FAFAFA] p-3 text-xs text-black/80">
+            <pre className="max-h-[65vh] overflow-auto whitespace-pre-wrap break-all rounded-md border border-black/[0.08] bg-[#FAFAFA] p-3 text-xs text-black/80">
               {formatDetailText(playgroundErrorDetail)}
             </pre>
           </div>

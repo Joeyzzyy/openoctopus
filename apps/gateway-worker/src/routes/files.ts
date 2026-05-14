@@ -90,6 +90,31 @@ export async function registerFileRoutes(app: FastifyInstance) {
       });
     }
 
+    const { data: assetRows, error: assetError } = await supabaseAdmin
+      .from("generated_assets")
+      .select("storage_bucket, storage_path, mime_type")
+      .eq("request_id", params.requestId)
+      .like("storage_path", `${params.requestId}/${params.assetIndex}.%`)
+      .limit(1);
+
+    if (assetError) {
+      throw new Error(assetError.message);
+    }
+
+    const storedAsset = assetRows?.[0];
+    if (storedAsset?.storage_bucket && storedAsset.storage_path) {
+      const storedDownload = await supabaseAdmin.storage
+        .from(storedAsset.storage_bucket)
+        .download(storedAsset.storage_path);
+      if (storedDownload.data) {
+        const buffer = Buffer.from(await storedDownload.data.arrayBuffer());
+        const contentType = storedAsset.mime_type || storedDownload.data.type || "application/octet-stream";
+        reply.header("content-type", contentType);
+        reply.header("cache-control", "public, max-age=31536000, immutable");
+        return reply.code(200).send(buffer);
+      }
+    }
+
     const cachePath = buildAssetCachePath(params.requestId, params.assetIndex);
     const cachedDownload = await supabaseAdmin.storage
       .from(env.GENERATED_ASSETS_BUCKET)

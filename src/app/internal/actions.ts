@@ -106,6 +106,15 @@ function buildInternalAlertHref(input: {
   return `/internal?tab=${input.tab}&alert=${encodeURIComponent(input.message)}&alertLevel=${input.level}`;
 }
 
+function normalizeUsageWorkspaceId(workspaceId: string) {
+  if (workspaceId === "00000000-0000-0000-0000-000000000000") {
+    return null;
+  }
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId)
+    ? workspaceId
+    : null;
+}
+
 async function loadProviderRuntimeContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
   input: {
@@ -320,7 +329,14 @@ async function logAdminAudit(input: {
     details: input.details ?? {},
   });
 
-  const { error } = await input.supabase.from("admin_audit_logs").insert(buildPayload(input.workspaceId));
+  let error: { code?: string; message?: string } | null = null;
+  try {
+    const response = await input.supabase.from("admin_audit_logs").insert(buildPayload(input.workspaceId));
+    error = response.error;
+  } catch (caught) {
+    console.warn("Failed to write admin audit log", caught);
+    return;
+  }
 
   const isWorkspaceFkViolation =
     error?.code === "23503" &&
@@ -328,15 +344,19 @@ async function logAdminAudit(input: {
     error.message.includes("admin_audit_logs_workspace_id_fkey");
 
   if (isWorkspaceFkViolation) {
-    const { error: fallbackError } = await input.supabase.from("admin_audit_logs").insert(buildPayload(null));
-    if (!fallbackError) {
-      return;
+    try {
+      const { error: fallbackError } = await input.supabase.from("admin_audit_logs").insert(buildPayload(null));
+      if (fallbackError) {
+        console.warn("Failed to write fallback admin audit log", fallbackError);
+      }
+    } catch (caught) {
+      console.warn("Failed to write fallback admin audit log", caught);
     }
-    throw new Error(fallbackError.message);
+    return;
   }
 
   if (error) {
-    throw new Error(error.message);
+    console.warn("Failed to write admin audit log", error);
   }
 }
 
@@ -2804,6 +2824,7 @@ export async function generateProviderModelDraftFromSource(input: {
   const startedAt = Date.now();
   const { supabase, userId, workspaceId } = await getInternalAdminContext();
   const actorUserId = /^[0-9a-f-]{36}$/i.test(userId) ? userId : null;
+  const usageWorkspaceId = normalizeUsageWorkspaceId(workspaceId);
 
   try {
     const parsedInput = providerModelAutofillSchema.parse(input);
@@ -2827,14 +2848,15 @@ export async function generateProviderModelDraftFromSource(input: {
     "Constraints:",
     "1) pricing must follow internal billing config format: { billingMode, currency, charges }.",
     "2) billingMode should be \"hybrid\" whenever possible.",
-    "3) charges can include: perRequest, perImage, perVideo, perSecond, inputPerMillion, outputPerMillion; use number values.",
+    "3) charges can include: perRequest, perImage, perVideo, perSecond, inputTextTokensPerMillion, outputTextTokensPerMillion; use number values ONLY when an explicit upstream provider cost is present in the source document.",
+    "3a) Never invent pricing. Never use 0 as a placeholder. If the source does not include an explicit provider price, return charges as an empty object: {}.",
     "4) inputSchema format: { officialDocUrl, params: [{ name, type, required, description, example, exposedToCustomer }] }.",
     "5) outputSchema format: { officialDocUrl, fields: [{ name, type, description, example, exposedToCustomer }] }.",
     "6) summary: short chinese text describing what was recognized and what needs manual check.",
     "7) If unknown, return empty string or empty array/object. Never omit required top-level keys.",
     "JSON OUTPUT EXAMPLE:",
     "{",
-    '  "pricing": {"billingMode":"hybrid","currency":"USD","charges":{"perRequest":0}},',
+    '  "pricing": {"billingMode":"hybrid","currency":"USD","charges":{}},',
     '  "inputSchema": {"officialDocUrl":"","params":[]},',
     '  "outputSchema": {"officialDocUrl":"","fields":[]},',
     '  "summary": ""',
@@ -2864,7 +2886,7 @@ export async function generateProviderModelDraftFromSource(input: {
     } catch (error) {
       const msg = formatDeepSeekNetworkError(error);
       await supabase.from("internal_model_ai_usage_logs").insert({
-        workspace_id: workspaceId,
+        workspace_id: usageWorkspaceId,
         actor_user_id: actorUserId,
         source_url: sourceLabel,
         model: "deepseek-chat",
@@ -2901,7 +2923,7 @@ export async function generateProviderModelDraftFromSource(input: {
         : "";
     if (!text.trim()) {
       await supabase.from("internal_model_ai_usage_logs").insert({
-        workspace_id: workspaceId,
+        workspace_id: usageWorkspaceId,
         actor_user_id: actorUserId,
         source_url: sourceLabel,
         model: "deepseek-chat",
@@ -2937,7 +2959,7 @@ export async function generateProviderModelDraftFromSource(input: {
                 ? `DeepSeek 服务异常（${deepseekRes.status}）：上游暂时不可用，请稍后重试。`
                 : `DeepSeek 请求失败（${deepseekRes.status}）：${errorMessage}`;
       await supabase.from("internal_model_ai_usage_logs").insert({
-        workspace_id: workspaceId,
+        workspace_id: usageWorkspaceId,
         actor_user_id: actorUserId,
         source_url: sourceLabel,
         model: "deepseek-chat",
@@ -2986,7 +3008,7 @@ export async function generateProviderModelDraftFromSource(input: {
         );
       } catch {
         await supabase.from("internal_model_ai_usage_logs").insert({
-          workspace_id: workspaceId,
+          workspace_id: usageWorkspaceId,
           actor_user_id: actorUserId,
           source_url: sourceLabel,
           model: "deepseek-chat",
@@ -3016,7 +3038,7 @@ export async function generateProviderModelDraftFromSource(input: {
     }
 
       await supabase.from("internal_model_ai_usage_logs").insert({
-      workspace_id: workspaceId,
+      workspace_id: usageWorkspaceId,
       actor_user_id: actorUserId,
       source_url: sourceLabel,
       model: "deepseek-chat",

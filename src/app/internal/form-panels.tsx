@@ -218,6 +218,60 @@ function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields")
   }
 }
 
+function readJsonRecord(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function hasPositivePricingCharge(pricingText: string) {
+  const pricing = readJsonRecord(pricingText);
+  if (!pricing) return false;
+  const charges =
+    pricing.charges && typeof pricing.charges === "object" && !Array.isArray(pricing.charges)
+      ? (pricing.charges as Record<string, unknown>)
+      : {};
+  return Object.values(charges).some((value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0;
+  });
+}
+
+function getSchemaRequiredWarnings(
+  schemaText: string,
+  key: "params" | "fields",
+  label: string
+) {
+  const schema = readJsonRecord(schemaText);
+  const rows = Array.isArray(schema?.[key]) ? (schema[key] as unknown[]) : [];
+  const warnings: string[] = [];
+
+  if (rows.length === 0) {
+    return [`${label}至少需要 1 条记录`];
+  }
+
+  rows.forEach((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      warnings.push(`${label}第 ${index + 1} 条格式无效`);
+      return;
+    }
+    const row = item as Record<string, unknown>;
+    if (typeof row.name !== "string" || row.name.trim().length === 0) {
+      warnings.push(`${label}第 ${index + 1} 条缺少 name`);
+    }
+    if (typeof row.type !== "string" || row.type.trim().length === 0) {
+      warnings.push(`${label}第 ${index + 1} 条缺少 type`);
+    }
+  });
+
+  return warnings;
+}
+
 function SchemaFieldEditor({
   name,
   keyName,
@@ -643,6 +697,19 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     inputCostPerMillion: "0.5",
     outputCostPerMillion: "1.5",
   };
+  const emptyState = {
+    ...fallback,
+    chargePerRequest: false,
+    chargePerImage: false,
+    chargePerVideo: false,
+    chargePerSecond: false,
+    chargeInputTokens: false,
+    chargeOutputTokens: false,
+  };
+  const hasPositiveCharge = (value: unknown) =>
+    typeof value === "number"
+      ? Number.isFinite(value) && value > 0
+      : typeof value === "string" && Number.isFinite(Number(value)) && Number(value) > 0;
 
   if (!initialValue) {
     return fallback;
@@ -655,12 +722,12 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
       return {
         ...fallback,
         currency: typeof parsed.currency === "string" ? parsed.currency : fallback.currency,
-        chargePerRequest: charges.perRequest !== undefined,
-        chargePerImage: charges.perImage !== undefined,
-        chargePerVideo: charges.perVideo !== undefined,
-        chargePerSecond: charges.perSecond !== undefined,
-        chargeInputTokens: charges.inputTextTokensPerMillion !== undefined,
-        chargeOutputTokens: charges.outputTextTokensPerMillion !== undefined,
+        chargePerRequest: hasPositiveCharge(charges.perRequest),
+        chargePerImage: hasPositiveCharge(charges.perImage),
+        chargePerVideo: hasPositiveCharge(charges.perVideo),
+        chargePerSecond: hasPositiveCharge(charges.perSecond),
+        chargeInputTokens: hasPositiveCharge(charges.inputTextTokensPerMillion),
+        chargeOutputTokens: hasPositiveCharge(charges.outputTextTokensPerMillion),
         costPerRequest: String(charges.perRequest ?? fallback.costPerRequest),
         costPerImage: String(charges.perImage ?? fallback.costPerImage),
         costPerVideo: String(charges.perVideo ?? fallback.costPerVideo),
@@ -674,15 +741,22 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
       };
     }
 
+    if (!parsed.billingMode) {
+      return {
+        ...emptyState,
+        currency: typeof parsed.currency === "string" ? parsed.currency : emptyState.currency,
+      };
+    }
+
     return {
       ...fallback,
       currency: typeof parsed.currency === "string" ? parsed.currency : fallback.currency,
-      chargePerRequest: parsed.billingMode === "per_request",
-      chargePerImage: parsed.billingMode === "per_image",
-      chargePerVideo: parsed.billingMode === "per_video",
-      chargePerSecond: parsed.billingMode === "per_second",
-      chargeInputTokens: parsed.billingMode === "per_million_tokens",
-      chargeOutputTokens: parsed.billingMode === "per_million_tokens",
+      chargePerRequest: parsed.billingMode === "per_request" && hasPositiveCharge(parsed.costPerRequest ?? parsed.costPerUnit),
+      chargePerImage: parsed.billingMode === "per_image" && hasPositiveCharge(parsed.costPerImage ?? parsed.costPerUnit),
+      chargePerVideo: parsed.billingMode === "per_video" && hasPositiveCharge(parsed.costPerVideo ?? parsed.costPerUnit),
+      chargePerSecond: parsed.billingMode === "per_second" && hasPositiveCharge(parsed.costPerSecond ?? parsed.costPerUnit),
+      chargeInputTokens: parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.inputCostPerMillion),
+      chargeOutputTokens: parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.outputCostPerMillion),
       costPerRequest: String(parsed.costPerRequest ?? parsed.costPerUnit ?? fallback.costPerRequest),
       costPerImage: String(parsed.costPerImage ?? parsed.costPerUnit ?? fallback.costPerImage),
       costPerVideo: String(parsed.costPerVideo ?? parsed.costPerUnit ?? fallback.costPerVideo),
@@ -908,15 +982,28 @@ function buildAutofillPreviewPayload(input: {
     pricing.charges && typeof pricing.charges === "object" && !Array.isArray(pricing.charges)
       ? (pricing.charges as Record<string, unknown>)
       : {};
-  const hasChargeEntry = Object.keys(charges).some((key) => Number.isFinite(Number(charges[key])));
+  const chargeEntries = Object.entries(charges);
+  const hasPositiveChargeEntry = chargeEntries.some(([, value]) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0;
+  });
+  const nonPositiveChargeKeys = chargeEntries
+    .filter(([, value]) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) && numeric <= 0;
+    })
+    .map(([key]) => key);
   if (!billingMode) {
     pricingWarnings.push("未识别到计费模式: pricing.billingMode");
   }
   if (!currency) {
     pricingWarnings.push("未识别到币种: pricing.currency");
   }
-  if (!hasChargeEntry) {
-    pricingWarnings.push("未识别到任何成本项: pricing.charges");
+  if (!hasPositiveChargeEntry) {
+    pricingWarnings.push("未识别到明确的大于 0 的供应商成本，请人工确认 pricing.charges");
+  }
+  if (nonPositiveChargeKeys.length > 0) {
+    pricingWarnings.push(`识别到 0 或负数成本项（${nonPositiveChargeKeys.join(", ")}），不能作为有效供应商成本`);
   }
 
   const inputWarnings: string[] = [];
@@ -1417,30 +1504,81 @@ export function CreateProviderModelForm({
       onSubmit={(event) => {
         const formData = new FormData(event.currentTarget);
         const missing: string[] = [];
+        let nextRootTab: ProviderModelRootTab | null = null;
+        let nextActiveTab: ProviderModelFormTab | null = null;
 
         const upstreamModelValue = String(formData.get("upstreamModelSlug") ?? "").trim();
         if (!upstreamModelValue) {
           missing.push("上游模型标识");
+          nextRootTab ??= "manage";
+          nextActiveTab ??= "basic";
         }
         if (!executionConfigState.submitPath.trim()) {
           missing.push("submitPath");
+          nextRootTab ??= "manage";
+          nextActiveTab ??= "basic";
         }
         if (!executionConfigState.taskIdPath.trim()) {
           missing.push("taskIdPath");
+          nextRootTab ??= "manage";
+          nextActiveTab ??= "basic";
         }
         if (!executionConfigState.resultUrlPath.trim()) {
           missing.push("resultUrlPath");
+          nextRootTab ??= "manage";
+          nextActiveTab ??= "basic";
         }
         if (isAsyncMode && !executionConfigState.pollPath.trim()) {
           missing.push("pollPath");
+          nextRootTab ??= "manage";
+          nextActiveTab ??= "basic";
         }
         if (isAsyncMode && !executionConfigState.statusPath.trim()) {
           missing.push("statusPath");
+          nextRootTab ??= "manage";
+          nextActiveTab ??= "basic";
+        }
+        if (rootTab === "source-doc" && !executionConfigState.docSourceUrl.trim()) {
+          missing.push("原文档 URL");
+          nextRootTab ??= "source-doc";
+        }
+        if (!hasPositivePricingCharge(String(formData.get("pricing") ?? ""))) {
+          missing.push("供应商成本配置（至少 1 个大于 0 的成本项）");
+          nextRootTab ??= "manage";
+          nextActiveTab ??= "cost";
+        }
+
+        const inputWarnings = getSchemaRequiredWarnings(
+          String(formData.get("inputSchema") ?? ""),
+          "params",
+          "输入参数"
+        );
+        if (inputWarnings.length > 0) {
+          missing.push(...inputWarnings);
+          nextRootTab ??= "manage";
+          nextActiveTab ??= "input-params";
+        }
+
+        const outputWarnings = getSchemaRequiredWarnings(
+          String(formData.get("outputSchema") ?? ""),
+          "fields",
+          "输出参数"
+        );
+        if (outputWarnings.length > 0) {
+          missing.push(...outputWarnings);
+          nextRootTab ??= "manage";
+          nextActiveTab ??= "output-params";
         }
 
         if (missing.length > 0) {
           event.preventDefault();
-          toast.error(`Missing required fields: ${missing.join(", ")}`);
+          if (nextRootTab) {
+            setRootTab(nextRootTab);
+          }
+          if (nextActiveTab) {
+            setActiveTab(nextActiveTab);
+          }
+          toast.error(`请先补全必填项：${missing.slice(0, 4).join("、")}${missing.length > 4 ? "…" : ""}`);
           return;
         }
 
@@ -1460,15 +1598,23 @@ export function CreateProviderModelForm({
       />
       <input type="hidden" name="upstreamModelSlug" value={upstreamModelSlug} />
       {rootTab === "source-doc" ? (
-        <input
-          type="hidden"
-          name="pricing"
-          value={
-            defaultPricing && defaultPricing.trim()
-              ? defaultPricing
-              : '{"billingMode":"hybrid","currency":"USD","charges":{"perRequest":0}}'
-          }
-        />
+        <>
+          <input
+            type="hidden"
+            name="pricing"
+            value={
+              seedPricingText && seedPricingText.trim()
+                ? seedPricingText
+                : defaultPricing && defaultPricing.trim()
+                  ? defaultPricing
+                  : '{"billingMode":"hybrid","currency":"USD","charges":{}}'
+            }
+          />
+          <input type="hidden" name="executionTemplate" value={executionTemplate} />
+          <input type="hidden" name="executionConfig" value={executionConfigValue} />
+          <input type="hidden" name="inputSchema" value={currentInputSchemaText || defaultInputSchema} />
+          <input type="hidden" name="outputSchema" value={currentOutputSchemaText || defaultOutputSchema} />
+        </>
       ) : null}
       <div className="mb-0.5 flex items-center gap-1">
         <button
@@ -1491,19 +1637,16 @@ export function CreateProviderModelForm({
         </button>
       </div>
       {rootTab === "source-doc" ? (
-        <div className="space-y-1 rounded-xl border border-black/[0.08] bg-white p-1">
-          <label className="block">
-            <span className="mb-1 block text-[11px] tracking-[0.35px] text-black/60">文档 URL</span>
-            <input
-              value={executionConfigState.docSourceUrl}
-              onChange={(event) =>
-                setExecutionConfigState((current) => ({ ...current, docSourceUrl: event.target.value }))
-              }
-              disabled={disabled}
-              className={formInputClassName}
-              placeholder="https://provider-docs.example.com/model-doc"
-            />
-          </label>
+        <div className="space-y-2">
+          <input
+            value={executionConfigState.docSourceUrl}
+            onChange={(event) =>
+              setExecutionConfigState((current) => ({ ...current, docSourceUrl: event.target.value }))
+            }
+            disabled={disabled}
+            className={formInputClassName}
+            placeholder="https://provider-docs.example.com/model-doc"
+          />
           <div className="h-[65vh] overflow-hidden rounded-lg border border-black/[0.08] bg-[#FCFCFA]">
             {executionConfigState.docSourceUrl.trim() ? (
               <iframe
@@ -1743,17 +1886,17 @@ export function CreateProviderModelForm({
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上游模型标识</span>
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上游模型 slug / 标识</span>
           <input
             value={upstreamModelSlug}
             onChange={(event) => setUpstreamModelSlug(event.target.value)}
-            placeholder="gemini-2.5-flash-image"
+            placeholder="google/imagen4-fast"
             disabled={disabled}
             className={formInputClassName}
           />
           <FieldHint
-            help="填写供应商 API 真实使用的模型标识。"
-            example="gemini-2.5-flash-image"
+            help="填写供应商 API 真实使用的模型 slug。调用协议里的 {upstreamModel} 会用这里的值替换。"
+            example="google/imagen4-fast"
           />
         </label>
         <input type="hidden" name="active" value="true" />
@@ -1765,6 +1908,20 @@ export function CreateProviderModelForm({
           }}
           className={activeTab === "protocol" ? "grid gap-3 md:grid-cols-2" : "hidden"}
         >
+        <label className="block md:col-span-2">
+          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上游模型 slug / 标识</span>
+          <input
+            value={upstreamModelSlug}
+            onChange={(event) => setUpstreamModelSlug(event.target.value)}
+            placeholder="google/imagen4-fast"
+            disabled={disabled}
+            className={formInputClassName}
+          />
+          <FieldHint
+            help="这个值来自模型映射，会替换 submitPath 里的 {upstreamModel}。例如 submitPath=/api/v3/{upstreamModel} 时，这里填 google/imagen4-fast。"
+            example="google/imagen4-fast"
+          />
+        </label>
         <div className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">调用协议配置</span>
           <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">

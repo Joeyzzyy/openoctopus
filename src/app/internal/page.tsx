@@ -272,6 +272,7 @@ function buildMonitoringHref(input: {
   interval: MonitoringInterval;
   range: MonitoringRange;
   status: MonitoringStatus;
+  model?: string | null;
 }) {
   const params = new URLSearchParams();
   params.set("tab", "monitoring");
@@ -279,6 +280,9 @@ function buildMonitoringHref(input: {
   params.set("monitoringInterval", input.interval);
   params.set("monitoringRange", input.range);
   params.set("monitoringStatus", input.status);
+  if (input.model && input.model !== "all") {
+    params.set("monitoringModel", input.model);
+  }
   return `/internal?${params.toString()}`;
 }
 
@@ -835,7 +839,7 @@ function VideoTaskMonitoringCard({
         <section className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
           <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">错误 / 诊断</p>
           {request.errorMessage || request.lastAttempt?.errorMessage ? (
-            <p className="mt-3 text-xs leading-5 text-[#b54432]">
+            <p className="mt-3 break-all text-xs leading-5 text-[#b54432]">
               {request.errorMessage ?? request.lastAttempt?.errorMessage}
             </p>
           ) : (
@@ -867,7 +871,15 @@ function ImageTaskLogRow({
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
+            <span
+              className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
+                request.status === "failed"
+                  ? "border-[#F4C9C4] bg-[#FDF0EE] text-[#B54432]"
+                  : request.status === "succeeded"
+                    ? "border-[#BFE5CC] bg-[#EDF9F1] text-[#1F7A44]"
+                    : "border-[#E9E1CF] bg-[#F6F1E7] text-[#6F5B27]"
+              }`}
+            >
               {request.status}
             </span>
             <span className="inline-flex h-6 items-center rounded-md border border-[#D7EADB] bg-[#EDF8F0] px-2 text-[11px] text-[#436B39]">
@@ -880,7 +892,7 @@ function ImageTaskLogRow({
           </p>
           <p className="mt-1 break-all font-mono text-[11px] text-black/40">{request.id}</p>
         </div>
-        <div className="max-w-md text-xs leading-5 text-black/55">
+        <div className="max-w-md break-all text-xs leading-5 text-black/55">
           {request.errorMessage ?? "无错误，整体状态正常。"}
         </div>
       </div>
@@ -936,6 +948,7 @@ export default async function InternalPage({
   const selectedMonitoringView = parseMonitoringView(
     getSearchValue(resolvedSearchParams, "monitoringView")
   );
+  const requestedMonitoringModel = getSearchValue(resolvedSearchParams, "monitoringModel") ?? "";
   const data = await getInternalAdminData({
     monitoringLookbackMs: parseMonitoringRangeMs(selectedMonitoringRange),
     bypassAuth: true,
@@ -1035,6 +1048,11 @@ export default async function InternalPage({
     selectedMonitoringInterval,
     selectedMonitoringRange
   );
+  const selectedMonitoringSeries =
+    monitoringSeries.find((series) => series.modelSlug === requestedMonitoringModel) ??
+    monitoringSeries[0] ??
+    null;
+  const selectedMonitoringModel = selectedMonitoringSeries?.modelSlug ?? "";
   const monitoringHealthSummary = Array.from(monitoringHealthByModel.values()).reduce(
     (summary, item) => ({
       total: summary.total + item.total,
@@ -1510,6 +1528,7 @@ export default async function InternalPage({
                         interval: selectedMonitoringInterval,
                         range: selectedMonitoringRange,
                         status: selectedMonitoringStatus,
+                        model: selectedMonitoringModel,
                       })}
                       className={`inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium transition-colors ${
                         selectedMonitoringView === option.value
@@ -1526,6 +1545,7 @@ export default async function InternalPage({
                       interval: selectedMonitoringInterval,
                       range: selectedMonitoringRange,
                       status: selectedMonitoringStatus,
+                      model: selectedMonitoringModel,
                     })}
                     className="ml-auto inline-flex h-9 items-center rounded-md border border-black/[0.12] bg-white px-3 text-sm font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
                   >
@@ -1536,7 +1556,7 @@ export default async function InternalPage({
                 {selectedMonitoringView === "overview" ? (
                   <>
                     <div className="mb-4 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
-                      <div className="grid gap-3 lg:grid-cols-3">
+                      <div className="grid gap-3 lg:grid-cols-4">
                         <div>
                           <p className="text-[11px] tracking-[0.35px] text-black/45">时间粒度</p>
                           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1548,6 +1568,7 @@ export default async function InternalPage({
                                   interval: option.value,
                                   range: selectedMonitoringRange,
                                   status: selectedMonitoringStatus,
+                                  model: selectedMonitoringModel,
                                 })}
                                 className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
                                   selectedMonitoringInterval === option.value
@@ -1572,6 +1593,7 @@ export default async function InternalPage({
                                   interval: selectedMonitoringInterval,
                                   range: option.value,
                                   status: selectedMonitoringStatus,
+                                  model: selectedMonitoringModel,
                                 })}
                                 className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
                                   selectedMonitoringRange === option.value
@@ -1596,6 +1618,7 @@ export default async function InternalPage({
                                   interval: selectedMonitoringInterval,
                                   range: selectedMonitoringRange,
                                   status: option.value,
+                                  model: selectedMonitoringModel,
                                 })}
                                 className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
                                   selectedMonitoringStatus === option.value
@@ -1608,6 +1631,36 @@ export default async function InternalPage({
                             ))}
                           </div>
                         </div>
+
+                        <div>
+                          <p className="text-[11px] tracking-[0.35px] text-black/45">模型</p>
+                          <form action="/internal" className="mt-2 flex gap-1.5">
+                            <input type="hidden" name="tab" value="monitoring" />
+                            <input type="hidden" name="monitoringView" value={selectedMonitoringView} />
+                            <input type="hidden" name="monitoringInterval" value={selectedMonitoringInterval} />
+                            <input type="hidden" name="monitoringRange" value={selectedMonitoringRange} />
+                            <input type="hidden" name="monitoringStatus" value={selectedMonitoringStatus} />
+                            <select
+                              name="monitoringModel"
+                              disabled={monitoringSeries.length === 0}
+                              defaultValue={selectedMonitoringModel}
+                              className="h-8 w-full rounded-md border border-black/10 bg-white px-2.5 text-[11px] font-medium text-black/72 outline-none"
+                            >
+                              {monitoringSeries.map((series) => (
+                                <option key={series.modelSlug} value={series.modelSlug}>
+                                  {series.title}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="submit"
+                              disabled={monitoringSeries.length === 0}
+                              className="h-8 shrink-0 rounded-md border border-black/10 bg-white px-2.5 text-[11px] font-medium text-black/72 hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:text-black/35"
+                            >
+                              应用
+                            </button>
+                          </form>
+                        </div>
                       </div>
                     </div>
 
@@ -1615,7 +1668,7 @@ export default async function InternalPage({
                       <OverviewCard
                         title="模型总数"
                         value={monitoringSummary.modelCount}
-                        note="按可售模型逐张展示折线图"
+                        note="通过模型筛选查看单张折线图"
                         icon={Network}
                       />
                       <OverviewCard
@@ -1654,9 +1707,10 @@ export default async function InternalPage({
 
                 {selectedMonitoringView === "overview" ? (
                   <>
-                    {monitoringSeries.length > 0 ? (
+                    {selectedMonitoringSeries ? (
                       <div className="grid gap-5">
-                        {monitoringSeries.map((series) => {
+                        {(() => {
+                          const series = selectedMonitoringSeries;
                           const health = monitoringHealthByModel.get(series.modelSlug) ?? {
                             total: 0,
                             settled: 0,
@@ -1685,12 +1739,12 @@ export default async function InternalPage({
                               inflightCount={health.inflight}
                             />
                           );
-                        })}
+                        })()}
                       </div>
                     ) : (
                       <EmptyState
                         title="还没有模型监控数据"
-                        detail="先创建可售模型，或者等待网关产生新的 inference_requests。这里会按模型自动生成对应的调用折线图。"
+                        detail="先创建可售模型，或者等待网关产生新的 inference_requests。这里会按模型筛选展示单张调用折线图。"
                       />
                     )}
                   </>
@@ -2027,7 +2081,7 @@ export default async function InternalPage({
                                         </span>
                                       </div>
                                       <p className="mt-1 truncate text-sm font-medium text-black">{request.public_model_slug}</p>
-                                      <p className="mt-0.5 text-xs text-black/50">
+                                      <p className="mt-0.5 break-all text-xs text-black/50">
                                         上游：{request.providerName} / {request.upstreamModelSlug}
                                       </p>
                                       <p className="mt-0.5 text-xs text-black/45">
@@ -2035,7 +2089,7 @@ export default async function InternalPage({
                                       </p>
                                       {request.status === "failed" &&
                                       (request.error_message || request.lastAttempt.error_message) ? (
-                                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#b54432]">
+                                        <p className="mt-1 line-clamp-2 break-all text-xs leading-5 text-[#b54432]">
                                           {request.error_message ?? request.lastAttempt.error_message}
                                         </p>
                                       ) : null}
@@ -2085,7 +2139,15 @@ export default async function InternalPage({
                                           <span className="text-black/58">
                                             最后一次尝试 #{request.lastAttempt.attempt_no}
                                           </span>
-                                          <span className="font-medium text-black">
+                                          <span
+                                            className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] font-medium ${
+                                              request.lastAttempt.status === "failed"
+                                                ? "border-[#F4C9C4] bg-[#FDF0EE] text-[#B54432]"
+                                                : request.lastAttempt.status === "succeeded"
+                                                  ? "border-[#BFE5CC] bg-[#EDF9F1] text-[#1F7A44]"
+                                                  : "border-[#E9E1CF] bg-[#F6F1E7] text-[#6F5B27]"
+                                            }`}
+                                          >
                                             {request.lastAttempt.status}
                                           </span>
                                         </div>
@@ -2094,7 +2156,7 @@ export default async function InternalPage({
                                             <p className="text-[11px] font-medium uppercase tracking-[0.5px] text-[#B54432]">
                                               Upstream raw error
                                             </p>
-                                            <pre className="mt-1 max-h-44 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5 text-[#B54432]">
+                                            <pre className="mt-1 max-h-44 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-[#B54432]">
                                               {request.error_message ?? request.lastAttempt.error_message}
                                             </pre>
                                           </div>

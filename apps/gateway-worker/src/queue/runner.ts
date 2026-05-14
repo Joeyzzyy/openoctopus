@@ -870,11 +870,16 @@ export async function processNextInferenceJob() {
       capability: message.capability,
       outputPayload: normalizedSyncResult.output ?? result.output,
     }) as Record<string, unknown>;
+    const persistedOutput = await persistGeneratedAssets({
+      requestId: message.requestId,
+      workspaceId: message.workspaceId,
+      output: normalizedOutput,
+    });
     const settlement = await resolveSettlementAmounts({
       providerModelId: message.providerModelId,
       publicModelSlug: message.publicModelSlug,
       requestInput: message.input,
-      output: normalizedOutput,
+      output: persistedOutput,
       providerRaw,
       providerReportedAmount: result.estimatedCost,
     });
@@ -882,7 +887,7 @@ export async function processNextInferenceJob() {
       .from("inference_requests")
       .update({
         status: "succeeded",
-        output_payload: normalizedOutput,
+        output_payload: persistedOutput,
         actual_cost: settlement.customer.total,
         actual_customer_charge: settlement.customer.total,
         actual_provider_cost: settlement.provider.total,
@@ -901,17 +906,11 @@ export async function processNextInferenceJob() {
       .update({
         status: "succeeded",
         upstream_request_id: result.upstreamRequestId,
-        response_payload: normalizedOutput,
+        response_payload: persistedOutput,
         latency_ms: Date.now() - attemptStartedAt,
       })
       .eq("request_id", message.requestId)
       .eq("attempt_no", 1);
-
-    await persistGeneratedAssets({
-      requestId: message.requestId,
-      workspaceId: message.workspaceId,
-      output: normalizedOutput,
-    });
 
     await recordRequestSettlement({
       requestId: message.requestId,
@@ -1231,11 +1230,16 @@ export async function processNextPollingJob() {
       outputPayload: normalizedPollingResult.output ?? result.output,
     }) as Record<string, unknown>;
     const normalizedProviderRaw = normalizedPollingResult.providerRaw ?? result.raw;
+    const persistedOutput = await persistGeneratedAssets({
+      requestId: message.requestId,
+      workspaceId: message.workspaceId,
+      output: normalizedOutput,
+    });
     const settlement = await resolveSettlementAmounts({
       providerModelId: message.providerModelId,
       publicModelSlug: message.publicModelSlug,
       requestInput: message.input,
-      output: normalizedOutput,
+      output: persistedOutput,
       providerRaw: normalizedProviderRaw,
       providerReportedAmount: result.actualCost,
     });
@@ -1243,7 +1247,7 @@ export async function processNextPollingJob() {
       .from("inference_requests")
       .update({
         status: "succeeded",
-        output_payload: normalizedOutput,
+        output_payload: persistedOutput,
         actual_cost: settlement.customer.total,
         actual_customer_charge: settlement.customer.total,
         actual_provider_cost: settlement.provider.total,
@@ -1260,12 +1264,6 @@ export async function processNextPollingJob() {
       })
       .eq("request_id", message.requestId)
       .eq("attempt_no", 1);
-
-    await persistGeneratedAssets({
-      requestId: message.requestId,
-      workspaceId: message.workspaceId,
-      output: normalizedOutput,
-    });
 
     await recordRequestSettlement({
       requestId: message.requestId,

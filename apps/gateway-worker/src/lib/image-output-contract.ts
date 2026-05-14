@@ -44,6 +44,26 @@ function inferImageMimeType(raw: Record<string, unknown> | null, assetUrl: strin
   return "image/png";
 }
 
+function looksLikeBase64Image(value: string) {
+  const text = value.trim();
+  if (text.startsWith("iVBORw0KGgo")) return true;
+  if (text.startsWith("/9j/")) return true;
+  if (text.startsWith("R0lGOD")) return true;
+  if (text.startsWith("UklGR")) return true;
+  return text.length > 256 && /^[A-Za-z0-9+/]+={0,2}$/.test(text);
+}
+
+function normalizeImageAssetUrl(url: string, mimeType: string) {
+  const text = url.trim();
+  if (text.startsWith("http://") || text.startsWith("https://") || text.startsWith("data:image/") || text.startsWith("/v1/files/")) {
+    return text;
+  }
+  if (looksLikeBase64Image(text)) {
+    return `data:${mimeType};base64,${text}`;
+  }
+  return text;
+}
+
 export function normalizeImageOutputPayload(outputPayload: unknown) {
   const output = isRecord(outputPayload) ? outputPayload : {};
   const raw = isRecord(output.raw) ? output.raw : null;
@@ -77,12 +97,13 @@ export function normalizeImageOutputPayload(outputPayload: unknown) {
       const width = Number(readPath(raw, ["data", "0", "width"]) ?? readPath(raw, ["width"]));
       const height = Number(readPath(raw, ["data", "0", "height"]) ?? readPath(raw, ["height"]));
       const mimeType = inferImageMimeType(raw, url);
+      const normalizedUrl = normalizeImageAssetUrl(url, mimeType);
 
       return {
         id: `${index}`,
         index,
         type: "image",
-        url,
+        url: normalizedUrl,
         ...(sourceUrl ? { sourceUrl } : {}),
         mimeType,
         ...(Number.isFinite(width) && width > 0 ? { width } : {}),

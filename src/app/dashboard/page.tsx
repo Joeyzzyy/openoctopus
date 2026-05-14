@@ -522,6 +522,35 @@ export default async function DashboardPage({
                             <div>Latency: {row.latency}</div>
                             <div>Cost: {row.cost}</div>
                           </div>
+                          {row.outputAssets.length > 0 ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {row.outputAssets.slice(0, 3).map((asset, index) => (
+                                <a
+                                  key={`${row.requestId}-${index}`}
+                                  href={asset.url}
+                                  download
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="group block overflow-hidden rounded-md border border-black/[0.08] bg-white"
+                                >
+                                  {asset.type === "image" ? (
+                                    <>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={asset.url}
+                                      alt={`Generated output ${index + 1}`}
+                                      className="size-20 object-cover transition-opacity group-hover:opacity-85"
+                                    />
+                                    </>
+                                  ) : (
+                                    <div className="flex size-20 items-center justify-center text-[11px] text-black/50">
+                                      Download
+                                    </div>
+                                  )}
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
                         </article>
                       ))
                     ) : (
@@ -558,9 +587,41 @@ export default async function DashboardPage({
                               >
                                 <td className="px-2 py-3 text-xs text-black/60">{row.createdAtLabel}</td>
                                 <td className="px-2 py-3 align-middle">
-                                  <div>
+                                  <div className="flex items-center gap-3">
+                                    {row.outputAssets.length > 0 ? (
+                                      <div className="flex shrink-0 gap-1">
+                                        {row.outputAssets.slice(0, 2).map((asset, index) => (
+                                          <a
+                                            key={`${row.requestId}-${index}`}
+                                            href={asset.url}
+                                            download
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="group block overflow-hidden rounded-md border border-black/[0.08] bg-white"
+                                            title="Open or download generated asset"
+                                          >
+                                            {asset.type === "image" ? (
+                                              <>
+                                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                                              <img
+                                                src={asset.url}
+                                                alt={`Generated output ${index + 1}`}
+                                                className="size-12 object-cover transition-opacity group-hover:opacity-85"
+                                              />
+                                              </>
+                                            ) : (
+                                              <div className="flex size-12 items-center justify-center text-[10px] text-black/45">
+                                                File
+                                              </div>
+                                            )}
+                                          </a>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  <div className="min-w-0">
                                     <p className="text-sm text-black">{row.model}</p>
                                     <p className="text-xs text-black/45">{row.capability}</p>
+                                  </div>
                                   </div>
                                 </td>
                                 <td className="px-2 py-3 text-sm text-black">{row.apiKeyName}</td>

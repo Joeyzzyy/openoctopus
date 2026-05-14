@@ -748,9 +748,9 @@ function ManagementDialog({
   const [open, setOpen] = useState(false);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={setOpen} disablePointerDismissal>
       <DialogTrigger disabled={disabled}>{trigger}</DialogTrigger>
-      <DialogContent className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] [&>button]:hidden sm:max-w-5xl">
+      <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] [&>button]:hidden sm:max-w-5xl">
         <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -2536,7 +2536,7 @@ export function InternalModelAiUsageLogsPanel({
                   <td className="border-b border-black/[0.06] px-3 py-2.5 text-xs text-black/65">
                     ${Number(row.estimatedCostUsd ?? 0).toFixed(6)}
                   </td>
-                  <td className="max-w-[340px] border-b border-black/[0.06] px-3 py-2.5 text-xs text-[#8D4336]">
+                  <td className="max-w-[340px] break-all border-b border-black/[0.06] px-3 py-2.5 text-xs text-[#8D4336]">
                     {row.error_message ?? "-"}
                   </td>
                 </tr>

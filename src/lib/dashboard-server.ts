@@ -28,6 +28,31 @@ type AnalyticsRequestRow = {
   created_at: string;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeDashboardAssetUrl(value: string, mimeType: string | null) {
+  const text = value.trim();
+  if (
+    text.startsWith("http://") ||
+    text.startsWith("https://") ||
+    text.startsWith("data:") ||
+    text.startsWith("/v1/files/")
+  ) {
+    return text;
+  }
+  if (
+    text.startsWith("iVBORw0KGgo") ||
+    text.startsWith("/9j/") ||
+    text.startsWith("R0lGOD") ||
+    text.startsWith("UklGR")
+  ) {
+    return `data:${mimeType ?? "image/png"};base64,${text}`;
+  }
+  return text;
+}
+
 export type DashboardData = {
   user: {
     id: string;
@@ -177,6 +202,11 @@ export type DashboardData = {
     status: RequestState;
     latency: string;
     cost: string;
+    outputAssets: Array<{
+      type: string;
+      url: string;
+      mimeType: string | null;
+    }>;
   }>;
 };
 
@@ -547,7 +577,7 @@ export async function getDashboardData({
         let query = supabaseAdmin
           .from("inference_requests")
           .select(
-            "id, api_key_id, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, created_at, queued_at, started_at, completed_at",
+            "id, api_key_id, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, output_payload, created_at, queued_at, started_at, completed_at",
             { count: "exact" }
           )
           .eq("workspace_id", workspace.id)
@@ -796,6 +826,25 @@ export async function getDashboardData({
       }
 
       const costValue = Number(row.actual_cost ?? row.estimated_cost ?? 0);
+      const outputPayload = isRecord((row as { output_payload?: unknown }).output_payload)
+        ? ((row as { output_payload?: unknown }).output_payload as Record<string, unknown>)
+        : {};
+      const outputAssets = Array.isArray(outputPayload.assets)
+        ? outputPayload.assets
+            .filter((asset): asset is Record<string, unknown> => isRecord(asset))
+            .map((asset) => ({
+              type: typeof asset.type === "string" ? asset.type : "image",
+              mimeType: typeof asset.mimeType === "string" ? asset.mimeType : null,
+              url:
+                typeof asset.url === "string"
+                  ? normalizeDashboardAssetUrl(
+                      asset.url,
+                      typeof asset.mimeType === "string" ? asset.mimeType : null
+                    )
+                  : "",
+            }))
+            .filter((asset) => asset.url.length > 0)
+        : [];
 
       return {
         requestId: row.id,
@@ -813,6 +862,7 @@ export async function getDashboardData({
               : "failed",
         latency,
         cost: costValue > 0 ? formatCurrency(costValue) : "pending",
+        outputAssets,
       };
     });
 
