@@ -34,11 +34,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function normalizeDashboardAssetUrl(value: string, mimeType: string | null) {
   const text = value.trim();
+  if (text.startsWith("http://") || text.startsWith("https://")) {
+    try {
+      const url = new URL(text);
+      if (url.pathname.startsWith("/v1/files/")) {
+        url.searchParams.set("display", "1");
+        return url.toString();
+      }
+    } catch {
+      return text;
+    }
+    return text;
+  }
+  if (text.startsWith("/v1/files/")) {
+    try {
+      const url = new URL(text, "https://openoctopus.local");
+      url.searchParams.set("display", "1");
+      return `${url.pathname}${url.search}`;
+    } catch {
+      return text;
+    }
+  }
   if (
-    text.startsWith("http://") ||
-    text.startsWith("https://") ||
-    text.startsWith("data:") ||
-    text.startsWith("/v1/files/")
+    text.startsWith("data:")
   ) {
     return text;
   }

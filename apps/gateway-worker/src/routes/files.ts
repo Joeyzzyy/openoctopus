@@ -31,6 +31,22 @@ function getAssetSourceUrl(outputPayload: unknown, assetIndex: number) {
       : null;
 }
 
+function parseDataUri(value: string) {
+  const match = value.match(/^data:([^;,]+)?(;base64)?,(.*)$/s);
+  if (!match) return null;
+  const mimeType = match[1] || "application/octet-stream";
+  const isBase64 = Boolean(match[2]);
+  const payload = match[3] ?? "";
+  try {
+    const buffer = isBase64
+      ? Buffer.from(payload, "base64")
+      : Buffer.from(decodeURIComponent(payload), "utf8");
+    return { buffer, mimeType };
+  } catch {
+    return null;
+  }
+}
+
 function isAllowedGeminiDownloadUrl(url: string) {
   try {
     const parsed = new URL(url);
@@ -138,6 +154,20 @@ export async function registerFileRoutes(app: FastifyInstance) {
     }
 
     const sourceUrl = getAssetSourceUrl(requestRow.output_payload, params.assetIndex);
+    if (sourceUrl?.startsWith("data:")) {
+      const parsed = parseDataUri(sourceUrl);
+      if (parsed) {
+        await supabaseAdmin.storage
+          .from(env.GENERATED_ASSETS_BUCKET)
+          .upload(cachePath, parsed.buffer, {
+            contentType: parsed.mimeType,
+            upsert: true,
+          });
+        setGeneratedAssetHeaders(reply, parsed.mimeType, parsed.buffer.length);
+        return reply.code(200).send(parsed.buffer);
+      }
+    }
+
     if (!sourceUrl || !isAllowedGeminiDownloadUrl(sourceUrl)) {
       return reply.code(404).send({
         error: {
