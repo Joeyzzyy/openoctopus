@@ -22,6 +22,7 @@ type DashboardDataOptions = {
 type AnalyticsRequestRow = {
   id: string;
   api_key_id: string | null;
+  request_source: string | null;
   public_model_slug: string;
   status: string;
   actual_cost: number | null;
@@ -223,6 +224,7 @@ export type DashboardData = {
     createdAtLabel: string;
     apiKeyId: string | null;
     apiKeyName: string;
+    requestSourceLabel: string;
     capability: string;
     model: string;
     provider: string;
@@ -582,7 +584,7 @@ export async function getDashboardData({
       monthly_budget: Number(workspaceRow.monthly_budget ?? 0),
     };
 
-    const pageSize = 10;
+    const pageSize = 20;
     const normalizedRequestsPage = Math.max(1, Math.floor(requestsPage));
     const requestFrom = (normalizedRequestsPage - 1) * pageSize;
     const requestTo = requestFrom + pageSize - 1;
@@ -641,7 +643,7 @@ export async function getDashboardData({
         let query = supabaseAdmin
           .from("inference_requests")
           .select(
-            "id, api_key_id, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, output_payload, created_at, queued_at, started_at, completed_at",
+            "id, api_key_id, request_source, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, output_payload, created_at, queued_at, started_at, completed_at",
             { count: "exact" }
           )
           .eq("workspace_id", workspace.id)
@@ -915,6 +917,12 @@ export async function getDashboardData({
         createdAtLabel: formatTimestamp(row.created_at),
         apiKeyId: row.api_key_id ?? null,
         apiKeyName: row.api_key_id ? keyNameById.get(row.api_key_id) ?? "Unknown key" : "No key",
+        requestSourceLabel:
+          row.request_source === "playground"
+            ? "Playground"
+            : row.api_key_id
+              ? `API Key · ${keyNameById.get(row.api_key_id) ?? "Unknown key"}`
+              : "API",
         capability: row.capability,
         model: row.public_model_slug,
         provider: row.provider_id ? providerNameById.get(row.provider_id) ?? "Unknown provider" : "Unrouted",

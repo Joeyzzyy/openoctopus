@@ -21,7 +21,6 @@ const defaultTaskResponseExample = `{
   "capability": "image_generation",
   "output_payload": {
     "format": "openoctopus.image.output.v1",
-    "raw": { "...": "provider payload" },
     "assets": [
       {
         "id": "0",

@@ -6,22 +6,12 @@ type ContractTabKey = "playground" | "api";
 
 const playgroundExample = {
   format: "openoctopus.image.output.v1",
-  raw: {
-    code: 200,
-    data: {
-      id: "prediction_id",
-      status: "completed",
-      outputs: ["https://cdn.example.com/image.png"],
-    },
-    message: "success",
-  },
   assets: [
     {
       id: "0",
       index: 0,
       type: "image",
       url: "https://your-gateway.com/v1/files/{requestId}/assets/0",
-      sourceUrl: "https://upstream.example.com/predictions/{id}/result",
       mimeType: "image/png",
     },
   ],
@@ -53,7 +43,7 @@ export function ImageResponseContractPanel() {
     if (activeTab === "playground") {
       return {
         title: "Playground 返回结构约定",
-        note: "供 internal Playground 调试使用，允许保留 upstream 原始信息。",
+        note: "供 internal Playground 调试使用。返回统一输出结构，不返回 raw/sourceUrl。",
         payload: playgroundExample,
       };
     }
@@ -101,4 +91,3 @@ export function ImageResponseContractPanel() {
     </div>
   );
 }
-

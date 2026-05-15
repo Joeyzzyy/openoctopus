@@ -2779,45 +2779,86 @@ export function CreateProviderModelForm({
           }}
           className={activeTab === "showcase-assets" ? "" : "hidden"}
         >
-          <div className="rounded-xl border border-black/[0.08] bg-white p-3">
-            <div className="mb-3">
-              <p className="text-[11px] tracking-[0.35px] text-black/60">效果图素材（工具页封面与作品轮播）</p>
-            </div>
-            {defaultShowcaseCoverUrl ? (
-              <div className="mb-3">
-                <p className="mb-2 text-[11px] text-black/55">当前封面</p>
-                {defaultShowcaseCoverAssetId ? (
-                  <input type="hidden" name="existingShowcaseCoverAssetId" value={defaultShowcaseCoverAssetId} />
-                ) : null}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={defaultShowcaseCoverUrl}
-                  alt="Current model cover"
-                  className="h-28 w-28 rounded-lg border border-black/[0.08] object-cover"
-                />
-                <label className="mt-3 block">
-                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">当前封面提示词</span>
-                  <textarea
-                    name="existingShowcaseCoverPrompt"
-                    defaultValue={defaultShowcaseCoverPrompt}
-                    disabled={disabled}
-                    className={formTextAreaClassName}
-                    rows={4}
-                    placeholder="给当前封面补充或修改提示词"
+          <div className="space-y-4 rounded-xl border border-black/[0.08] bg-white p-3">
+            <p className="text-[11px] tracking-[0.35px] text-black/60">效果图素材（工具页封面与作品轮播）</p>
+
+            <section className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-black/80">封面图区域</p>
+                <span className="text-[11px] text-black/45">单张封面</span>
+              </div>
+              {defaultShowcaseCoverUrl ? (
+                <div className="rounded-lg border border-black/[0.08] bg-white p-3">
+                  <p className="mb-2 text-[11px] text-black/55">已上传封面</p>
+                  {defaultShowcaseCoverAssetId ? (
+                    <input type="hidden" name="existingShowcaseCoverAssetId" value={defaultShowcaseCoverAssetId} />
+                  ) : null}
+                  <div className="grid gap-3 md:grid-cols-[132px_1fr]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={defaultShowcaseCoverUrl}
+                      alt="Current model cover"
+                      className="h-28 w-28 rounded-lg border border-black/[0.08] object-cover"
+                    />
+                    <div>
+                      <label className="block">
+                        <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">封面提示词</span>
+                        <textarea
+                          name="existingShowcaseCoverPrompt"
+                          defaultValue={defaultShowcaseCoverPrompt}
+                          disabled={disabled}
+                          className={formTextAreaClassName}
+                          rows={4}
+                          placeholder="给当前封面补充或修改提示词"
+                        />
+                      </label>
+                      <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#B54432]">
+                        <input type="checkbox" name="removeShowcaseCover" className="size-3.5" />
+                        删除当前封面图
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-black/[0.12] bg-white p-3 text-xs text-black/50">
+                  暂无封面图
+                </div>
+              )}
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上传封面（单张）</span>
+                  <input
+                    type="file"
+                    name="showcaseCoverFile"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    onChange={(event) => setSelectedCoverFileName(event.target.files?.[0]?.name ?? "")}
+                    className="block w-full text-xs text-black/65 file:mr-3 file:rounded-md file:border-0 file:bg-black file:px-3 file:py-2 file:text-xs file:font-medium file:text-white hover:file:bg-black/90"
                   />
                 </label>
-                <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#B54432]">
-                  <input type="checkbox" name="removeShowcaseCover" className="size-3.5" />
-                  删除当前封面图
+                <label className="block">
+                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">新封面提示词</span>
+                  <textarea
+                    name="showcaseCoverPrompt"
+                    defaultValue=""
+                    disabled={disabled}
+                    className={formTextAreaClassName}
+                    rows={5}
+                    placeholder="这张封面图对应的提示词，会在前台 hover 时展示并可复制。"
+                  />
                 </label>
               </div>
-            ) : null}
-            {defaultShowcaseGalleryUrls.length > 0 ? (
-              <div className="mb-3">
-                <p className="mb-2 text-[11px] text-black/55">当前作品图</p>
-                <div className="grid gap-2 md:grid-cols-2">
+            </section>
+
+            <section className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-black/80">作品素材区域</p>
+                <span className="text-[11px] text-black/45">{defaultShowcaseGalleryUrls.length} 张已上传</span>
+              </div>
+              {defaultShowcaseGalleryUrls.length > 0 ? (
+                <div className="space-y-2">
                   {defaultShowcaseGalleryUrls.map((url, index) => (
-                    <div key={url} className="rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-2">
+                    <div key={url} className="rounded-lg border border-black/[0.08] bg-white p-3">
                       {defaultShowcaseGalleryAssetIds[index] ? (
                         <input
                           type="hidden"
@@ -2826,101 +2867,89 @@ export function CreateProviderModelForm({
                         />
                       ) : null}
                       <p className="mb-2 text-[11px] text-black/45">作品图 {index + 1}</p>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={url}
-                        alt="Current showcase asset"
-                        className="h-20 w-20 rounded-lg border border-black/[0.08] object-cover"
-                      />
-                      <label className="mt-2 block">
-                        <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提示词</span>
-                        <textarea
-                          name="existingShowcaseGalleryPrompts"
-                          defaultValue={defaultShowcaseGalleryPrompts[index] ?? ""}
-                          disabled={disabled}
-                          className={formTextAreaClassName}
-                          rows={4}
-                          placeholder="给这张作品图补充或修改提示词"
+                      <div className="grid gap-3 md:grid-cols-[110px_1fr]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={url}
+                          alt="Current showcase asset"
+                          className="h-20 w-20 rounded-lg border border-black/[0.08] object-cover"
                         />
-                      </label>
-                      {defaultShowcaseGalleryAssetIds[index] ? (
-                        <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#B54432]">
-                          <input
-                            type="checkbox"
-                            name="deleteShowcaseGalleryAssetIds"
-                            value={defaultShowcaseGalleryAssetIds[index]}
-                            className="size-3.5"
-                          />
-                          删除这张作品图
-                        </label>
-                      ) : null}
+                        <div>
+                          <label className="block">
+                            <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提示词</span>
+                            <textarea
+                              name="existingShowcaseGalleryPrompts"
+                              defaultValue={defaultShowcaseGalleryPrompts[index] ?? ""}
+                              disabled={disabled}
+                              className={formTextAreaClassName}
+                              rows={3}
+                              placeholder="给这张作品图补充或修改提示词"
+                            />
+                          </label>
+                          {defaultShowcaseGalleryAssetIds[index] ? (
+                            <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#B54432]">
+                              <input
+                                type="checkbox"
+                                name="deleteShowcaseGalleryAssetIds"
+                                value={defaultShowcaseGalleryAssetIds[index]}
+                                className="size-3.5"
+                              />
+                              删除这张作品图
+                            </label>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-black/[0.12] bg-white p-3 text-xs text-black/50">
+                  暂无作品素材图
+                </div>
+              )}
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上传作品图（可多张）</span>
+                  <input
+                    type="file"
+                    name="showcaseGalleryFiles"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    multiple
+                    onChange={(event) =>
+                      setSelectedGalleryFileNames(Array.from(event.target.files ?? []).map((file) => file.name))
+                    }
+                    className="block w-full text-xs text-black/65 file:mr-3 file:rounded-md file:border-0 file:bg-black file:px-3 file:py-2 file:text-xs file:font-medium file:text-white hover:file:bg-black/90"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">作品图提示词（每行对应一张，按上传顺序）</span>
+                  <textarea
+                    name="showcaseGalleryPromptsText"
+                    defaultValue=""
+                    disabled={disabled}
+                    className={formTextAreaClassName}
+                    rows={6}
+                    placeholder={
+                      galleryPromptPlaceholder ||
+                      "第 1 行对应第 1 张图，第 2 行对应第 2 张图。留空则该图片不展示提示词。"
+                    }
+                  />
+                </label>
+                <label className="inline-flex items-center gap-2 text-xs text-black/70">
+                  <input type="checkbox" name="replaceShowcaseGallery" className="size-3.5" />
+                  用新上传图片替换当前作品图
+                </label>
               </div>
-            ) : null}
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="block">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上传封面（单张）</span>
-                <input
-                  type="file"
-                  name="showcaseCoverFile"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  onChange={(event) =>
-                    setSelectedCoverFileName(event.target.files?.[0]?.name ?? "")
-                  }
-                  className="block w-full text-xs text-black/65 file:mr-3 file:rounded-md file:border-0 file:bg-black file:px-3 file:py-2 file:text-xs file:font-medium file:text-white hover:file:bg-black/90"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">封面提示词</span>
-                <textarea
-                  name="showcaseCoverPrompt"
-                  defaultValue={defaultShowcaseCoverPrompt}
-                  disabled={disabled}
-                  className={formTextAreaClassName}
-                  rows={5}
-                  placeholder="这张封面图对应的提示词，会在前台 hover 时展示并可复制。"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上传作品图（可多张）</span>
-                <input
-                  type="file"
-                  name="showcaseGalleryFiles"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  multiple
-                  onChange={(event) =>
-                    setSelectedGalleryFileNames(
-                      Array.from(event.target.files ?? []).map((file) => file.name)
-                    )
-                  }
-                  className="block w-full text-xs text-black/65 file:mr-3 file:rounded-md file:border-0 file:bg-black file:px-3 file:py-2 file:text-xs file:font-medium file:text-white hover:file:bg-black/90"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">作品图提示词（每行对应一张，按上传顺序）</span>
-                <textarea
-                  name="showcaseGalleryPromptsText"
-                  defaultValue={defaultShowcaseGalleryPrompts.join("\n")}
-                  disabled={disabled}
-                  className={formTextAreaClassName}
-                  rows={6}
-                  placeholder={
-                    galleryPromptPlaceholder ||
-                    "第 1 行对应第 1 张图，第 2 行对应第 2 张图。留空则该图片不展示提示词。"
-                  }
-                />
-              </label>
-              <label className="inline-flex items-center gap-2 text-xs text-black/70">
-                <input type="checkbox" name="replaceShowcaseGallery" className="size-3.5" />
-                用新上传图片替换当前作品图
-              </label>
+            </section>
+
+            <div className="rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-3">
+              <p className="mb-2 text-[11px] text-black/55">本次待上传</p>
+              <ShowcaseUploadStatus
+                coverFileName={selectedCoverFileName}
+                galleryFileNames={selectedGalleryFileNames}
+              />
             </div>
-            <ShowcaseUploadStatus
-              coverFileName={selectedCoverFileName}
-              galleryFileNames={selectedGalleryFileNames}
-            />
           </div>
         </div>
         </div>

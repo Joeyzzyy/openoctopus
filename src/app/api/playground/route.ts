@@ -24,6 +24,32 @@ function resolveGatewayBaseUrl() {
   return process.env.OPENOCTOPUS_API_BASE_URL?.trim() || PUBLIC_API_BASE_URL;
 }
 
+function sanitizePlaygroundOutputPayload(outputPayload: unknown) {
+  if (!outputPayload || typeof outputPayload !== "object" || Array.isArray(outputPayload)) {
+    return outputPayload;
+  }
+
+  const record = outputPayload as Record<string, unknown>;
+  const { raw: _raw, ...rest } = record;
+  const assets = Array.isArray(rest.assets) ? rest.assets : null;
+
+  if (!assets) {
+    return rest;
+  }
+
+  return {
+    ...rest,
+    assets: assets.map((asset) => {
+      if (!asset || typeof asset !== "object" || Array.isArray(asset)) {
+        return asset;
+      }
+      const assetRecord = asset as Record<string, unknown>;
+      const { sourceUrl: _sourceUrl, ...assetRest } = assetRecord;
+      return assetRest;
+    }),
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -77,7 +103,18 @@ export async function POST(request: Request) {
         { status: statusResponse.status }
       );
     }
-    return NextResponse.json(statusJson);
+
+    const sanitized =
+      statusJson && typeof statusJson === "object" && !Array.isArray(statusJson)
+        ? ({
+            ...statusJson,
+            output_payload: sanitizePlaygroundOutputPayload(
+              (statusJson as Record<string, unknown>).output_payload
+            ),
+          } as Record<string, unknown>)
+        : statusJson;
+
+    return NextResponse.json(sanitized);
   } catch (error) {
     if (isGatewayValidationError(error)) {
       const response = await buildGatewayErrorResponse({

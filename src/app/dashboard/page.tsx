@@ -15,7 +15,6 @@ import { ApiKeysTable } from "./api-keys-table";
 import { TopUpForm } from "./top-up-form";
 import { AutoRefreshOnReturn } from "./auto-refresh-on-return";
 import { TopUpCelebration } from "./top-up-celebration";
-import { InteractiveTrendChartCard, RequestDetailsFilters } from "./request-details-controls";
 import { AccountPasswordForm } from "./account-password-form";
 import { ExplorePanel } from "./explore-panel";
 import { buildModelCanonicalPath, loadModelsPageData } from "@/app/(marketing)/models/data";
@@ -306,14 +305,12 @@ export default async function DashboardPage({
   const requestsPage = Number.isFinite(rawRequestsPage) ? rawRequestsPage : 1;
   const rawBillingPage = Number(getSearchValue(resolvedSearchParams, "billingPage") ?? "1");
   const billingPage = Number.isFinite(rawBillingPage) ? Math.max(1, Math.floor(rawBillingPage)) : 1;
-  const selectedApiKeyId = getSearchValue(resolvedSearchParams, "apiKey") ?? null;
+  const selectedApiKeyId = null;
   const selectedModelType = parseModelType(getSearchValue(resolvedSearchParams, "modelType"));
   const selectedModelSlug = parseModelSlug(getSearchValue(resolvedSearchParams, "modelSlug"));
   const data = await getDashboardData({
     requestsPage,
     billingPage,
-    requestsApiKeyId: selectedApiKeyId,
-    analyticsApiKeyId: selectedApiKeyId,
     analyticsLookbackMs: parseRangeMs(analyticsRange),
   });
 
@@ -321,7 +318,7 @@ export default async function DashboardPage({
     redirect("/login");
   }
 
-  const { apiKeys, metrics, requestFilters, requestPagination, billingPagination, requestQueueRows, analyticsRequests, billingRows, user } =
+  const { apiKeys, metrics, requestPagination, billingPagination, requestQueueRows, analyticsRequests, billingRows, user } =
     data;
   const exploreData = await loadModelsPageData().catch(() => ({
     modelDocRows: [],
@@ -330,11 +327,6 @@ export default async function DashboardPage({
 
   const walletMetric = metrics.find((metric) => metric.label === "Wallet Balance");
   const topupMetric = metrics.find((metric) => metric.label === "Total Top-Ups");
-  const selectedApiKey =
-    selectedApiKeyId !== null
-      ? requestFilters.apiKeys.find((item) => item.id === selectedApiKeyId) ?? null
-      : null;
-
   const trendSeries = buildRequestTrendSeries(analyticsRequests, analyticsInterval, analyticsRange);
   const filteredSpend = analyticsRequests.reduce((sum, row) => sum + row.costValue, 0);
   const filteredRequests = analyticsRequests.length;
@@ -353,7 +345,7 @@ export default async function DashboardPage({
     {
       title: "Spend in view",
       value: formatCurrency(filteredSpend),
-      note: selectedApiKey ? `${selectedApiKey.name} in ${analyticsRange}` : `All keys in ${analyticsRange}`,
+      note: `All keys in ${analyticsRange}`,
       icon: LineChart,
     },
     {
@@ -449,33 +441,7 @@ export default async function DashboardPage({
 
             {view === "request-details" ? (
               <section className="p-0">
-                  <RequestDetailsFilters
-                    apiKeys={requestFilters.apiKeys}
-                    selectedApiKeyId={selectedApiKeyId}
-                    analyticsInterval={analyticsInterval}
-                    analyticsRange={analyticsRange}
-                  />
-
-                  {analyticsRequests.length > 0 ? (
-                    <div className="grid gap-4 xl:grid-cols-2">
-                      <InteractiveTrendChartCard
-                        title="Request count"
-                        points={trendSeries.requestPoints}
-                        labels={trendSeries.labels}
-                        valueLabel={`${filteredRequests} requests in the selected window`}
-                        valueKind="count"
-                      />
-                      <InteractiveTrendChartCard
-                        title="Spend"
-                        points={trendSeries.spendPoints}
-                        labels={trendSeries.labels}
-                        valueLabel={`${formatCurrency(filteredSpend)} billed in the selected window`}
-                        valueKind="currency"
-                      />
-                    </div>
-                  ) : null}
-
-                  <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="min-w-0">
                       <h3 className="text-lg font-semibold text-black">Request list</h3>
                     </div>
@@ -499,7 +465,7 @@ export default async function DashboardPage({
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <p className="truncate text-sm font-medium text-black">{row.model}</p>
-                              <p className="mt-1 text-xs text-black/45">{row.apiKeyName}</p>
+                              <p className="mt-1 text-xs text-black/45">{row.requestSourceLabel}</p>
                               <p className="mt-1 text-xs text-black/50">{row.requestId}</p>
                             </div>
                             <span
@@ -551,7 +517,7 @@ export default async function DashboardPage({
                     ) : (
                       <EmptyState
                         title="No requests found"
-                        detail="No routed requests match the current API key filter."
+                        detail="No request records found in this workspace."
                       />
                     )}
                   </div>
@@ -561,7 +527,7 @@ export default async function DashboardPage({
                       <table className="w-full min-w-[860px] text-sm">
                         <thead>
                           <tr className="border-b border-black/10 text-left">
-                            {["Time", "Output", "API Key", "ID", "Provider", "Status", "Latency", "Cost"].map(
+                            {["Time", "Output", "Source", "ID", "Provider", "Status", "Latency", "Cost"].map(
                               (heading) => (
                                 <th
                                   key={heading}
@@ -619,7 +585,7 @@ export default async function DashboardPage({
                                   </div>
                                   </div>
                                 </td>
-                                <td className="px-2 py-3 text-sm text-black">{row.apiKeyName}</td>
+                                <td className="px-2 py-3 text-sm text-black">{row.requestSourceLabel}</td>
                                 <td className="px-2 py-3 text-xs text-black/60">{row.requestId}</td>
                                 <td className="px-2 py-3 text-sm text-black">{row.provider}</td>
                                 <td className="px-2 py-3">
