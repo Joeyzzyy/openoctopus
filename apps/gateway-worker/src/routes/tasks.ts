@@ -21,6 +21,34 @@ function redactOutputPayloadRaw(outputPayload: unknown) {
     raw: null,
   };
 }
+
+function redactOutputAssetSourceUrl(outputPayload: unknown) {
+  if (!outputPayload || typeof outputPayload !== "object" || Array.isArray(outputPayload)) {
+    return outputPayload;
+  }
+  const record = outputPayload as Record<string, unknown>;
+  const assets = Array.isArray(record.assets) ? record.assets : null;
+  if (!assets) {
+    return outputPayload;
+  }
+
+  const nextAssets = assets.map((asset) => {
+    if (!asset || typeof asset !== "object" || Array.isArray(asset)) {
+      return asset;
+    }
+    const assetRecord = asset as Record<string, unknown>;
+    if (!("sourceUrl" in assetRecord)) {
+      return asset;
+    }
+    const { sourceUrl: _sourceUrl, ...rest } = assetRecord;
+    return rest;
+  });
+
+  return {
+    ...record,
+    assets: nextAssets,
+  };
+}
 import { enqueueInferenceJob } from "../queue/runner.js";
 import {
   createQueuedRequest,
@@ -263,9 +291,12 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         capability: data.capability,
         outputPayload: data.output_payload,
       });
+      const redactedOutputPayload = redactOutputAssetSourceUrl(
+        redactOutputPayloadRaw(normalizedOutputPayload)
+      );
       return {
         ...data,
-        output_payload: redactOutputPayloadRaw(normalizedOutputPayload),
+        output_payload: redactedOutputPayload,
       };
     }
 
