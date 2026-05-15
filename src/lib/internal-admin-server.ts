@@ -798,7 +798,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
             .limit(200),
       supabase
         .from("wallet_transactions")
-        .select("entry_type, amount_delta"),
+        .select("workspace_id, entry_type, amount_delta"),
       supabase
         .from("inference_requests")
         .select(
@@ -876,6 +876,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const walletTransactions = (walletTransactionsResponse.error
     ? []
     : walletTransactionsResponse.data ?? []) as Array<{
+    workspace_id: string | null;
     entry_type: string | null;
     amount_delta: number | string | null;
   }>;
@@ -1288,6 +1289,78 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     }, 0),
   };
 
+  const workspaceNameById = new Map(
+    recentRequestSummaries.map((request) => [
+      request.workspaceId,
+      { name: request.customerName, slug: request.workspaceSlug },
+    ])
+  );
+
+  const customerFinanceMap = new Map<
+    string,
+    {
+      workspaceId: string;
+      workspaceName: string;
+      workspaceSlug: string;
+      totalTopup: number;
+      totalSystemCredit: number;
+      totalConsumption: number;
+      totalProviderCost: number;
+      totalProfit: number;
+      requestCount: number;
+    }
+  >();
+
+  for (const tx of walletTransactions) {
+    if (!tx.workspace_id) continue;
+    const workspaceMeta = workspaceNameById.get(tx.workspace_id) ?? {
+      name: tx.workspace_id,
+      slug: tx.workspace_id,
+    };
+    const current = customerFinanceMap.get(tx.workspace_id) ?? {
+      workspaceId: tx.workspace_id,
+      workspaceName: workspaceMeta.name,
+      workspaceSlug: workspaceMeta.slug,
+      totalTopup: 0,
+      totalSystemCredit: 0,
+      totalConsumption: 0,
+      totalProviderCost: 0,
+      totalProfit: 0,
+      requestCount: 0,
+    };
+    const amount = Number(tx.amount_delta ?? 0);
+    if (tx.entry_type === "topup" && amount > 0) {
+      current.totalTopup += amount;
+    } else if (amount > 0) {
+      current.totalSystemCredit += amount;
+    }
+    customerFinanceMap.set(tx.workspace_id, current);
+  }
+
+  for (const request of recentRequestSummaries) {
+    const workspaceId = request.workspaceId ?? request.workspaceSlug;
+    const current = customerFinanceMap.get(workspaceId) ?? {
+      workspaceId,
+      workspaceName: request.customerName,
+      workspaceSlug: request.workspaceSlug,
+      totalTopup: 0,
+      totalSystemCredit: 0,
+      totalConsumption: 0,
+      totalProviderCost: 0,
+      totalProfit: 0,
+      requestCount: 0,
+    };
+    current.totalConsumption += request.customerCharge;
+    current.totalProviderCost += request.providerCost;
+    current.totalProfit += request.profit;
+    current.requestCount += 1;
+    customerFinanceMap.set(workspaceId, current);
+  }
+
+  const customerFinances = Array.from(customerFinanceMap.values()).sort(
+    (a, b) => b.totalConsumption - a.totalConsumption
+  );
+
   return {
     authorized: true as const,
     user: {
@@ -1380,5 +1453,6 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         environment: key.environment,
       })),
     },
+    customerFinances,
   };
 }

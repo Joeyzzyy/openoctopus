@@ -477,9 +477,9 @@ export default async function DashboardPage({
                               {row.status}
                             </span>
                           </div>
-                          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-black/70">
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-black/70">
                             <div>Time: {row.createdAtLabel}</div>
-                            <div>Provider: {row.provider}</div>
+                            <div>Vendor: {row.vendor}</div>
                             <div>Latency: {row.latency}</div>
                             <div>Cost: {row.cost}</div>
                           </div>
@@ -527,7 +527,7 @@ export default async function DashboardPage({
                       <table className="w-full min-w-[860px] text-sm">
                         <thead>
                           <tr className="border-b border-black/10 text-left">
-                            {["Time", "Output", "Source", "ID", "Provider", "Status", "Latency", "Cost"].map(
+                            {["Time", "Output", "Source", "ID", "Vendor", "Status", "Latency", "Cost"].map(
                               (heading) => (
                                 <th
                                   key={heading}
@@ -587,7 +587,7 @@ export default async function DashboardPage({
                                 </td>
                                 <td className="px-2 py-3 text-sm text-black">{row.requestSourceLabel}</td>
                                 <td className="px-2 py-3 text-xs text-black/60">{row.requestId}</td>
-                                <td className="px-2 py-3 text-sm text-black">{row.provider}</td>
+                                <td className="px-2 py-3 text-sm text-black">{row.vendor}</td>
                                 <td className="px-2 py-3">
                                   <span
                                     className={cn(

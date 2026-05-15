@@ -227,7 +227,7 @@ export type DashboardData = {
     requestSourceLabel: string;
     capability: string;
     model: string;
-    provider: string;
+    vendor: string;
     status: RequestState;
     latency: string;
     cost: string;
@@ -627,7 +627,7 @@ export async function getDashboardData({
         .select("id, provider_id, upstream_model_slug, public_model_slug, supported_model_id, capability, active, input_schema, output_schema, execution_config"),
       supabaseAdmin
         .from("supported_models")
-        .select("id, model_slug, display_name, capability, active"),
+        .select("id, model_slug, display_name, capability, active, provider"),
       supabaseAdmin.from("routing_rules").select("id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy").or(`workspace_id.eq.${workspace.id},workspace_id.is.null`).eq("active", true).order("created_at", { ascending: true }),
     ]);
 
@@ -684,6 +684,9 @@ export async function getDashboardData({
     const requestTotal = requestResponse.error ? 0 : requestResponse.count ?? 0;
     const analyticsRows = analyticsRequestRows ?? [];
     const providerNameById = new Map(providers.map((row) => [row.id, row.name]));
+    const modelVendorBySlug = new Map(
+      supportedModels.map((row) => [row.model_slug, typeof row.provider === "string" && row.provider.trim().length > 0 ? row.provider : "Unknown vendor"])
+    );
     const providerById = new Map(providers.map((row) => [row.id, row]));
     const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
     const modelsPerProvider = providerModels.reduce((acc, row) => {
@@ -925,7 +928,7 @@ export async function getDashboardData({
               : "API",
         capability: row.capability,
         model: row.public_model_slug,
-        provider: row.provider_id ? providerNameById.get(row.provider_id) ?? "Unknown provider" : "Unrouted",
+        vendor: modelVendorBySlug.get(row.public_model_slug) ?? "Unknown vendor",
         status:
           row.status === "queued" || row.status === "processing" || row.status === "succeeded" || row.status === "failed"
             ? (row.status as RequestState)

@@ -1,14 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import {
-  Fingerprint,
-  Network,
-  Activity,
-  ShieldAlert,
-  ShieldCheck,
-  Waypoints,
-} from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { getInternalAdminData } from "@/lib/internal-admin-server";
 import { clearApiKeyRequestRecords, unlockInternalAccess } from "./actions";
@@ -441,23 +433,16 @@ function OverviewCard({
   title,
   value,
   note,
-  icon: Icon,
 }: {
   title: string;
   value: string | number;
   note: string;
-  icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
     <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] px-3 py-2.5 shadow-sm">
-      <div className="flex items-center gap-2.5">
-        <div className="inline-flex size-7 shrink-0 items-center justify-center rounded-xl bg-white text-black/55">
-          <Icon className="size-3.5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] tracking-[0.35px] text-black/60">{title}</p>
-          <p className="text-lg font-medium tracking-tight text-black">{value}</p>
-        </div>
+      <div className="min-w-0">
+        <p className="text-[11px] tracking-[0.35px] text-black/60">{title}</p>
+        <p className="text-lg font-medium tracking-tight text-black">{value}</p>
       </div>
       <p className="mt-1 text-[11px] leading-4 text-black/50">{note}</p>
     </div>
@@ -597,7 +582,6 @@ function MonitoringChartCard({
             <span>失败率 {failureRate}</span>
           </div>
           <div className="inline-flex items-center gap-2 rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2.5 py-1 text-[11px] text-black/60">
-            <Activity className="size-3.5" />
             <span>峰值 {maxValue}</span>
           </div>
         </div>
@@ -900,6 +884,16 @@ export default async function InternalPage({
     profit: filteredRequests.reduce((sum, request) => sum + request.profit, 0),
     requestCount: filteredRequests.length,
   };
+  const filteredCustomerFinances = data.customerFinances.filter((item) =>
+    selectedRequestCustomer === "all" ? true : item.workspaceSlug === selectedRequestCustomer
+  );
+  const requestFinanceSummary = {
+    totalTopup: filteredCustomerFinances.reduce((sum, item) => sum + item.totalTopup, 0),
+    totalSystemCredit: filteredCustomerFinances.reduce((sum, item) => sum + item.totalSystemCredit, 0),
+    totalConsumption: filteredCustomerFinances.reduce((sum, item) => sum + item.totalConsumption, 0),
+    totalProviderCost: filteredCustomerFinances.reduce((sum, item) => sum + item.totalProviderCost, 0),
+    totalProfit: filteredCustomerFinances.reduce((sum, item) => sum + item.totalProfit, 0),
+  };
   const hasFilteredRequests = filteredRequests.length > 0;
   const requestPageSize = 20;
   const requestTotalPages = Math.max(1, Math.ceil(filteredRequests.length / requestPageSize));
@@ -979,13 +973,6 @@ export default async function InternalPage({
   const selectedMonitoringStatusLabel =
     monitoringStatusOptions.find((option) => option.value === selectedMonitoringStatus)?.label ??
     "全部请求";
-  const financeSummary = data.financeSummary ?? {
-    totalTopup: 0,
-    totalProviderCost: 0,
-    totalCustomerCharge: 0,
-    totalProfit: 0,
-    pendingProviderCost: 0,
-  };
   const globalVideoInflightRequests = data.globalMonitoring.videoInflightRequests;
   const recentVideoSettledRequests = data.globalMonitoring.recentVideoRequests.filter(
     (request) => !isInflightRequestStatus(request.status)
@@ -1153,45 +1140,12 @@ export default async function InternalPage({
 
           {activeTab === "monitoring" ? (
             <section>
-              <SectionShell
+                <SectionShell
                 id="monitoring-panel"
                 title="系统使用监控"
                 description=" "
               >
                 <MonitoringAutoRefresh enabled={activeTab === "monitoring" && selectedMonitoringView === "video"} />
-
-                <div className="mb-4 grid gap-3 md:grid-cols-5">
-                  <OverviewCard
-                    title="累计充值"
-                    value={formatCurrency(financeSummary.totalTopup)}
-                    note="wallet_transactions topup 汇总"
-                    icon={Fingerprint}
-                  />
-                  <OverviewCard
-                    title="累计客户收费"
-                    value={formatCurrency(financeSummary.totalCustomerCharge)}
-                    note="inference_requests 客户收费"
-                    icon={Network}
-                  />
-                  <OverviewCard
-                    title="累计上游成本"
-                    value={formatCurrency(financeSummary.totalProviderCost)}
-                    note="inference_requests 供应商成本"
-                    icon={ShieldCheck}
-                  />
-                  <OverviewCard
-                    title="累计利润"
-                    value={formatCurrency(financeSummary.totalProfit)}
-                    note="客户收费 - 供应商成本"
-                    icon={Waypoints}
-                  />
-                  <OverviewCard
-                    title="待结算上游成本"
-                    value={formatCurrency(financeSummary.pendingProviderCost)}
-                    note="actual 为空时按 estimated 计算"
-                    icon={Activity}
-                  />
-                </div>
 
                 <div className="mb-4 flex flex-wrap gap-2 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
                   {monitoringViewOptions.map((option) => (
@@ -1343,37 +1297,31 @@ export default async function InternalPage({
                         title="模型总数"
                         value={monitoringSummary.modelCount}
                         note="通过模型筛选查看单张折线图"
-                        icon={Network}
                       />
                       <OverviewCard
                         title="活跃模型"
                         value={monitoringSummary.activeModelCount}
                         note={`${selectedMonitoringRangeLabel} 内至少调用过一次`}
-                        icon={Activity}
                       />
                       <OverviewCard
                         title="总调用量"
                         value={monitoringSummary.requestCount}
                         note={`${selectedMonitoringRangeLabel} · ${selectedMonitoringStatusLabel}`}
-                        icon={Fingerprint}
                       />
                       <OverviewCard
                         title="单桶峰值"
                         value={monitoringSummary.peakValue}
                         note={`${selectedMonitoringIntervalLabel}`}
-                        icon={Waypoints}
                       />
                       <OverviewCard
                         title="成功率"
                         value={formatPercent(monitoringSuccessRate)}
                         note={`已结算 ${monitoringHealthSummary.settled} 条`}
-                        icon={ShieldCheck}
                       />
                       <OverviewCard
                         title="失败率"
                         value={formatPercent(monitoringFailureRate)}
                         note={`失败 ${monitoringHealthSummary.failed} · 取消 ${monitoringHealthSummary.cancelled}`}
-                        icon={ShieldAlert}
                       />
                     </div>
                   </>
@@ -1431,19 +1379,16 @@ export default async function InternalPage({
                         title="进行中视频任务"
                         value={globalVideoInflightRequests.length}
                         note="全系统当前 queued / processing 的视频请求"
-                        icon={Activity}
                       />
                       <OverviewCard
                         title="近期成功视频"
                         value={recentVideoSucceededCount}
                         note="最近抓取到的已结算视频任务"
-                        icon={ShieldCheck}
                       />
                       <OverviewCard
                         title="近期失败视频"
                         value={recentVideoFailedCount}
                         note="用于排查上游 provider 错误"
-                        icon={ShieldAlert}
                       />
                     </div>
 
@@ -1505,25 +1450,21 @@ export default async function InternalPage({
                         title="图片总量"
                         value={imageMonitoringSummary.total}
                         note="最近抓取窗口内图片请求总数"
-                        icon={Fingerprint}
                       />
                       <OverviewCard
                         title="图片进行中"
                         value={imageMonitoringSummary.inflight}
                         note="queued / processing"
-                        icon={Activity}
                       />
                       <OverviewCard
                         title="图片成功"
                         value={imageMonitoringSummary.succeeded}
                         note="最近抓取窗口内 succeeded"
-                        icon={ShieldCheck}
                       />
                       <OverviewCard
                         title="图片失败"
                         value={imageMonitoringSummary.failed}
                         note="最近抓取窗口内 failed"
-                        icon={ShieldAlert}
                       />
                     </div>
 
@@ -1553,6 +1494,34 @@ export default async function InternalPage({
 
                 {selectedMonitoringView === "requests" ? (
                   <>
+                    <div className="mb-4 grid gap-3 md:grid-cols-5">
+                      <OverviewCard
+                        title="用户充值"
+                        value={formatCurrency(requestFinanceSummary.totalTopup)}
+                        note="wallet_transactions · topup"
+                      />
+                      <OverviewCard
+                        title="系统加款"
+                        value={formatCurrency(requestFinanceSummary.totalSystemCredit)}
+                        note="wallet_transactions · 非 topup 正向入账"
+                      />
+                      <OverviewCard
+                        title="用户消耗"
+                        value={formatCurrency(requestFinanceSummary.totalConsumption)}
+                        note="inference_requests · customer charge"
+                      />
+                      <OverviewCard
+                        title="上游成本"
+                        value={formatCurrency(requestFinanceSummary.totalProviderCost)}
+                        note="inference_requests · provider cost"
+                      />
+                      <OverviewCard
+                        title="用户盈亏"
+                        value={formatCurrency(requestFinanceSummary.totalProfit)}
+                        note="用户消耗 - 上游成本"
+                      />
+                    </div>
+
                     <div className="mb-4 grid gap-3 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                       <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
                         <p className="text-[11px] tracking-[0.35px] text-black/45">客户</p>
@@ -1661,25 +1630,21 @@ export default async function InternalPage({
                         title="请求数"
                         value={requestSummary.requestCount}
                         note="当前筛选条件下的请求行数"
-                        icon={Network}
                       />
                       <OverviewCard
                         title="客户收费"
                         value={formatCurrency(requestSummary.customerCharge)}
                         note="来源：inference_requests 客户收费字段"
-                        icon={Fingerprint}
                       />
                       <OverviewCard
                         title="供应商成本"
                         value={formatCurrency(requestSummary.providerCost)}
                         note="来源：inference_requests 供应商成本字段"
-                        icon={ShieldCheck}
                       />
                       <OverviewCard
                         title="利润"
                         value={formatCurrency(requestSummary.profit)}
                         note="客户收费减去供应商成本"
-                        icon={Waypoints}
                       />
                     </div>
 

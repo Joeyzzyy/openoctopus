@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 
 type ExploreModel = {
@@ -49,6 +49,20 @@ export function ExplorePanel({ models }: { models: ExploreModel[] }) {
   const categories = useMemo(() => buildCategoryList(models), [models]);
   const [activeProvider, setActiveProvider] = useState<string>("all");
   const [selectedCategories, setSelectedCategories] = useState<string[]>(categories);
+  useEffect(() => {
+    if (categories.length > 0 && selectedCategories.length === 0) {
+      setSelectedCategories(categories);
+    }
+  }, [categories, selectedCategories.length]);
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const model of models) {
+      if (activeProvider !== "all" && model.providerName !== activeProvider) continue;
+      const category = capabilityToCategory(model.capability);
+      counts.set(category, (counts.get(category) ?? 0) + 1);
+    }
+    return counts;
+  }, [activeProvider, models]);
 
   const filteredModels = useMemo(() => {
     return models.filter((model) => {
@@ -60,9 +74,12 @@ export function ExplorePanel({ models }: { models: ExploreModel[] }) {
   }, [activeProvider, models, selectedCategories]);
 
   const toggleCategory = (category: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(category) ? prev.filter((item) => item !== category) : [...prev, category]
-    );
+    setSelectedCategories((prev) => {
+      const next = prev.includes(category)
+        ? prev.filter((item) => item !== category)
+        : [...prev, category];
+      return next.length === 0 ? categories : next;
+    });
   };
 
   return (
@@ -116,7 +133,12 @@ export function ExplorePanel({ models }: { models: ExploreModel[] }) {
                   onChange={() => toggleCategory(category)}
                   className="size-4 rounded border-[#CFC6B6] text-[#B7661F] focus:ring-[#E58A35]"
                 />
-                <span>{category}</span>
+                <span className="flex items-center gap-2">
+                  <span>{category}</span>
+                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-black/[0.05] px-1.5 text-[11px] text-black/60">
+                    {categoryCounts.get(category) ?? 0}
+                  </span>
+                </span>
               </label>
             ))}
           </div>
