@@ -1050,10 +1050,15 @@ export async function getDashboardData({
         const amount = Number(row.amount_delta ?? 0);
         const normalizedDescription = row.description?.trim() ?? "";
         const legacyTopupText = /topup\s+through\s+stripe/i.test(normalizedDescription);
+        const isStripeTopupDescription = /^stripe top-up\b/i.test(normalizedDescription);
         const isDebitUsage = row.entry_type === "usage" || (row.entry_type !== "topup" && amount < 0);
         const description =
           row.entry_type === "topup"
-            ? (normalizedDescription.length > 0 ? normalizedDescription : "Balance Top-up Through Stripe")
+            ? (isStripeTopupDescription
+                ? "Stripe top-up"
+                : normalizedDescription.length > 0
+                  ? normalizedDescription
+                  : "Balance Top-up Through Stripe")
             : row.entry_type === "refund"
               ? (normalizedDescription.length > 0 ? normalizedDescription : "Refund")
               : row.entry_type === "adjustment"

@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     entry_type: "topup",
     amount_delta: amountUsd,
     balance_after: null,
-    description: `Stripe top-up ${session.id}`,
+    description: "Stripe top-up",
     reference_id: null,
     metadata: {
       stripe_event_id: event.id,
