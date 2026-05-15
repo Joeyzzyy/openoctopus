@@ -50,6 +50,14 @@ export type ModelDocRow = {
   primaryPriceLabel: string | null;
 };
 
+export type GatewayErrorDocRow = {
+  code: string;
+  httpStatus: number;
+  retryable: boolean;
+  publicMessage: string;
+  category: string;
+};
+
 function parseMetadataRecord(value: unknown) {
   try {
     const raw =
@@ -319,6 +327,14 @@ export const loadModelsPageData = cache(async () => {
     .order("created_at", { ascending: true });
   if (showcaseAssetError) throw new Error(showcaseAssetError.message);
 
+  const { data: errorCodeRows, error: errorCodeError } = await supabase
+    .from("gateway_error_definitions")
+    .select("code, category, http_status, public_message, retryable, active, sort_order")
+    .eq("active", true)
+    .order("sort_order", { ascending: true })
+    .order("code", { ascending: true });
+  if (errorCodeError) throw new Error(errorCodeError.message);
+
   const providerModelsBySupportedId = new Map<string, Array<Record<string, unknown>>>();
   for (const row of providerModelRows ?? []) {
     const supportedId = typeof row.supported_model_id === "string" ? row.supported_model_id : null;
@@ -403,7 +419,15 @@ export const loadModelsPageData = cache(async () => {
     .map((row) => row.name?.trim() ?? "")
     .filter((name) => name.length > 0);
 
-  return { modelDocRows, vendorOptions };
+  const gatewayErrorDocs: GatewayErrorDocRow[] = ((errorCodeRows ?? []) as Array<Record<string, unknown>>).map((row) => ({
+    code: typeof row.code === "string" ? row.code : "",
+    category: typeof row.category === "string" ? row.category : "general",
+    httpStatus: Number(row.http_status ?? 500),
+    publicMessage: typeof row.public_message === "string" ? row.public_message : "",
+    retryable: row.retryable === true,
+  })).filter((row) => row.code.length > 0);
+
+  return { modelDocRows, vendorOptions, gatewayErrorDocs };
 });
 
 export const findModelDocRowByRoute = cache(async (provider: string, modelSlug: string) => {

@@ -101,7 +101,7 @@ export async function ModelsPageShell({
   initialProvider,
   initialModelSlug,
 }: ModelsPageShellProps) {
-  const { modelDocRows, vendorOptions } = await loadModelsPageData();
+  const { modelDocRows, vendorOptions, gatewayErrorDocs } = await loadModelsPageData();
   const selectedModel =
     initialProvider && initialModelSlug
       ? matchModelDocRow(modelDocRows, initialProvider, initialModelSlug)
@@ -123,6 +123,7 @@ export async function ModelsPageShell({
         <ModelsBrowser
           rows={modelDocRows}
           vendorOptions={vendorOptions}
+          gatewayErrorDocs={gatewayErrorDocs}
           initialProvider={initialProvider}
           initialModelSlug={initialModelSlug}
         />

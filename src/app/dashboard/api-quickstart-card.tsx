@@ -18,6 +18,14 @@ type ModelDocItem = {
   normalizedOutputExampleJson: string | null;
 };
 
+type GatewayErrorDocItem = {
+  code: string;
+  httpStatus: number;
+  retryable: boolean;
+  publicMessage: string;
+  category: string;
+};
+
 type LanguageTab = "curl" | "nodejs" | "python" | "go" | "ruby";
 
 function safeParseJsonObject(value: string | null | undefined) {
@@ -147,13 +155,13 @@ function CodeBlock({
       <button
         type="button"
         onClick={() => onCopy(code, copyId)}
-        className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-white/20 bg-black/40 text-white/85 transition-colors hover:bg-black/60"
+        className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-black/[0.12] bg-white text-black/75 transition-colors hover:bg-black/[0.03]"
         aria-label="Copy code"
         title="Copy code"
       >
         {copiedBlock === copyId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
       </button>
-      <pre className="overflow-x-auto rounded-2xl bg-[#111827] p-4 pr-12 font-mono text-[11px] leading-6 text-[#F9FAFB]">
+      <pre className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-[#F6F8FB] p-4 pr-12 font-mono text-[11px] leading-6 text-[#1F2937]">
         <code>{code}</code>
       </pre>
     </div>
@@ -263,14 +271,67 @@ puts response.body`;
   return { curl, nodejs, python, go, ruby };
 }
 
+function buildPollingExamples(taskId = "task_id_from_previous_response") {
+  const nodejs = `const timeoutMs = 180000;
+const intervalMs = 1800;
+const startedAt = Date.now();
+
+while (Date.now() - startedAt < timeoutMs) {
+  const r = await fetch("${PUBLIC_API_BASE_URL}/v1/tasks/${taskId}", {
+    headers: { Authorization: "Bearer " + process.env.OPENOCTOPUS_API_KEY },
+  });
+  const task = await r.json();
+  if (!r.ok) throw new Error(task?.error?.message ?? "task query failed");
+
+  if (task.status === "queued" || task.status === "processing") {
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    continue;
+  }
+  if (task.status === "succeeded") {
+    console.log(task.output_payload);
+    break;
+  }
+  throw new Error(task?.error_message ?? "task failed");
+}`;
+
+  const python = `import time, requests
+
+timeout_s = 180
+interval_s = 1.8
+started = time.time()
+
+while time.time() - started < timeout_s:
+    resp = requests.get(
+        "${PUBLIC_API_BASE_URL}/v1/tasks/${taskId}",
+        headers={"Authorization": f"Bearer {OPENOCTOPUS_API_KEY}"},
+        timeout=30,
+    )
+    task = resp.json()
+    if resp.status_code >= 400:
+        raise RuntimeError(task.get("error", {}).get("message", "task query failed"))
+
+    status = task.get("status")
+    if status in ("queued", "processing"):
+        time.sleep(interval_s)
+        continue
+    if status == "succeeded":
+        print(task.get("output_payload"))
+        break
+    raise RuntimeError(task.get("error_message", "task failed"))`;
+
+  return { nodejs, python };
+}
+
 export function ApiQuickstartCard({
   models,
   initialModel,
   headerControls,
+  gatewayErrorDocs,
 }: {
   models?: ModelDocItem[];
   initialModel?: string | null;
   headerControls?: React.ReactNode;
+  gatewayErrorDocs?: GatewayErrorDocItem[];
 }) {
   const safeModels =
     models && models.length > 0
@@ -301,10 +362,11 @@ export function ApiQuickstartCard({
 
   const [selectedModelSlug, setSelectedModelSlug] = useState(resolvedModel);
   const [languageTab, setLanguageTab] = useState<LanguageTab>("curl");
-  const [activeSection, setActiveSection] = useState<"quickstart" | "input" | "output">("quickstart");
+  const [activeSection, setActiveSection] = useState<"quickstart" | "input" | "output" | "errors">("quickstart");
   const quickstartRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLDivElement | null>(null);
   const outputRef = useRef<HTMLDivElement | null>(null);
+  const errorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setSelectedModelSlug(resolvedModel);
@@ -319,6 +381,7 @@ export function ApiQuickstartCard({
   const inputFieldDocs = extractFieldDocs(providerInputSchema, "params");
   const outputFieldDocs = extractFieldDocs(providerOutputSchema, "fields");
   const createExamples = buildCreateExamples(selectedModel?.publicModel ?? fallbackModel, capability);
+  const pollingExamples = buildPollingExamples();
   const taskExample = buildTaskStatusCurl();
   const executionConfig = safeParseJsonObject(selectedModel?.executionConfigText);
   const protocolModeRaw =
@@ -344,14 +407,16 @@ export function ApiQuickstartCard({
       ? "border-[#E58A35] bg-[#FFF1DD] text-[#9A4F18]"
       : "border-[#E7E0D3] bg-white text-[#6B5F4E] hover:bg-[#FFF7EA]";
 
-  const jumpToSection = (section: "quickstart" | "input" | "output") => {
+  const jumpToSection = (section: "quickstart" | "input" | "output" | "errors") => {
     setActiveSection(section);
     const target =
       section === "quickstart"
         ? quickstartRef.current
         : section === "input"
           ? inputRef.current
-          : outputRef.current;
+          : section === "output"
+            ? outputRef.current
+            : errorRef.current;
     target?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -377,7 +442,7 @@ export function ApiQuickstartCard({
         output_payload: {
           format: "openoctopus.image.output.v1 | openoctopus.video.output.v1",
           assets: "normalized output assets",
-          raw: "full upstream raw payload (provider original response)",
+          raw: "optional provider raw payload (may be omitted depending on endpoint policy)",
         },
       },
       providerExtension: providerOutputSchema,
@@ -387,6 +452,39 @@ export function ApiQuickstartCard({
   );
 
   const currentCreateExample = createExamples[languageTab];
+  const safeGatewayErrorDocs =
+    gatewayErrorDocs && gatewayErrorDocs.length > 0
+      ? gatewayErrorDocs
+      : [
+          {
+            code: "invalid_request",
+            httpStatus: 400,
+            retryable: false,
+            publicMessage: "Request validation failed.",
+            category: "validation",
+          },
+          {
+            code: "insufficient_balance",
+            httpStatus: 402,
+            retryable: false,
+            publicMessage: "Insufficient balance.",
+            category: "billing",
+          },
+          {
+            code: "provider_timeout",
+            httpStatus: 504,
+            retryable: true,
+            publicMessage: "Upstream provider timeout.",
+            category: "upstream",
+          },
+          {
+            code: "internal_error",
+            httpStatus: 500,
+            retryable: true,
+            publicMessage: "Internal server error.",
+            category: "internal",
+          },
+        ];
 
   return (
     <section className="rounded-[28px] border border-black/[0.08] bg-white p-4 shadow-[0_24px_70px_rgba(17,24,39,0.08)] sm:p-6">
@@ -403,40 +501,48 @@ export function ApiQuickstartCard({
               onClick={() => jumpToSection("quickstart")}
               className={`flex w-full cursor-pointer items-center rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${tabClass(activeSection === "quickstart")}`}
             >
-              Quickstart
+              Step 1 · Submit & Poll
             </button>
             <button
               type="button"
               onClick={() => jumpToSection("input")}
               className={`flex w-full cursor-pointer items-center rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${tabClass(activeSection === "input")}`}
             >
-              Input Params
+              Step 2 · Input Params
             </button>
             <button
               type="button"
               onClick={() => jumpToSection("output")}
               className={`flex w-full cursor-pointer items-center rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${tabClass(activeSection === "output")}`}
             >
-              Output Params
+              Step 3 · Output Params
+            </button>
+            <button
+              type="button"
+              onClick={() => jumpToSection("errors")}
+              className={`flex w-full cursor-pointer items-center rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${tabClass(activeSection === "errors")}`}
+            >
+              Step 4 · Error Handling
             </button>
           </nav>
         </aside>
         <div className="space-y-3">
           <div ref={quickstartRef} className="space-y-3">
             <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
-              <p className="text-[10px] uppercase tracking-[1px] text-black/45">How This Flow Works</p>
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Integration Steps</p>
               <ol className="mt-2 space-y-1.5 text-xs leading-5 text-black/70">
                 <li>1. Request style: <code className="font-mono">{protocolModeLabel}</code></li>
                 <li>2. Send Create Request with your API key and selected model input.</li>
-                <li>3. Poll task status until completion.</li>
-                <li>4. Parse the unified output payload for image/video asset URLs.</li>
+                <li>3. Poll every <code className="font-mono">1.8s</code> for up to <code className="font-mono">180s</code>.</li>
+                <li>4. Stop only on <code className="font-mono">succeeded / failed / cancelled</code>.</li>
+                <li>5. Parse unified <code className="font-mono">output_payload.assets[]</code> URLs.</li>
               </ol>
             </div>
 
             <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">Create Request</p>
+                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">Step 1 · Create Request</p>
                   <p className="mt-1 text-xs leading-5 text-black/55">
                     Submit generation input. Choose a backend language example below.
                   </p>
@@ -468,7 +574,7 @@ export function ApiQuickstartCard({
             <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
               <div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">Check Task Status</p>
+                  <p className="text-[10px] uppercase tracking-[1px] text-black/45">Poll Task Status</p>
                   <p className="mt-1 text-xs leading-5 text-black/55">
                     Use the task ID from create response to poll execution status.
                   </p>
@@ -476,6 +582,10 @@ export function ApiQuickstartCard({
               </div>
               <div className="mt-3">
                 <CodeBlock code={taskExample} copyId="task" copiedBlock={copiedBlock} onCopy={copyText} />
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <CodeBlock code={pollingExamples.nodejs} copyId="task-poll-node" copiedBlock={copiedBlock} onCopy={copyText} />
+                <CodeBlock code={pollingExamples.python} copyId="task-poll-python" copiedBlock={copiedBlock} onCopy={copyText} />
               </div>
             </div>
 
@@ -540,7 +650,7 @@ export function ApiQuickstartCard({
                   Output Schema (Standard + Provider Extension)
                 </p>
                 <p className="mt-1 text-xs leading-5 text-black/55">
-                  Standard output contract merged with this model&apos;s upstream raw output structure.
+                  Standard output contract merged with provider extension fields.
                 </p>
               </div>
               {outputFieldDocs.length > 0 ? (
@@ -555,6 +665,55 @@ export function ApiQuickstartCard({
                   copiedBlock={copiedBlock}
                   onCopy={copyText}
                 />
+              </div>
+            </div>
+            {selectedModel?.normalizedOutputExampleJson ? (
+              <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+                <p className="text-[10px] uppercase tracking-[1px] text-black/45">Final Output Example (Normalized)</p>
+                <div className="mt-3">
+                  <CodeBlock
+                    code={selectedModel.normalizedOutputExampleJson}
+                    copyId="doc-normalized-output-example"
+                    copiedBlock={copiedBlock}
+                    onCopy={copyText}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div ref={errorRef} className="space-y-3">
+            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <p className="text-[10px] uppercase tracking-[1px] text-black/45">Step 4 · Error Handling Guide</p>
+              <p className="mt-1 text-xs leading-5 text-black/55">
+                Error codes below are loaded from internal gateway error definitions and should be treated as source of truth.
+              </p>
+              <div className="mt-2 overflow-x-auto rounded-xl border border-black/[0.08] bg-white">
+                <table className="min-w-full text-xs text-black/75">
+                  <thead>
+                    <tr className="border-b border-black/[0.08] bg-[#FCFCFA] text-[10px] uppercase tracking-[0.8px] text-black/45">
+                      <th className="px-3 py-2 text-left">Code</th>
+                      <th className="px-3 py-2 text-left">HTTP</th>
+                      <th className="px-3 py-2 text-left">Retryable</th>
+                      <th className="px-3 py-2 text-left">Category</th>
+                      <th className="px-3 py-2 text-left">Message</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {safeGatewayErrorDocs.map((item) => (
+                      <tr key={item.code} className="border-b border-black/[0.06] last:border-b-0">
+                        <td className="px-3 py-2 font-mono">{item.code}</td>
+                        <td className="px-3 py-2">{item.httpStatus}</td>
+                        <td className="px-3 py-2">{item.retryable ? "Yes" : "No"}</td>
+                        <td className="px-3 py-2">{item.category}</td>
+                        <td className="px-3 py-2">{item.publicMessage}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-3 rounded-md border border-black/[0.08] bg-white p-2.5 text-[11px] leading-5 text-black/60">
+                Integration rule: for <code>task.status=failed</code>, always read <code>error.code</code> and match the table above; retry only when <code>retryable=true</code>.
               </div>
             </div>
           </div>

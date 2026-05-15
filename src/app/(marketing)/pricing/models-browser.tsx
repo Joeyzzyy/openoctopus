@@ -2,9 +2,9 @@
 
 import type { ReactNode } from "react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CircleHelp, Copy, Download } from "lucide-react";
-import type { ModelDocRow } from "../models/data";
+import type { GatewayErrorDocRow, ModelDocRow } from "../models/data";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
 
@@ -812,16 +812,19 @@ function extractImageUrls(output: unknown): string[] {
 export function ModelsBrowser({
   rows,
   vendorOptions,
+  gatewayErrorDocs,
   initialProvider,
   initialModelSlug,
 }: {
   rows: ModelDocRow[];
   vendorOptions: string[];
+  gatewayErrorDocs?: GatewayErrorDocRow[];
   initialProvider?: string;
   initialModelSlug?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const safeRows = rows;
   const providerModelCountMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -943,11 +946,9 @@ export function ModelsBrowser({
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [showcasePromptCopied, setShowcasePromptCopied] = useState(false);
   const [activeShowcaseIndex, setActiveShowcaseIndex] = useState(0);
   const [previousShowcaseIndex, setPreviousShowcaseIndex] = useState<number | null>(null);
   const [showcaseImageVisible, setShowcaseImageVisible] = useState(true);
-  const [showcasePromptModalOpen, setShowcasePromptModalOpen] = useState(false);
   const [isRouteSwitching, setIsRouteSwitching] = useState(false);
   const routeSwitchStartedAtRef = useRef<number | null>(null);
   const playgroundImageUrls = useMemo(
@@ -961,7 +962,6 @@ export function ModelsBrowser({
     setActiveShowcaseIndex(0);
     setPreviousShowcaseIndex(null);
     setShowcaseImageVisible(true);
-    setShowcasePromptCopied(false);
   }, [selectedModel?.publicModel]);
   useEffect(() => {
     if (showcaseItems.length <= 1) return;
@@ -1168,6 +1168,14 @@ export function ModelsBrowser({
       return changed ? next : current;
     });
   }, [parsedFields]);
+
+  useEffect(() => {
+    const prefillPrompt = searchParams.get("prompt")?.trim();
+    if (!prefillPrompt) return;
+    const hasPromptField = parsedFields.some((field) => field.key === "prompt");
+    if (!hasPromptField) return;
+    setPlaygroundForm((current) => ({ ...current, prompt: prefillPrompt }));
+  }, [parsedFields, searchParams]);
 
   const inferEndpoint = (capability: string | null | undefined) =>
     capability?.includes("video") ? "/v1/videos/generations" : "/v1/images/generations";
@@ -1389,16 +1397,6 @@ export function ModelsBrowser({
     }
   };
 
-  const copyShowcasePrompt = async (prompt: string) => {
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setShowcasePromptCopied(true);
-      setTimeout(() => setShowcasePromptCopied(false), 1500);
-    } catch {
-      setShowcasePromptCopied(false);
-    }
-  };
-
   const downloadImage = async (src: string, filename: string) => {
     try {
       if (src.startsWith("data:image/")) {
@@ -1420,44 +1418,80 @@ export function ModelsBrowser({
       window.open(buildDisplayImageUrl(src), "_blank", "noopener,noreferrer");
     }
   };
+  const openModelWithPrompt = (prompt: string | null | undefined) => {
+    if (!selectedModel) return;
+    const providerSlug = slugifyPathPart(selectedProvider) || encodeURIComponent(selectedProvider);
+    const modelSlug = slugifyPathPart(selectedModel.publicModel) || encodeURIComponent(selectedModel.publicModel);
+    const params = new URLSearchParams();
+    if (prompt && prompt.trim().length > 0) {
+      params.set("prompt", prompt.trim());
+    }
+    const href = `/models/${providerSlug}/${modelSlug}${params.toString().length > 0 ? `?${params.toString()}` : ""}`;
+    if (typeof window !== "undefined") {
+      window.open(href, "_blank", "noopener,noreferrer");
+    }
+  };
 
   return (
     <section className="space-y-4">
       <div className="space-y-2.5">
-        <div className="grid gap-3 rounded-2xl border border-[#F0DFC3] bg-[#FFFBF4] p-3 md:grid-cols-2">
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium tracking-[0.2px] text-black/55">Model Vendor</span>
-            <select
-              value={selectedProvider}
-              onChange={(event) => handleProviderChange(event.target.value)}
-              className="h-11 w-full rounded-md border border-[#E7E0D3] bg-white px-3 text-sm text-black/80 focus:border-[#E58A35]"
-            >
-              {selectableProviderOptions.map((provider) => (
-                <option key={provider} value={provider}>
-                  {provider}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium tracking-[0.2px] text-black/55">Model</span>
-            <select
-              value={effectiveModelSlug ?? visibleRows[0]?.publicModel ?? ""}
-              onChange={(event) => handleModelChange(event.target.value || null)}
-              className="h-11 w-full rounded-md border border-[#E7E0D3] bg-white px-3 text-sm text-black/85 focus:border-[#E58A35]"
-            >
-              {modelsByCapability.map(([capability, models]) => (
-                <optgroup key={capability} label={capability}>
-                  {models.map((item) => (
-                    <option key={item.publicModel} value={item.publicModel}>
-                      {item.displayName}
+        {selectedModel ? (
+          <div className="rounded-2xl border border-[#E9DEC9] bg-[linear-gradient(135deg,#FFF7EA_0%,#FFFDFC_55%,#F6F1E7_100%)] p-3 sm:p-3.5">
+            <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-medium tracking-[0.2px] text-black/50">Vendor</span>
+                <select
+                  value={selectedProvider}
+                  onChange={(event) => handleProviderChange(event.target.value)}
+                  className="h-9 w-full appearance-none rounded-md border border-transparent bg-white/55 px-2.5 text-sm text-black/80 outline-none transition-colors hover:bg-white/70 focus:bg-white/85"
+                >
+                  {selectableProviderOptions.map((provider) => (
+                    <option key={provider} value={provider}>
+                      {provider}
                     </option>
                   ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-        </div>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-medium tracking-[0.2px] text-black/50">Model</span>
+                <select
+                  value={effectiveModelSlug ?? visibleRows[0]?.publicModel ?? ""}
+                  onChange={(event) => handleModelChange(event.target.value || null)}
+                  className="h-9 w-full appearance-none rounded-md border border-transparent bg-white/55 px-2.5 text-sm font-semibold text-black/90 outline-none transition-colors hover:bg-white/70 focus:bg-white/85"
+                >
+                  {modelsByCapability.map(([capability, models]) => (
+                    <optgroup key={capability} label={capability}>
+                      {models.map((item) => (
+                        <option key={item.publicModel} value={item.publicModel}>
+                          {item.displayName}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="mt-1.5 text-[13px] leading-5.5 text-black/68">
+              {selectedModel.modelDescription || "This model does not have a detailed description yet."}
+            </p>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              <span className="inline-flex rounded-full border border-[#E7C89A] bg-white/80 px-3 py-1 text-xs font-medium text-[#9A4F18]">
+                {selectedModel.providerName}
+              </span>
+              <span className="inline-flex rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
+                {capabilityTag}
+              </span>
+              {priceTag ? (
+                <span className="inline-flex rounded-full border border-[#CFE5D5] bg-[#EAF7ED] px-3 py-1 text-xs font-medium text-[#245C31]">
+                  {priceTag}
+                </span>
+              ) : null}
+              <span className="inline-flex rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
+                {selectedModel.publicModel}
+              </span>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="relative">
@@ -1473,99 +1507,7 @@ export function ModelsBrowser({
         ) : null}
 
         <div className={`space-y-4 ${isRouteSwitching ? "pointer-events-none opacity-55" : ""}`}>
-      {selectedModel ? (
-        <section className="overflow-hidden rounded-[28px] border border-[#E9DEC9] bg-[linear-gradient(135deg,#FFF7EA_0%,#FFFDFC_55%,#F6F1E7_100%)] shadow-sm">
-          <div className="grid gap-0 lg:grid-cols-[minmax(0,0.92fr)_440px]">
-            <div className="flex flex-col justify-between p-3 sm:p-3.5">
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.32em] text-[#9A4F18]">
-                  Showcase
-                </p>
-                <h1 className="mt-1.5 text-lg font-semibold tracking-tight text-black sm:text-[22px]">
-                  {selectedModel.displayName}
-                </h1>
-                <p className="mt-1.5 max-w-2xl text-[13px] leading-5.5 text-black/68">
-                  {selectedModel.modelDescription || "This model does not have a detailed description yet."}
-                </p>
-                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                  <span className="inline-flex rounded-full border border-[#E7C89A] bg-white/80 px-3 py-1 text-xs font-medium text-[#9A4F18]">
-                    {selectedModel.providerName}
-                  </span>
-                  <span className="inline-flex rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
-                    {capabilityTag}
-                  </span>
-                  {priceTag ? (
-                    <span className="inline-flex rounded-full border border-[#CFE5D5] bg-[#EAF7ED] px-3 py-1 text-xs font-medium text-[#245C31]">
-                      {priceTag}
-                    </span>
-        ) : null}
-                  <span className="inline-flex rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
-                    {selectedModel.publicModel}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-black/[0.06] p-1.5 lg:border-t-0 lg:pl-0">
-              {activeShowcaseImage ? (
-                <div>
-                  <div className="relative h-[220px] overflow-hidden rounded-[16px] sm:h-[240px]">
-                    {previousShowcaseImage ? (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={buildDisplayImageUrl(previousShowcaseImage.url)}
-                          alt={`${selectedModel.displayName} showcase previous`}
-                          className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-700 ease-out ${
-                            showcaseImageVisible ? "opacity-0" : "opacity-100"
-                          }`}
-                        />
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={buildDisplayImageUrl(activeShowcaseImage.url)}
-                          alt={`${selectedModel.displayName} showcase`}
-                          className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-700 ease-out ${
-                            showcaseImageVisible ? "opacity-100" : "opacity-0"
-                          }`}
-                        />
-                      </>
-                    ) : (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={buildDisplayImageUrl(activeShowcaseImage.url)}
-                        alt={`${selectedModel.displayName} showcase`}
-                        className="h-full w-full object-contain"
-                      />
-                    )}
-                    {activeShowcaseImage.prompt?.trim() ? (
-                      <button
-                        type="button"
-                        onClick={() => setShowcasePromptModalOpen(true)}
-                        className="absolute bottom-3 right-3 inline-flex h-9 items-center justify-center rounded-full border border-black/[0.08] bg-white/90 px-3 text-xs font-medium text-black/75 shadow-sm transition-colors hover:border-[#E58A35] hover:text-[#9A4F18]"
-                        aria-label="Open showcase prompt"
-                        title="查看提示词"
-                      >
-                        Show Prompt
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-[220px] items-center justify-center rounded-[16px] border border-dashed border-black/[0.12] px-6 text-center text-sm text-black/45 sm:h-[240px]">
-                  Showcase assets have not been uploaded for this model yet.
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      ) : null}
-
       <section className="rounded-2xl border border-black/[0.08] bg-white p-2.5 shadow-sm sm:p-3">
-        <div className="mb-2">
-          <h2 className="text-base font-semibold text-black">Model Workspace</h2>
-          <p className="mt-0.5 text-xs text-black/55">
-            API reference and live playground for {selectedModel?.displayName ?? "the selected model"}.
-          </p>
-        </div>
         <div className="mb-2 border-b border-black/[0.08] pb-1.5">
           <div className="flex items-center gap-1">
             {(["playground", "api"] as const).map((tab) => (
@@ -1830,11 +1772,65 @@ export function ModelsBrowser({
             <div className="h-28 animate-pulse rounded-md bg-black/[0.06]" />
           </div>
         ) : (
-          <ApiQuickstartCard models={visibleRows} initialModel={effectiveModelSlug} />
+          <ApiQuickstartCard
+            models={visibleRows}
+            initialModel={effectiveModelSlug}
+            gatewayErrorDocs={gatewayErrorDocs}
+          />
         )}
       </section>
 
-      {relatedModels.length > 0 ? (
+      {mainTab === "playground" ? (
+        <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+            <div className="mb-3">
+              <h2 className="text-base font-semibold text-black">Examples</h2>
+            </div>
+            {activeShowcaseImage ? (
+              <div className="relative h-[220px] overflow-hidden rounded-[16px] border border-black/[0.08] bg-[#FAFAFA] sm:h-[240px]">
+                {previousShowcaseImage ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={buildDisplayImageUrl(previousShowcaseImage.url)}
+                      alt={`${selectedModel?.displayName ?? "Model"} example previous`}
+                      className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-700 ease-out ${
+                        showcaseImageVisible ? "opacity-0" : "opacity-100"
+                      }`}
+                    />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={buildDisplayImageUrl(activeShowcaseImage.url)}
+                      alt={`${selectedModel?.displayName ?? "Model"} example`}
+                      className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-700 ease-out ${
+                        showcaseImageVisible ? "opacity-100" : "opacity-0"
+                      }`}
+                    />
+                  </>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={buildDisplayImageUrl(activeShowcaseImage.url)}
+                    alt={`${selectedModel?.displayName ?? "Model"} example`}
+                    className="h-full w-full object-contain"
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => openModelWithPrompt(activeShowcaseImage.prompt)}
+                  className="absolute bottom-3 right-3 inline-flex h-9 items-center justify-center rounded-full border border-white/40 bg-black/35 px-3 text-xs font-medium text-white transition-colors hover:bg-black/50"
+                >
+                  Go try
+                </button>
+              </div>
+            ) : (
+              <div className="flex h-[220px] items-center justify-center rounded-[16px] border border-dashed border-black/[0.12] px-6 text-center text-sm text-black/45 sm:h-[240px]">
+                Showcase assets have not been uploaded for this model yet.
+              </div>
+            )}
+          </section>
+      ) : null}
+
+      {mainTab === "playground" && relatedModels.length > 0 ? (
         <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
           <div className="mb-3">
             <h2 className="text-base font-semibold text-black">Related Models</h2>
@@ -1880,7 +1876,7 @@ export function ModelsBrowser({
         </section>
       ) : null}
 
-      {selectedModel?.readmeMarkdown?.trim() ? (
+      {mainTab === "playground" && selectedModel?.readmeMarkdown?.trim() ? (
         looksLikeHtmlDocument(selectedModel.readmeMarkdown) ? (
           <HtmlReadme html={selectedModel.readmeMarkdown} />
         ) : (
@@ -1948,37 +1944,6 @@ export function ModelsBrowser({
         </div>
       ) : null}
 
-      {showcasePromptModalOpen && activeShowcaseImage?.prompt?.trim() ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">
-          <div className="w-full max-w-2xl rounded-xl border border-black/[0.1] bg-white p-4 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-black">Showcase Prompt</h4>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => copyShowcasePrompt(activeShowcaseImage.prompt ?? "")}
-                  className="inline-flex h-7 items-center gap-1 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
-                >
-                  <Copy className="size-3.5" />
-                  {showcasePromptCopied ? "Copied" : "Copy"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowcasePromptModalOpen(false)}
-                  className="h-7 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-            <div className="rounded-md border border-black/[0.08] bg-[#FAFAFA] p-3">
-              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-black/80">
-                {activeShowcaseImage.prompt}
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }
