@@ -979,6 +979,13 @@ export default async function InternalPage({
   const selectedMonitoringStatusLabel =
     monitoringStatusOptions.find((option) => option.value === selectedMonitoringStatus)?.label ??
     "全部请求";
+  const financeSummary = data.financeSummary ?? {
+    totalTopup: 0,
+    totalProviderCost: 0,
+    totalCustomerCharge: 0,
+    totalProfit: 0,
+    pendingProviderCost: 0,
+  };
   const globalVideoInflightRequests = data.globalMonitoring.videoInflightRequests;
   const recentVideoSettledRequests = data.globalMonitoring.recentVideoRequests.filter(
     (request) => !isInflightRequestStatus(request.status)
@@ -1152,6 +1159,39 @@ export default async function InternalPage({
                 description=" "
               >
                 <MonitoringAutoRefresh enabled={activeTab === "monitoring" && selectedMonitoringView === "video"} />
+
+                <div className="mb-4 grid gap-3 md:grid-cols-5">
+                  <OverviewCard
+                    title="累计充值"
+                    value={formatCurrency(financeSummary.totalTopup)}
+                    note="wallet_transactions topup 汇总"
+                    icon={Fingerprint}
+                  />
+                  <OverviewCard
+                    title="累计客户收费"
+                    value={formatCurrency(financeSummary.totalCustomerCharge)}
+                    note="inference_requests 客户收费"
+                    icon={Network}
+                  />
+                  <OverviewCard
+                    title="累计上游成本"
+                    value={formatCurrency(financeSummary.totalProviderCost)}
+                    note="inference_requests 供应商成本"
+                    icon={ShieldCheck}
+                  />
+                  <OverviewCard
+                    title="累计利润"
+                    value={formatCurrency(financeSummary.totalProfit)}
+                    note="客户收费 - 供应商成本"
+                    icon={Waypoints}
+                  />
+                  <OverviewCard
+                    title="待结算上游成本"
+                    value={formatCurrency(financeSummary.pendingProviderCost)}
+                    note="actual 为空时按 estimated 计算"
+                    icon={Activity}
+                  />
+                </div>
 
                 <div className="mb-4 flex flex-wrap gap-2 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
                   {monitoringViewOptions.map((option) => (

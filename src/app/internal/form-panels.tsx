@@ -60,6 +60,8 @@ type BillingFormState = {
   costPerSecond: string;
   inputCostPerMillion: string;
   outputCostPerMillion: string;
+  resolutionMultipliersJson: string;
+  qualityMultipliersJson: string;
 };
 
 type ExecutionConfigFormState = {
@@ -881,6 +883,8 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     costPerSecond: "0.05",
     inputCostPerMillion: "0.5",
     outputCostPerMillion: "1.5",
+    resolutionMultipliersJson: "{}",
+    qualityMultipliersJson: "{}",
   };
   const emptyState = {
     ...fallback,
@@ -923,6 +927,30 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
         outputCostPerMillion: String(
           charges.outputTextTokensPerMillion ?? fallback.outputCostPerMillion
         ),
+        resolutionMultipliersJson: JSON.stringify(
+          (parsed.parameterMultipliers &&
+          typeof parsed.parameterMultipliers === "object" &&
+          !Array.isArray(parsed.parameterMultipliers) &&
+          (parsed.parameterMultipliers as Record<string, unknown>).resolution &&
+          typeof (parsed.parameterMultipliers as Record<string, unknown>).resolution === "object" &&
+          !Array.isArray((parsed.parameterMultipliers as Record<string, unknown>).resolution)
+            ? (parsed.parameterMultipliers as Record<string, unknown>).resolution
+            : {}),
+          null,
+          2
+        ),
+        qualityMultipliersJson: JSON.stringify(
+          (parsed.parameterMultipliers &&
+          typeof parsed.parameterMultipliers === "object" &&
+          !Array.isArray(parsed.parameterMultipliers) &&
+          (parsed.parameterMultipliers as Record<string, unknown>).quality &&
+          typeof (parsed.parameterMultipliers as Record<string, unknown>).quality === "object" &&
+          !Array.isArray((parsed.parameterMultipliers as Record<string, unknown>).quality)
+            ? (parsed.parameterMultipliers as Record<string, unknown>).quality
+            : {}),
+          null,
+          2
+        ),
       };
     }
 
@@ -948,10 +976,33 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
       costPerSecond: String(parsed.costPerSecond ?? parsed.costPerUnit ?? fallback.costPerSecond),
       inputCostPerMillion: String(parsed.inputCostPerMillion ?? fallback.inputCostPerMillion),
       outputCostPerMillion: String(parsed.outputCostPerMillion ?? fallback.outputCostPerMillion),
+      resolutionMultipliersJson: fallback.resolutionMultipliersJson,
+      qualityMultipliersJson: fallback.qualityMultipliersJson,
     };
   } catch {
     return fallback;
   }
+}
+
+function safeParseNumberMap(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>)
+        .map(([key, raw]) => [key.trim(), Number(raw)] as const)
+        .filter(([key, num]) => key.length > 0 && Number.isFinite(num) && num > 0)
+    );
+  } catch {
+    return {};
+  }
+}
+
+function stringifyNumberMap(value: Record<string, number>) {
+  const entries = Object.entries(value).sort((a, b) => a[0].localeCompare(b[0], "en-US"));
+  return JSON.stringify(Object.fromEntries(entries), null, 2);
 }
 
 function buildBillingConfigValue(state: BillingFormState) {
@@ -976,10 +1027,21 @@ function buildBillingConfigValue(state: BillingFormState) {
     charges.outputTextTokensPerMillion = Number(state.outputCostPerMillion);
   }
 
+  const resolutionMultipliers = safeParseNumberMap(state.resolutionMultipliersJson);
+  const qualityMultipliers = safeParseNumberMap(state.qualityMultipliersJson);
+  const parameterMultipliers: Record<string, Record<string, number>> = {};
+  if (Object.keys(resolutionMultipliers).length > 0) {
+    parameterMultipliers.resolution = resolutionMultipliers;
+  }
+  if (Object.keys(qualityMultipliers).length > 0) {
+    parameterMultipliers.quality = qualityMultipliers;
+  }
+
   return JSON.stringify({
     billingMode: "hybrid",
     currency: state.currency.trim() || "USD",
     charges,
+    ...(Object.keys(parameterMultipliers).length > 0 ? { parameterMultipliers } : {}),
   });
 }
 
@@ -1321,6 +1383,8 @@ export function BillingConfigEditor({
     setState(parseBillingFormState(initialValue));
   }, [initialValue]);
   const hiddenValue = buildBillingConfigValue(state);
+  const resolutionMultiplierMap = safeParseNumberMap(state.resolutionMultipliersJson);
+  const qualityMultiplierMap = safeParseNumberMap(state.qualityMultipliersJson);
   const inputMethod = state.chargeInputTokens
     ? "input_tokens"
     : state.chargePerRequest
@@ -1352,6 +1416,24 @@ export function BillingConfigEditor({
       chargePerVideo: method === "per_video",
       chargePerSecond: method === "per_second",
     }));
+  };
+
+  const updateMultiplier = (target: "resolution" | "quality", key: string, value?: number) => {
+    const currentMap =
+      target === "resolution"
+        ? safeParseNumberMap(state.resolutionMultipliersJson)
+        : safeParseNumberMap(state.qualityMultipliersJson);
+    if (value === undefined || !Number.isFinite(value) || value <= 0) {
+      delete currentMap[key];
+    } else {
+      currentMap[key] = value;
+    }
+    const nextJson = stringifyNumberMap(currentMap);
+    setState((current) =>
+      target === "resolution"
+        ? { ...current, resolutionMultipliersJson: nextJson }
+        : { ...current, qualityMultipliersJson: nextJson }
+    );
   };
 
   return (
@@ -1451,6 +1533,69 @@ export function BillingConfigEditor({
             onChange={(value) => setState((current) => ({ ...current, outputCostPerMillion: value }))}
           />
         ) : null}
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+          <p className="text-[11px] tracking-[0.35px] text-black/60">resolution 价格系数（可选）</p>
+          <div className="mt-2 grid gap-2">
+            {RESOLUTION_CANDIDATES.map((key) => {
+              const enabled = key in resolutionMultiplierMap;
+              const numericValue = resolutionMultiplierMap[key] ?? 1;
+              return (
+                <label key={key} className="flex items-center gap-2 text-xs text-black/75">
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    onChange={(event) => updateMultiplier("resolution", key, event.target.checked ? numericValue : undefined)}
+                    className="size-3.5"
+                  />
+                  <span className="w-12">{key}</span>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={numericValue}
+                    disabled={!enabled}
+                    onChange={(event) => updateMultiplier("resolution", key, Number(event.target.value))}
+                    className="h-8 w-20 rounded-md border border-black/[0.08] bg-white px-2 text-xs disabled:bg-black/[0.03]"
+                  />
+                </label>
+              );
+            })}
+          </div>
+          <FieldHint help="按输入参数 resolution 应用到输出单价（perImage/perVideo）的乘数。" />
+        </div>
+        <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+          <p className="text-[11px] tracking-[0.35px] text-black/60">quality 价格系数（可选）</p>
+          <div className="mt-2 grid gap-2">
+            {QUALITY_CANDIDATES.map((key) => {
+              const enabled = key in qualityMultiplierMap;
+              const numericValue = qualityMultiplierMap[key] ?? 1;
+              return (
+                <label key={key} className="flex items-center gap-2 text-xs text-black/75">
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    onChange={(event) => updateMultiplier("quality", key, event.target.checked ? numericValue : undefined)}
+                    className="size-3.5"
+                  />
+                  <span className="w-12">{key}</span>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={numericValue}
+                    disabled={!enabled}
+                    onChange={(event) => updateMultiplier("quality", key, Number(event.target.value))}
+                    className="h-8 w-20 rounded-md border border-black/[0.08] bg-white px-2 text-xs disabled:bg-black/[0.03]"
+                  />
+                </label>
+              );
+            })}
+          </div>
+          <FieldHint help="按输入参数 quality 应用到输出单价（perImage/perVideo）的乘数。" />
+        </div>
       </div>
 
       <div className="mt-3 rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">

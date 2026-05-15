@@ -52,10 +52,18 @@ const hybridChargesSchema = z
     }
   });
 
+const parameterMultipliersSchema = z
+  .object({
+    resolution: z.record(z.string(), z.coerce.number().positive().max(100)).optional(),
+    quality: z.record(z.string(), z.coerce.number().positive().max(100)).optional(),
+  })
+  .optional();
+
 const hybridBillingSchema = z.object({
   billingMode: z.literal("hybrid"),
   currency: currencySchema,
   charges: hybridChargesSchema,
+  parameterMultipliers: parameterMultipliersSchema,
 });
 
 export const billingConfigSchema = z.union([
@@ -392,11 +400,29 @@ export function resolveBillingBreakdown(input: {
 }): BillingResolution {
   const config = normalizeBillingConfig(input.config);
   const metrics = resolveBillingMetrics(input);
+  const requestInput = input.requestInput ?? null;
+  const normalizedResolution =
+    typeof requestInput?.resolution === "string" ? requestInput.resolution.trim() : "";
+  const normalizedQuality =
+    typeof requestInput?.quality === "string" ? requestInput.quality.trim().toLowerCase() : "";
+  const resolutionMultiplier =
+    normalizedResolution &&
+    config.parameterMultipliers?.resolution &&
+    typeof config.parameterMultipliers.resolution[normalizedResolution] === "number"
+      ? config.parameterMultipliers.resolution[normalizedResolution]
+      : 1;
+  const qualityMultiplier =
+    normalizedQuality &&
+    config.parameterMultipliers?.quality &&
+    typeof config.parameterMultipliers.quality[normalizedQuality] === "number"
+      ? config.parameterMultipliers.quality[normalizedQuality]
+      : 1;
+  const outputPriceMultiplier = resolutionMultiplier * qualityMultiplier;
 
   const components = {
     perRequest: config.charges.perRequest ?? 0,
-    perImage: metrics.imageCount * (config.charges.perImage ?? 0),
-    perVideo: metrics.videoCount * (config.charges.perVideo ?? 0),
+    perImage: metrics.imageCount * (config.charges.perImage ?? 0) * outputPriceMultiplier,
+    perVideo: metrics.videoCount * (config.charges.perVideo ?? 0) * outputPriceMultiplier,
     perSecond: metrics.durationSeconds * (config.charges.perSecond ?? 0),
     inputTextTokens:
       (metrics.inputTokens / 1_000_000) * (config.charges.inputTextTokensPerMillion ?? 0),

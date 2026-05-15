@@ -662,6 +662,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     attemptsResponse,
     adminAuditLogsResponse,
     internalModelAiUsageLogsResponse,
+    walletTransactionsResponse,
+    financeRequestsResponse,
   ] =
     await Promise.all([
       supabase
@@ -794,6 +796,14 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
             .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
             .order("created_at", { ascending: false })
             .limit(200),
+      supabase
+        .from("wallet_transactions")
+        .select("entry_type, amount_delta"),
+      supabase
+        .from("inference_requests")
+        .select(
+          "actual_provider_cost, estimated_provider_cost, actual_customer_charge, estimated_customer_charge, actual_profit, estimated_profit"
+        ),
     ]);
 
   const providers = (providersResponse.error ? [] : providersResponse.data ?? []) as ProviderRow[];
@@ -863,6 +873,22 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const internalModelAiUsageLogs = (internalModelAiUsageLogsResponse.error
     ? []
     : internalModelAiUsageLogsResponse.data ?? []) as InternalModelAiUsageLogRow[];
+  const walletTransactions = (walletTransactionsResponse.error
+    ? []
+    : walletTransactionsResponse.data ?? []) as Array<{
+    entry_type: string | null;
+    amount_delta: number | string | null;
+  }>;
+  const financeRequests = (financeRequestsResponse.error
+    ? []
+    : financeRequestsResponse.data ?? []) as Array<{
+    actual_provider_cost: number | null;
+    estimated_provider_cost: number | null;
+    actual_customer_charge: number | null;
+    estimated_customer_charge: number | null;
+    actual_profit: number | null;
+    estimated_profit: number | null;
+  }>;
   const monitoringRequests = await fetchMonitoringRequests(supabase, monitoringLookbackMs);
 
   const providerById = new Map(providers.map((row) => [row.id, row]));
@@ -1227,6 +1253,40 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   });
 
   const globalMonitoring = await fetchGlobalMonitoringData(supabase);
+  const financeSummary = {
+    totalTopup: walletTransactions.reduce((sum, row) => {
+      if (row.entry_type !== "topup") return sum;
+      const amount = Number(row.amount_delta ?? 0);
+      return amount > 0 ? sum + amount : sum;
+    }, 0),
+    totalProviderCost: financeRequests.reduce(
+      (sum, row) =>
+        sum + Number(row.actual_provider_cost ?? row.estimated_provider_cost ?? 0),
+      0
+    ),
+    totalCustomerCharge: financeRequests.reduce(
+      (sum, row) =>
+        sum + Number(row.actual_customer_charge ?? row.estimated_customer_charge ?? 0),
+      0
+    ),
+    totalProfit: financeRequests.reduce(
+      (sum, row) =>
+        sum +
+        Number(
+          row.actual_profit ??
+            row.estimated_profit ??
+            Number(row.actual_customer_charge ?? row.estimated_customer_charge ?? 0) -
+              Number(row.actual_provider_cost ?? row.estimated_provider_cost ?? 0)
+        ),
+      0
+    ),
+    pendingProviderCost: financeRequests.reduce((sum, row) => {
+      if (row.actual_provider_cost !== null && row.actual_provider_cost !== undefined) {
+        return sum;
+      }
+      return sum + Number(row.estimated_provider_cost ?? 0);
+    }, 0),
+  };
 
   return {
     authorized: true as const,
@@ -1255,6 +1315,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         (item) => item.status === "queued" || item.status === "processing"
       ).length,
     },
+    financeSummary,
     providers: providerSummaries,
     modelVendors: modelVendors.map((vendor) => ({
       ...vendor,

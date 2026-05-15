@@ -256,10 +256,6 @@ function summarizeInputSchema(schemaText: string) {
   }
 }
 
-function readModelDescriptionFromBillingConfig(configText: string) {
-  return readBillingConfigMetadataField(configText, "modelDescription");
-}
-
 function readModelTypeFromBillingConfig(configText: string) {
   return readBillingConfigMetadataField(configText, "modelType");
 }
@@ -985,6 +981,127 @@ function FormTextArea({
   );
 }
 
+function SupportedModelDetailsForm({
+  model,
+  vendorOptions,
+  capabilityOptions,
+  providerModelMappings,
+  close,
+}: {
+  model: SupportedModelSummary;
+  vendorOptions: Array<{ value: string; label: string }>;
+  capabilityOptions: readonly CapabilityOption[];
+  providerModelMappings: ProviderModelSummary[];
+  close: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"basic" | "pricing">("basic");
+
+  return (
+    <ManagedDialogForm action={updateSupportedModelDetails} close={close} className="grid gap-4">
+      <input type="hidden" name="supportedModelId" value={model.id} />
+      <input type="hidden" name="active" value="true" />
+      <div className="grid items-start gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
+        <aside className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-1.5">
+          <nav className="space-y-1">
+            {[
+              { key: "basic" as const, label: "基础信息" },
+              { key: "pricing" as const, label: "售价" },
+            ].map((tab) => {
+              const active = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex w-full cursor-pointer items-center rounded-md px-2.5 py-1.5 text-left text-[11px] font-medium transition-colors ${
+                    active ? "bg-black text-white" : "text-black/68 hover:bg-black/[0.05]"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+        <div className="space-y-3">
+          <div className={activeTab === "basic" ? "grid gap-4 md:grid-cols-2" : "hidden"}>
+            <FormSelect label="模型厂商（内部分类）" name="provider" defaultValue={model.provider} options={vendorOptions} />
+            <FormField label="可售模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
+            <FormField label="显示名称" name="displayName" defaultValue={model.display_name} required />
+            <FormField
+              label="SEO Title"
+              name="seoTitle"
+              defaultValue={readBillingConfigMetadataField(model.billingConfigText, "seoTitle")}
+              placeholder="例如：Imagen 3 by Google | Pricing, Prompt Guide & API"
+              help="可选。用于模型详情页 title、OG 和 Twitter 标题。"
+              className="md:col-span-2"
+            />
+            <FormTextArea
+              label="SEO Description"
+              name="seoDescription"
+              defaultValue={readBillingConfigMetadataField(model.billingConfigText, "seoDescription")}
+              placeholder="用于搜索摘要和分享描述。建议 120-180 字符。"
+              help="会自动同步为模型介绍文案。"
+              className="md:col-span-2"
+            />
+            <FormTextArea
+              label="SEO Keywords"
+              name="seoKeywords"
+              defaultValue={readBillingConfigMetadataField(model.billingConfigText, "seoKeywords")}
+              placeholder="一行或逗号分隔一个关键词，例如 imagen 3, google image model, text to image api"
+              help="可选。会写入 metadata keywords 和结构化数据。"
+              className="md:col-span-2"
+            />
+            <FormSelect
+              label="类型"
+              name="modelType"
+              defaultValue={readModelTypeFromBillingConfig(model.billingConfigText)}
+              options={SUPPORTED_MODEL_TYPE_OPTIONS.map((item) => ({ value: item, label: item }))}
+            />
+            <FormSelect
+              label="模态"
+              name="modality"
+              defaultValue={model.modality}
+              options={[
+                { value: "image", label: "图片" },
+                { value: "video", label: "视频" },
+                { value: "audio", label: "音频" },
+              ]}
+            />
+            <FormSelect label="能力类型" name="capability" defaultValue={model.capability ?? "image_generation"} options={[...capabilityOptions]} />
+          </div>
+          <div className={activeTab === "pricing" ? "" : "hidden"}>
+            <div className="mb-3 rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+              <p className="text-[11px] tracking-[0.35px] text-black/60">已配置映射成本参考</p>
+              {providerModelMappings.length > 0 ? (
+                <div className="mt-2 space-y-1.5">
+                  {providerModelMappings.map((mapping) => (
+                    <div
+                      key={mapping.id}
+                      className="flex items-center justify-between gap-3 rounded-md border border-black/[0.06] bg-white px-2.5 py-1.5 text-xs"
+                    >
+                      <span className="min-w-0 truncate text-black/65">
+                        {mapping.providerName} / {mapping.upstream_model_slug}
+                      </span>
+                      <span className="shrink-0 font-medium text-black/75">{mapping.pricingSummary}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-black/45">当前可售模型还没有供应商映射成本配置。</p>
+              )}
+            </div>
+            <BillingConfigEditor initialValue={model.billingConfigText} />
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <SubmitButton label="保存可售模型" />
+      </div>
+    </ManagedDialogForm>
+  );
+}
+
 function FormSelect({
   label,
   name,
@@ -1310,68 +1427,13 @@ export function PublicModelsPanel({
                       description="在独立弹窗中编辑这个可售模型。"
                     >
                       {({ close }) => (
-                        <ManagedDialogForm action={updateSupportedModelDetails} close={close} className="grid gap-4 md:grid-cols-2">
-                          <input type="hidden" name="supportedModelId" value={model.id} />
-                          <input type="hidden" name="active" value="true" />
-                          <FormSelect label="模型厂商（内部分类）" name="provider" defaultValue={model.provider} options={vendorOptions} />
-                          <FormField label="可售模型 Slug" name="modelSlug" defaultValue={model.model_slug} required />
-                          <FormField label="显示名称" name="displayName" defaultValue={model.display_name} required />
-                          <FormTextArea
-                            label="模型介绍"
-                            name="modelDescription"
-                            defaultValue={readModelDescriptionFromBillingConfig(model.billingConfigText)}
-                            placeholder="用于对外展示的模型简介，例如适用场景、风格、速度与质量特点。"
-                            help="可选。会随模型配置保存。"
-                            className="md:col-span-2"
-                          />
-                          <FormField
-                            label="SEO Title"
-                            name="seoTitle"
-                            defaultValue={readBillingConfigMetadataField(model.billingConfigText, "seoTitle")}
-                            placeholder="例如：Imagen 3 by Google | Pricing, Prompt Guide & API"
-                            help="可选。用于模型详情页 title、OG 和 Twitter 标题。"
-                            className="md:col-span-2"
-                          />
-                          <FormTextArea
-                            label="SEO Description"
-                            name="seoDescription"
-                            defaultValue={readBillingConfigMetadataField(model.billingConfigText, "seoDescription")}
-                            placeholder="用于搜索摘要和分享描述。建议 120-180 字符。"
-                            help="可选。留空时会回退到模型介绍或 README 摘要。"
-                            className="md:col-span-2"
-                          />
-                          <FormTextArea
-                            label="SEO Keywords"
-                            name="seoKeywords"
-                            defaultValue={readBillingConfigMetadataField(model.billingConfigText, "seoKeywords")}
-                            placeholder="一行或逗号分隔一个关键词，例如 imagen 3, google image model, text to image api"
-                            help="可选。会写入 metadata keywords 和结构化数据。"
-                            className="md:col-span-2"
-                          />
-                          <FormSelect
-                            label="类型"
-                            name="modelType"
-                            defaultValue={readModelTypeFromBillingConfig(model.billingConfigText)}
-                            options={SUPPORTED_MODEL_TYPE_OPTIONS.map((item) => ({ value: item, label: item }))}
-                          />
-                          <FormSelect
-                            label="模态"
-                            name="modality"
-                            defaultValue={model.modality}
-                            options={[
-                              { value: "image", label: "图片" },
-                              { value: "video", label: "视频" },
-                              { value: "audio", label: "音频" },
-                            ]}
-                          />
-                          <FormSelect label="能力类型" name="capability" defaultValue={model.capability ?? "image_generation"} options={[...capabilityOptions]} />
-                          <div className="md:col-span-2">
-                            <BillingConfigEditor initialValue={model.billingConfigText} />
-                          </div>
-                          <div className="flex justify-end md:col-span-2">
-                            <SubmitButton label="保存可售模型" />
-                          </div>
-                        </ManagedDialogForm>
+                        <SupportedModelDetailsForm
+                          model={model}
+                          vendorOptions={vendorOptions}
+                          capabilityOptions={capabilityOptions}
+                          providerModelMappings={mappings}
+                          close={close}
+                        />
                       )}
                     </ManagementDialog>
                     <ManagementDialog
@@ -1774,13 +1836,6 @@ export function CreateSupportedModelButton({
         />
         <FormField label="可售模型 Slug" name="modelSlug" defaultValue="openoctopus/gemini-2.5-flash-image" required />
         <FormField label="显示名称" name="displayName" defaultValue="Gemini Image" required />
-        <FormTextArea
-          label="模型介绍"
-          name="modelDescription"
-          placeholder="用于对外展示的模型简介，例如适用场景、风格、速度与质量特点。"
-          help="可选。会随模型配置保存。"
-          className="md:col-span-2"
-        />
         <FormField
           label="SEO Title"
           name="seoTitle"
@@ -1792,7 +1847,7 @@ export function CreateSupportedModelButton({
           label="SEO Description"
           name="seoDescription"
           placeholder="用于搜索摘要和分享描述。建议 120-180 字符。"
-          help="可选。留空时会回退到模型介绍或 README 摘要。"
+          help="会自动同步为模型介绍文案。"
           className="md:col-span-2"
         />
         <FormTextArea
