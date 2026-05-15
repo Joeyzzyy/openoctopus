@@ -14,6 +14,7 @@ import {
   deleteProviderCredential,
   deleteProviderModel,
   deleteRoutingRule,
+  createRoutingRule,
   rotateProviderCredentialSecret,
   upsertGatewayErrorDefinition,
   updateProvider,
