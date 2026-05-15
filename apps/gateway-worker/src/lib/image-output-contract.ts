@@ -64,6 +64,42 @@ function normalizeImageAssetUrl(url: string, mimeType: string) {
   return text;
 }
 
+function readUpstreamSourceUrl(raw: Record<string, unknown> | null) {
+  if (!raw) return undefined;
+  const candidates = [
+    readPath(raw, ["data", "urls", "get"]),
+    readPath(raw, ["urls", "get"]),
+    readPath(raw, ["result", "url"]),
+    readPath(raw, ["response", "outputUrl"]),
+    readPath(raw, ["outputs", "0"]),
+    readPath(raw, ["data", "outputs", "0"]),
+  ];
+  for (const value of candidates) {
+    if (typeof value !== "string") continue;
+    const text = value.trim();
+    if (!text) continue;
+    if (text.startsWith("http://") || text.startsWith("https://") || text.startsWith("data:")) {
+      return text;
+    }
+  }
+  return undefined;
+}
+
+function resolvePreferredSourceUrl(input: {
+  existingSourceUrl?: string;
+  raw: Record<string, unknown> | null;
+}) {
+  const existing = input.existingSourceUrl?.trim();
+  const upstream = readUpstreamSourceUrl(input.raw);
+  if (!existing) {
+    return upstream;
+  }
+  if (existing.startsWith("data:") && upstream && (upstream.startsWith("http://") || upstream.startsWith("https://"))) {
+    return upstream;
+  }
+  return existing;
+}
+
 export function normalizeImageOutputPayload(outputPayload: unknown) {
   const output = isRecord(outputPayload) ? outputPayload : {};
   const raw = isRecord(output.raw) ? output.raw : null;
@@ -90,10 +126,13 @@ export function normalizeImageOutputPayload(outputPayload: unknown) {
         return null;
       }
 
-      const sourceUrl =
-        typeof assetRecord?.sourceUrl === "string" && assetRecord.sourceUrl.length > 0
-          ? assetRecord.sourceUrl
-          : undefined;
+      const sourceUrl = resolvePreferredSourceUrl({
+        existingSourceUrl:
+          typeof assetRecord?.sourceUrl === "string" && assetRecord.sourceUrl.length > 0
+            ? assetRecord.sourceUrl
+            : undefined,
+        raw,
+      });
       const width = Number(readPath(raw, ["data", "0", "width"]) ?? readPath(raw, ["width"]));
       const height = Number(readPath(raw, ["data", "0", "height"]) ?? readPath(raw, ["height"]));
       const mimeType = inferImageMimeType(raw, url);

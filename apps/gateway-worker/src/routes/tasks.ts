@@ -7,6 +7,20 @@ import {
 } from "../lib/gateway-errors.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { normalizeOutputPayloadByCapability } from "../lib/image-output-contract.js";
+
+function redactOutputPayloadRaw(outputPayload: unknown) {
+  if (!outputPayload || typeof outputPayload !== "object" || Array.isArray(outputPayload)) {
+    return outputPayload;
+  }
+  const record = outputPayload as Record<string, unknown>;
+  if (!("raw" in record)) {
+    return outputPayload;
+  }
+  return {
+    ...record,
+    raw: null,
+  };
+}
 import { enqueueInferenceJob } from "../queue/runner.js";
 import {
   createQueuedRequest,
@@ -245,12 +259,13 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     }
 
     if (data.status === "succeeded") {
+      const normalizedOutputPayload = normalizeOutputPayloadByCapability({
+        capability: data.capability,
+        outputPayload: data.output_payload,
+      });
       return {
         ...data,
-        output_payload: normalizeOutputPayloadByCapability({
-          capability: data.capability,
-          outputPayload: data.output_payload,
-        }),
+        output_payload: redactOutputPayloadRaw(normalizedOutputPayload),
       };
     }
 

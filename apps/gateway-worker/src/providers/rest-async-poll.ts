@@ -131,7 +131,11 @@ function buildAssetFromResult(
   })();
   const resultValue = readPath(data, resultValuePath);
   const resultType = readString(cfg.resultValueType, "url");
+  const looksLikeHttpUrl = (value: string) => value.startsWith("http://") || value.startsWith("https://");
   if (resultType === "base64" && typeof resultValue === "string" && resultValue.length > 0) {
+    if (looksLikeHttpUrl(resultValue)) {
+      return { url: resultValue, type: inferredType };
+    }
     const mimeType = readString(cfg.resultMimeType, "image/png");
     return { url: `data:${mimeType};base64,${resultValue}`, type: inferredType };
   }
