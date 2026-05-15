@@ -4,32 +4,9 @@ import type { ReactNode } from "react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CircleHelp, Copy, Download } from "lucide-react";
+import type { ModelDocRow } from "../models/data";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
-
-type ModelDocRow = {
-  id: string;
-  publicModel: string;
-  displayName: string;
-  capability: string;
-  providerName: string;
-  upstreamModelSlug: string;
-  inputSchemaText: string;
-  outputSchemaText: string;
-  officialDocUrl: string | null;
-  executionConfigText: string;
-  requestExampleJson: string | null;
-  submitResponseExampleJson: string | null;
-  normalizedOutputExampleJson: string | null;
-  readmeMarkdown: string | null;
-  coverImageUrl: string | null;
-  coverImagePrompt: string | null;
-  showcaseImageUrls: string[];
-  showcaseImagePrompts: Array<string | null>;
-  modelTypeLabel: string;
-  priceLabel: string;
-  modelDescription: string;
-};
 
 type JsonSchemaField = {
   key: string;
@@ -54,6 +31,7 @@ type MarkdownBlock =
   | { type: "blockquote"; text: string }
   | { type: "list"; items: string[] }
   | { type: "ordered-list"; items: string[] }
+  | { type: "table"; headers: string[]; rows: string[][] }
   | { type: "code"; code: string; language: string }
   | { type: "paragraph"; text: string };
 
@@ -215,16 +193,17 @@ function sanitizeReadmeHtml(html: string) {
 
   sanitized = sanitized.replace(/<\/?([a-zA-Z0-9-]+)([^>]*)>/g, (full, rawTag, rawAttrs) => {
     const tag = String(rawTag).toLowerCase();
+    const safeTag = tag === "h1" ? "h2" : tag;
     if (!ALLOWED_README_TAGS.has(tag)) {
       return "";
     }
 
     const isClosing = full.startsWith("</");
     if (isClosing) {
-      return `</${tag}>`;
+      return `</${safeTag}>`;
     }
 
-    if (tag === "a") {
+    if (safeTag === "a") {
       const hrefMatch = String(rawAttrs).match(/\shref=(["'])(.*?)\1/i);
       const href = hrefMatch?.[2]?.trim() ?? "";
       const safeHref = /^https?:\/\//i.test(href) ? href : "";
@@ -233,11 +212,11 @@ function sanitizeReadmeHtml(html: string) {
         : "<a>";
     }
 
-    if (tag === "br") {
+    if (safeTag === "br") {
       return "<br />";
     }
 
-    return `<${tag}>`;
+    return `<${safeTag}>`;
   });
 
   return sanitized.trim();
@@ -306,6 +285,29 @@ function extractImpliedHeading(blockText: string, isFirstBlock: boolean) {
   return null;
 }
 
+function isMarkdownTableRow(line: string) {
+  const trimmed = line.trim();
+  return trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.includes("|");
+}
+
+function isMarkdownTableDivider(line: string) {
+  const trimmed = line.trim();
+  if (!isMarkdownTableRow(trimmed)) return false;
+  const cells = trimmed
+    .slice(1, -1)
+    .split("|")
+    .map((cell) => cell.trim());
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function splitMarkdownTableRow(line: string) {
+  return line
+    .trim()
+    .slice(1, -1)
+    .split("|")
+    .map((cell) => cell.trim());
+}
+
 function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
   const normalized = markdown.replace(/\r\n/g, "\n").trim();
   if (!normalized) return [];
@@ -356,6 +358,22 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
         index += 1;
       }
       blocks.push({ type: "blockquote", text: quoteLines.join(" ") });
+      continue;
+    }
+
+    if (
+      isMarkdownTableRow(trimmed) &&
+      index + 1 < lines.length &&
+      isMarkdownTableDivider(lines[index + 1].trim())
+    ) {
+      const headers = splitMarkdownTableRow(trimmed);
+      const rows: string[][] = [];
+      index += 2;
+      while (index < lines.length && isMarkdownTableRow(lines[index].trim())) {
+        rows.push(splitMarkdownTableRow(lines[index].trim()));
+        index += 1;
+      }
+      blocks.push({ type: "table", headers, rows });
       continue;
     }
 
@@ -429,9 +447,9 @@ function MarkdownReadme({ markdown }: { markdown: string }) {
           if (block.type === "heading") {
             if (block.level === 1) {
               return (
-                <h1 key={index} className="text-3xl font-semibold tracking-tight text-black">
+                <h2 key={index} className="text-3xl font-semibold tracking-tight text-black">
                   {renderInlineMarkdown(block.text, `heading-${index}`)}
-                </h1>
+                </h2>
               );
             }
             if (block.level === 2) {
@@ -476,6 +494,38 @@ function MarkdownReadme({ markdown }: { markdown: string }) {
                   <li key={itemIndex}>{renderInlineMarkdown(item, `olist-${index}-${itemIndex}`)}</li>
                 ))}
               </ol>
+            );
+          }
+
+          if (block.type === "table") {
+            return (
+              <div key={index} className="overflow-x-auto rounded-xl border border-black/[0.08] bg-white">
+                <table className="min-w-full border-collapse text-left text-sm text-black/75">
+                  <thead className="bg-[#FCFCFA]">
+                    <tr>
+                      {block.headers.map((header, headerIndex) => (
+                        <th
+                          key={headerIndex}
+                          className="border-b border-black/[0.08] px-4 py-3 font-semibold text-black"
+                        >
+                          {renderInlineMarkdown(header, `thead-${index}-${headerIndex}`)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {block.rows.map((row, rowIndex) => (
+                      <tr key={rowIndex} className="border-b border-black/[0.06] last:border-b-0">
+                        {row.map((cell, cellIndex) => (
+                          <td key={cellIndex} className="px-4 py-3 align-top">
+                            {renderInlineMarkdown(cell, `tbody-${index}-${rowIndex}-${cellIndex}`)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             );
           }
 
@@ -675,6 +725,7 @@ function pickImageUrl(value: unknown): string | null {
   const text = value.trim();
   if (!text) return null;
   if (
+    text.startsWith("/v1/files/") ||
     text.startsWith("https://") ||
     text.startsWith("http://") ||
     text.startsWith("data:image/")
@@ -695,7 +746,11 @@ function pickImageUrl(value: unknown): string | null {
 function buildDisplayImageUrl(src: string) {
   if (src.startsWith("data:image/")) return src;
   try {
-    const url = new URL(src);
+    const url = src.startsWith("/v1/files/")
+      ? new URL(src, PUBLIC_API_BASE_URL)
+      : src.startsWith("/")
+        ? new URL(src, typeof window !== "undefined" ? window.location.origin : "http://localhost")
+      : new URL(src);
     if (url.pathname.startsWith("/v1/files/")) {
       url.searchParams.set("display", "1");
       return url.toString();
@@ -721,11 +776,21 @@ function extractImageUrls(output: unknown): string[] {
   for (const item of assets) {
     if (!isRecord(item)) continue;
     if (item.type && item.type !== "image") continue;
-    pushUrl(item.url);
+    const primaryUrl = pickImageUrl(item.url);
+    if (primaryUrl) {
+      pushUrl(primaryUrl);
+      continue;
+    }
+    pushUrl(item.sourceUrl);
   }
 
   if (urls.length === 0) {
-    pushUrl(output.url);
+    const primaryUrl = pickImageUrl(output.url);
+    if (primaryUrl) {
+      pushUrl(primaryUrl);
+    } else {
+      pushUrl(output.sourceUrl);
+    }
   }
 
   return urls;
@@ -867,6 +932,9 @@ export function ModelsBrowser({
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showcasePromptCopied, setShowcasePromptCopied] = useState(false);
   const [activeShowcaseIndex, setActiveShowcaseIndex] = useState(0);
+  const [previousShowcaseIndex, setPreviousShowcaseIndex] = useState<number | null>(null);
+  const [showcaseImageVisible, setShowcaseImageVisible] = useState(true);
+  const [showcasePromptModalOpen, setShowcasePromptModalOpen] = useState(false);
   const playgroundImageUrls = useMemo(
     () => extractImageUrls(playgroundOutput),
     [playgroundOutput]
@@ -876,8 +944,36 @@ export function ModelsBrowser({
   }, [effectiveModelSlug]);
   useEffect(() => {
     setActiveShowcaseIndex(0);
+    setPreviousShowcaseIndex(null);
+    setShowcaseImageVisible(true);
     setShowcasePromptCopied(false);
   }, [selectedModel?.publicModel]);
+  useEffect(() => {
+    if (showcaseItems.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setActiveShowcaseIndex((current) => {
+        const next = current >= showcaseItems.length - 1 ? 0 : current + 1;
+        setPreviousShowcaseIndex(current);
+        setShowcaseImageVisible(false);
+        if (typeof window !== "undefined") {
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => setShowcaseImageVisible(true));
+          });
+        } else {
+          setShowcaseImageVisible(true);
+        }
+        return next;
+      });
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [showcaseItems.length]);
+  useEffect(() => {
+    if (previousShowcaseIndex === null) return;
+    const timer = window.setTimeout(() => {
+      setPreviousShowcaseIndex(null);
+    }, 750);
+    return () => window.clearTimeout(timer);
+  }, [previousShowcaseIndex, activeShowcaseIndex]);
   const handleProviderChange = (nextProvider: string) => {
     setSelectedProvider(nextProvider);
     const nextRows = rowsByProvider.find(([provider]) => provider === nextProvider)?.[1] ?? [];
@@ -962,6 +1058,8 @@ export function ModelsBrowser({
   const priceTag = selectedModel?.priceLabel || "";
   const modelSlugTail = selectedModel?.upstreamModelSlug || selectedModel?.publicModel || "model";
   const activeShowcaseImage = showcaseItems[activeShowcaseIndex] ?? null;
+  const previousShowcaseImage =
+    previousShowcaseIndex === null ? null : showcaseItems[previousShowcaseIndex] ?? null;
   const parsedFields = useMemo(
     () =>
       parseInputSchemaText(selectedModel?.inputSchemaText ?? "").filter(
@@ -1309,19 +1407,19 @@ export function ModelsBrowser({
 
       {selectedModel ? (
         <section className="overflow-hidden rounded-[28px] border border-[#E9DEC9] bg-[linear-gradient(135deg,#FFF7EA_0%,#FFFDFC_55%,#F6F1E7_100%)] shadow-sm">
-          <div className="grid gap-0 lg:grid-cols-[minmax(0,1.2fr)_420px]">
-            <div className="flex flex-col justify-between p-4 sm:p-5">
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,0.92fr)_440px]">
+            <div className="flex flex-col justify-between p-3 sm:p-3.5">
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-[0.32em] text-[#9A4F18]">
                   Showcase
                 </p>
-                <h2 className="mt-2 text-xl font-semibold tracking-tight text-black sm:text-2xl">
+                <h1 className="mt-1.5 text-lg font-semibold tracking-tight text-black sm:text-[22px]">
                   {selectedModel.displayName}
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-black/68">
+                </h1>
+                <p className="mt-1.5 max-w-2xl text-[13px] leading-5.5 text-black/68">
                   {selectedModel.modelDescription || "This model does not have a detailed description yet."}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
                   <span className="inline-flex rounded-full border border-[#E7C89A] bg-white/80 px-3 py-1 text-xs font-medium text-[#9A4F18]">
                     {selectedModel.providerName}
                   </span>
@@ -1348,98 +1446,53 @@ export function ModelsBrowser({
                   ) : null}
                 </div>
               </div>
-              {showcaseItems.length > 1 ? (
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActiveShowcaseIndex((current) =>
-                        current === 0 ? showcaseItems.length - 1 : current - 1
-                      )
-                    }
-                    className="inline-flex h-9 items-center rounded-full border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:border-[#E58A35] hover:text-[#9A4F18]"
-                  >
-                    Prev
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActiveShowcaseIndex((current) =>
-                        current === showcaseItems.length - 1 ? 0 : current + 1
-                      )
-                    }
-                    className="inline-flex h-9 items-center rounded-full border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:border-[#E58A35] hover:text-[#9A4F18]"
-                  >
-                    Next
-                  </button>
-                  <span className="text-xs text-black/45">
-                    {activeShowcaseIndex + 1} / {showcaseItems.length}
-                  </span>
-                </div>
-              ) : null}
             </div>
-            <div className="border-t border-black/[0.06] bg-[#F6EFE1] p-2.5 lg:border-l lg:border-t-0">
+            <div className="border-t border-black/[0.06] p-1.5 lg:border-t-0 lg:pl-0">
               {activeShowcaseImage ? (
-                <div className="space-y-2.5">
-                  <div className="group relative aspect-[16/10] overflow-hidden rounded-[18px] border border-white/70 bg-white shadow-[0_12px_28px_rgba(17,24,39,0.08)]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={buildDisplayImageUrl(activeShowcaseImage.url)}
-                      alt={`${selectedModel.displayName} showcase`}
-                      className="h-full w-full object-cover"
-                    />
+                <div>
+                  <div className="relative h-[220px] overflow-hidden rounded-[16px] sm:h-[240px]">
+                    {previousShowcaseImage ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={buildDisplayImageUrl(previousShowcaseImage.url)}
+                          alt={`${selectedModel.displayName} showcase previous`}
+                          className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-700 ease-out ${
+                            showcaseImageVisible ? "opacity-0" : "opacity-100"
+                          }`}
+                        />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={buildDisplayImageUrl(activeShowcaseImage.url)}
+                          alt={`${selectedModel.displayName} showcase`}
+                          className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-700 ease-out ${
+                            showcaseImageVisible ? "opacity-100" : "opacity-0"
+                          }`}
+                        />
+                      </>
+                    ) : (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={buildDisplayImageUrl(activeShowcaseImage.url)}
+                        alt={`${selectedModel.displayName} showcase`}
+                        className="h-full w-full object-contain"
+                      />
+                    )}
                     {activeShowcaseImage.prompt?.trim() ? (
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-[linear-gradient(180deg,rgba(17,24,39,0.02)_0%,rgba(17,24,39,0.88)_40%)] p-4 opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100">
-                        <div className="pointer-events-auto rounded-2xl border border-white/15 bg-black/35 p-3 backdrop-blur-sm">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="line-clamp-5 whitespace-pre-wrap text-xs leading-5 text-white/92">
-                              {activeShowcaseImage.prompt}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => copyShowcasePrompt(activeShowcaseImage.prompt ?? "")}
-                              className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/20"
-                              aria-label="Copy prompt"
-                            >
-                              <Copy className="size-3.5" />
-                            </button>
-                          </div>
-                          <p className="mt-2 text-[11px] text-white/65">
-                            {showcasePromptCopied ? "Prompt copied" : "Hover to view prompt, click copy to reuse it."}
-                          </p>
-                        </div>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowcasePromptModalOpen(true)}
+                        className="absolute bottom-3 right-3 inline-flex h-9 items-center justify-center rounded-full border border-black/[0.08] bg-white/90 px-3 text-xs font-medium text-black/75 shadow-sm transition-colors hover:border-[#E58A35] hover:text-[#9A4F18]"
+                        aria-label="Open showcase prompt"
+                        title="查看提示词"
+                      >
+                        Show Prompt
+                      </button>
                     ) : null}
                   </div>
-                  {showcaseItems.length > 1 ? (
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {showcaseItems.slice(0, 8).map((item, index) => {
-                        const active = index === activeShowcaseIndex;
-                        return (
-                          <button
-                            key={`${item}-${index}`}
-                            type="button"
-                            onClick={() => setActiveShowcaseIndex(index)}
-                            className={`relative aspect-[6/5] overflow-hidden rounded-lg border transition-all ${
-                              active
-                                ? "border-[#E58A35] ring-2 ring-[#F3C68F]"
-                                : "border-white/70 hover:border-[#E7C89A]"
-                            }`}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={buildDisplayImageUrl(item.url)}
-                              alt={`${selectedModel.displayName} thumbnail ${index + 1}`}
-                              className="h-full w-full object-cover"
-                            />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
                 </div>
               ) : (
-                <div className="flex aspect-[16/10] items-center justify-center rounded-[18px] border border-dashed border-black/[0.12] bg-white/70 px-6 text-center text-sm text-black/45">
+                <div className="flex h-[220px] items-center justify-center rounded-[16px] border border-dashed border-black/[0.12] px-6 text-center text-sm text-black/45 sm:h-[240px]">
                   Showcase assets have not been uploaded for this model yet.
                 </div>
               )}
@@ -1462,7 +1515,7 @@ export function ModelsBrowser({
                     : "border-transparent text-[#6B7280] hover:text-[#111827]"
                 }`}
               >
-                {tab === "api" ? "API" : "playground"}
+                {tab === "api" ? "API" : "Playground"}
               </button>
             ))}
           </div>
@@ -1825,6 +1878,38 @@ export function ModelsBrowser({
             <pre className="max-h-[65vh] overflow-auto rounded-md border border-black/[0.08] bg-[#FAFAFA] p-3 text-xs text-black/80">
               {formatDetailText(playgroundOutput)}
             </pre>
+          </div>
+        </div>
+      ) : null}
+
+      {showcasePromptModalOpen && activeShowcaseImage?.prompt?.trim() ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-2xl rounded-xl border border-black/[0.1] bg-white p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-black">Showcase Prompt</h4>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => copyShowcasePrompt(activeShowcaseImage.prompt ?? "")}
+                  className="inline-flex h-7 items-center gap-1 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
+                >
+                  <Copy className="size-3.5" />
+                  {showcasePromptCopied ? "Copied" : "Copy"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowcasePromptModalOpen(false)}
+                  className="h-7 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="rounded-md border border-black/[0.08] bg-[#FAFAFA] p-3">
+              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-black/80">
+                {activeShowcaseImage.prompt}
+              </p>
+            </div>
           </div>
         </div>
       ) : null}

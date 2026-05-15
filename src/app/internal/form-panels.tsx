@@ -1384,6 +1384,8 @@ export function CreateProviderModelForm({
   defaultShowcaseGalleryUrls = [],
   defaultShowcaseCoverPrompt = "",
   defaultShowcaseGalleryPrompts = [],
+  defaultShowcaseCoverAssetId,
+  defaultShowcaseGalleryAssetIds = [],
   providerModelId,
   disabled,
   onSuccess,
@@ -1410,6 +1412,8 @@ export function CreateProviderModelForm({
   defaultShowcaseGalleryUrls?: string[];
   defaultShowcaseCoverPrompt?: string;
   defaultShowcaseGalleryPrompts?: string[];
+  defaultShowcaseCoverAssetId?: string;
+  defaultShowcaseGalleryAssetIds?: string[];
   providerModelId?: string;
   disabled: boolean;
   onSuccess?: () => void;
@@ -2541,17 +2545,30 @@ export function CreateProviderModelForm({
             {defaultShowcaseCoverUrl ? (
               <div className="mb-3">
                 <p className="mb-2 text-[11px] text-black/55">当前封面</p>
+                {defaultShowcaseCoverAssetId ? (
+                  <input type="hidden" name="existingShowcaseCoverAssetId" value={defaultShowcaseCoverAssetId} />
+                ) : null}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={defaultShowcaseCoverUrl}
                   alt="Current model cover"
                   className="h-28 w-28 rounded-lg border border-black/[0.08] object-cover"
                 />
-                {defaultShowcaseCoverPrompt ? (
-                  <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-black/60">
-                    当前提示词：{defaultShowcaseCoverPrompt}
-                  </p>
-                ) : null}
+                <label className="mt-3 block">
+                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">当前封面提示词</span>
+                  <textarea
+                    name="existingShowcaseCoverPrompt"
+                    defaultValue={defaultShowcaseCoverPrompt}
+                    disabled={disabled}
+                    className={formTextAreaClassName}
+                    rows={4}
+                    placeholder="给当前封面补充或修改提示词"
+                  />
+                </label>
+                <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#B54432]">
+                  <input type="checkbox" name="removeShowcaseCover" className="size-3.5" />
+                  删除当前封面图
+                </label>
               </div>
             ) : null}
             {defaultShowcaseGalleryUrls.length > 0 ? (
@@ -2560,6 +2577,13 @@ export function CreateProviderModelForm({
                 <div className="grid gap-2 md:grid-cols-2">
                   {defaultShowcaseGalleryUrls.map((url, index) => (
                     <div key={url} className="rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-2">
+                      {defaultShowcaseGalleryAssetIds[index] ? (
+                        <input
+                          type="hidden"
+                          name="existingShowcaseGalleryAssetIds"
+                          value={defaultShowcaseGalleryAssetIds[index]}
+                        />
+                      ) : null}
                       <p className="mb-2 text-[11px] text-black/45">作品图 {index + 1}</p>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -2567,10 +2591,27 @@ export function CreateProviderModelForm({
                         alt="Current showcase asset"
                         className="h-20 w-20 rounded-lg border border-black/[0.08] object-cover"
                       />
-                      {defaultShowcaseGalleryPrompts[index] ? (
-                        <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-black/60">
-                          {defaultShowcaseGalleryPrompts[index]}
-                        </p>
+                      <label className="mt-2 block">
+                        <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提示词</span>
+                        <textarea
+                          name="existingShowcaseGalleryPrompts"
+                          defaultValue={defaultShowcaseGalleryPrompts[index] ?? ""}
+                          disabled={disabled}
+                          className={formTextAreaClassName}
+                          rows={4}
+                          placeholder="给这张作品图补充或修改提示词"
+                        />
+                      </label>
+                      {defaultShowcaseGalleryAssetIds[index] ? (
+                        <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#B54432]">
+                          <input
+                            type="checkbox"
+                            name="deleteShowcaseGalleryAssetIds"
+                            value={defaultShowcaseGalleryAssetIds[index]}
+                            className="size-3.5"
+                          />
+                          删除这张作品图
+                        </label>
                       ) : null}
                     </div>
                   ))}
@@ -2629,10 +2670,6 @@ export function CreateProviderModelForm({
                     "第 1 行对应第 1 张图，第 2 行对应第 2 张图。留空则该图片不展示提示词。"
                   }
                 />
-              </label>
-              <label className="inline-flex items-center gap-2 text-xs text-black/70">
-                <input type="checkbox" name="removeShowcaseCover" className="size-3.5" />
-                清空当前封面
               </label>
               <label className="inline-flex items-center gap-2 text-xs text-black/70">
                 <input type="checkbox" name="replaceShowcaseGallery" className="size-3.5" />

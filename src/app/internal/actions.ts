@@ -118,14 +118,18 @@ async function syncProviderModelShowcaseAssets(input: {
   providerModelId: string;
   coverFile: File | null;
   coverPrompt: string | null;
+  existingCoverAssetId: string | null;
+  existingCoverPrompt: string | null;
   removeCover: boolean;
   galleryFiles: File[];
   galleryPrompts: string[];
+  existingGalleryPromptUpdates: Array<{ id: string; prompt: string | null }>;
+  deleteGalleryAssetIds: string[];
   replaceGallery: boolean;
 }) {
   const { data: existingRows, error: existingError } = await input.supabase
     .from("provider_model_showcase_assets")
-    .select("id, asset_kind, storage_bucket, storage_path, sort_order")
+    .select("id, asset_kind, storage_bucket, storage_path, sort_order, alt_text")
     .eq("provider_model_id", input.providerModelId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
@@ -137,6 +141,7 @@ async function syncProviderModelShowcaseAssets(input: {
   const existing = existingRows ?? [];
   const existingCover = existing.filter((row) => row.asset_kind === "cover");
   const existingGallery = existing.filter((row) => row.asset_kind === "gallery");
+  const existingGalleryById = new Map(existingGallery.map((row) => [row.id, row]));
 
   const deleteRows = async (
     rows: Array<{
@@ -171,8 +176,44 @@ async function syncProviderModelShowcaseAssets(input: {
     await deleteRows(existingCover);
   }
 
+  if (!input.removeCover && !input.coverFile && input.existingCoverAssetId) {
+    const coverPrompt = input.existingCoverPrompt?.trim() || null;
+    const existingCoverRow = existingCover.find((row) => row.id === input.existingCoverAssetId);
+    if (existingCoverRow && (existingCoverRow.alt_text ?? null) !== coverPrompt) {
+      const { error } = await input.supabase
+        .from("provider_model_showcase_assets")
+        .update({ alt_text: coverPrompt })
+        .eq("id", existingCoverRow.id);
+      if (error) {
+        throw new Error(error.message);
+      }
+    }
+  }
+
   if (input.replaceGallery && existingGallery.length > 0) {
     await deleteRows(existingGallery);
+  }
+
+  if (!input.replaceGallery && input.deleteGalleryAssetIds.length > 0) {
+    await deleteRows(
+      existingGallery.filter((row) => input.deleteGalleryAssetIds.includes(row.id))
+    );
+  }
+
+  if (!input.replaceGallery) {
+    for (const item of input.existingGalleryPromptUpdates) {
+      if (input.deleteGalleryAssetIds.includes(item.id)) continue;
+      const existingRow = existingGalleryById.get(item.id);
+      if (!existingRow) continue;
+      if ((existingRow.alt_text ?? null) === item.prompt) continue;
+      const { error } = await input.supabase
+        .from("provider_model_showcase_assets")
+        .update({ alt_text: item.prompt })
+        .eq("id", item.id);
+      if (error) {
+        throw new Error(error.message);
+      }
+    }
   }
 
   if (input.coverFile) {
@@ -195,9 +236,12 @@ async function syncProviderModelShowcaseAssets(input: {
   }
 
   if (input.galleryFiles.length > 0) {
+    const remainingGallery = input.replaceGallery
+      ? []
+      : existingGallery.filter((row) => !input.deleteGalleryAssetIds.includes(row.id));
     const nextSortOrder = input.replaceGallery
       ? 0
-      : existingGallery.reduce((max, row) => Math.max(max, Number(row.sort_order ?? 0)), -1) + 1;
+      : remainingGallery.reduce((max, row) => Math.max(max, Number(row.sort_order ?? 0)), -1) + 1;
 
     for (const [index, file] of input.galleryFiles.entries()) {
       const uploaded = await uploadShowcaseImage({
@@ -1669,6 +1713,9 @@ const createSupportedModelSchema = z.object({
   modelSlug: z.string().min(3).max(160),
   displayName: z.string().min(2).max(120),
   modelDescription: z.string().trim().max(2000).nullable(),
+  seoTitle: z.string().trim().max(160).nullable(),
+  seoDescription: z.string().trim().max(320).nullable(),
+  seoKeywords: z.string().trim().max(1000).nullable(),
   modelType: z.string().trim().max(80).nullable(),
   modality: modalitySchema,
   capability: capabilitySchema,
@@ -1683,6 +1730,9 @@ export async function createSupportedModel(formData: FormData) {
     modelSlug: formData.get("modelSlug"),
     displayName: formData.get("displayName"),
     modelDescription: normalizeOptionalText(formData.get("modelDescription")),
+    seoTitle: normalizeOptionalText(formData.get("seoTitle")),
+    seoDescription: normalizeOptionalText(formData.get("seoDescription")),
+    seoKeywords: normalizeOptionalText(formData.get("seoKeywords")),
     modelType: normalizeOptionalText(formData.get("modelType")),
     modality: formData.get("modality"),
     capability: formData.get("capability"),
@@ -1695,6 +1745,9 @@ export async function createSupportedModel(formData: FormData) {
     metadata: {
       ...(((billingConfig as Record<string, unknown>).metadata as Record<string, unknown> | undefined) ?? {}),
       modelDescription: parsed.modelDescription,
+      seoTitle: parsed.seoTitle,
+      seoDescription: parsed.seoDescription,
+      seoKeywords: parsed.seoKeywords,
       modelType: parsed.modelType,
     },
   };
@@ -1849,6 +1902,9 @@ const updateSupportedModelDetailsSchema = z.object({
   modelSlug: z.string().min(3).max(160),
   displayName: z.string().min(2).max(120),
   modelDescription: z.string().trim().max(2000).nullable(),
+  seoTitle: z.string().trim().max(160).nullable(),
+  seoDescription: z.string().trim().max(320).nullable(),
+  seoKeywords: z.string().trim().max(1000).nullable(),
   modelType: z.string().trim().max(80).nullable(),
   modality: modalitySchema,
   capability: capabilitySchema,
@@ -1864,6 +1920,9 @@ export async function updateSupportedModelDetails(formData: FormData) {
     modelSlug: formData.get("modelSlug"),
     displayName: formData.get("displayName"),
     modelDescription: normalizeOptionalText(formData.get("modelDescription")),
+    seoTitle: normalizeOptionalText(formData.get("seoTitle")),
+    seoDescription: normalizeOptionalText(formData.get("seoDescription")),
+    seoKeywords: normalizeOptionalText(formData.get("seoKeywords")),
     modelType: normalizeOptionalText(formData.get("modelType")),
     modality: formData.get("modality"),
     capability: formData.get("capability"),
@@ -1876,6 +1935,9 @@ export async function updateSupportedModelDetails(formData: FormData) {
     metadata: {
       ...(((billingConfig as Record<string, unknown>).metadata as Record<string, unknown> | undefined) ?? {}),
       modelDescription: parsed.modelDescription,
+      seoTitle: parsed.seoTitle,
+      seoDescription: parsed.seoDescription,
+      seoKeywords: parsed.seoKeywords,
       modelType: parsed.modelType,
     },
   };
@@ -2075,6 +2137,12 @@ export async function createProviderModel(formData: FormData) {
     const showcaseGalleryFiles = formData
       .getAll("showcaseGalleryFiles")
       .filter((value): value is File => isNonEmptyFile(value));
+    const existingGalleryAssetIds = formData
+      .getAll("existingShowcaseGalleryAssetIds")
+      .filter((value): value is string => typeof value === "string");
+    const existingGalleryPrompts = formData
+      .getAll("existingShowcaseGalleryPrompts")
+      .filter((value): value is string => typeof value === "string");
     const removeShowcaseCover = parseBooleanField(formData.get("removeShowcaseCover"));
     const replaceShowcaseGallery = parseBooleanField(formData.get("replaceShowcaseGallery"));
     const parsed = createProviderModelSchema.parse({
@@ -2176,12 +2244,21 @@ export async function createProviderModel(formData: FormData) {
         providerModelId: data.id,
         coverFile: showcaseCoverFile,
         coverPrompt: normalizeOptionalText(formData.get("showcaseCoverPrompt")),
+        existingCoverAssetId: normalizeOptionalText(formData.get("existingShowcaseCoverAssetId")),
+        existingCoverPrompt: normalizeOptionalText(formData.get("existingShowcaseCoverPrompt")),
         removeCover: removeShowcaseCover,
         galleryFiles: showcaseGalleryFiles,
         galleryPrompts:
           normalizeOptionalText(formData.get("showcaseGalleryPromptsText"))
             ?.split(/\r?\n/)
             .map((value) => value.trim()) ?? [],
+        existingGalleryPromptUpdates: existingGalleryAssetIds.map((id, index) => ({
+          id,
+          prompt: existingGalleryPrompts[index]?.trim() || null,
+        })),
+        deleteGalleryAssetIds: formData
+          .getAll("deleteShowcaseGalleryAssetIds")
+          .filter((value): value is string => typeof value === "string"),
         replaceGallery: replaceShowcaseGallery,
       });
     }
@@ -2319,6 +2396,12 @@ export async function updateProviderModelDetails(formData: FormData) {
   const showcaseGalleryFiles = formData
     .getAll("showcaseGalleryFiles")
     .filter((value): value is File => isNonEmptyFile(value));
+  const existingGalleryAssetIds = formData
+    .getAll("existingShowcaseGalleryAssetIds")
+    .filter((value): value is string => typeof value === "string");
+  const existingGalleryPrompts = formData
+    .getAll("existingShowcaseGalleryPrompts")
+    .filter((value): value is string => typeof value === "string");
   const removeShowcaseCover = parseBooleanField(formData.get("removeShowcaseCover"));
   const replaceShowcaseGallery = parseBooleanField(formData.get("replaceShowcaseGallery"));
   const parsed = updateProviderModelDetailsSchema.parse({
@@ -2419,12 +2502,21 @@ export async function updateProviderModelDetails(formData: FormData) {
     providerModelId: parsed.providerModelId,
     coverFile: showcaseCoverFile,
     coverPrompt: normalizeOptionalText(formData.get("showcaseCoverPrompt")),
+    existingCoverAssetId: normalizeOptionalText(formData.get("existingShowcaseCoverAssetId")),
+    existingCoverPrompt: normalizeOptionalText(formData.get("existingShowcaseCoverPrompt")),
     removeCover: removeShowcaseCover,
     galleryFiles: showcaseGalleryFiles,
     galleryPrompts:
       normalizeOptionalText(formData.get("showcaseGalleryPromptsText"))
         ?.split(/\r?\n/)
         .map((value) => value.trim()) ?? [],
+    existingGalleryPromptUpdates: existingGalleryAssetIds.map((id, index) => ({
+      id,
+      prompt: existingGalleryPrompts[index]?.trim() || null,
+    })),
+    deleteGalleryAssetIds: formData
+      .getAll("deleteShowcaseGalleryAssetIds")
+      .filter((value): value is string => typeof value === "string"),
     replaceGallery: replaceShowcaseGallery,
   });
 

@@ -257,26 +257,21 @@ function summarizeInputSchema(schemaText: string) {
 }
 
 function readModelDescriptionFromBillingConfig(configText: string) {
-  try {
-    const parsed = JSON.parse(configText) as Record<string, unknown>;
-    const metadata =
-      parsed.metadata && typeof parsed.metadata === "object" && !Array.isArray(parsed.metadata)
-        ? (parsed.metadata as Record<string, unknown>)
-        : null;
-    return typeof metadata?.modelDescription === "string" ? metadata.modelDescription : "";
-  } catch {
-    return "";
-  }
+  return readBillingConfigMetadataField(configText, "modelDescription");
 }
 
 function readModelTypeFromBillingConfig(configText: string) {
+  return readBillingConfigMetadataField(configText, "modelType");
+}
+
+function readBillingConfigMetadataField(configText: string, key: string) {
   try {
     const parsed = JSON.parse(configText) as Record<string, unknown>;
     const metadata =
       parsed.metadata && typeof parsed.metadata === "object" && !Array.isArray(parsed.metadata)
         ? (parsed.metadata as Record<string, unknown>)
         : null;
-    return typeof metadata?.modelType === "string" ? metadata.modelType : "";
+    return typeof metadata?.[key] === "string" ? String(metadata[key]) : "";
   } catch {
     return "";
   }
@@ -1198,6 +1193,30 @@ export function PublicModelsPanel({
                             help="可选。会随模型配置保存。"
                             className="md:col-span-2"
                           />
+                          <FormField
+                            label="SEO Title"
+                            name="seoTitle"
+                            defaultValue={readBillingConfigMetadataField(model.billingConfigText, "seoTitle")}
+                            placeholder="例如：Imagen 3 by Google | Pricing, Prompt Guide & API"
+                            help="可选。用于模型详情页 title、OG 和 Twitter 标题。"
+                            className="md:col-span-2"
+                          />
+                          <FormTextArea
+                            label="SEO Description"
+                            name="seoDescription"
+                            defaultValue={readBillingConfigMetadataField(model.billingConfigText, "seoDescription")}
+                            placeholder="用于搜索摘要和分享描述。建议 120-180 字符。"
+                            help="可选。留空时会回退到模型介绍或 README 摘要。"
+                            className="md:col-span-2"
+                          />
+                          <FormTextArea
+                            label="SEO Keywords"
+                            name="seoKeywords"
+                            defaultValue={readBillingConfigMetadataField(model.billingConfigText, "seoKeywords")}
+                            placeholder="一行或逗号分隔一个关键词，例如 imagen 3, google image model, text to image api"
+                            help="可选。会写入 metadata keywords 和结构化数据。"
+                            className="md:col-span-2"
+                          />
                           <FormSelect
                             label="类型"
                             name="modelType"
@@ -1334,6 +1353,9 @@ export function PublicModelsPanel({
                                         defaultShowcaseCoverUrl={
                                           mapping.showcaseAssets.find((asset) => asset.kind === "cover")?.publicUrl ?? null
                                         }
+                                        defaultShowcaseCoverAssetId={
+                                          mapping.showcaseAssets.find((asset) => asset.kind === "cover")?.id
+                                        }
                                         defaultShowcaseCoverPrompt={
                                           mapping.showcaseAssets.find((asset) => asset.kind === "cover")?.altText ?? ""
                                         }
@@ -1341,6 +1363,11 @@ export function PublicModelsPanel({
                                           mapping.showcaseAssets
                                             .filter((asset) => asset.kind === "gallery")
                                             .map((asset) => asset.publicUrl)
+                                        }
+                                        defaultShowcaseGalleryAssetIds={
+                                          mapping.showcaseAssets
+                                            .filter((asset) => asset.kind === "gallery")
+                                            .map((asset) => asset.id)
                                         }
                                         defaultShowcaseGalleryPrompts={
                                           mapping.showcaseAssets
@@ -1573,6 +1600,27 @@ export function CreateSupportedModelButton({
           name="modelDescription"
           placeholder="用于对外展示的模型简介，例如适用场景、风格、速度与质量特点。"
           help="可选。会随模型配置保存。"
+          className="md:col-span-2"
+        />
+        <FormField
+          label="SEO Title"
+          name="seoTitle"
+          placeholder="例如：Gemini Image by Google | Pricing, Prompt Guide & API"
+          help="可选。用于模型详情页 title、OG 和 Twitter 标题。"
+          className="md:col-span-2"
+        />
+        <FormTextArea
+          label="SEO Description"
+          name="seoDescription"
+          placeholder="用于搜索摘要和分享描述。建议 120-180 字符。"
+          help="可选。留空时会回退到模型介绍或 README 摘要。"
+          className="md:col-span-2"
+        />
+        <FormTextArea
+          label="SEO Keywords"
+          name="seoKeywords"
+          placeholder="一行或逗号分隔一个关键词，例如 gemini image, google image api, text to image"
+          help="可选。会写入 metadata keywords 和结构化数据。"
           className="md:col-span-2"
         />
         <FormSelect
@@ -1837,6 +1885,9 @@ export function EconomicsPanel({
                                     defaultShowcaseCoverUrl={
                                       row.providerModel.showcaseAssets.find((asset) => asset.kind === "cover")?.publicUrl ?? null
                                     }
+                                    defaultShowcaseCoverAssetId={
+                                      row.providerModel.showcaseAssets.find((asset) => asset.kind === "cover")?.id
+                                    }
                                     defaultShowcaseCoverPrompt={
                                       row.providerModel.showcaseAssets.find((asset) => asset.kind === "cover")?.altText ?? ""
                                     }
@@ -1844,6 +1895,11 @@ export function EconomicsPanel({
                                       row.providerModel.showcaseAssets
                                         .filter((asset) => asset.kind === "gallery")
                                         .map((asset) => asset.publicUrl)
+                                    }
+                                    defaultShowcaseGalleryAssetIds={
+                                      row.providerModel.showcaseAssets
+                                        .filter((asset) => asset.kind === "gallery")
+                                        .map((asset) => asset.id)
                                     }
                                     defaultShowcaseGalleryPrompts={
                                       row.providerModel.showcaseAssets

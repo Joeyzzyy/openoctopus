@@ -23,7 +23,18 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+function resolveMetadataBase() {
+  const value = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (!value) return undefined;
+  try {
+    return new URL(value);
+  } catch {
+    return undefined;
+  }
+}
+
 export const metadata: Metadata = {
+  metadataBase: resolveMetadataBase(),
   title: "OpenOctopus",
   description:
     "OpenOctopus — AI media generation platform with model budgets, API keys, and spend oversight.",
