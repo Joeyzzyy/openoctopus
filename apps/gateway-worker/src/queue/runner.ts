@@ -2,7 +2,7 @@ import { supabaseAdmin } from "../lib/supabase.js";
 import { decryptProviderSecret } from "../lib/provider-secret-crypto.js";
 import { normalizeOutputPayloadByCapability } from "../lib/image-output-contract.js";
 import { getProviderAdapter } from "../providers/index.js";
-import { persistGeneratedAssets } from "../services/assets-service.js";
+import { AssetIntegrityError, persistGeneratedAssets } from "../services/assets-service.js";
 import {
   recordRequestSettlement,
   resolveSettlementAmounts,
@@ -53,6 +53,7 @@ const POLLING_RECOVERY_STALE_SECONDS = 120;
 const POLLING_TIMEOUT_SECONDS = 20 * 60;
 const POLLING_RECOVERY_BATCH_SIZE = 20;
 const FEISHU_ERROR_WEBHOOK_URL = process.env.FEISHU_BOT_WEBHOOK_URL?.trim() ?? "";
+let hasWarnedMissingFeishuWebhook = false;
 
 function formatShanghaiTimestamp(value: Date | string | null | undefined) {
   if (!value) {
@@ -92,6 +93,12 @@ async function sendFeishuFailureAlert(input: {
   occurredAt?: Date;
 }) {
   if (!FEISHU_ERROR_WEBHOOK_URL) {
+    if (!hasWarnedMissingFeishuWebhook) {
+      hasWarnedMissingFeishuWebhook = true;
+      console.warn(
+        "[gateway-worker] FEISHU_BOT_WEBHOOK_URL is not configured; failure alerts are disabled."
+      );
+    }
     return;
   }
 
@@ -162,7 +169,7 @@ async function sendFeishuFailureAlert(input: {
   ];
 
   try {
-    await fetch(FEISHU_ERROR_WEBHOOK_URL, {
+    const response = await fetch(FEISHU_ERROR_WEBHOOK_URL, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -226,8 +233,35 @@ async function sendFeishuFailureAlert(input: {
         },
       }),
     });
+    const responseText = await response.text();
+    let parsedBody: Record<string, unknown> | null = null;
+    try {
+      parsedBody = JSON.parse(responseText) as Record<string, unknown>;
+    } catch {
+      parsedBody = null;
+    }
+
+    const feishuCode =
+      parsedBody && typeof parsedBody.code === "number" ? parsedBody.code : null;
+    if (!response.ok || (feishuCode !== null && feishuCode !== 0)) {
+      console.error("[gateway-worker] Feishu alert delivery failed", {
+        requestId: input.requestId,
+        status: response.status,
+        statusText: response.statusText,
+        feishuCode,
+        responseBody:
+          responseText.length > 500
+            ? `${responseText.slice(0, 500)}...`
+            : responseText,
+      });
+    }
   } catch {
     // keep worker path non-blocking on alert delivery failures
+    console.error("[gateway-worker] Feishu alert delivery threw an exception", {
+      requestId: input.requestId,
+      phase: input.phase,
+      errorCode: input.errorCode,
+    });
   }
 }
 
@@ -859,84 +893,109 @@ export async function processNextInferenceJob() {
   }
 
   if (result.mode === "sync") {
-    const normalizedSyncResult = withNormalizedOutput({
-      capability: message.capability,
-      requestInput: message.input,
-      output: result.output,
-      providerRaw: asRecord(result.output.raw),
-    });
-    const providerRaw = normalizedSyncResult.providerRaw;
-    const normalizedOutput = normalizeOutputPayloadByCapability({
-      capability: message.capability,
-      outputPayload: normalizedSyncResult.output ?? result.output,
-    }) as Record<string, unknown>;
-    const persistedOutput = await persistGeneratedAssets({
-      requestId: message.requestId,
-      workspaceId: message.workspaceId,
-      output: normalizedOutput,
-    });
-    const settlement = await resolveSettlementAmounts({
-      providerModelId: message.providerModelId,
-      publicModelSlug: message.publicModelSlug,
-      requestInput: message.input,
-      output: persistedOutput,
-      providerRaw,
-      providerReportedAmount: result.estimatedCost,
-    });
-    await supabaseAdmin
-      .from("inference_requests")
-      .update({
-        status: "succeeded",
-        output_payload: persistedOutput,
-        actual_cost: settlement.customer.total,
-        actual_customer_charge: settlement.customer.total,
-        actual_provider_cost: settlement.provider.total,
-        actual_profit: settlement.actualProfit,
-        estimated_cost: settlement.customer.total,
-        estimated_customer_charge: settlement.customer.total,
-        estimated_provider_cost: settlement.provider.total,
-        estimated_profit: settlement.actualProfit,
-        started_at: new Date(attemptStartedAt).toISOString(),
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", message.requestId);
+    try {
+      const normalizedSyncResult = withNormalizedOutput({
+        capability: message.capability,
+        requestInput: message.input,
+        output: result.output,
+        providerRaw: asRecord(result.output.raw),
+      });
+      const providerRaw = normalizedSyncResult.providerRaw;
+      const normalizedOutput = normalizeOutputPayloadByCapability({
+        capability: message.capability,
+        outputPayload: normalizedSyncResult.output ?? result.output,
+      }) as Record<string, unknown>;
+      const persistedOutput = await persistGeneratedAssets({
+        requestId: message.requestId,
+        workspaceId: message.workspaceId,
+        output: normalizedOutput,
+      });
+      const settlement = await resolveSettlementAmounts({
+        providerModelId: message.providerModelId,
+        publicModelSlug: message.publicModelSlug,
+        requestInput: message.input,
+        output: persistedOutput,
+        providerRaw,
+        providerReportedAmount: result.estimatedCost,
+      });
+      await supabaseAdmin
+        .from("inference_requests")
+        .update({
+          status: "succeeded",
+          output_payload: persistedOutput,
+          actual_cost: settlement.customer.total,
+          actual_customer_charge: settlement.customer.total,
+          actual_provider_cost: settlement.provider.total,
+          actual_profit: settlement.actualProfit,
+          estimated_cost: settlement.customer.total,
+          estimated_customer_charge: settlement.customer.total,
+          estimated_provider_cost: settlement.provider.total,
+          estimated_profit: settlement.actualProfit,
+          started_at: new Date(attemptStartedAt).toISOString(),
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", message.requestId);
 
-    await supabaseAdmin
-      .from("provider_attempts")
-      .update({
-        status: "succeeded",
-        upstream_request_id: result.upstreamRequestId,
-        response_payload: persistedOutput,
-        latency_ms: Date.now() - attemptStartedAt,
-      })
-      .eq("request_id", message.requestId)
-      .eq("attempt_no", 1);
+      await supabaseAdmin
+        .from("provider_attempts")
+        .update({
+          status: "succeeded",
+          upstream_request_id: result.upstreamRequestId,
+          response_payload: persistedOutput,
+          latency_ms: Date.now() - attemptStartedAt,
+        })
+        .eq("request_id", message.requestId)
+        .eq("attempt_no", 1);
 
-    await recordRequestSettlement({
-      requestId: message.requestId,
-      workspaceId: message.workspaceId,
-      apiKeyId: message.apiKeyId,
-      publicModelSlug: message.publicModelSlug,
-      endpoint: message.endpoint,
-      customerCharge: settlement.customer.total,
-      providerCost: settlement.provider.total,
-      statusCode: 200,
-      breakdown: buildSettlementBreakdown({
+      await recordRequestSettlement({
+        requestId: message.requestId,
+        workspaceId: message.workspaceId,
+        apiKeyId: message.apiKeyId,
+        publicModelSlug: message.publicModelSlug,
+        endpoint: message.endpoint,
         customerCharge: settlement.customer.total,
         providerCost: settlement.provider.total,
-        profit: settlement.actualProfit,
-        customerBreakdown: {
-          currency: settlement.customer.currency,
-          components: settlement.customer.components,
-          metrics: settlement.customer.metrics,
-        },
-        providerBreakdown: {
-          currency: settlement.provider.currency,
-          components: settlement.provider.components,
-          metrics: settlement.provider.metrics,
-        },
-      }),
-    });
+        statusCode: 200,
+        breakdown: buildSettlementBreakdown({
+          customerCharge: settlement.customer.total,
+          providerCost: settlement.provider.total,
+          profit: settlement.actualProfit,
+          customerBreakdown: {
+            currency: settlement.customer.currency,
+            components: settlement.customer.components,
+            metrics: settlement.customer.metrics,
+          },
+          providerBreakdown: {
+            currency: settlement.provider.currency,
+            components: settlement.provider.components,
+            metrics: settlement.provider.metrics,
+          },
+        }),
+      });
+    } catch (error) {
+      const reason =
+        error instanceof AssetIntegrityError
+          ? `asset_integrity_failed(index=${error.assetIndex}, reason=${error.reasonCode})`
+          : error instanceof Error
+            ? error.message
+            : "result_persist_failed";
+      await failRequestAndDeleteQueueMessage({
+        queueName: "inference_jobs",
+        messageId: row.msg_id,
+        requestId: message.requestId,
+        workspaceId: message.workspaceId,
+        apiKeyId: message.apiKeyId,
+        publicModelSlug: message.publicModelSlug,
+        endpoint: message.endpoint,
+        errorCode: "upstream_result_missing",
+        errorMessage: reason,
+        startedAt: new Date(attemptStartedAt),
+        capability: message.capability,
+        providerSlug: message.providerSlug,
+        upstreamModelSlug: message.upstreamModelSlug,
+      });
+      return true;
+    }
   } else {
     const settlement = await resolveSettlementAmounts({
       providerModelId: message.providerModelId,
@@ -1219,77 +1278,101 @@ export async function processNextPollingJob() {
   }
 
   if (result.success) {
-    const normalizedPollingResult = withNormalizedOutput({
-      capability: message.capability,
-      requestInput: message.input,
-      output: result.output,
-      providerRaw: result.raw,
-    });
-    const normalizedOutput = normalizeOutputPayloadByCapability({
-      capability: message.capability,
-      outputPayload: normalizedPollingResult.output ?? result.output,
-    }) as Record<string, unknown>;
-    const normalizedProviderRaw = normalizedPollingResult.providerRaw ?? result.raw;
-    const persistedOutput = await persistGeneratedAssets({
-      requestId: message.requestId,
-      workspaceId: message.workspaceId,
-      output: normalizedOutput,
-    });
-    const settlement = await resolveSettlementAmounts({
-      providerModelId: message.providerModelId,
-      publicModelSlug: message.publicModelSlug,
-      requestInput: message.input,
-      output: persistedOutput,
-      providerRaw: normalizedProviderRaw,
-      providerReportedAmount: result.actualCost,
-    });
-    await supabaseAdmin
-      .from("inference_requests")
-      .update({
-        status: "succeeded",
-        output_payload: persistedOutput,
-        actual_cost: settlement.customer.total,
-        actual_customer_charge: settlement.customer.total,
-        actual_provider_cost: settlement.provider.total,
-        actual_profit: settlement.actualProfit,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", message.requestId);
+    try {
+      const normalizedPollingResult = withNormalizedOutput({
+        capability: message.capability,
+        requestInput: message.input,
+        output: result.output,
+        providerRaw: result.raw,
+      });
+      const normalizedOutput = normalizeOutputPayloadByCapability({
+        capability: message.capability,
+        outputPayload: normalizedPollingResult.output ?? result.output,
+      }) as Record<string, unknown>;
+      const normalizedProviderRaw = normalizedPollingResult.providerRaw ?? result.raw;
+      const persistedOutput = await persistGeneratedAssets({
+        requestId: message.requestId,
+        workspaceId: message.workspaceId,
+        output: normalizedOutput,
+      });
+      const settlement = await resolveSettlementAmounts({
+        providerModelId: message.providerModelId,
+        publicModelSlug: message.publicModelSlug,
+        requestInput: message.input,
+        output: persistedOutput,
+        providerRaw: normalizedProviderRaw,
+        providerReportedAmount: result.actualCost,
+      });
+      await supabaseAdmin
+        .from("inference_requests")
+        .update({
+          status: "succeeded",
+          output_payload: persistedOutput,
+          actual_cost: settlement.customer.total,
+          actual_customer_charge: settlement.customer.total,
+          actual_provider_cost: settlement.provider.total,
+          actual_profit: settlement.actualProfit,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", message.requestId);
 
-    await supabaseAdmin
-      .from("provider_attempts")
-      .update({
-        status: "succeeded",
-        response_payload: normalizedProviderRaw,
-      })
-      .eq("request_id", message.requestId)
-      .eq("attempt_no", 1);
+      await supabaseAdmin
+        .from("provider_attempts")
+        .update({
+          status: "succeeded",
+          response_payload: normalizedProviderRaw,
+        })
+        .eq("request_id", message.requestId)
+        .eq("attempt_no", 1);
 
-    await recordRequestSettlement({
-      requestId: message.requestId,
-      workspaceId: message.workspaceId,
-      apiKeyId: message.apiKeyId,
-      publicModelSlug: message.publicModelSlug,
-      endpoint: message.endpoint,
-      customerCharge: settlement.customer.total,
-      providerCost: settlement.provider.total,
-      statusCode: 200,
-      breakdown: buildSettlementBreakdown({
+      await recordRequestSettlement({
+        requestId: message.requestId,
+        workspaceId: message.workspaceId,
+        apiKeyId: message.apiKeyId,
+        publicModelSlug: message.publicModelSlug,
+        endpoint: message.endpoint,
         customerCharge: settlement.customer.total,
         providerCost: settlement.provider.total,
-        profit: settlement.actualProfit,
-        customerBreakdown: {
-          currency: settlement.customer.currency,
-          components: settlement.customer.components,
-          metrics: settlement.customer.metrics,
-        },
-        providerBreakdown: {
-          currency: settlement.provider.currency,
-          components: settlement.provider.components,
-          metrics: settlement.provider.metrics,
-        },
-      }),
-    });
+        statusCode: 200,
+        breakdown: buildSettlementBreakdown({
+          customerCharge: settlement.customer.total,
+          providerCost: settlement.provider.total,
+          profit: settlement.actualProfit,
+          customerBreakdown: {
+            currency: settlement.customer.currency,
+            components: settlement.customer.components,
+            metrics: settlement.customer.metrics,
+          },
+          providerBreakdown: {
+            currency: settlement.provider.currency,
+            components: settlement.provider.components,
+            metrics: settlement.provider.metrics,
+          },
+        }),
+      });
+    } catch (error) {
+      const reason =
+        error instanceof AssetIntegrityError
+          ? `asset_integrity_failed(index=${error.assetIndex}, reason=${error.reasonCode})`
+          : error instanceof Error
+            ? error.message
+            : "result_persist_failed";
+      await failRequestAndDeleteQueueMessage({
+        queueName: "inference_polling",
+        messageId: row.msg_id,
+        requestId: message.requestId,
+        workspaceId: message.workspaceId,
+        apiKeyId: message.apiKeyId,
+        publicModelSlug: message.publicModelSlug,
+        endpoint: message.endpoint,
+        errorCode: "upstream_result_missing",
+        errorMessage: reason,
+        capability: message.capability,
+        providerSlug: message.providerSlug,
+        upstreamModelSlug: message.upstreamModelSlug,
+      });
+      return true;
+    }
   } else {
     const completedAt = new Date();
     await supabaseAdmin

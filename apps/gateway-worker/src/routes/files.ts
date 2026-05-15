@@ -76,6 +76,26 @@ function buildAssetCachePath(requestId: string, assetIndex: number) {
   return `${requestId}/${assetIndex}`;
 }
 
+function buildAssetCachePathWithExtension(
+  requestId: string,
+  assetIndex: number,
+  mimeType: string | null
+) {
+  const extension =
+    mimeType === "image/jpeg"
+      ? "jpg"
+      : mimeType === "image/webp"
+        ? "webp"
+        : mimeType === "image/gif"
+          ? "gif"
+          : mimeType === "video/mp4"
+            ? "mp4"
+            : mimeType === "video/webm"
+              ? "webm"
+              : "png";
+  return `${requestId}/${assetIndex}.${extension}`;
+}
+
 function readHeaderValue(
   headers: Record<string, string | string[] | undefined>,
   name: string
@@ -96,15 +116,90 @@ function setGeneratedAssetHeaders(
   reply.header("cross-origin-resource-policy", "cross-origin");
 }
 
+function hasPrefix(buffer: Buffer, bytes: number[]) {
+  if (buffer.length < bytes.length) {
+    return false;
+  }
+  return bytes.every((value, index) => buffer[index] === value);
+}
+
+function looksLikeValidBinary(buffer: Buffer, mimeType: string | null) {
+  if (buffer.length < 128) {
+    return false;
+  }
+  const normalizedMime = (mimeType ?? "").toLowerCase();
+  if (normalizedMime === "image/png") {
+    return hasPrefix(buffer, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  }
+  if (normalizedMime === "image/jpeg") {
+    return hasPrefix(buffer, [0xff, 0xd8, 0xff]);
+  }
+  if (normalizedMime === "image/webp") {
+    return (
+      hasPrefix(buffer, [0x52, 0x49, 0x46, 0x46]) &&
+      buffer.length >= 12 &&
+      buffer.subarray(8, 12).toString("ascii") === "WEBP"
+    );
+  }
+  if (normalizedMime === "image/gif") {
+    return (
+      hasPrefix(buffer, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]) ||
+      hasPrefix(buffer, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61])
+    );
+  }
+  if (normalizedMime === "video/mp4") {
+    return buffer.length >= 12 && buffer.subarray(4, 8).toString("ascii") === "ftyp";
+  }
+  if (normalizedMime === "video/webm") {
+    return hasPrefix(buffer, [0x1a, 0x45, 0xdf, 0xa3]);
+  }
+  return true;
+}
+
+async function downloadFromGeneratedBucket(storagePath: string) {
+  const download = await supabaseAdmin.storage
+    .from(env.GENERATED_ASSETS_BUCKET)
+    .download(storagePath);
+  if (!download.data) {
+    return null;
+  }
+  const buffer = Buffer.from(await download.data.arrayBuffer());
+  return {
+    buffer,
+    contentType: download.data.type || "application/octet-stream",
+  };
+}
+
+async function markGeneratedAssetInvalid(input: {
+  requestId: string;
+  storagePath: string;
+  reason: string;
+}) {
+  await supabaseAdmin
+    .from("generated_assets")
+    .update({
+      metadata: {
+        assetIntegrity: {
+          status: "invalid",
+          reason: input.reason,
+          checkedAt: new Date().toISOString(),
+        },
+      },
+    })
+    .eq("request_id", input.requestId)
+    .eq("storage_path", input.storagePath);
+}
+
 export async function registerFileRoutes(app: FastifyInstance) {
   app.get("/v1/files/:requestId/assets/:assetIndex", async (request, reply) => {
     const params = fileAssetParamsSchema.parse(request.params);
 
     const { data: assetRows, error: assetError } = await supabaseAdmin
       .from("generated_assets")
-      .select("storage_bucket, storage_path, mime_type")
+      .select("storage_bucket, storage_path, mime_type, created_at")
       .eq("request_id", params.requestId)
       .like("storage_path", `${params.requestId}/${params.assetIndex}.%`)
+      .order("created_at", { ascending: false })
       .limit(1);
 
     if (assetError) {
@@ -119,20 +214,38 @@ export async function registerFileRoutes(app: FastifyInstance) {
       if (storedDownload.data) {
         const buffer = Buffer.from(await storedDownload.data.arrayBuffer());
         const contentType = storedAsset.mime_type || storedDownload.data.type || "application/octet-stream";
-        setGeneratedAssetHeaders(reply, contentType, buffer.length);
-        return reply.code(200).send(buffer);
+        if (looksLikeValidBinary(buffer, contentType)) {
+          setGeneratedAssetHeaders(reply, contentType, buffer.length);
+          return reply.code(200).send(buffer);
+        }
+        await markGeneratedAssetInvalid({
+          requestId: params.requestId,
+          storagePath: storedAsset.storage_path,
+          reason: "invalid_binary_from_generated_assets",
+        });
       }
     }
 
-    const cachePath = buildAssetCachePath(params.requestId, params.assetIndex);
-    const cachedDownload = await supabaseAdmin.storage
-      .from(env.GENERATED_ASSETS_BUCKET)
-      .download(cachePath);
-    if (cachedDownload.data) {
-      const buffer = Buffer.from(await cachedDownload.data.arrayBuffer());
-      const contentType = cachedDownload.data.type || "application/octet-stream";
-      setGeneratedAssetHeaders(reply, contentType, buffer.length);
-      return reply.code(200).send(buffer);
+    const cachePathBase = buildAssetCachePath(params.requestId, params.assetIndex);
+    const candidatePaths = [
+      cachePathBase,
+      `${cachePathBase}.png`,
+      `${cachePathBase}.jpg`,
+      `${cachePathBase}.webp`,
+      `${cachePathBase}.gif`,
+      `${cachePathBase}.mp4`,
+      `${cachePathBase}.webm`,
+    ];
+    for (const path of candidatePaths) {
+      const cachedFile = await downloadFromGeneratedBucket(path);
+      if (!cachedFile) {
+        continue;
+      }
+      if (!looksLikeValidBinary(cachedFile.buffer, cachedFile.contentType)) {
+        continue;
+      }
+      setGeneratedAssetHeaders(reply, cachedFile.contentType, cachedFile.buffer.length);
+      return reply.code(200).send(cachedFile.buffer);
     }
 
     const { data: requestRow, error: requestError } = await supabaseAdmin
@@ -215,9 +328,15 @@ export async function registerFileRoutes(app: FastifyInstance) {
       }
       const bodyBuffer = Buffer.concat(chunks);
       const contentType = readHeaderValue(upstream.headers, "content-type");
+      if (!looksLikeValidBinary(bodyBuffer, contentType ?? null)) {
+        return sendGatewayError(reply, {
+          code: "upstream_result_missing",
+          statusCode: 502,
+        });
+      }
       await supabaseAdmin.storage
         .from(env.GENERATED_ASSETS_BUCKET)
-        .upload(cachePath, bodyBuffer, {
+        .upload(buildAssetCachePathWithExtension(params.requestId, params.assetIndex, contentType ?? null), bodyBuffer, {
           contentType,
           upsert: true,
         });

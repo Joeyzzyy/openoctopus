@@ -10,15 +10,15 @@ type InternalTabKey =
   | "economics"
   | "worker-templates"
   | "gateway-error-definitions"
+  | "image-response-contracts"
   | "providers"
   | "monitoring"
-  | "routes"
   | "internal-model-ai-usage-logs";
 
 type TabItem = {
   key: InternalTabKey;
   label: string;
-  group: "basic" | "overview";
+  group: "static" | "dynamic" | "overview";
   count?: number;
 };
 
@@ -44,11 +44,12 @@ export function InternalShell({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const basicTabs = tabs.filter((tab) => tab.group === "basic");
+  const staticTabs = tabs.filter((tab) => tab.group === "static");
+  const dynamicTabs = tabs.filter((tab) => tab.group === "dynamic");
   const overviewTabs = tabs.filter((tab) => tab.group === "overview");
 
   const renderTabs = (items: TabItem[]) => (
-    <nav className="space-y-2">
+    <nav className="space-y-1.5">
       {items.map((tab) => {
         const active = tab.key === activeTab;
         const href = buildHref(tab.key, selectedTemplateKey);
@@ -63,7 +64,7 @@ export function InternalShell({
                 router.push(href);
               });
             }}
-            className={`block rounded-xl border px-3 py-3 transition-colors ${
+            className={`block rounded-lg border px-2.5 py-2 transition-colors ${
               active
                 ? "border-[#111827] bg-[#111827] text-white"
                 : "border-black/[0.08] bg-[#FCFCFA] text-black/75 hover:bg-white"
@@ -71,11 +72,11 @@ export function InternalShell({
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium">{tab.label}</p>
+                <p className="text-xs font-medium leading-5">{tab.label}</p>
               </div>
               {typeof tab.count === "number" ? (
                 <span
-                  className={`inline-flex min-w-8 items-center justify-center rounded-md px-2 py-1 text-[11px] ${
+                  className={`inline-flex min-w-7 items-center justify-center rounded-md px-1.5 py-0.5 text-[10px] ${
                     active ? "bg-white/12 text-white" : "bg-white text-black/55"
                   }`}
                 >
@@ -90,15 +91,19 @@ export function InternalShell({
   );
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[296px_minmax(0,1fr)]">
+    <div className="grid gap-4 lg:grid-cols-[244px_minmax(0,1fr)]">
       <aside className="lg:sticky lg:top-5 lg:self-start">
-        <div className="space-y-3">
-          <div className="rounded-2xl border border-black/[0.08] bg-white p-3 shadow-sm">
-            <p className="mb-2 px-1 text-xs tracking-[0.35px] text-black/45">基础配置</p>
-            {renderTabs(basicTabs)}
+        <div className="space-y-2.5">
+          <div className="rounded-xl border border-black/[0.08] bg-white p-2.5 shadow-sm">
+            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-black/45">静态配置</p>
+            {renderTabs(staticTabs)}
           </div>
-          <div className="rounded-2xl border border-black/[0.08] bg-white p-3 shadow-sm">
-            <p className="mb-2 px-1 text-xs tracking-[0.35px] text-black/45">总览数据</p>
+          <div className="rounded-xl border border-black/[0.08] bg-white p-2.5 shadow-sm">
+            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-black/45">动态配置</p>
+            {renderTabs(dynamicTabs)}
+          </div>
+          <div className="rounded-xl border border-black/[0.08] bg-white p-2.5 shadow-sm">
+            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-black/45">总览数据</p>
             {renderTabs(overviewTabs)}
           </div>
         </div>

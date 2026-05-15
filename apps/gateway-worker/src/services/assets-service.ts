@@ -15,6 +15,25 @@ type CachedAsset = {
   sizeBytes: number | null;
 };
 
+type AssetIntegrity = {
+  status: "valid" | "invalid";
+  reason: string;
+};
+
+const MIN_VALID_BINARY_BYTES = 128;
+
+export class AssetIntegrityError extends Error {
+  readonly assetIndex: number;
+  readonly reasonCode: string;
+
+  constructor(input: { assetIndex: number; reasonCode: string }) {
+    super(`Asset integrity check failed at index ${input.assetIndex}: ${input.reasonCode}`);
+    this.name = "AssetIntegrityError";
+    this.assetIndex = input.assetIndex;
+    this.reasonCode = input.reasonCode;
+  }
+}
+
 function readNumericCandidate(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -76,12 +95,58 @@ function parseDataUri(value: string) {
   };
 }
 
+function hasPrefix(buffer: Buffer, bytes: number[]) {
+  if (buffer.length < bytes.length) {
+    return false;
+  }
+  return bytes.every((value, index) => buffer[index] === value);
+}
+
+function looksLikeValidBinary(buffer: Buffer, mimeType: string | null) {
+  if (buffer.length < MIN_VALID_BINARY_BYTES) {
+    return false;
+  }
+
+  if (!mimeType) {
+    return true;
+  }
+
+  const normalizedMime = mimeType.toLowerCase();
+  if (normalizedMime === "image/png") {
+    return hasPrefix(buffer, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  }
+  if (normalizedMime === "image/jpeg") {
+    return hasPrefix(buffer, [0xff, 0xd8, 0xff]);
+  }
+  if (normalizedMime === "image/webp") {
+    return (
+      hasPrefix(buffer, [0x52, 0x49, 0x46, 0x46]) &&
+      buffer.length >= 12 &&
+      buffer.subarray(8, 12).toString("ascii") === "WEBP"
+    );
+  }
+  if (normalizedMime === "image/gif") {
+    return (
+      hasPrefix(buffer, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]) ||
+      hasPrefix(buffer, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61])
+    );
+  }
+  if (normalizedMime === "video/mp4") {
+    return buffer.length >= 12 && buffer.subarray(4, 8).toString("ascii") === "ftyp";
+  }
+  if (normalizedMime === "video/webm") {
+    return hasPrefix(buffer, [0x1a, 0x45, 0xdf, 0xa3]);
+  }
+
+  return true;
+}
+
 async function cacheAsset(input: {
   requestId: string;
   assetIndex: number;
   url: string;
   mimeType?: string;
-}): Promise<CachedAsset | null> {
+}): Promise<{ cached: CachedAsset | null; integrity: AssetIntegrity }> {
   const dataUri = parseDataUri(input.url);
   let buffer: Buffer | null = dataUri?.buffer ?? null;
   let mimeType = dataUri?.mimeType ?? input.mimeType ?? null;
@@ -89,14 +154,36 @@ async function cacheAsset(input: {
   if (!buffer && (input.url.startsWith("https://") || input.url.startsWith("http://"))) {
     const response = await fetch(input.url);
     if (!response.ok) {
-      return null;
+      return {
+        cached: null,
+        integrity: {
+          status: "invalid",
+          reason: `upstream_fetch_not_ok_${response.status}`,
+        },
+      };
     }
     buffer = Buffer.from(await response.arrayBuffer());
     mimeType = response.headers.get("content-type")?.split(";")[0] ?? mimeType;
   }
 
   if (!buffer) {
-    return null;
+    return {
+      cached: null,
+      integrity: {
+        status: "invalid",
+        reason: "asset_buffer_missing",
+      },
+    };
+  }
+
+  if (!looksLikeValidBinary(buffer, mimeType)) {
+    return {
+      cached: null,
+      integrity: {
+        status: "invalid",
+        reason: "asset_binary_signature_mismatch",
+      },
+    };
   }
 
   const storagePath = buildAssetCachePath(input.requestId, input.assetIndex, mimeType);
@@ -112,11 +199,17 @@ async function cacheAsset(input: {
   }
 
   return {
-    url: buildPublicAssetUrl(input.requestId, input.assetIndex),
-    storageBucket: env.GENERATED_ASSETS_BUCKET,
-    storagePath,
-    mimeType,
-    sizeBytes: buffer.byteLength,
+    cached: {
+      url: buildPublicAssetUrl(input.requestId, input.assetIndex),
+      storageBucket: env.GENERATED_ASSETS_BUCKET,
+      storagePath,
+      mimeType,
+      sizeBytes: buffer.byteLength,
+    },
+    integrity: {
+      status: "valid",
+      reason: "asset_binary_validated",
+    },
   };
 }
 
@@ -129,6 +222,7 @@ export async function persistGeneratedAssets(input: PersistAssetInput) {
 
   const nextAssets: unknown[] = [];
   const rows = [];
+  const checkedAt = new Date().toISOString();
 
   for (const [index, asset] of assets.entries()) {
     if (
@@ -142,12 +236,18 @@ export async function persistGeneratedAssets(input: PersistAssetInput) {
     }
 
     const assetRecord = asset as Record<string, unknown> & { url: string; type?: string };
-    const cached = await cacheAsset({
+    const { cached, integrity } = await cacheAsset({
       requestId: input.requestId,
       assetIndex: index,
       url: assetRecord.url,
       mimeType: typeof assetRecord.mimeType === "string" ? assetRecord.mimeType : undefined,
     });
+    if (integrity.status === "invalid") {
+      throw new AssetIntegrityError({
+        assetIndex: index,
+        reasonCode: integrity.reason,
+      });
+    }
     const storedUrl = cached?.url ?? assetRecord.url;
     nextAssets.push({
       ...assetRecord,
@@ -166,7 +266,14 @@ export async function persistGeneratedAssets(input: PersistAssetInput) {
       size_bytes: cached?.sizeBytes ?? null,
       duration_ms:
         assetRecord.type === "video" ? resolveAssetDurationMs(assetRecord, input.output) : null,
-      metadata: input.output,
+      metadata: {
+        output: input.output,
+        assetIntegrity: {
+          ...integrity,
+          checkedAt,
+          assetIndex: index,
+        },
+      },
     });
   }
 

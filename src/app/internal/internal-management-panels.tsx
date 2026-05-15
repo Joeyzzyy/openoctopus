@@ -1050,6 +1050,7 @@ function ActiveCheckbox({
 export function PublicModelsPanel({
   models,
   providerModels = [],
+  routingRules = [],
   providers = [],
   workerTemplates = [],
   modelVendors = [],
@@ -1057,14 +1058,17 @@ export function PublicModelsPanel({
 }: {
   models: SupportedModelSummary[];
   providerModels?: ProviderModelSummary[];
+  routingRules?: RoutingRuleSummary[];
   providers?: ProviderSummary[];
   workerTemplates?: WorkerTemplateSummary[];
   modelVendors?: ModelVendorSummary[];
   capabilityOptions: readonly CapabilityOption[];
 }) {
   const [activeModelTypeFilter, setActiveModelTypeFilter] = useState<string>("all");
+  const [activeStatusFilter, setActiveStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const safeModelVendors = Array.isArray(modelVendors) ? modelVendors : [];
   const safeProviderModels = Array.isArray(providerModels) ? providerModels : [];
+  const safeRoutingRules = Array.isArray(routingRules) ? routingRules : [];
   const safeProviders = Array.isArray(providers) ? providers : [];
   const safeWorkerTemplates = Array.isArray(workerTemplates) ? workerTemplates : [];
   const vendorSuggestions = Array.from(
@@ -1154,34 +1158,75 @@ export function PublicModelsPanel({
     activeModelTypeFilter === "all"
       ? modelGroups
       : modelGroups.filter((group) => group.category === activeModelTypeFilter);
+  const visibleModelGroupsWithStatus = visibleModelGroups
+    .map((group) => ({
+      ...group,
+      models:
+        activeStatusFilter === "all"
+          ? group.models
+          : group.models.filter((model) =>
+              activeStatusFilter === "active" ? model.active : !model.active
+            ),
+    }))
+    .filter((group) => group.models.length > 0);
 
   return (
     <div className="space-y-4">
       {models.length > 0 ? (
         <div className="space-y-5">
           <div className="rounded-xl border border-black/[0.08] bg-white p-3">
-            <p className="mb-2 text-[11px] tracking-[0.25px] text-black/55">按类型筛选</p>
-            <div className="flex flex-wrap gap-2">
-              {modelTypeFilterOptions.map((option) => {
-                const active = activeModelTypeFilter === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setActiveModelTypeFilter(option.value)}
-                    className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                      active
-                        ? "border-black bg-black text-white"
-                        : "border-black/[0.12] bg-[#FCFCFA] text-black/70 hover:bg-black/[0.04]"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
+            <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
+              <div>
+                <p className="mb-2 text-[11px] tracking-[0.25px] text-black/55">按类型筛选</p>
+                <div className="flex flex-wrap gap-2">
+                  {modelTypeFilterOptions.map((option) => {
+                    const active = activeModelTypeFilter === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setActiveModelTypeFilter(option.value)}
+                        className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                          active
+                            ? "border-black bg-black text-white"
+                            : "border-black/[0.12] bg-[#FCFCFA] text-black/70 hover:bg-black/[0.04]"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-[11px] tracking-[0.25px] text-black/55">按状态筛选</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: "all" as const, label: "全部状态" },
+                    { value: "active" as const, label: "已启用" },
+                    { value: "inactive" as const, label: "已停用" },
+                  ].map((option) => {
+                    const active = activeStatusFilter === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setActiveStatusFilter(option.value)}
+                        className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                          active
+                            ? "border-black bg-black text-white"
+                            : "border-black/[0.12] bg-[#FCFCFA] text-black/70 hover:bg-black/[0.04]"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
-          {visibleModelGroups.map((group) => (
+          {visibleModelGroupsWithStatus.map((group) => (
             <section key={group.category} className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-3">
               <div className="mb-3 flex items-center gap-2">
                 <span className="inline-flex rounded-full border border-black/[0.08] bg-white px-2.5 py-1 text-xs font-medium text-black/75">
@@ -1194,6 +1239,13 @@ export function PublicModelsPanel({
             const mappings = providerModelsBySupportedModelId.get(model.id) ?? [];
             const modelType = readModelTypeFromBillingConfig(model.billingConfigText);
             const seoCoverage = readSeoCoverage(model.billingConfigText);
+            const modelRoutingRules = safeRoutingRules.filter((rule) => rule.supportedModelId === model.id);
+            const activeRoutingRule =
+              modelRoutingRules.find((rule) => rule.active && rule.scopeLabel.includes("全局")) ??
+              modelRoutingRules.find((rule) => rule.active) ??
+              modelRoutingRules[0] ??
+              null;
+            const hasRouting = Boolean(activeRoutingRule?.primary_provider_model_id);
             return (
               <section key={model.id} className="rounded-2xl border border-black/[0.06] bg-white p-3 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-2.5">
@@ -1223,6 +1275,14 @@ export function PublicModelsPanel({
                       <StatusPill
                         label={seoCoverage.isComplete ? "SEO complete" : `SEO ${seoCoverage.completedCount}/3`}
                         ok={seoCoverage.isComplete}
+                      />
+                      <StatusPill
+                        label={
+                          hasRouting
+                            ? `Routing ${activeRoutingRule?.fallback_provider_model_id ? "主备" : "仅主路由"}`
+                            : "Routing missing"
+                        }
+                        ok={hasRouting}
                       />
                       <StatusPill label="Title" ok={seoCoverage.hasTitle} />
                       <StatusPill label="Description" ok={seoCoverage.hasDescription} />
@@ -1312,6 +1372,41 @@ export function PublicModelsPanel({
                             <SubmitButton label="保存可售模型" />
                           </div>
                         </ManagedDialogForm>
+                      )}
+                    </ManagementDialog>
+                    <ManagementDialog
+                      trigger={<ModalButton tone="secondary">配置路由</ModalButton>}
+                      disabled={mappings.length === 0}
+                      title={`配置路由：${model.display_name}`}
+                      description="为当前可售模型设置主路由和回退路由。"
+                    >
+                      {({ close }) => (
+                        <CreateRoutingRuleForm
+                          action={activeRoutingRule ? updateRoutingRule : createRoutingRule}
+                          routingRuleId={activeRoutingRule?.id}
+                          supportedModels={supportedModelOptions}
+                          providerModels={safeProviderModels.map((item) => ({
+                            id: item.id,
+                            providerName: item.providerName,
+                            supportedModelName: item.supportedModelName,
+                            upstreamModelSlug: item.upstream_model_slug,
+                            capability: item.capability,
+                            supportedModelId: item.supported_model_id ?? "",
+                          }))}
+                          defaultSupportedModelId={model.id}
+                          defaultPrimaryProviderModelId={activeRoutingRule?.primary_provider_model_id}
+                          defaultFallbackProviderModelId={activeRoutingRule?.fallback_provider_model_id ?? ""}
+                          defaultStrategy={activeRoutingRule?.route_strategy ?? "primary_only"}
+                          defaultWorkspaceScope={
+                            activeRoutingRule?.scopeLabel.includes("工作区") ? "workspace" : "global"
+                          }
+                          defaultActive={activeRoutingRule?.active ?? true}
+                          allowWorkspaceScope={false}
+                          lockSupportedModel
+                          submitLabel={activeRoutingRule ? "保存路由" : "创建路由"}
+                          onSuccess={close}
+                          disabled={false}
+                        />
                       )}
                     </ManagementDialog>
                     <ManagementDialog
@@ -1498,7 +1593,7 @@ export function PublicModelsPanel({
               </div>
             </section>
           ))}
-          {visibleModelGroups.length === 0 ? (
+          {visibleModelGroupsWithStatus.length === 0 ? (
             <div className="rounded-xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6 text-sm text-black/55">
               当前筛选下没有可售模型。
             </div>
@@ -2085,17 +2180,14 @@ export function WorkerTemplatesPanel({
     <div className="space-y-4">
       {rows.length > 0 ? (
         <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
-          <table className="min-w-[1400px] border-separate border-spacing-0 text-left text-sm">
+          <table className="min-w-[1020px] border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="text-xs text-black/50">
                 <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">显示名称</th>
                 <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">模板标识</th>
-                <th className="w-[8%] border-b border-black/[0.08] px-3 py-2.5">模式</th>
-                <th className="w-[13%] border-b border-black/[0.08] px-3 py-2.5">说明</th>
+                <th className="w-[18%] border-b border-black/[0.08] px-3 py-2.5">模式说明</th>
                 <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
                 <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">上游模型</th>
-                <th className="w-[15%] border-b border-black/[0.08] px-3 py-2.5">关联供应商</th>
-                <th className="w-[10%] border-b border-black/[0.08] px-3 py-2.5">引用状态</th>
               </tr>
             </thead>
             <tbody>
@@ -2107,13 +2199,11 @@ export function WorkerTemplatesPanel({
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/55">
                     {row.slug}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/65">
-                    {row.modeLabel}
-                  </td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs">
-                    <span className="text-black/65">
+                    <p className="font-medium text-black/72">{row.modeLabel}</p>
+                    <p className="mt-1 text-black/60">
                       {row.modeLabel === "任务轮询" ? "提交后轮询获取结果" : "请求成功后直接返回结果"}
-                    </span>
+                    </p>
                   </td>
                   <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
                     {row.relatedModels.length > 0 ? (
@@ -2136,10 +2226,6 @@ export function WorkerTemplatesPanel({
                     ) : (
                       <span>-</span>
                     )}
-                  </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{row.providersLabel}</td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
-                    {row.providerModelCount > 0 ? `${row.providerModelCount} 个模型` : "未引用"}
                   </td>
                 </tr>
               ))}

@@ -176,6 +176,8 @@ const ASPECT_RATIO_CANDIDATES = [
 ];
 
 const RESOLUTION_CANDIDATES = ["1k", "2k", "3k", "4k"];
+const QUALITY_CANDIDATES = ["medium", "low", "high"];
+const OUTPUT_FORMAT_CANDIDATES = ["png", "jpeg", "webp"];
 
 const README_MARKDOWN_PROMPT = `Generate a clean SEO-friendly README in RAW MARKDOWN SOURCE format.
 
@@ -225,6 +227,25 @@ function isResolutionFieldName(value: string) {
   return value.trim().toLowerCase() === "resolution";
 }
 
+function isQualityFieldName(value: string) {
+  return value.trim().toLowerCase() === "quality";
+}
+
+function isOutputFormatFieldName(value: string) {
+  return value.trim().toLowerCase() === "output_format";
+}
+
+function defaultEnumValuesForKnownInputField(fieldName: string) {
+  const normalized = fieldName.trim().toLowerCase();
+  if (normalized === "quality") {
+    return ["medium", "low", "high"];
+  }
+  if (normalized === "output_format") {
+    return ["png", "jpeg", "webp"];
+  }
+  return [];
+}
+
 function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields") {
   try {
     const parsed = JSON.parse(schemaText) as Record<string, unknown>;
@@ -242,6 +263,13 @@ function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields")
         if (!name) {
           return null;
         }
+        const parsedEnumValues = Array.isArray(row.enum)
+          ? row.enum.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+          : [];
+        const fallbackEnumValues =
+          key === "params" && parsedEnumValues.length === 0
+            ? defaultEnumValuesForKnownInputField(name)
+            : [];
         return {
           id: randomFieldId(),
           name,
@@ -255,9 +283,7 @@ function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields")
               : typeof row.customerVisible === "boolean"
                 ? row.customerVisible
                 : true,
-          enumValues: Array.isArray(row.enum)
-            ? row.enum.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-            : [],
+          enumValues: parsedEnumValues.length > 0 ? parsedEnumValues : fallbackEnumValues,
         } satisfies SchemaFieldState;
       })
       .filter((row): row is SchemaFieldState => Boolean(row));
@@ -539,21 +565,23 @@ function SchemaFieldEditor({
                 className={`${formInputClassName} h-9 text-xs md:col-span-2`}
                 placeholder="示例值"
               />
-              <input
-                value={draft.enumValues.join(", ")}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    enumValues: event.target.value
-                      .split(",")
-                      .map((item) => item.trim())
-                      .filter((item) => item.length > 0),
-                  }))
-                }
-                disabled={disabled}
-                className={`${formInputClassName} h-9 text-xs md:col-span-2`}
-                placeholder='可选值（逗号分隔），如 1:1, 16:9, 9:16, 4:3, 3:4'
-              />
+              {!isQualityFieldName(draft.name) && !isOutputFormatFieldName(draft.name) ? (
+                <input
+                  value={draft.enumValues.join(", ")}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      enumValues: event.target.value
+                        .split(",")
+                        .map((item) => item.trim())
+                        .filter((item) => item.length > 0),
+                    }))
+                  }
+                  disabled={disabled}
+                  className={`${formInputClassName} h-9 text-xs md:col-span-2`}
+                  placeholder='可选值（逗号分隔），如 1:1, 16:9, 9:16, 4:3, 3:4'
+                />
+              ) : null}
               {isResolutionFieldName(draft.name) ? (
                 <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
                   <p className="mb-2 text-[11px] text-black/60">常用分辨率（可多选）</p>
@@ -582,6 +610,74 @@ function SchemaFieldEditor({
                             className="size-3.5"
                           />
                           {resolution}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+              {isQualityFieldName(draft.name) ? (
+                <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
+                  <p className="mb-2 text-[11px] text-black/60">quality 可选值（可多选）</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {QUALITY_CANDIDATES.map((value) => {
+                      const checked = draft.enumValues.includes(value);
+                      return (
+                        <label key={value} className="inline-flex items-center gap-2 text-xs text-black/75">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) =>
+                              setDraft((current) => {
+                                const set = new Set(current.enumValues);
+                                if (event.target.checked) {
+                                  set.add(value);
+                                } else {
+                                  set.delete(value);
+                                }
+                                return {
+                                  ...current,
+                                  enumValues: Array.from(set),
+                                };
+                              })
+                            }
+                            className="size-3.5"
+                          />
+                          {value}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+              {isOutputFormatFieldName(draft.name) ? (
+                <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
+                  <p className="mb-2 text-[11px] text-black/60">output_format 可选值（可多选）</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {OUTPUT_FORMAT_CANDIDATES.map((value) => {
+                      const checked = draft.enumValues.includes(value);
+                      return (
+                        <label key={value} className="inline-flex items-center gap-2 text-xs text-black/75">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) =>
+                              setDraft((current) => {
+                                const set = new Set(current.enumValues);
+                                if (event.target.checked) {
+                                  set.add(value);
+                                } else {
+                                  set.delete(value);
+                                }
+                                return {
+                                  ...current,
+                                  enumValues: Array.from(set),
+                                };
+                              })
+                            }
+                            className="size-3.5"
+                          />
+                          {value}
                         </label>
                       );
                     })}
@@ -2718,6 +2814,7 @@ export function CreateRoutingRuleForm({
   submitLabel = "添加路由规则",
   className = panelSurfaceClassName,
   allowWorkspaceScope = true,
+  lockSupportedModel = false,
 }: {
   action?: (formData: FormData) => void | Promise<void>;
   supportedModels: SupportedModelOption[];
@@ -2734,10 +2831,12 @@ export function CreateRoutingRuleForm({
   submitLabel?: string;
   className?: string;
   allowWorkspaceScope?: boolean;
+  lockSupportedModel?: boolean;
 }) {
   const initialSupportedModelId = defaultSupportedModelId ?? supportedModels[0]?.id ?? "";
   const [supportedModelId, setSupportedModelId] = useState(initialSupportedModelId);
   const [submitted, setSubmitted] = useState(false);
+  void defaultActive;
 
   useEffect(() => {
     setSupportedModelId(initialSupportedModelId);
@@ -2766,24 +2865,39 @@ export function CreateRoutingRuleForm({
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">可售模型</span>
-          <select
-            name="supportedModelId"
-            value={supportedModelId}
-            onChange={(event) => setSupportedModelId(event.target.value)}
-            disabled={disabled}
-            className={formSelectClassName}
-          >
-            {supportedModels.length > 0 ? (
-              supportedModels.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.displayName} ({item.modelSlug})
-                </option>
-              ))
-            ) : (
-              <option value="">请先创建可售模型</option>
-            )}
-          </select>
-          <FieldHint help="选择要上线的客户侧能力入口。" />
+          {lockSupportedModel ? (
+            <>
+              <input
+                value={
+                  selectedSupportedModel
+                    ? `${selectedSupportedModel.displayName} (${selectedSupportedModel.modelSlug})`
+                    : "请先创建可售模型"
+                }
+                readOnly
+                className="h-10 w-full rounded-md border border-black/[0.08] bg-black/[0.03] px-3 text-sm text-black/60 outline-none"
+              />
+              <input type="hidden" name="supportedModelId" value={supportedModelId} />
+            </>
+          ) : (
+            <select
+              name="supportedModelId"
+              value={supportedModelId}
+              onChange={(event) => setSupportedModelId(event.target.value)}
+              disabled={disabled}
+              className={formSelectClassName}
+            >
+              {supportedModels.length > 0 ? (
+                supportedModels.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.displayName} ({item.modelSlug})
+                  </option>
+                ))
+              ) : (
+                <option value="">请先创建可售模型</option>
+              )}
+            </select>
+          )}
+          <FieldHint help={lockSupportedModel ? "已绑定当前可售模型，不可在此弹窗切换。" : "选择要上线的客户侧能力入口。"} />
         </label>
 
         <label className="block">
@@ -2876,16 +2990,7 @@ export function CreateRoutingRuleForm({
           <FieldHint help="只有一个实现时用 primary_only；有真实备用供应商时用 primary_then_fallback。" />
         </label>
 
-        <label className="flex items-center gap-3 rounded-md border border-black/[0.08] bg-white px-3 py-3 text-sm text-black/72">
-          <input
-            type="checkbox"
-            name="active"
-            defaultChecked={defaultActive}
-            disabled={disabled}
-            className="size-4 rounded border-black/20 bg-white accent-black"
-          />
-          启用
-        </label>
+        <input type="hidden" name="active" value="true" />
       </div>
 
       <div className="mt-4">

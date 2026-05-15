@@ -15,17 +15,16 @@ import { clearApiKeyRequestRecords, unlockInternalAccess } from "./actions";
 import { INTERNAL_ACCESS_COOKIE, INTERNAL_ACCESS_COOKIE_VALUE } from "@/lib/internal-access";
 import { InternalShell } from "./internal-shell";
 import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
+import { ImageResponseContractPanel } from "./image-response-contract-panel";
 import {
   CreateProviderButton,
   GatewayErrorDefinitionsPanel,
   CreateModelVendorButton,
   CreateSupportedModelButton,
-  CreateRoutingRuleButton,
   ModelVendorsPanel,
   InternalModelAiUsageLogsPanel,
   ProvidersPanel,
   PublicModelsPanel,
-  RoutesPanel,
   WorkerTemplatesPanel,
 } from "./internal-management-panels";
 import { RequestRecordsClearForm } from "./request-records-clear-form";
@@ -47,39 +46,39 @@ const tabs = [
   },
   {
     key: "worker-templates",
-    group: "basic",
+    group: "static",
     label: "API 调用格式配置",
     description: "管理供应商模型调用格式模板。",
   },
   {
+    key: "image-response-contracts",
+    group: "static",
+    label: "图片返回结构约定",
+    description: "维护 Playground 与 API 两套图片返回结构约定。",
+  },
+  {
     key: "gateway-error-definitions",
-    group: "basic",
+    group: "static",
     label: "统一错误码",
     description: "维护所有对外 API 异常的错误码与用户提示文案。",
   },
   {
     key: "providers",
-    group: "basic",
+    group: "dynamic",
     label: "供应商管理",
     description: "同页管理上游厂商与供应商密钥。",
   },
   {
     key: "model-vendors",
-    group: "basic",
+    group: "dynamic",
     label: "模型厂商管理",
     description: "维护可售模型里的模型厂商名称列表。",
   },
   {
     key: "public-models",
-    group: "basic",
+    group: "dynamic",
     label: "可售模型管理",
     description: "定义用户可售模型、供应商供应模型列表与价格联动。",
-  },
-  {
-    key: "routes",
-    group: "basic",
-    label: "路由配置",
-    description: "决定当前流量走哪个供应商模型。",
   },
 ] as const;
 
@@ -437,67 +436,6 @@ function buildLinePath(points: number[], width: number, height: number) {
     })
     .join(" ");
 }
-
-const providerTemplates = {
-  "gemini-direct": {
-    provider: {
-      name: "Gemini Direct",
-      slug: "gemini-direct",
-      baseUrl: "https://generativelanguage.googleapis.com",
-      status: "healthy",
-      regions: "",
-      credentialsRef: "env://GEMINI_API_KEY",
-      config: '{\n  "timeoutMs": 60000,\n  "apiVersion": "v1beta"\n}',
-    },
-    credential: {
-      label: "Primary production key",
-      secretRef: "Google AI Studio production key",
-      environment: "production",
-      notes: "Primary Gemini image generation credential",
-      metadata: '{\n  "owner": "infra"\n}',
-    },
-    providerModel: {
-      capability: "image_generation",
-      upstreamModelSlug: "gemini-2.5-flash-image",
-      pricing:
-        '{\n  "billingMode": "hybrid",\n  "currency": "USD",\n  "charges": {\n    "inputTextTokensPerMillion": 0.3,\n    "outputTextTokensPerMillion": 30\n  }\n}',
-    },
-    route: {
-      capability: "image_generation",
-      workspaceScope: "global",
-      routeStrategy: "primary_only",
-    },
-  },
-  wavespeed: {
-    provider: {
-      name: "WaveSpeed",
-      slug: "wavespeed",
-      baseUrl: "https://api.wavespeed.ai",
-      status: "healthy",
-      regions: "sgp1, us-west",
-      credentialsRef: "env://WAVESPEED_API_KEY",
-      config: '{\n  "timeoutMs": 90000\n}',
-    },
-    credential: {
-      label: "Primary production key",
-      secretRef: "WaveSpeed production key",
-      environment: "production",
-      notes: "Primary WaveSpeed production credential",
-      metadata: '{\n  "owner": "ops"\n}',
-    },
-    providerModel: {
-      capability: "image_generation",
-      upstreamModelSlug: "gemini-2.5-flash-image",
-      pricing:
-        '{\n  "billingMode": "hybrid",\n  "currency": "USD",\n  "charges": {\n    "inputTextTokensPerMillion": 0.3,\n    "outputTextTokensPerMillion": 30\n  }\n}',
-    },
-    route: {
-      capability: "image_generation",
-      workspaceScope: "global",
-      routeStrategy: "primary_then_fallback",
-    },
-  },
-} as const;
 
 function OverviewCard({
   title,
@@ -920,10 +858,6 @@ export default async function InternalPage({
   const selectedRequestPage = Number.isFinite(selectedRequestPageRaw) && selectedRequestPageRaw >= 1
     ? Math.floor(selectedRequestPageRaw)
     : 1;
-  const selectedTemplate =
-    selectedTemplateKey && selectedTemplateKey in providerTemplates
-      ? providerTemplates[selectedTemplateKey as keyof typeof providerTemplates]
-      : null;
   const modelVendorCount = new Set(
     [
       ...data.modelVendors.map((vendor) => vendor.name.trim().toLowerCase()),
@@ -948,8 +882,6 @@ export default async function InternalPage({
               ? data.gatewayErrorDefinitions.length
             : tab.key === "internal-model-ai-usage-logs"
               ? data.internalModelAiUsageLogs.length
-            : tab.key === "routes"
-                ? data.metrics.activeRoutes
               : undefined,
   }));
   const filteredRequests = data.requests.filter((request) => {
@@ -1117,6 +1049,7 @@ export default async function InternalPage({
                 <PublicModelsPanel
                   models={data.supportedModels}
                   providerModels={data.providerModels}
+                  routingRules={data.routingRules}
                   providers={data.providers}
                   workerTemplates={data.workerTemplates ?? []}
                   modelVendors={data.modelVendors}
@@ -1160,28 +1093,15 @@ export default async function InternalPage({
             </>
           ) : null}
 
-          {activeTab === "routes" ? (
+          {activeTab === "image-response-contracts" ? (
             <>
-              <section>
-                <SectionShell
-                id="routes-panel"
-                title="可售模型路由"
-                description=""
-                headerRight={
-                  <CreateRoutingRuleButton
-                    providerModels={data.providerModels}
-                    supportedModels={data.supportedModels}
-                    selectedTemplate={selectedTemplate}
-                  />
-                }
-                >
-                <RoutesPanel
-                  routingRules={data.routingRules}
-                  providerModels={data.providerModels}
-                  supportedModels={data.supportedModels}
-                />
-                </SectionShell>
-              </section>
+              <SectionShell
+                id="image-response-contracts-panel"
+                title="图片返回结构约定"
+                description="维护 internal Playground 与对外 API 的图片返回结构契约。"
+              >
+                <ImageResponseContractPanel />
+              </SectionShell>
             </>
           ) : null}
 
