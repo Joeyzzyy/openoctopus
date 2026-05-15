@@ -12,26 +12,28 @@ import { getDashboardData } from "@/lib/dashboard-server";
 import { cn } from "@/lib/utils";
 import { CreateKeyButton } from "./dashboard-actions";
 import { ApiKeysTable } from "./api-keys-table";
-import { ModelCatalogTable } from "./model-catalog-table";
 import { TopUpForm } from "./top-up-form";
 import { AutoRefreshOnReturn } from "./auto-refresh-on-return";
 import { TopUpCelebration } from "./top-up-celebration";
 import { InteractiveTrendChartCard, RequestDetailsFilters } from "./request-details-controls";
 import { AccountPasswordForm } from "./account-password-form";
+import { ExplorePanel } from "./explore-panel";
+import { buildModelCanonicalPath, loadModelsPageData } from "@/app/(marketing)/models/data";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 type DashboardView =
   | "dashboard"
+  | "explore"
   | "request-details"
   | "api-keys"
   | "account";
 type RequestInterval = "minute" | "hour" | "day";
 type RequestRange = "60m" | "6h" | "24h" | "7d" | "30d" | "90d";
 type ModelType = "image" | "video" | "text-coding";
-type ModelCapabilityType = ModelType;
 const pageNav = [
   { view: "dashboard" },
+  { view: "explore" },
   { view: "api-keys" },
   { view: "request-details" },
   { view: "account" },
@@ -319,12 +321,15 @@ export default async function DashboardPage({
     redirect("/login");
   }
 
-  const { apiKeys, metrics, modelCatalogRows, requestFilters, requestPagination, billingPagination, requestQueueRows, analyticsRequests, billingRows, user } =
+  const { apiKeys, metrics, requestFilters, requestPagination, billingPagination, requestQueueRows, analyticsRequests, billingRows, user } =
     data;
+  const exploreData = await loadModelsPageData().catch(() => ({
+    modelDocRows: [],
+    vendorOptions: [],
+  }));
 
   const walletMetric = metrics.find((metric) => metric.label === "Wallet Balance");
   const topupMetric = metrics.find((metric) => metric.label === "Total Top-Ups");
-  const keyMetric = metrics.find((metric) => metric.label === "Active API Keys");
   const selectedApiKey =
     selectedApiKeyId !== null
       ? requestFilters.apiKeys.find((item) => item.id === selectedApiKeyId) ?? null
@@ -334,22 +339,6 @@ export default async function DashboardPage({
   const filteredSpend = analyticsRequests.reduce((sum, row) => sum + row.costValue, 0);
   const filteredRequests = analyticsRequests.length;
   const successfulRequests = analyticsRequests.filter((row) => row.status === "succeeded").length;
-  const modelRowsByType: Record<ModelCapabilityType, typeof modelCatalogRows> = {
-    image: modelCatalogRows.filter((row) => row.capability.includes("image")),
-    video: modelCatalogRows.filter((row) => row.capability.includes("video")),
-    "text-coding": modelCatalogRows.filter(
-      (row) => row.capability.includes("text") || row.capability.includes("code")
-    ),
-  } as const;
-  const modelCatalogRowsByType =
-    selectedModelType === "image"
-      ? modelRowsByType.image
-      : selectedModelType === "video"
-        ? modelRowsByType.video
-        : modelRowsByType["text-coding"];
-  const modelCatalogRowsFiltered = selectedModelSlug
-    ? modelCatalogRowsByType.filter((row) => row.publicModel === selectedModelSlug)
-    : modelCatalogRowsByType;
   const billingRowsPage = billingRows;
   const billingTotalPages = billingPagination.totalPages;
   const normalizedBillingPage = Math.min(billingPagination.page, billingTotalPages);
@@ -397,6 +386,15 @@ export default async function DashboardPage({
           modelType: selectedModelType,
           modelSlug: selectedModelSlug,
         })}
+          exploreHref={buildDashboardHref({
+            view: "explore",
+            requestsPage: 1,
+            apiKeyId: selectedApiKeyId,
+            analyticsInterval,
+            analyticsRange,
+            modelType: selectedModelType,
+            modelSlug: selectedModelSlug,
+          })}
           modelsHref="/models"
           apiKeysHref={buildDashboardHref({
             view: "api-keys",
@@ -721,6 +719,21 @@ export default async function DashboardPage({
                     </div>
                   ) : null}
                 </section>
+            ) : null}
+
+            {view === "explore" ? (
+              <ExplorePanel
+                models={exploreData.modelDocRows.map((model) => ({
+                  id: model.id,
+                  displayName: model.displayName,
+                  providerName: model.providerName,
+                  capability: model.capability,
+                  modelDescription: model.modelDescription,
+                  priceLabel: model.priceLabel,
+                  coverImageUrl: model.coverImageUrl,
+                  modelHref: buildModelCanonicalPath(model),
+                }))}
+              />
             ) : null}
 
             {view === "dashboard" ? (

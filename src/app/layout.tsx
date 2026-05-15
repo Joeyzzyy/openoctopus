@@ -25,11 +25,11 @@ const jetbrainsMono = JetBrains_Mono({
 
 function resolveMetadataBase() {
   const value = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (!value) return undefined;
+  if (!value) return new URL("http://localhost:3000");
   try {
     return new URL(value);
   } catch {
-    return undefined;
+    return new URL("http://localhost:3000");
   }
 }
 

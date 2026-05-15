@@ -698,6 +698,7 @@ const ASPECT_RATIO_OPTIONS = [
 ];
 
 const RESOLUTION_OPTIONS = ["1k", "2k", "3k", "4k"];
+const ROUTE_SWITCH_MIN_LOADING_MS = 220;
 
 function isAspectRatioEnum(values?: string[]) {
   if (!values || values.length === 0) return false;
@@ -759,6 +760,18 @@ function buildDisplayImageUrl(src: string) {
     return src;
   }
   return src;
+}
+
+function isRouteSyncedWithSelection(input: {
+  pathname: string;
+  selectedProvider: string;
+  selectedModelPublicSlug: string;
+}) {
+  const providerSlug =
+    slugifyPathPart(input.selectedProvider) || encodeURIComponent(input.selectedProvider);
+  const modelSlug =
+    slugifyPathPart(input.selectedModelPublicSlug) || encodeURIComponent(input.selectedModelPublicSlug);
+  return input.pathname === `/models/${providerSlug}/${modelSlug}`;
 }
 
 function extractImageUrls(output: unknown): string[] {
@@ -935,6 +948,8 @@ export function ModelsBrowser({
   const [previousShowcaseIndex, setPreviousShowcaseIndex] = useState<number | null>(null);
   const [showcaseImageVisible, setShowcaseImageVisible] = useState(true);
   const [showcasePromptModalOpen, setShowcasePromptModalOpen] = useState(false);
+  const [isRouteSwitching, setIsRouteSwitching] = useState(false);
+  const routeSwitchStartedAtRef = useRef<number | null>(null);
   const playgroundImageUrls = useMemo(
     () => extractImageUrls(playgroundOutput),
     [playgroundOutput]
@@ -975,12 +990,20 @@ export function ModelsBrowser({
     return () => window.clearTimeout(timer);
   }, [previousShowcaseIndex, activeShowcaseIndex]);
   const handleProviderChange = (nextProvider: string) => {
+    if (nextProvider !== selectedProvider) {
+      routeSwitchStartedAtRef.current = Date.now();
+      setIsRouteSwitching(true);
+    }
     setSelectedProvider(nextProvider);
     const nextRows = rowsByProvider.find(([provider]) => provider === nextProvider)?.[1] ?? [];
     setSelectedModelSlug(nextRows[0]?.publicModel ?? null);
   };
 
   const handleModelChange = (nextModelSlug: string | null) => {
+    if (nextModelSlug && nextModelSlug !== effectiveModelSlug) {
+      routeSwitchStartedAtRef.current = Date.now();
+      setIsRouteSwitching(true);
+    }
     setSelectedModelSlug(nextModelSlug);
   };
 
@@ -1013,6 +1036,38 @@ export function ModelsBrowser({
     if (pathname === nextHref) return;
     router.replace(nextHref, { scroll: false });
   }, [pathname, router, selectedModel, selectedProvider]);
+
+  useEffect(() => {
+    if (!selectedModel || !selectedProvider) {
+      setIsRouteSwitching(false);
+      return;
+    }
+
+    if (
+      isRouteSyncedWithSelection({
+        pathname,
+        selectedProvider,
+        selectedModelPublicSlug: selectedModel.publicModel,
+      })
+    ) {
+      const startedAt = routeSwitchStartedAtRef.current;
+      const elapsed = startedAt ? Date.now() - startedAt : ROUTE_SWITCH_MIN_LOADING_MS;
+      const remaining = Math.max(0, ROUTE_SWITCH_MIN_LOADING_MS - elapsed);
+
+      if (remaining === 0) {
+        routeSwitchStartedAtRef.current = null;
+        setIsRouteSwitching(false);
+        return;
+      }
+
+      const timer = window.setTimeout(() => {
+        routeSwitchStartedAtRef.current = null;
+        setIsRouteSwitching(false);
+      }, remaining);
+
+      return () => window.clearTimeout(timer);
+    }
+  }, [pathname, selectedModel, selectedProvider]);
 
   const handleMainTabChange = (tab: "playground" | "api") => {
     if (tab === mainTab) return;
@@ -1405,6 +1460,19 @@ export function ModelsBrowser({
         </div>
       </div>
 
+      <div className="relative">
+        {isRouteSwitching ? (
+          <div className="absolute inset-0 z-30 flex items-start justify-center rounded-[28px] bg-[rgba(252,252,250,0.72)] px-4 py-24 backdrop-blur-[2px]">
+            <div className="rounded-xl border border-black/[0.08] bg-white px-4 py-3 shadow-[0_18px_40px_rgba(17,24,39,0.08)]">
+              <div className="flex items-center gap-3 text-sm text-black/70">
+                <span className="inline-flex size-4 animate-spin rounded-full border-2 border-black/15 border-t-[#E58A35]" />
+                Loading model content...
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className={`space-y-4 ${isRouteSwitching ? "pointer-events-none opacity-55" : ""}`}>
       {selectedModel ? (
         <section className="overflow-hidden rounded-[28px] border border-[#E9DEC9] bg-[linear-gradient(135deg,#FFF7EA_0%,#FFFDFC_55%,#F6F1E7_100%)] shadow-sm">
           <div className="grid gap-0 lg:grid-cols-[minmax(0,0.92fr)_440px]">
@@ -1430,20 +1498,10 @@ export function ModelsBrowser({
                     <span className="inline-flex rounded-full border border-[#CFE5D5] bg-[#EAF7ED] px-3 py-1 text-xs font-medium text-[#245C31]">
                       {priceTag}
                     </span>
-                  ) : null}
+        ) : null}
                   <span className="inline-flex rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
                     {selectedModel.publicModel}
                   </span>
-                  {selectedModel.officialDocUrl ? (
-                    <a
-                      href={selectedModel.officialDocUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex rounded-full border border-black/[0.08] bg-white px-3 py-1 text-xs text-black/70 transition-colors hover:border-[#E58A35] hover:text-[#9A4F18]"
-                    >
-                      Official docs
-                    </a>
-                  ) : null}
                 </div>
               </div>
             </div>
@@ -1502,6 +1560,12 @@ export function ModelsBrowser({
       ) : null}
 
       <section className="rounded-2xl border border-black/[0.08] bg-white p-2.5 shadow-sm sm:p-3">
+        <div className="mb-2">
+          <h2 className="text-base font-semibold text-black">Model Workspace</h2>
+          <p className="mt-0.5 text-xs text-black/55">
+            API reference and live playground for {selectedModel?.displayName ?? "the selected model"}.
+          </p>
+        </div>
         <div className="mb-2 border-b border-black/[0.08] pb-1.5">
           <div className="flex items-center gap-1">
             {(["playground", "api"] as const).map((tab) => (
@@ -1541,7 +1605,7 @@ export function ModelsBrowser({
           ) : (
           <div className="grid gap-4 md:grid-cols-2">
             <section className="rounded-xl border border-black/[0.08] bg-white p-4">
-              <div className="mb-3 text-sm font-medium text-black">Input</div>
+              <h3 className="mb-3 text-sm font-medium text-black">Input</h3>
               <div className="space-y-3">
                 {parsedFields.length === 0 ? (
                   <p className="text-sm text-black/55">
@@ -1678,7 +1742,7 @@ export function ModelsBrowser({
 
             <section className="flex min-h-[360px] flex-col rounded-xl border border-black/[0.08] bg-[#FAFAFA] p-4">
               <div className="mb-3 flex items-center justify-between">
-                <div className="text-sm font-medium text-black">Output</div>
+                <h3 className="text-sm font-medium text-black">Output</h3>
                 <div className="flex items-center gap-2">
                   {playgroundImageUrls.length > 0 ? (
                     <button
@@ -1823,6 +1887,8 @@ export function ModelsBrowser({
           <MarkdownReadme markdown={selectedModel.readmeMarkdown} />
         )
       ) : null}
+        </div>
+      </div>
 
       {detailModalOpen ? (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">

@@ -5,15 +5,23 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type ProductTopTabsProps = {
   dashboardHref?: string;
+  exploreHref?: string;
   modelsHref?: string;
   apiKeysHref?: string;
   requestDetailsHref?: string;
   accountHref?: string;
 };
-type ProductTopTabKey = "dashboard" | "models" | "api-keys" | "request-details" | "account";
+type ProductTopTabKey =
+  | "dashboard"
+  | "explore"
+  | "models"
+  | "api-keys"
+  | "request-details"
+  | "account";
 
 export function ProductTopTabs({
   dashboardHref = "/dashboard",
+  exploreHref = "/dashboard?view=explore",
   modelsHref = "/models",
   apiKeysHref = "/dashboard?view=api-keys",
   requestDetailsHref = "/dashboard?view=request-details&requestsPage=1&billingPage=1&analyticsInterval=minute&analyticsRange=24h",
@@ -33,6 +41,12 @@ export function ProductTopTabs({
           label: "Dashboard",
           href: dashboardHref,
           active: pathname === "/dashboard" && dashboardView === "dashboard",
+        },
+        {
+          key: "explore",
+          label: "Explore",
+          href: exploreHref,
+          active: pathname === "/dashboard" && dashboardView === "explore",
         },
         {
           key: "models",
@@ -64,6 +78,7 @@ export function ProductTopTabs({
       apiKeysHref,
       dashboardHref,
       dashboardView,
+      exploreHref,
       modelsHref,
       pathname,
       requestDetailsHref,

@@ -277,6 +277,67 @@ function readBillingConfigMetadataField(configText: string, key: string) {
   }
 }
 
+function readReadmeMarkdownFromExecutionConfig(configText: string) {
+  try {
+    const parsed = JSON.parse(configText) as Record<string, unknown>;
+    const doc =
+      parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc)
+        ? (parsed.doc as Record<string, unknown>)
+        : null;
+    return typeof doc?.readmeMarkdown === "string" ? doc.readmeMarkdown.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+function readSeoCoverage(configText: string) {
+  const title = readBillingConfigMetadataField(configText, "seoTitle").trim();
+  const description = readBillingConfigMetadataField(configText, "seoDescription").trim();
+  const keywords = readBillingConfigMetadataField(configText, "seoKeywords").trim();
+  const completedCount = [title, description, keywords].filter(Boolean).length;
+
+  return {
+    hasTitle: title.length > 0,
+    hasDescription: description.length > 0,
+    hasKeywords: keywords.length > 0,
+    completedCount,
+    isComplete: completedCount === 3,
+  };
+}
+
+function readProviderModelContentCoverage(model: ProviderModelSummary) {
+  const coverCount = model.showcaseAssets.filter((asset) => asset.kind === "cover").length;
+  const galleryCount = model.showcaseAssets.filter((asset) => asset.kind === "gallery").length;
+  const readmeMarkdown = readReadmeMarkdownFromExecutionConfig(model.executionConfigText);
+
+  return {
+    hasCover: coverCount > 0,
+    hasGallery: galleryCount > 0,
+    galleryCount,
+    hasReadme: readmeMarkdown.length > 0,
+  };
+}
+
+function StatusPill({
+  label,
+  ok,
+}: {
+  label: string;
+  ok: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+        ok
+          ? "border-[#9CC9A5] bg-[#EAF7ED] text-[#2F7A3E]"
+          : "border-[#EBC7BF] bg-[#FFF4F1] text-[#A14B3B]"
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
 const SUPPORTED_MODEL_TYPE_OPTIONS = [
   "text-to-video",
   "text-to-image",
@@ -1132,6 +1193,7 @@ export function PublicModelsPanel({
           {group.models.map((model) => {
             const mappings = providerModelsBySupportedModelId.get(model.id) ?? [];
             const modelType = readModelTypeFromBillingConfig(model.billingConfigText);
+            const seoCoverage = readSeoCoverage(model.billingConfigText);
             return (
               <section key={model.id} className="rounded-2xl border border-black/[0.06] bg-white p-3 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-2.5">
@@ -1156,6 +1218,15 @@ export function PublicModelsPanel({
                       <span className="rounded border border-black/[0.1] bg-[#FCFCFA] px-1.5 py-0.5 text-black/65">
                         {model.billingSummary}
                       </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <StatusPill
+                        label={seoCoverage.isComplete ? "SEO complete" : `SEO ${seoCoverage.completedCount}/3`}
+                        ok={seoCoverage.isComplete}
+                      />
+                      <StatusPill label="Title" ok={seoCoverage.hasTitle} />
+                      <StatusPill label="Description" ok={seoCoverage.hasDescription} />
+                      <StatusPill label="Keywords" ok={seoCoverage.hasKeywords} />
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -1305,16 +1376,29 @@ export function PublicModelsPanel({
                           <tr className="border-b border-black/[0.06] bg-[#FCFCFA] text-black/45">
                             <th className="px-2 py-1.5 text-left font-medium">供应商</th>
                             <th className="px-2 py-1.5 text-left font-medium">上游模型</th>
+                            <th className="px-2 py-1.5 text-left font-medium">内容状态</th>
                             <th className="px-2 py-1.5 text-left font-medium">成本</th>
                             <th className="px-2 py-1.5 text-left font-medium">状态</th>
                             <th className="px-2 py-1.5 text-left font-medium">操作</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {mappings.map((mapping) => (
+                          {mappings.map((mapping) => {
+                            const contentCoverage = readProviderModelContentCoverage(mapping);
+                            return (
                             <tr key={mapping.id} className="border-b border-black/[0.05] last:border-b-0">
                               <td className="px-2 py-1.5 text-black/75">{mapping.providerName}</td>
                               <td className="px-2 py-1.5 font-mono text-black/70">{mapping.upstream_model_slug}</td>
+                              <td className="px-2 py-1.5">
+                                <div className="flex min-w-[210px] flex-wrap gap-1">
+                                  <StatusPill label="封面" ok={contentCoverage.hasCover} />
+                                  <StatusPill
+                                    label={contentCoverage.hasGallery ? `素材图 ${contentCoverage.galleryCount}` : "素材图"}
+                                    ok={contentCoverage.hasGallery}
+                                  />
+                                  <StatusPill label="README" ok={contentCoverage.hasReadme} />
+                                </div>
+                              </td>
                               <td className="px-2 py-1.5 text-black/70">{mapping.pricingSummary}</td>
                               <td className="px-2 py-1.5 text-black/60">{mapping.active ? "已启用" : "未启用"}</td>
                               <td className="px-2 py-1.5">
@@ -1402,7 +1486,7 @@ export function PublicModelsPanel({
                                 </div>
                               </td>
                             </tr>
-                          ))}
+                          )})}
                         </tbody>
                       </table>
                     </div>

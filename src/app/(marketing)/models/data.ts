@@ -30,7 +30,6 @@ export type ModelDocRow = {
   capability: string;
   inputSchemaText: string;
   outputSchemaText: string;
-  officialDocUrl: string | null;
   executionConfigText: string;
   requestExampleJson: string | null;
   submitResponseExampleJson: string | null;
@@ -175,12 +174,11 @@ export function buildModelCanonicalPath(model: Pick<ModelDocRow, "providerName" 
 
 export function resolveSiteUrl() {
   const value = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  return value ? value.replace(/\/$/, "") : null;
+  return value ? value.replace(/\/$/, "") : "http://localhost:3000";
 }
 
 export function buildAbsoluteUrl(path: string) {
   const base = resolveSiteUrl();
-  if (!base) return path;
   return new URL(path, `${base}/`).toString();
 }
 
@@ -364,7 +362,6 @@ export const loadModelsPageData = cache(async () => {
       capability: mapping && typeof mapping.capability === "string" ? mapping.capability : (model.capability ?? "image_generation"),
       inputSchemaText: JSON.stringify(inputSchema ?? {}, null, 2),
       outputSchemaText: JSON.stringify(outputSchema ?? {}, null, 2),
-      officialDocUrl: typeof executionDoc.sourceUrl === "string" ? executionDoc.sourceUrl : null,
       executionConfigText: JSON.stringify(executionConfig ?? {}, null, 2),
       requestExampleJson:
         typeof executionDoc.requestExampleJson === "string"

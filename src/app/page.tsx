@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { HomeMobileMenu } from "@/components/marketing/home-mobile-menu";
+import { buildAbsoluteUrl } from "./(marketing)/models/data";
 import { createClient } from "@/lib/supabase/server";
 
 const HEADER_NAV_ITEMS = [
@@ -153,6 +155,28 @@ const WORKFLOW_STEPS = [
   },
 ];
 
+export const metadata: Metadata = {
+  title: "OpenOctopus | One API for AI Image, Video, and Model Routing",
+  description:
+    "OpenOctopus unifies top AI models behind one API with routing, budgets, pricing visibility, and model management for teams shipping image and video generation.",
+  alternates: {
+    canonical: buildAbsoluteUrl("/"),
+  },
+  openGraph: {
+    type: "website",
+    url: buildAbsoluteUrl("/"),
+    title: "OpenOctopus | One API for AI Image, Video, and Model Routing",
+    description:
+      "OpenOctopus unifies top AI models behind one API with routing, budgets, pricing visibility, and model management for teams shipping image and video generation.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "OpenOctopus | One API for AI Image, Video, and Model Routing",
+    description:
+      "OpenOctopus unifies top AI models behind one API with routing, budgets, pricing visibility, and model management for teams shipping image and video generation.",
+  },
+};
+
 export default async function Home() {
   const supabase = await createClient();
   const {
@@ -164,6 +188,38 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-[#FCFCFA] text-[#111827]" style={{ colorScheme: "light" }}>
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@graph": [
+              {
+                "@type": "Organization",
+                name: "OpenOctopus",
+                url: buildAbsoluteUrl("/"),
+              },
+              {
+                "@type": "WebSite",
+                name: "OpenOctopus",
+                url: buildAbsoluteUrl("/"),
+                description:
+                  "OpenOctopus unifies top AI models behind one API with routing, budgets, pricing visibility, and model management for teams shipping image and video generation.",
+              },
+              {
+                "@type": "SoftwareApplication",
+                name: "OpenOctopus",
+                applicationCategory: "DeveloperApplication",
+                operatingSystem: "Web",
+                url: buildAbsoluteUrl("/"),
+                description:
+                  "OpenOctopus unifies top AI models behind one API with routing, budgets, pricing visibility, and model management for teams shipping image and video generation.",
+              },
+            ],
+          }),
+        }}
+      />
       <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
         <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
           <div className="relative flex h-14 w-full items-center justify-start text-sm md:text-base">

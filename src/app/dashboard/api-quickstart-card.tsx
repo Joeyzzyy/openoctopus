@@ -11,7 +11,7 @@ type ModelDocItem = {
   capability: string;
   inputSchemaText: string;
   outputSchemaText: string;
-  officialDocUrl: string | null;
+  officialDocUrl?: string | null;
   executionConfigText: string;
   requestExampleJson: string | null;
   submitResponseExampleJson: string | null;

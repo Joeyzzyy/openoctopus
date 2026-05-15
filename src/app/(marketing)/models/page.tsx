@@ -17,6 +17,20 @@ import {
 export const metadata: Metadata = {
   title: "Models — OpenOctopus",
   description: "Model catalog, API docs, and live pricing sourced from internal model configuration.",
+  alternates: {
+    canonical: buildAbsoluteUrl("/models"),
+  },
+  openGraph: {
+    type: "website",
+    url: buildAbsoluteUrl("/models"),
+    title: "Models — OpenOctopus",
+    description: "Model catalog, API docs, and live pricing sourced from internal model configuration.",
+  },
+  twitter: {
+    card: "summary",
+    title: "Models — OpenOctopus",
+    description: "Model catalog, API docs, and live pricing sourced from internal model configuration.",
+  },
 };
 
 type ModelsPageShellProps = {
