@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 
 export function HeaderUserMenu({
   userLabel,
@@ -11,7 +13,9 @@ export function HeaderUserMenu({
   userAvatarUrl?: string | null;
   walletBalanceLabel?: string | null;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [isRefreshing, startRefreshTransition] = useTransition();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const avatarFallback = (userLabel?.trim()?.charAt(0) || "U").toUpperCase();
 
@@ -46,6 +50,26 @@ export function HeaderUserMenu({
           <span>{avatarFallback}</span>
         )}
       </button>
+      {walletBalanceLabel ? (
+        <>
+          <span className="max-w-[120px] truncate text-[12px] font-medium text-[#111827] sm:max-w-none sm:text-[13px]">
+            {walletBalanceLabel}
+          </span>
+          <button
+            type="button"
+            aria-label={isRefreshing ? "Refreshing balance" : "Refresh balance"}
+            disabled={isRefreshing}
+            onClick={() => {
+              startRefreshTransition(() => {
+                router.refresh();
+              });
+            }}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/[0.08] bg-white text-black/55 transition-colors hover:bg-black/[0.03] hover:text-black disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+          </button>
+        </>
+      ) : null}
 
       {open ? (
         <div className="absolute right-0 top-11 z-20 w-64 rounded-xl border border-black/[0.08] bg-white p-3 shadow-xl">
