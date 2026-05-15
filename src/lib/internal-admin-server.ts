@@ -54,6 +54,20 @@ type WorkerTemplateRow = {
   created_at: string;
 };
 
+type GatewayErrorDefinitionRow = {
+  id: string;
+  code: string;
+  category: string;
+  http_status: number;
+  public_message: string;
+  retryable: boolean;
+  active: boolean;
+  sort_order: number;
+  operator_notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type ProviderAdapterAliasRow = {
   id: string;
   alias_slug: string;
@@ -82,6 +96,18 @@ type ProviderModelRow = {
   output_schema: Record<string, unknown> | null;
   execution_template: string | null;
   execution_config: Record<string, unknown> | null;
+  created_at: string;
+};
+
+type ProviderModelShowcaseAssetRow = {
+  id: string;
+  provider_model_id: string;
+  asset_kind: "cover" | "gallery";
+  storage_bucket: string;
+  storage_path: string;
+  public_url: string;
+  alt_text: string | null;
+  sort_order: number;
   created_at: string;
 };
 
@@ -621,10 +647,12 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     supportedModelsResponse,
     modelVendorsResponse,
     workerTemplatesResponse,
+    gatewayErrorDefinitionsResponse,
     providerAdapterCatalogResponse,
     providerAdapterAliasesResponse,
     providerCredentialsResponse,
     providerModelsResponse,
+    providerModelShowcaseAssetsResponse,
     routingRulesResponse,
     requestsResponse,
     apiKeysResponse,
@@ -659,6 +687,11 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         .eq("active", true)
         .order("slug", { ascending: true }),
       supabase
+        .from("gateway_error_definitions")
+        .select("id, code, category, http_status, public_message, retryable, active, sort_order, operator_notes, created_at, updated_at")
+        .order("sort_order", { ascending: true })
+        .order("code", { ascending: true }),
+      supabase
         .from("provider_adapter_catalog")
         .select("id, slug, active, created_at")
         .eq("active", true)
@@ -679,6 +712,11 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       .select(
           "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, input_schema, output_schema, execution_template, execution_config, created_at"
         )
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("provider_model_showcase_assets")
+        .select("id, provider_model_id, asset_kind, storage_bucket, storage_path, public_url, alt_text, sort_order, created_at")
+        .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true }),
       bypassAuth
         ? supabase
@@ -768,6 +806,9 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const workerTemplates = (workerTemplatesResponse.error
     ? []
     : workerTemplatesResponse.data ?? []) as WorkerTemplateRow[];
+  const gatewayErrorDefinitions = (gatewayErrorDefinitionsResponse.error
+    ? []
+    : gatewayErrorDefinitionsResponse.data ?? []) as GatewayErrorDefinitionRow[];
   const providerAdapterCatalog = (providerAdapterCatalogResponse.error
     ? []
     : providerAdapterCatalogResponse.data ?? []) as ProviderAdapterCatalogRow[];
@@ -778,6 +819,10 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     ? []
     : providerCredentialsResponse.data ?? []) as ProviderCredentialRow[];
   const providerModels = (providerModelsResponse.error ? [] : providerModelsResponse.data ?? []) as ProviderModelRow[];
+  const providerModelShowcaseAssets =
+    (providerModelShowcaseAssetsResponse.error
+      ? []
+      : providerModelShowcaseAssetsResponse.data ?? []) as ProviderModelShowcaseAssetRow[];
   const derivedWorkerTemplates =
     workerTemplates.length > 0
       ? workerTemplates
@@ -835,6 +880,12 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     map.set(credential.provider_id, list);
     return map;
   }, new Map<string, ProviderCredentialRow[]>());
+  const showcaseAssetsByProviderModelId = providerModelShowcaseAssets.reduce((map, asset) => {
+    const list = map.get(asset.provider_model_id) ?? [];
+    list.push(asset);
+    map.set(asset.provider_model_id, list);
+    return map;
+  }, new Map<string, ProviderModelShowcaseAssetRow[]>());
   const apiKeyById = new Map(apiKeys.map((row) => [row.id, row]));
   const apiKeySpendById = new Map(apiKeySpendSummaries.map((row) => [row.api_key_id, row]));
   const usageEventByRequestId = new Map(
@@ -888,6 +939,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       ? supportedModelById.get(providerModel.supported_model_id)
       : null;
     const credentials = credentialsByProviderId.get(providerModel.provider_id) ?? [];
+    const showcaseAssets = showcaseAssetsByProviderModelId.get(providerModel.id) ?? [];
 
     return {
       ...providerModel,
@@ -903,6 +955,15 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       executionConfigText: formatJson(providerModel.execution_config),
       inputSchemaText: formatJson(providerModel.input_schema),
       outputSchemaText: formatJson(providerModel.output_schema),
+      showcaseAssets: showcaseAssets.map((asset) => ({
+        id: asset.id,
+        kind: asset.asset_kind,
+        publicUrl: asset.public_url,
+        storageBucket: asset.storage_bucket,
+        storagePath: asset.storage_path,
+        altText: asset.alt_text,
+        sortOrder: asset.sort_order,
+      })),
       runtimeDiagnostics: getProviderModelRuntimeDiagnostics({
         providerModel,
         provider: provider ?? null,
@@ -1203,6 +1264,19 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       ...worker,
       display_name: worker.display_name ?? worker.slug,
       createdLabel: formatRelativeTimestamp(worker.created_at),
+    })),
+    gatewayErrorDefinitions: gatewayErrorDefinitions.map((definition) => ({
+      id: definition.id,
+      code: definition.code,
+      category: definition.category,
+      httpStatus: Number(definition.http_status ?? 500),
+      publicMessage: definition.public_message,
+      retryable: definition.retryable === true,
+      active: definition.active === true,
+      sortOrder: Number(definition.sort_order ?? 100),
+      operatorNotes: definition.operator_notes,
+      createdLabel: formatRelativeTimestamp(definition.created_at),
+      updatedLabel: formatRelativeTimestamp(definition.updated_at),
     })),
     providerAdapterCatalog: providerAdapterCatalog.map((item) => ({
       ...item,

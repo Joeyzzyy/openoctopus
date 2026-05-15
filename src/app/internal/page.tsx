@@ -17,6 +17,7 @@ import { InternalShell } from "./internal-shell";
 import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
 import {
   CreateProviderButton,
+  GatewayErrorDefinitionsPanel,
   CreateModelVendorButton,
   CreateSupportedModelButton,
   CreateRoutingRuleButton,
@@ -49,6 +50,12 @@ const tabs = [
     group: "basic",
     label: "API 调用格式配置",
     description: "管理供应商模型调用格式模板。",
+  },
+  {
+    key: "gateway-error-definitions",
+    group: "basic",
+    label: "统一错误码",
+    description: "维护所有对外 API 异常的错误码与用户提示文案。",
   },
   {
     key: "providers",
@@ -933,10 +940,12 @@ export default async function InternalPage({
         ? data.metrics.publicModels
         : tab.key === "providers"
           ? data.metrics.providers
-          : tab.key === "model-vendors"
+        : tab.key === "model-vendors"
             ? modelVendorCount
             : tab.key === "worker-templates"
               ? workerTemplateCount
+            : tab.key === "gateway-error-definitions"
+              ? data.gatewayErrorDefinitions.length
             : tab.key === "internal-model-ai-usage-logs"
               ? data.internalModelAiUsageLogs.length
             : tab.key === "routes"
@@ -1187,6 +1196,18 @@ export default async function InternalPage({
                   workerTemplates={data.workerTemplates ?? []}
                   providerModels={data.providerModels}
                 />
+              </SectionShell>
+            </>
+          ) : null}
+
+          {activeTab === "gateway-error-definitions" ? (
+            <>
+              <SectionShell
+                id="gateway-error-definitions-panel"
+                title="统一错误码"
+                description="维护所有对外请求失败时返回的错误码、HTTP 状态码、用户文案与可重试标记。"
+              >
+                <GatewayErrorDefinitionsPanel definitions={data.gatewayErrorDefinitions} />
               </SectionShell>
             </>
           ) : null}

@@ -15,6 +15,7 @@ import {
   deleteProviderModel,
   deleteRoutingRule,
   rotateProviderCredentialSecret,
+  upsertGatewayErrorDefinition,
   updateProvider,
   updateProviderCredentialDetails,
   updateProviderCredentialState,
@@ -72,6 +73,20 @@ type WorkerTemplateSummary = {
   config: Record<string, unknown> | null;
   active: boolean;
   createdLabel: string;
+};
+
+type GatewayErrorDefinitionSummary = {
+  id: string;
+  code: string;
+  category: string;
+  httpStatus: number;
+  publicMessage: string;
+  retryable: boolean;
+  active: boolean;
+  sortOrder: number;
+  operatorNotes: string | null;
+  createdLabel: string;
+  updatedLabel: string;
 };
 
 type ProviderSummary = {
@@ -134,6 +149,15 @@ type ProviderModelSummary = {
   executionConfigText: string;
   inputSchemaText: string;
   outputSchemaText: string;
+  showcaseAssets: Array<{
+    id: string;
+    kind: "cover" | "gallery";
+    publicUrl: string;
+    storageBucket: string;
+    storagePath: string;
+    altText: string | null;
+    sortOrder: number;
+  }>;
   runtimeDiagnostics: string[];
 };
 
@@ -672,7 +696,7 @@ function ModalButton({
   tone = "default",
 }: {
   children: React.ReactNode;
-  tone?: "default" | "secondary";
+  tone?: "default" | "secondary" | "primary";
 }) {
   return (
     <span
@@ -1307,6 +1331,22 @@ export function PublicModelsPanel({
                                         defaultExecutionTemplate={mapping.executionTemplate}
                                         defaultExecutionConfig={mapping.executionConfigText}
                                         defaultActive={mapping.active}
+                                        defaultShowcaseCoverUrl={
+                                          mapping.showcaseAssets.find((asset) => asset.kind === "cover")?.publicUrl ?? null
+                                        }
+                                        defaultShowcaseCoverPrompt={
+                                          mapping.showcaseAssets.find((asset) => asset.kind === "cover")?.altText ?? ""
+                                        }
+                                        defaultShowcaseGalleryUrls={
+                                          mapping.showcaseAssets
+                                            .filter((asset) => asset.kind === "gallery")
+                                            .map((asset) => asset.publicUrl)
+                                        }
+                                        defaultShowcaseGalleryPrompts={
+                                          mapping.showcaseAssets
+                                            .filter((asset) => asset.kind === "gallery")
+                                            .map((asset) => asset.altText ?? "")
+                                        }
                                         formId={`provider-model-form-${mapping.id}`}
                                         showSubmitButton={false}
                                         className="grid gap-4"
@@ -1794,6 +1834,22 @@ export function EconomicsPanel({
                                     defaultExecutionTemplate={row.providerModel.executionTemplate}
                                     defaultExecutionConfig={row.providerModel.executionConfigText}
                                     defaultActive={row.providerModel.active}
+                                    defaultShowcaseCoverUrl={
+                                      row.providerModel.showcaseAssets.find((asset) => asset.kind === "cover")?.publicUrl ?? null
+                                    }
+                                    defaultShowcaseCoverPrompt={
+                                      row.providerModel.showcaseAssets.find((asset) => asset.kind === "cover")?.altText ?? ""
+                                    }
+                                    defaultShowcaseGalleryUrls={
+                                      row.providerModel.showcaseAssets
+                                        .filter((asset) => asset.kind === "gallery")
+                                        .map((asset) => asset.publicUrl)
+                                    }
+                                    defaultShowcaseGalleryPrompts={
+                                      row.providerModel.showcaseAssets
+                                        .filter((asset) => asset.kind === "gallery")
+                                        .map((asset) => asset.altText ?? "")
+                                    }
                                     formId={`provider-model-form-${row.providerModel.id}`}
                                     showSubmitButton={false}
                                     className="grid gap-4"
@@ -1956,6 +2012,168 @@ export function WorkerTemplatesPanel({
         </div>
       )}
 
+    </div>
+  );
+}
+
+export function GatewayErrorDefinitionsPanel({
+  definitions,
+}: {
+  definitions: GatewayErrorDefinitionSummary[];
+}) {
+  const rows = [...definitions].sort(
+    (a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code, "en-US")
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-black/[0.08] bg-white px-4 py-3 shadow-sm">
+        <div>
+          <p className="text-sm font-medium text-black">统一错误码维护</p>
+          <p className="mt-1 text-xs leading-5 text-black/55">
+            所有对外 API 异常都应返回这里维护的错误码与文案，避免暴露上游供应商或内部系统细节。
+          </p>
+        </div>
+        <ManagementDialog
+          trigger={<ModalButton tone="primary">新增错误码</ModalButton>}
+          title="新增错误码定义"
+          description="新增或覆盖一个对外错误码的状态码、文案和重试策略。"
+        >
+          {({ close }) => (
+            <ManagedDialogForm action={upsertGatewayErrorDefinition} close={close}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField label="错误码" name="code" required placeholder="provider_submit_failed" />
+                <FormField label="分类" name="category" required placeholder="upstream" />
+                <FormField label="HTTP 状态码" name="httpStatus" required placeholder="502" />
+                <FormField label="排序" name="sortOrder" required placeholder="180" />
+              </div>
+              <FormTextArea
+                label="对外提示文案"
+                name="publicMessage"
+                defaultValue="The generation provider could not accept the request. Please retry shortly."
+              />
+              <FormTextArea
+                label="内部备注"
+                name="operatorNotes"
+                placeholder="给运营/研发的说明，不会返回给客户。"
+              />
+              <div className="grid gap-3 md:grid-cols-2">
+                <ActiveCheckbox name="retryable" defaultChecked={true} label="允许提示可重试" />
+                <ActiveCheckbox name="active" defaultChecked={true} label="启用此定义" />
+              </div>
+              <div className="flex justify-end">
+                <SubmitButton label="保存错误码" />
+              </div>
+            </ManagedDialogForm>
+          )}
+        </ManagementDialog>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+          <table className="min-w-[1280px] border-separate border-spacing-0 text-left text-sm">
+            <thead>
+              <tr className="text-xs text-black/50">
+                <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">错误码</th>
+                <th className="w-[10%] border-b border-black/[0.08] px-3 py-2.5">分类</th>
+                <th className="w-[7%] border-b border-black/[0.08] px-3 py-2.5">状态码</th>
+                <th className="w-[25%] border-b border-black/[0.08] px-3 py-2.5">对外文案</th>
+                <th className="w-[8%] border-b border-black/[0.08] px-3 py-2.5">重试</th>
+                <th className="w-[8%] border-b border-black/[0.08] px-3 py-2.5">启用</th>
+                <th className="w-[8%] border-b border-black/[0.08] px-3 py-2.5">排序</th>
+                <th className="w-[12%] border-b border-black/[0.08] px-3 py-2.5">更新时间</th>
+                <th className="w-[6%] border-b border-black/[0.08] px-3 py-2.5">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                    <p className="font-mono text-xs text-black">{row.code}</p>
+                    {row.operatorNotes ? (
+                      <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-black/50">
+                        {row.operatorNotes}
+                      </p>
+                    ) : null}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/65">
+                    {row.category}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/65">
+                    {row.httpStatus}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs leading-5 text-black/72">
+                    {row.publicMessage}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/65">
+                    {row.retryable ? "是" : "否"}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/65">
+                    {row.active ? "启用" : "停用"}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/65">
+                    {row.sortOrder}
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/50">
+                    <p>{row.updatedLabel}</p>
+                    <p className="mt-1">创建于 {row.createdLabel}</p>
+                  </td>
+                  <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                    <ManagementDialog
+                      trigger={<ModalButton tone="secondary">编辑</ModalButton>}
+                      title={`编辑错误码 ${row.code}`}
+                      description="修改对外错误码的状态码、文案、启用状态与重试策略。"
+                    >
+                      {({ close }) => (
+                        <ManagedDialogForm action={upsertGatewayErrorDefinition} close={close}>
+                          <input type="hidden" name="definitionId" value={row.id} />
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <FormField label="错误码" name="code" required defaultValue={row.code} />
+                            <FormField label="分类" name="category" required defaultValue={row.category} />
+                            <FormField
+                              label="HTTP 状态码"
+                              name="httpStatus"
+                              required
+                              defaultValue={String(row.httpStatus)}
+                            />
+                            <FormField
+                              label="排序"
+                              name="sortOrder"
+                              required
+                              defaultValue={String(row.sortOrder)}
+                            />
+                          </div>
+                          <FormTextArea
+                            label="对外提示文案"
+                            name="publicMessage"
+                            defaultValue={row.publicMessage}
+                          />
+                          <FormTextArea
+                            label="内部备注"
+                            name="operatorNotes"
+                            defaultValue={row.operatorNotes ?? ""}
+                          />
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <ActiveCheckbox name="retryable" defaultChecked={row.retryable} label="允许提示可重试" />
+                            <ActiveCheckbox name="active" defaultChecked={row.active} label="启用此定义" />
+                          </div>
+                          <div className="flex justify-end">
+                            <SubmitButton label="保存错误码" />
+                          </div>
+                        </ManagedDialogForm>
+                      )}
+                    </ManagementDialog>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+          <p className="text-sm font-medium text-black">还没有错误码定义</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ type RequestState = "queued" | "processing" | "succeeded" | "failed" | "cancelle
 
 type DashboardDataOptions = {
   requestsPage?: number;
+  billingPage?: number;
   requestsApiKeyId?: string | null;
   analyticsLookbackMs?: number;
   analyticsApiKeyId?: string | null;
@@ -211,6 +212,12 @@ export type DashboardData = {
     total: number;
     totalPages: number;
   };
+  billingPagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
   requestQueueRows: Array<{
     requestId: string;
     createdAtLabel: string;
@@ -357,6 +364,12 @@ function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardDa
       total: 0,
       totalPages: 1,
     },
+    billingPagination: {
+      page: 1,
+      pageSize: 5,
+      total: 0,
+      totalPages: 1,
+    },
     requestQueueRows: [],
   };
 }
@@ -491,6 +504,7 @@ async function buildStripeInvoiceUrlMapBySessionId(sessionIds: string[]) {
 
 export async function getDashboardData({
   requestsPage = 1,
+  billingPage = 1,
   requestsApiKeyId = null,
   analyticsLookbackMs = 24 * 60 * 60 * 1000,
   analyticsApiKeyId = null,
@@ -572,6 +586,10 @@ export async function getDashboardData({
     const normalizedRequestsPage = Math.max(1, Math.floor(requestsPage));
     const requestFrom = (normalizedRequestsPage - 1) * pageSize;
     const requestTo = requestFrom + pageSize - 1;
+    const billingPageSize = 5;
+    const normalizedBillingPage = Math.max(1, Math.floor(billingPage));
+    const billingFrom = (normalizedBillingPage - 1) * billingPageSize;
+    const billingTo = billingFrom + billingPageSize - 1;
 
     const [
       { data: keySummary },
@@ -581,7 +599,7 @@ export async function getDashboardData({
       { data: keyRows },
       { data: usageEvents },
       { data: walletSummaryRows },
-      { data: walletLedgerRows },
+      walletLedgerResponse,
       providerResponse,
       providerModelResponse,
       supportedModelResponse,
@@ -594,7 +612,13 @@ export async function getDashboardData({
       supabaseAdmin.from("api_keys").select("id, name, key_prefix, environment, status, monthly_budget, last_used_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false }),
       supabaseAdmin.from("usage_events").select("id, endpoint, request_count, total_cost, status_code, created_at, api_key_id, model_id").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(8),
       supabaseAdmin.from("wallet_transactions").select("amount_delta").eq("workspace_id", workspace.id),
-      supabaseAdmin.from("wallet_transactions").select("id, entry_type, amount_delta, description, created_at, metadata").eq("workspace_id", workspace.id).order("created_at", { ascending: false }).limit(20),
+      supabaseAdmin
+        .from("wallet_transactions")
+        .select("id, entry_type, amount_delta, description, created_at, metadata", { count: "exact" })
+        .eq("workspace_id", workspace.id)
+        .gt("amount_delta", 0)
+        .order("created_at", { ascending: false })
+        .range(billingFrom, billingTo),
       supabaseAdmin.from("providers").select("id, name, regions, status"),
       supabaseAdmin
         .from("provider_models")
@@ -606,6 +630,7 @@ export async function getDashboardData({
     ]);
 
     const keyIdSet = new Set((keyRows ?? []).map((row) => row.id));
+    const walletLedgerRows = walletLedgerResponse.error ? [] : walletLedgerResponse.data ?? [];
     const safeRequestsApiKeyId =
       requestsApiKeyId && keyIdSet.has(requestsApiKeyId) ? requestsApiKeyId : null;
     const safeAnalyticsApiKeyId =
@@ -1128,6 +1153,15 @@ export async function getDashboardData({
         pageSize,
         total: requestTotal,
         totalPages: Math.max(1, Math.ceil(requestTotal / pageSize)),
+      },
+      billingPagination: {
+        page: normalizedBillingPage,
+        pageSize: billingPageSize,
+        total: walletLedgerResponse.error ? 0 : walletLedgerResponse.count ?? 0,
+        totalPages: Math.max(
+          1,
+          Math.ceil((walletLedgerResponse.error ? 0 : walletLedgerResponse.count ?? 0) / billingPageSize)
+        ),
       },
       requestQueueRows,
     };

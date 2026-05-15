@@ -1,5 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import {
+  buildGatewayErrorResponse,
+  resolveGatewayErrorDefinition,
+  sendGatewayError,
+} from "../lib/gateway-errors.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { normalizeOutputPayloadByCapability } from "../lib/image-output-contract.js";
 import { enqueueInferenceJob } from "../queue/runner.js";
@@ -25,50 +30,19 @@ const videoRequestSchema = z.object({
   resolution: z.string().optional(),
 });
 
-function normalizePublicErrorMessage(errorCode: string | null, errorMessage: string | null) {
-  const raw = (errorMessage ?? "").toLowerCase();
-
-  if (errorCode === "provider_submit_failed") {
-    if (
-      raw.includes(" 429") ||
-      raw.includes("quota") ||
-      raw.includes("rate limit") ||
-      raw.includes("rate-limit") ||
-      raw.includes("too many requests")
-    ) {
-      return "Upstream provider capacity is temporarily limited. Please retry shortly.";
-    }
-
-    return "The upstream provider could not accept this request. Please retry.";
-  }
-
-  if (errorCode === "upstream_timeout") {
-    return "The generation request timed out upstream. Please retry.";
-  }
-
-  if (errorCode === "upstream_failed") {
-    return "The upstream provider failed to complete this request. Please retry.";
-  }
-
-  if (errorCode === "upstream_result_missing") {
-    return "The upstream provider returned an incomplete result. Please retry.";
-  }
-
-  return errorMessage ?? "Request failed. Please retry.";
-}
-
 export async function registerTaskRoutes(app: FastifyInstance) {
   const sendRequestError = (reply: { code: (statusCode: number) => { send: (body: unknown) => unknown } }, error: unknown) => {
     if (error instanceof RequestValidationError) {
-      return reply.code(error.statusCode).send({
-        error: {
-          code: error.code,
-          message: error.message,
-        },
+      return sendGatewayError(reply, {
+        code: error.code,
+        statusCode: error.statusCode,
       });
     }
 
-    throw error;
+    return sendGatewayError(reply, {
+      code: "internal_error",
+      statusCode: 500,
+    });
   };
 
   app.get("/v1/models", async () => {
@@ -257,9 +231,16 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     }
 
     if (!data) {
+      const notFound = await buildGatewayErrorResponse({
+        code: "task_not_found",
+        statusCode: 404,
+      });
       return {
         id: params.id,
         status: "not_found",
+        error_code: notFound.error.code,
+        error_message: notFound.error.message,
+        error: notFound.error,
       };
     }
 
@@ -274,9 +255,16 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     }
 
     if (data.status === "failed") {
+      const publicError = await resolveGatewayErrorDefinition(data.error_code);
       return {
         ...data,
-        error_message: normalizePublicErrorMessage(data.error_code, data.error_message),
+        error_code: publicError.code,
+        error_message: publicError.publicMessage,
+        error: {
+          code: publicError.code,
+          message: publicError.publicMessage,
+          retryable: publicError.retryable,
+        },
       };
     }
 

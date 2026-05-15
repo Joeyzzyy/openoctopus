@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { CircleHelp, Copy, Download } from "lucide-react";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
 
@@ -19,6 +21,11 @@ type ModelDocRow = {
   requestExampleJson: string | null;
   submitResponseExampleJson: string | null;
   normalizedOutputExampleJson: string | null;
+  readmeMarkdown: string | null;
+  coverImageUrl: string | null;
+  coverImagePrompt: string | null;
+  showcaseImageUrls: string[];
+  showcaseImagePrompts: Array<string | null>;
   modelTypeLabel: string;
   priceLabel: string;
   modelDescription: string;
@@ -41,6 +48,50 @@ type TaskStatus =
   | "processing"
   | "succeeded"
   | "failed";
+
+type MarkdownBlock =
+  | { type: "heading"; level: 1 | 2 | 3; text: string }
+  | { type: "blockquote"; text: string }
+  | { type: "list"; items: string[] }
+  | { type: "ordered-list"; items: string[] }
+  | { type: "code"; code: string; language: string }
+  | { type: "paragraph"; text: string };
+
+const ALLOWED_README_TAGS = new Set([
+  "div",
+  "p",
+  "h1",
+  "h2",
+  "h3",
+  "ul",
+  "ol",
+  "li",
+  "strong",
+  "em",
+  "code",
+  "pre",
+  "blockquote",
+  "a",
+  "br",
+]);
+
+const IMPLIED_SECTION_TITLES = [
+  "Overview",
+  "Why it looks great",
+  "Limits and Performance",
+  "API Information",
+  "Input Schema",
+  "Output Schema",
+  "Usage Examples",
+  "Pricing",
+  "Billing Rule",
+  "How to Use",
+  "Pro tips for best quality",
+  "More Versions",
+  "Additional Resources",
+  "Documentation",
+  "Note",
+] as const;
 
 function formatPlaygroundError(payload: unknown) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
@@ -89,6 +140,395 @@ function taskStatusLabel(status: TaskStatus) {
   if (status === "succeeded") return "Succeeded";
   if (status === "failed") return "Failed";
   return "Idle";
+}
+
+function decodeHtmlEntities(text: string) {
+  return text
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
+  const source = decodeHtmlEntities(text);
+  const pattern = /(\[([^\]]+)\]\((https?:\/\/[^)]+)\)|`([^`]+)`|\*\*([^*]+)\*\*)/g;
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null = null;
+
+  while ((match = pattern.exec(source)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(source.slice(lastIndex, match.index));
+    }
+    if (match[2] && match[3]) {
+      nodes.push(
+        <a
+          key={`${keyPrefix}-${match.index}`}
+          href={match[3]}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[#9A4F18] underline underline-offset-4"
+        >
+          {match[2]}
+        </a>
+      );
+    } else if (match[4]) {
+      nodes.push(
+        <code
+          key={`${keyPrefix}-${match.index}`}
+          className="rounded bg-black/[0.05] px-1 py-0.5 text-[0.95em] text-black"
+        >
+          {decodeHtmlEntities(match[4])}
+        </code>
+      );
+    } else if (match[5]) {
+      nodes.push(
+        <strong key={`${keyPrefix}-${match.index}`} className="font-semibold text-black">
+          {decodeHtmlEntities(match[5])}
+        </strong>
+      );
+    }
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < source.length) {
+    nodes.push(source.slice(lastIndex));
+  }
+
+  return nodes;
+}
+
+function looksLikeHtmlDocument(text: string) {
+  return /^\s*<[^>]+>/.test(text);
+}
+
+function sanitizeReadmeHtml(html: string) {
+  let sanitized = html;
+
+  sanitized = sanitized.replace(/<!--[\s\S]*?-->/g, "");
+  sanitized = sanitized.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
+  sanitized = sanitized.replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "");
+
+  sanitized = sanitized.replace(/<\/?([a-zA-Z0-9-]+)([^>]*)>/g, (full, rawTag, rawAttrs) => {
+    const tag = String(rawTag).toLowerCase();
+    if (!ALLOWED_README_TAGS.has(tag)) {
+      return "";
+    }
+
+    const isClosing = full.startsWith("</");
+    if (isClosing) {
+      return `</${tag}>`;
+    }
+
+    if (tag === "a") {
+      const hrefMatch = String(rawAttrs).match(/\shref=(["'])(.*?)\1/i);
+      const href = hrefMatch?.[2]?.trim() ?? "";
+      const safeHref = /^https?:\/\//i.test(href) ? href : "";
+      return safeHref
+        ? `<a href="${safeHref}" target="_blank" rel="noreferrer">`
+        : "<a>";
+    }
+
+    if (tag === "br") {
+      return "<br />";
+    }
+
+    return `<${tag}>`;
+  });
+
+  return sanitized.trim();
+}
+
+function HtmlReadme({ html }: { html: string }) {
+  const sanitizedHtml = useMemo(() => sanitizeReadmeHtml(html), [html]);
+
+  if (!sanitizedHtml) return null;
+
+  return (
+    <section className="rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-black">README</h2>
+        <p className="mt-1 text-sm text-black/55">
+          Supplemental model documentation for search indexing and user context.
+        </p>
+      </div>
+      <article
+        className="readme-html space-y-4 text-[15px] leading-7 text-black/75 [&_a]:text-[#9A4F18] [&_a]:underline [&_a]:underline-offset-4 [&_blockquote]:border-l-4 [&_blockquote]:border-[#E58A35] [&_blockquote]:bg-[#FFF8EC] [&_blockquote]:px-4 [&_blockquote]:py-3 [&_blockquote]:italic [&_code]:rounded [&_code]:bg-black/[0.05] [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-3xl [&_h1]:font-semibold [&_h1]:tracking-tight [&_h1]:text-black [&_h2]:pt-2 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-black [&_h3]:pt-1 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-black [&_li]:my-1 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-5 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:border [&_pre]:border-black/[0.08] [&_pre]:bg-[#111827] [&_pre]:px-4 [&_pre]:py-4 [&_pre]:text-sm [&_pre]:leading-6 [&_pre]:text-white/90 [&_strong]:font-semibold [&_strong]:text-black [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5"
+        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+      />
+    </section>
+  );
+}
+
+function renderMultilineText(text: string, keyPrefix: string) {
+  return decodeHtmlEntities(text)
+    .split("\n")
+    .map((line, index, lines) => (
+      <Fragment key={`${keyPrefix}-${index}`}>
+        {renderInlineMarkdown(line, `${keyPrefix}-${index}`)}
+        {index < lines.length - 1 ? <br /> : null}
+      </Fragment>
+    ));
+}
+
+function extractImpliedHeading(blockText: string, isFirstBlock: boolean) {
+  const trimmed = blockText.trim();
+  if (!trimmed) return null;
+
+  const impliedSectionTitle = IMPLIED_SECTION_TITLES.find((title) =>
+    trimmed.toLowerCase().startsWith(`${title.toLowerCase()} `)
+  );
+  if (impliedSectionTitle) {
+    return {
+      heading: impliedSectionTitle,
+      body: trimmed.slice(impliedSectionTitle.length).trim(),
+      level: impliedSectionTitle === "Documentation" ? 3 : 2,
+    };
+  }
+
+  if (isFirstBlock) {
+    const titleAndBodyMatch = trimmed.match(
+      /^([A-Z0-9][A-Za-z0-9'’.+/-]*(?:\s+[A-Z0-9][A-Za-z0-9'’.+/-]*){0,4})\s+((?:The|A|An)\b[\s\S]*)$/
+    );
+    if (titleAndBodyMatch) {
+      return {
+        heading: titleAndBodyMatch[1].trim(),
+        body: titleAndBodyMatch[2].trim(),
+        level: 1,
+      };
+    }
+  }
+
+  return null;
+}
+
+function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
+  const normalized = markdown.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return [];
+
+  const lines = normalized.split("\n");
+  const blocks: MarkdownBlock[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index].trimEnd();
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      index += 1;
+      continue;
+    }
+
+    if (trimmed.startsWith("```")) {
+      const language = trimmed.slice(3).trim();
+      const codeLines: string[] = [];
+      index += 1;
+      while (index < lines.length && !lines[index].trim().startsWith("```")) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) {
+        index += 1;
+      }
+      blocks.push({ type: "code", code: codeLines.join("\n"), language });
+      continue;
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,3})\s+(.*)$/);
+    if (headingMatch) {
+      blocks.push({
+        type: "heading",
+        level: headingMatch[1].length as 1 | 2 | 3,
+        text: headingMatch[2].trim(),
+      });
+      index += 1;
+      continue;
+    }
+
+    if (trimmed.startsWith(">")) {
+      const quoteLines: string[] = [];
+      while (index < lines.length && lines[index].trim().startsWith(">")) {
+        quoteLines.push(lines[index].trim().replace(/^>\s?/, ""));
+        index += 1;
+      }
+      blocks.push({ type: "blockquote", text: quoteLines.join(" ") });
+      continue;
+    }
+
+    if (trimmed.startsWith("- ")) {
+      const items: string[] = [];
+      while (index < lines.length && lines[index].trim().startsWith("- ")) {
+        items.push(lines[index].trim().slice(2).trim());
+        index += 1;
+      }
+      blocks.push({ type: "list", items });
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(trimmed)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\d+\.\s+/.test(lines[index].trim())) {
+        items.push(lines[index].trim().replace(/^\d+\.\s+/, "").trim());
+        index += 1;
+      }
+      blocks.push({ type: "ordered-list", items });
+      continue;
+    }
+
+    const paragraphLines: string[] = [];
+    while (
+      index < lines.length &&
+      lines[index].trim() &&
+      !lines[index].trim().startsWith("```") &&
+      !lines[index].trim().startsWith(">") &&
+      !lines[index].trim().startsWith("- ") &&
+      !/^\d+\.\s+/.test(lines[index].trim()) &&
+      !/^(#{1,3})\s+/.test(lines[index].trim())
+    ) {
+      paragraphLines.push(lines[index].trim());
+      index += 1;
+    }
+    const paragraphText = paragraphLines.join("\n");
+    const inferredHeading = extractImpliedHeading(paragraphText, blocks.length === 0);
+    if (inferredHeading) {
+      blocks.push({
+        type: "heading",
+        level: inferredHeading.level as 1 | 2 | 3,
+        text: inferredHeading.heading,
+      });
+      if (inferredHeading.body) {
+        blocks.push({ type: "paragraph", text: inferredHeading.body });
+      }
+      continue;
+    }
+    blocks.push({ type: "paragraph", text: paragraphText });
+  }
+
+  return blocks;
+}
+
+function MarkdownReadme({ markdown }: { markdown: string }) {
+  const blocks = useMemo(() => parseMarkdownBlocks(markdown), [markdown]);
+
+  if (blocks.length === 0) return null;
+
+  return (
+    <section className="rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-black">README</h2>
+        <p className="mt-1 text-sm text-black/55">
+          Supplemental model documentation for search indexing and user context.
+        </p>
+      </div>
+      <article className="space-y-4 text-[15px] leading-7 text-black/75">
+        {blocks.map((block, index) => {
+          if (block.type === "heading") {
+            if (block.level === 1) {
+              return (
+                <h1 key={index} className="text-3xl font-semibold tracking-tight text-black">
+                  {renderInlineMarkdown(block.text, `heading-${index}`)}
+                </h1>
+              );
+            }
+            if (block.level === 2) {
+              return (
+                <h2 key={index} className="pt-2 text-2xl font-semibold tracking-tight text-black">
+                  {renderInlineMarkdown(block.text, `heading-${index}`)}
+                </h2>
+              );
+            }
+            return (
+              <h3 key={index} className="pt-1 text-xl font-semibold text-black">
+                {renderInlineMarkdown(block.text, `heading-${index}`)}
+              </h3>
+            );
+          }
+
+          if (block.type === "blockquote") {
+            return (
+              <blockquote
+                key={index}
+                className="border-l-4 border-[#E58A35] bg-[#FFF8EC] px-4 py-3 italic text-black/70"
+              >
+                {renderMultilineText(block.text, `quote-${index}`)}
+              </blockquote>
+            );
+          }
+
+          if (block.type === "list") {
+            return (
+              <ul key={index} className="list-disc space-y-2 pl-5 marker:text-[#9A4F18]">
+                {block.items.map((item, itemIndex) => (
+                  <li key={itemIndex}>{renderInlineMarkdown(item, `list-${index}-${itemIndex}`)}</li>
+                ))}
+              </ul>
+            );
+          }
+
+          if (block.type === "ordered-list") {
+            return (
+              <ol key={index} className="list-decimal space-y-2 pl-5 marker:text-[#9A4F18]">
+                {block.items.map((item, itemIndex) => (
+                  <li key={itemIndex}>{renderInlineMarkdown(item, `olist-${index}-${itemIndex}`)}</li>
+                ))}
+              </ol>
+            );
+          }
+
+          if (block.type === "code") {
+            return (
+              <div key={index} className="overflow-hidden rounded-xl border border-black/[0.08] bg-[#111827]">
+                {block.language ? (
+                  <div className="border-b border-white/10 px-3 py-2 text-xs uppercase tracking-[0.25em] text-white/45">
+                    {block.language}
+                  </div>
+                ) : null}
+                <pre className="overflow-x-auto px-4 py-4 text-sm leading-6 text-white/90">
+                  <code>{block.code}</code>
+                </pre>
+              </div>
+            );
+          }
+
+          return (
+            <p key={index} className="text-[15px] leading-7 text-black/75">
+              {renderMultilineText(block.text, `paragraph-${index}`)}
+            </p>
+          );
+        })}
+      </article>
+    </section>
+  );
+}
+
+function FieldHelpTooltip({
+  label,
+  description,
+}: {
+  label: string;
+  description?: string;
+}) {
+  const text = description?.trim();
+  if (!text) return null;
+
+  return (
+    <span className="group relative ml-1 inline-flex align-middle">
+      <button
+        type="button"
+        aria-label={`About ${label}`}
+        className="inline-flex size-4 items-center justify-center rounded-full text-black/35 outline-none transition-colors hover:text-[#9A4F18] focus-visible:text-[#9A4F18]"
+      >
+        <CircleHelp className="size-3.5" />
+      </button>
+      <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 hidden w-56 -translate-y-1/2 rounded-lg border border-black/[0.08] bg-[#111827] px-2.5 py-2 text-[11px] leading-5 text-white shadow-xl group-hover:block group-focus-within:block">
+        {text}
+      </span>
+    </span>
+  );
 }
 
 function parseInputSchemaText(schemaText: string): JsonSchemaField[] {
@@ -207,9 +647,15 @@ const ASPECT_RATIO_OPTIONS = [
   "21:9",
 ];
 
+const RESOLUTION_OPTIONS = ["1k", "2k", "3k", "4k"];
+
 function isAspectRatioEnum(values?: string[]) {
   if (!values || values.length === 0) return false;
   return values.every((value) => /^\d+:\d+$/.test(value));
+}
+
+function isResolutionField(key: string) {
+  return key.trim().toLowerCase() === "resolution";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -298,7 +744,7 @@ export function ModelsBrowser({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const safeRows = rows.length > 0 ? rows : [];
+  const safeRows = rows;
   const providerModelCountMap = useMemo(() => {
     const map = new Map<string, number>();
     for (const row of safeRows) {
@@ -384,6 +830,22 @@ export function ModelsBrowser({
       : (visibleRows[0]?.publicModel ?? null);
   const selectedModel =
     visibleRows.find((row) => row.publicModel === effectiveModelSlug) ?? visibleRows[0] ?? null;
+  const showcaseItems = useMemo(() => {
+    if (!selectedModel) return [];
+    const items = [
+      ...(selectedModel.coverImageUrl
+        ? [{ url: selectedModel.coverImageUrl, prompt: selectedModel.coverImagePrompt, kind: "cover" as const }]
+        : []),
+      ...selectedModel.showcaseImageUrls.map((url, index) => ({
+        url,
+        prompt: selectedModel.showcaseImagePrompts[index] ?? null,
+        kind: "gallery" as const,
+      })),
+    ];
+    return items.filter(
+      (item, index) => items.findIndex((candidate) => candidate.url === item.url) === index
+    );
+  }, [selectedModel]);
 
   const [mainTab, setMainTab] = useState<"playground" | "api">("playground");
   const [mountedTabs, setMountedTabs] = useState<Record<"playground" | "api", boolean>>({
@@ -403,6 +865,8 @@ export function ModelsBrowser({
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [showcasePromptCopied, setShowcasePromptCopied] = useState(false);
+  const [activeShowcaseIndex, setActiveShowcaseIndex] = useState(0);
   const playgroundImageUrls = useMemo(
     () => extractImageUrls(playgroundOutput),
     [playgroundOutput]
@@ -410,6 +874,10 @@ export function ModelsBrowser({
   useEffect(() => {
     setPlaygroundForm({});
   }, [effectiveModelSlug]);
+  useEffect(() => {
+    setActiveShowcaseIndex(0);
+    setShowcasePromptCopied(false);
+  }, [selectedModel?.publicModel]);
   const handleProviderChange = (nextProvider: string) => {
     setSelectedProvider(nextProvider);
     const nextRows = rowsByProvider.find(([provider]) => provider === nextProvider)?.[1] ?? [];
@@ -483,9 +951,17 @@ export function ModelsBrowser({
     }
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], "en-US"));
   }, [visibleRows]);
+  const relatedModels = useMemo(
+    () =>
+      visibleRows
+        .filter((row) => row.publicModel !== selectedModel?.publicModel)
+        .slice(0, 6),
+    [selectedModel?.publicModel, visibleRows]
+  );
   const capabilityTag = selectedModel?.modelTypeLabel || "uncategorized";
   const priceTag = selectedModel?.priceLabel || "";
   const modelSlugTail = selectedModel?.upstreamModelSlug || selectedModel?.publicModel || "model";
+  const activeShowcaseImage = showcaseItems[activeShowcaseIndex] ?? null;
   const parsedFields = useMemo(
     () =>
       parseInputSchemaText(selectedModel?.inputSchemaText ?? "").filter(
@@ -510,6 +986,16 @@ export function ModelsBrowser({
               ? field.enumValues[0]
               : ASPECT_RATIO_OPTIONS[0];
           next[field.key] = defaultRatio;
+          changed = true;
+          continue;
+        }
+
+        if (isResolutionField(field.key)) {
+          const defaultResolution =
+            field.enumValues && field.enumValues.length > 0
+              ? field.enumValues[0]
+              : RESOLUTION_OPTIONS[0];
+          next[field.key] = defaultResolution;
           changed = true;
           continue;
         }
@@ -692,7 +1178,15 @@ export function ModelsBrowser({
         }
         if (statusJson.status === "failed") {
           setTaskStatus("failed");
-          setPlaygroundError(statusJson.error_message || "Generation failed");
+          const structuredError =
+            statusJson.error && typeof statusJson.error === "object" && !Array.isArray(statusJson.error)
+              ? statusJson.error
+              : null;
+          setPlaygroundError(
+            statusJson.error_message ||
+              (typeof structuredError?.message === "string" ? structuredError.message : "") ||
+              "Generation failed"
+          );
           setPlaygroundErrorDetail({
             stage: "task_failed",
             taskId: submitJson.id,
@@ -742,6 +1236,38 @@ export function ModelsBrowser({
     }
   };
 
+  const copyShowcasePrompt = async (prompt: string) => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setShowcasePromptCopied(true);
+      setTimeout(() => setShowcasePromptCopied(false), 1500);
+    } catch {
+      setShowcasePromptCopied(false);
+    }
+  };
+
+  const downloadImage = async (src: string, filename: string) => {
+    try {
+      if (src.startsWith("data:image/")) {
+        const link = document.createElement("a");
+        link.href = src;
+        link.download = filename;
+        link.click();
+        return;
+      }
+      const response = await fetch(buildDisplayImageUrl(src));
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(buildDisplayImageUrl(src), "_blank", "noopener,noreferrer");
+    }
+  };
+
   return (
     <section className="space-y-4">
       <div className="space-y-2.5">
@@ -779,20 +1305,148 @@ export function ModelsBrowser({
             </select>
           </label>
         </div>
-        <p className="text-sm leading-6 text-black/65">
-          {selectedModel?.modelDescription || "No description is available for this model yet."}
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex rounded-sm bg-[#F3F4F6] px-2 py-1 text-xs text-black/75">
-            {capabilityTag}
-          </span>
-          {priceTag ? (
-            <span className="inline-flex rounded-sm bg-[#EAF7ED] px-2 py-1 text-xs font-medium text-[#245C31]">
-              {priceTag}
-            </span>
-          ) : null}
-        </div>
       </div>
+
+      {selectedModel ? (
+        <section className="overflow-hidden rounded-[28px] border border-[#E9DEC9] bg-[linear-gradient(135deg,#FFF7EA_0%,#FFFDFC_55%,#F6F1E7_100%)] shadow-sm">
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,1.2fr)_420px]">
+            <div className="flex flex-col justify-between p-4 sm:p-5">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.32em] text-[#9A4F18]">
+                  Showcase
+                </p>
+                <h2 className="mt-2 text-xl font-semibold tracking-tight text-black sm:text-2xl">
+                  {selectedModel.displayName}
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-black/68">
+                  {selectedModel.modelDescription || "This model does not have a detailed description yet."}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="inline-flex rounded-full border border-[#E7C89A] bg-white/80 px-3 py-1 text-xs font-medium text-[#9A4F18]">
+                    {selectedModel.providerName}
+                  </span>
+                  <span className="inline-flex rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
+                    {capabilityTag}
+                  </span>
+                  {priceTag ? (
+                    <span className="inline-flex rounded-full border border-[#CFE5D5] bg-[#EAF7ED] px-3 py-1 text-xs font-medium text-[#245C31]">
+                      {priceTag}
+                    </span>
+                  ) : null}
+                  <span className="inline-flex rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
+                    {selectedModel.publicModel}
+                  </span>
+                  {selectedModel.officialDocUrl ? (
+                    <a
+                      href={selectedModel.officialDocUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex rounded-full border border-black/[0.08] bg-white px-3 py-1 text-xs text-black/70 transition-colors hover:border-[#E58A35] hover:text-[#9A4F18]"
+                    >
+                      Official docs
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+              {showcaseItems.length > 1 ? (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveShowcaseIndex((current) =>
+                        current === 0 ? showcaseItems.length - 1 : current - 1
+                      )
+                    }
+                    className="inline-flex h-9 items-center rounded-full border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:border-[#E58A35] hover:text-[#9A4F18]"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveShowcaseIndex((current) =>
+                        current === showcaseItems.length - 1 ? 0 : current + 1
+                      )
+                    }
+                    className="inline-flex h-9 items-center rounded-full border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/70 transition-colors hover:border-[#E58A35] hover:text-[#9A4F18]"
+                  >
+                    Next
+                  </button>
+                  <span className="text-xs text-black/45">
+                    {activeShowcaseIndex + 1} / {showcaseItems.length}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+            <div className="border-t border-black/[0.06] bg-[#F6EFE1] p-2.5 lg:border-l lg:border-t-0">
+              {activeShowcaseImage ? (
+                <div className="space-y-2.5">
+                  <div className="group relative aspect-[16/10] overflow-hidden rounded-[18px] border border-white/70 bg-white shadow-[0_12px_28px_rgba(17,24,39,0.08)]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={buildDisplayImageUrl(activeShowcaseImage.url)}
+                      alt={`${selectedModel.displayName} showcase`}
+                      className="h-full w-full object-cover"
+                    />
+                    {activeShowcaseImage.prompt?.trim() ? (
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-[linear-gradient(180deg,rgba(17,24,39,0.02)_0%,rgba(17,24,39,0.88)_40%)] p-4 opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100">
+                        <div className="pointer-events-auto rounded-2xl border border-white/15 bg-black/35 p-3 backdrop-blur-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="line-clamp-5 whitespace-pre-wrap text-xs leading-5 text-white/92">
+                              {activeShowcaseImage.prompt}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => copyShowcasePrompt(activeShowcaseImage.prompt ?? "")}
+                              className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/20"
+                              aria-label="Copy prompt"
+                            >
+                              <Copy className="size-3.5" />
+                            </button>
+                          </div>
+                          <p className="mt-2 text-[11px] text-white/65">
+                            {showcasePromptCopied ? "Prompt copied" : "Hover to view prompt, click copy to reuse it."}
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                  {showcaseItems.length > 1 ? (
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {showcaseItems.slice(0, 8).map((item, index) => {
+                        const active = index === activeShowcaseIndex;
+                        return (
+                          <button
+                            key={`${item}-${index}`}
+                            type="button"
+                            onClick={() => setActiveShowcaseIndex(index)}
+                            className={`relative aspect-[6/5] overflow-hidden rounded-lg border transition-all ${
+                              active
+                                ? "border-[#E58A35] ring-2 ring-[#F3C68F]"
+                                : "border-white/70 hover:border-[#E7C89A]"
+                            }`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={buildDisplayImageUrl(item.url)}
+                              alt={`${selectedModel.displayName} thumbnail ${index + 1}`}
+                              className="h-full w-full object-cover"
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="flex aspect-[16/10] items-center justify-center rounded-[18px] border border-dashed border-black/[0.12] bg-white/70 px-6 text-center text-sm text-black/45">
+                  Showcase assets have not been uploaded for this model yet.
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-2xl border border-black/[0.08] bg-white p-2.5 shadow-sm sm:p-3">
         <div className="mb-2 border-b border-black/[0.08] pb-1.5">
@@ -844,14 +1498,12 @@ export function ModelsBrowser({
                   parsedFields.map((field) => (
                     <label key={field.key} className="block">
                       <span className="mb-1 block text-xs text-black/65">
-                        {field.label}
+                        <span className="inline-flex items-center">
+                          {field.label}
+                          <FieldHelpTooltip label={field.label} description={field.description} />
+                        </span>
                         {field.required ? <span className="pl-1 text-red-500">*</span> : null}
                       </span>
-                      {field.description ? (
-                        <p className="mb-1.5 text-[11px] leading-5 text-black/50">
-                          {field.description}
-                        </p>
-                      ) : null}
                       {field.key === "aspect_ratio" || isAspectRatioEnum(field.enumValues) ? (
                         <select
                           disabled={isSubmitting}
@@ -872,6 +1524,29 @@ export function ModelsBrowser({
                           ).map((ratio) => (
                             <option key={ratio} value={ratio}>
                               {ratio}
+                            </option>
+                          ))}
+                        </select>
+                      ) : isResolutionField(field.key) ? (
+                        <select
+                          disabled={isSubmitting}
+                          value={
+                            playgroundForm[field.key] ??
+                            (field.enumValues && field.enumValues.length > 0
+                              ? field.enumValues[0]
+                              : RESOLUTION_OPTIONS[0])
+                          }
+                          onChange={(event) =>
+                            setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
+                          }
+                          className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03]"
+                        >
+                          {(field.enumValues && field.enumValues.length > 0
+                            ? field.enumValues
+                            : RESOLUTION_OPTIONS
+                          ).map((resolution) => (
+                            <option key={resolution} value={resolution}>
+                              {resolution}
                             </option>
                           ))}
                         </select>
@@ -952,6 +1627,21 @@ export function ModelsBrowser({
               <div className="mb-3 flex items-center justify-between">
                 <div className="text-sm font-medium text-black">Output</div>
                 <div className="flex items-center gap-2">
+                  {playgroundImageUrls.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadImage(
+                          playgroundImageUrls[0],
+                          `${slugifyPathPart(selectedModel?.publicModel || "generated-image")}-1.png`
+                        )
+                      }
+                      className="inline-flex h-7 items-center gap-1 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
+                    >
+                      <Download className="size-3.5" />
+                      Download image
+                    </button>
+                  ) : null}
                   {playgroundOutput ? (
                     <button
                       type="button"
@@ -1026,6 +1716,60 @@ export function ModelsBrowser({
           <ApiQuickstartCard models={visibleRows} initialModel={effectiveModelSlug} />
         )}
       </section>
+
+      {relatedModels.length > 0 ? (
+        <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+          <div className="mb-3">
+            <h2 className="text-base font-semibold text-black">Related Models</h2>
+            <p className="mt-1 text-xs text-black/55">
+              More models from {selectedProvider || "this vendor"} that you can switch to quickly.
+            </p>
+          </div>
+          <div
+            className="grid gap-2.5"
+            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}
+          >
+            {relatedModels.map((model) => {
+              const active = model.publicModel === selectedModel?.publicModel;
+              return (
+                <button
+                  key={model.publicModel}
+                  type="button"
+                  onClick={() => handleModelChange(model.publicModel)}
+                  className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                    active
+                      ? "border-[#E58A35] bg-[#FFF8EC]"
+                      : "border-black/[0.08] bg-[#FCFCFA] hover:border-[#E7C89A] hover:bg-[#FFFBF4]"
+                  }`}
+                >
+                  <div className="text-[13px] font-medium leading-5 text-black">{model.displayName}</div>
+                  <div className="mt-0.5 line-clamp-2 text-[11px] leading-4.5 text-black/55">
+                    {model.modelDescription || model.upstreamModelSlug || model.publicModel}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-1">
+                    <span className="rounded-sm bg-white px-1.5 py-0.5 text-[10px] text-black/60">
+                      {model.modelTypeLabel || "model"}
+                    </span>
+                    {model.priceLabel ? (
+                      <span className="rounded-sm bg-[#EAF7ED] px-1.5 py-0.5 text-[10px] font-medium text-[#245C31]">
+                        {model.priceLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {selectedModel?.readmeMarkdown?.trim() ? (
+        looksLikeHtmlDocument(selectedModel.readmeMarkdown) ? (
+          <HtmlReadme html={selectedModel.readmeMarkdown} />
+        ) : (
+          <MarkdownReadme markdown={selectedModel.readmeMarkdown} />
+        )
+      ) : null}
 
       {detailModalOpen ? (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">

@@ -30,6 +30,7 @@ const capabilitySchema = z.enum([
 ]);
 const modalitySchema = z.enum(["image", "video", "audio"]);
 const modelVendorNameSchema = z.string().trim().min(2).max(80);
+const MODEL_SHOWCASE_BUCKET = "model-showcase-assets";
 
 function normalizeOptionalText(value: FormDataEntryValue | null) {
   if (typeof value !== "string") {
@@ -42,6 +43,182 @@ function normalizeOptionalText(value: FormDataEntryValue | null) {
 
 function parseBooleanField(value: FormDataEntryValue | null) {
   return value === "on" || value === "true";
+}
+
+function isNonEmptyFile(value: FormDataEntryValue | null): value is File {
+  return typeof File !== "undefined" && value instanceof File && value.size > 0;
+}
+
+function sanitizePathPart(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || "asset";
+}
+
+function inferImageExtension(file: File) {
+  const fromType =
+    file.type === "image/png"
+      ? "png"
+      : file.type === "image/jpeg"
+        ? "jpg"
+        : file.type === "image/webp"
+          ? "webp"
+          : file.type === "image/gif"
+            ? "gif"
+            : "";
+  if (fromType) return fromType;
+  const fromName = file.name.split(".").pop()?.trim().toLowerCase();
+  if (fromName && ["png", "jpg", "jpeg", "webp", "gif"].includes(fromName)) {
+    return fromName === "jpeg" ? "jpg" : fromName;
+  }
+  return "png";
+}
+
+async function uploadShowcaseImage(input: {
+  supabase: ReturnType<typeof createAdminClient>;
+  providerModelId: string;
+  file: File;
+  kind: "cover" | "gallery";
+  index?: number;
+}) {
+  const extension = inferImageExtension(input.file);
+  const baseName = sanitizePathPart(input.file.name.replace(/\.[^.]+$/, ""));
+  const path =
+    input.kind === "cover"
+      ? `provider-model-showcase/${input.providerModelId}/cover-${Date.now()}-${baseName}.${extension}`
+      : `provider-model-showcase/${input.providerModelId}/gallery-${Date.now()}-${input.index ?? 0}-${baseName}.${extension}`;
+  const buffer = Buffer.from(await input.file.arrayBuffer());
+  const { error: uploadError } = await input.supabase.storage
+    .from(MODEL_SHOWCASE_BUCKET)
+    .upload(path, buffer, {
+      contentType: input.file.type || "image/png",
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error(uploadError.message);
+  }
+
+  const { data: publicUrlData } = input.supabase.storage
+    .from(MODEL_SHOWCASE_BUCKET)
+    .getPublicUrl(path);
+
+  return {
+    storage_bucket: MODEL_SHOWCASE_BUCKET,
+    storage_path: path,
+    public_url: publicUrlData.publicUrl,
+  };
+}
+
+async function syncProviderModelShowcaseAssets(input: {
+  supabase: ReturnType<typeof createAdminClient>;
+  providerModelId: string;
+  coverFile: File | null;
+  coverPrompt: string | null;
+  removeCover: boolean;
+  galleryFiles: File[];
+  galleryPrompts: string[];
+  replaceGallery: boolean;
+}) {
+  const { data: existingRows, error: existingError } = await input.supabase
+    .from("provider_model_showcase_assets")
+    .select("id, asset_kind, storage_bucket, storage_path, sort_order")
+    .eq("provider_model_id", input.providerModelId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  const existing = existingRows ?? [];
+  const existingCover = existing.filter((row) => row.asset_kind === "cover");
+  const existingGallery = existing.filter((row) => row.asset_kind === "gallery");
+
+  const deleteRows = async (
+    rows: Array<{
+      id: string;
+      storage_bucket: string;
+      storage_path: string;
+    }>
+  ) => {
+    if (rows.length === 0) return;
+    const rowsByBucket = rows.reduce((map, row) => {
+      const list = map.get(row.storage_bucket) ?? [];
+      list.push(row.storage_path);
+      map.set(row.storage_bucket, list);
+      return map;
+    }, new Map<string, string[]>());
+
+    for (const [bucket, paths] of rowsByBucket.entries()) {
+      await input.supabase.storage.from(bucket).remove(paths);
+    }
+
+    const { error } = await input.supabase
+      .from("provider_model_showcase_assets")
+      .delete()
+      .in("id", rows.map((row) => row.id));
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  };
+
+  if (input.removeCover || input.coverFile) {
+    await deleteRows(existingCover);
+  }
+
+  if (input.replaceGallery && existingGallery.length > 0) {
+    await deleteRows(existingGallery);
+  }
+
+  if (input.coverFile) {
+    const uploaded = await uploadShowcaseImage({
+      supabase: input.supabase,
+      providerModelId: input.providerModelId,
+      file: input.coverFile,
+      kind: "cover",
+    });
+    const { error } = await input.supabase.from("provider_model_showcase_assets").insert({
+      provider_model_id: input.providerModelId,
+      asset_kind: "cover",
+      ...uploaded,
+      alt_text: input.coverPrompt,
+      sort_order: 0,
+    });
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  if (input.galleryFiles.length > 0) {
+    const nextSortOrder = input.replaceGallery
+      ? 0
+      : existingGallery.reduce((max, row) => Math.max(max, Number(row.sort_order ?? 0)), -1) + 1;
+
+    for (const [index, file] of input.galleryFiles.entries()) {
+      const uploaded = await uploadShowcaseImage({
+        supabase: input.supabase,
+        providerModelId: input.providerModelId,
+        file,
+        kind: "gallery",
+        index,
+      });
+      const { error } = await input.supabase.from("provider_model_showcase_assets").insert({
+        provider_model_id: input.providerModelId,
+        asset_kind: "gallery",
+        ...uploaded,
+        alt_text: input.galleryPrompts[index] || null,
+        sort_order: nextSortOrder + index,
+      });
+      if (error) {
+        throw new Error(error.message);
+      }
+    }
+  }
 }
 
 function parseStringArray(value: FormDataEntryValue | null) {
@@ -1111,6 +1288,25 @@ const deleteWorkerTemplateSchema = z.object({
   workerId: z.string().uuid(),
 });
 
+const gatewayErrorCodeSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(80)
+  .regex(/^[a-z0-9_]+$/);
+
+const upsertGatewayErrorDefinitionSchema = z.object({
+  definitionId: z.string().uuid().optional(),
+  code: gatewayErrorCodeSchema,
+  category: z.string().trim().min(2).max(40),
+  httpStatus: z.coerce.number().int().min(100).max(599),
+  publicMessage: z.string().trim().min(5).max(400),
+  retryable: z.boolean().default(false),
+  active: z.boolean().default(true),
+  sortOrder: z.coerce.number().int().min(0).max(9999).default(100),
+  operatorNotes: z.string().trim().max(2000).optional().nullable(),
+});
+
 
 export async function createWorkerTemplate(formData: FormData) {
   const { supabase, userId, workspaceId } = await getInternalAdminContext();
@@ -1233,6 +1429,65 @@ export async function deleteWorkerTemplate(formData: FormData) {
     targetType: "worker_template",
     targetId: parsed.workerId,
     summary: `Deleted worker template ${worker.slug}`,
+    details: parsed,
+  });
+
+  revalidatePath("/internal");
+}
+
+export async function upsertGatewayErrorDefinition(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = upsertGatewayErrorDefinitionSchema.parse({
+    definitionId: normalizeOptionalText(formData.get("definitionId")) ?? undefined,
+    code: formData.get("code"),
+    category: formData.get("category"),
+    httpStatus: formData.get("httpStatus"),
+    publicMessage: formData.get("publicMessage"),
+    retryable: parseBooleanField(formData.get("retryable")),
+    active: parseBooleanField(formData.get("active")),
+    sortOrder: formData.get("sortOrder"),
+    operatorNotes: normalizeOptionalText(formData.get("operatorNotes")),
+  });
+
+  const payload = {
+    code: parsed.code,
+    category: parsed.category,
+    http_status: parsed.httpStatus,
+    public_message: parsed.publicMessage,
+    retryable: parsed.retryable,
+    active: parsed.active,
+    sort_order: parsed.sortOrder,
+    operator_notes: parsed.operatorNotes ?? null,
+  };
+
+  const { data, error } = await supabase
+    .from("gateway_error_definitions")
+    .upsert(
+      parsed.definitionId
+        ? {
+            id: parsed.definitionId,
+            ...payload,
+          }
+        : payload,
+      { onConflict: "code" }
+    )
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: parsed.definitionId
+      ? "gateway_error_definition.update"
+      : "gateway_error_definition.create",
+    targetType: "gateway_error_definition",
+    targetId: data?.id ?? parsed.definitionId ?? null,
+    summary: `${parsed.definitionId ? "Updated" : "Created"} gateway error definition ${parsed.code}`,
     details: parsed,
   });
 
@@ -1814,6 +2069,14 @@ const createProviderModelSchema = z.object({
 export async function createProviderModel(formData: FormData) {
   try {
     const { supabase, userId, workspaceId } = await getInternalAdminContext();
+    const showcaseCoverFile = isNonEmptyFile(formData.get("showcaseCoverFile"))
+      ? (formData.get("showcaseCoverFile") as File)
+      : null;
+    const showcaseGalleryFiles = formData
+      .getAll("showcaseGalleryFiles")
+      .filter((value): value is File => isNonEmptyFile(value));
+    const removeShowcaseCover = parseBooleanField(formData.get("removeShowcaseCover"));
+    const replaceShowcaseGallery = parseBooleanField(formData.get("replaceShowcaseGallery"));
     const parsed = createProviderModelSchema.parse({
       providerId: formData.get("providerId"),
       supportedModelId: formData.get("supportedModelId"),
@@ -1905,6 +2168,22 @@ export async function createProviderModel(formData: FormData) {
 
     if (error) {
       throw new Error(error.message);
+    }
+
+    if (data?.id) {
+      await syncProviderModelShowcaseAssets({
+        supabase,
+        providerModelId: data.id,
+        coverFile: showcaseCoverFile,
+        coverPrompt: normalizeOptionalText(formData.get("showcaseCoverPrompt")),
+        removeCover: removeShowcaseCover,
+        galleryFiles: showcaseGalleryFiles,
+        galleryPrompts:
+          normalizeOptionalText(formData.get("showcaseGalleryPromptsText"))
+            ?.split(/\r?\n/)
+            .map((value) => value.trim()) ?? [],
+        replaceGallery: replaceShowcaseGallery,
+      });
     }
 
     await logAdminAudit({
@@ -2034,6 +2313,14 @@ const updateProviderModelDetailsSchema = z.object({
 
 export async function updateProviderModelDetails(formData: FormData) {
   const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const showcaseCoverFile = isNonEmptyFile(formData.get("showcaseCoverFile"))
+    ? (formData.get("showcaseCoverFile") as File)
+    : null;
+  const showcaseGalleryFiles = formData
+    .getAll("showcaseGalleryFiles")
+    .filter((value): value is File => isNonEmptyFile(value));
+  const removeShowcaseCover = parseBooleanField(formData.get("removeShowcaseCover"));
+  const replaceShowcaseGallery = parseBooleanField(formData.get("replaceShowcaseGallery"));
   const parsed = updateProviderModelDetailsSchema.parse({
     providerModelId: formData.get("providerModelId"),
     providerId: formData.get("providerId"),
@@ -2126,6 +2413,20 @@ export async function updateProviderModelDetails(formData: FormData) {
   if (error) {
     throw new Error(error.message);
   }
+
+  await syncProviderModelShowcaseAssets({
+    supabase,
+    providerModelId: parsed.providerModelId,
+    coverFile: showcaseCoverFile,
+    coverPrompt: normalizeOptionalText(formData.get("showcaseCoverPrompt")),
+    removeCover: removeShowcaseCover,
+    galleryFiles: showcaseGalleryFiles,
+    galleryPrompts:
+      normalizeOptionalText(formData.get("showcaseGalleryPromptsText"))
+        ?.split(/\r?\n/)
+        .map((value) => value.trim()) ?? [],
+    replaceGallery: replaceShowcaseGallery,
+  });
 
   await logAdminAudit({
     supabase,

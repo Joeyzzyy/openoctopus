@@ -9,6 +9,7 @@ type InternalTabKey =
   | "model-vendors"
   | "economics"
   | "worker-templates"
+  | "gateway-error-definitions"
   | "providers"
   | "monitoring"
   | "routes"

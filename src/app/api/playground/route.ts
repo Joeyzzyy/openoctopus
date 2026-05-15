@@ -5,6 +5,7 @@ import {
   getOrCreateWorkspacePlaygroundKey,
 } from "@/lib/playground-key-server";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
+import { buildGatewayErrorResponse, isGatewayValidationError } from "@/lib/gateway-errors";
 
 const submitSchema = z.object({
   action: z.literal("submit"),
@@ -78,9 +79,26 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(statusJson);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Invalid request" },
-      { status: 400 }
-    );
+    if (isGatewayValidationError(error)) {
+      const response = await buildGatewayErrorResponse({
+        code: "invalid_request",
+        statusCode: 400,
+      });
+      return NextResponse.json(response.payload, { status: response.statusCode });
+    }
+
+    if (error instanceof Error && error.message === "Not authenticated") {
+      const response = await buildGatewayErrorResponse({
+        code: "unauthorized",
+        statusCode: 401,
+      });
+      return NextResponse.json(response.payload, { status: response.statusCode });
+    }
+
+    const response = await buildGatewayErrorResponse({
+      code: "internal_error",
+      statusCode: 500,
+    });
+    return NextResponse.json(response.payload, { status: response.statusCode });
   }
 }

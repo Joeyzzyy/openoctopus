@@ -30,7 +30,6 @@ type RequestInterval = "minute" | "hour" | "day";
 type RequestRange = "60m" | "6h" | "24h" | "7d" | "30d" | "90d";
 type ModelType = "image" | "video" | "text-coding";
 type ModelCapabilityType = ModelType;
-type BillingFlow = "incoming" | "outgoing";
 const pageNav = [
   { view: "dashboard" },
   { view: "api-keys" },
@@ -117,10 +116,6 @@ function parseModelSlug(value: string | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function parseBillingFlow(value: string | undefined): BillingFlow {
-  return value === "outgoing" ? "outgoing" : "incoming";
-}
-
 function parseRangeMs(value: RequestRange) {
   if (value.endsWith("m")) {
     return Number(value.replace("m", "")) * 60 * 1000;
@@ -176,7 +171,6 @@ function buildDashboardHref(input: {
   analyticsRange: RequestRange;
   modelType?: ModelType;
   modelSlug?: string | null;
-  billingFlow?: BillingFlow;
 }) {
   const params = new URLSearchParams();
   params.set("view", input.view);
@@ -192,9 +186,6 @@ function buildDashboardHref(input: {
   }
   if (input.apiKeyId) {
     params.set("apiKey", input.apiKeyId);
-  }
-  if (input.billingFlow && input.view === "dashboard") {
-    params.set("billingFlow", input.billingFlow);
   }
   return `/dashboard?${params.toString()}`;
 }
@@ -316,10 +307,9 @@ export default async function DashboardPage({
   const selectedApiKeyId = getSearchValue(resolvedSearchParams, "apiKey") ?? null;
   const selectedModelType = parseModelType(getSearchValue(resolvedSearchParams, "modelType"));
   const selectedModelSlug = parseModelSlug(getSearchValue(resolvedSearchParams, "modelSlug"));
-  const selectedBillingFlow = parseBillingFlow(getSearchValue(resolvedSearchParams, "billingFlow"));
-
   const data = await getDashboardData({
     requestsPage,
+    billingPage,
     requestsApiKeyId: selectedApiKeyId,
     analyticsApiKeyId: selectedApiKeyId,
     analyticsLookbackMs: parseRangeMs(analyticsRange),
@@ -329,7 +319,7 @@ export default async function DashboardPage({
     redirect("/login");
   }
 
-  const { apiKeys, metrics, modelCatalogRows, requestFilters, requestPagination, requestQueueRows, analyticsRequests, billingRows, user } =
+  const { apiKeys, metrics, modelCatalogRows, requestFilters, requestPagination, billingPagination, requestQueueRows, analyticsRequests, billingRows, user } =
     data;
 
   const walletMetric = metrics.find((metric) => metric.label === "Wallet Balance");
@@ -360,12 +350,9 @@ export default async function DashboardPage({
   const modelCatalogRowsFiltered = selectedModelSlug
     ? modelCatalogRowsByType.filter((row) => row.publicModel === selectedModelSlug)
     : modelCatalogRowsByType;
-  const billingRowsFiltered = billingRows.filter((row) => row.amountValue >= 0);
-  const billingPageSize = 5;
-  const billingTotalPages = Math.max(1, Math.ceil(billingRowsFiltered.length / billingPageSize));
-  const normalizedBillingPage = Math.min(billingPage, billingTotalPages);
-  const billingStart = (normalizedBillingPage - 1) * billingPageSize;
-  const billingRowsPage = billingRowsFiltered.slice(billingStart, billingStart + billingPageSize);
+  const billingRowsPage = billingRows;
+  const billingTotalPages = billingPagination.totalPages;
+  const normalizedBillingPage = Math.min(billingPagination.page, billingTotalPages);
 
   const overviewCards = [
     {
@@ -405,43 +392,39 @@ export default async function DashboardPage({
             view: "dashboard",
             requestsPage: 1,
             apiKeyId: selectedApiKeyId,
-            analyticsInterval,
-            analyticsRange,
-            modelType: selectedModelType,
-            modelSlug: selectedModelSlug,
-            billingFlow: selectedBillingFlow,
-          })}
+          analyticsInterval,
+          analyticsRange,
+          modelType: selectedModelType,
+          modelSlug: selectedModelSlug,
+        })}
           modelsHref="/models"
           apiKeysHref={buildDashboardHref({
             view: "api-keys",
             requestsPage: 1,
             apiKeyId: selectedApiKeyId,
-            analyticsInterval,
-            analyticsRange,
-            modelType: selectedModelType,
-            modelSlug: selectedModelSlug,
-            billingFlow: selectedBillingFlow,
-          })}
+          analyticsInterval,
+          analyticsRange,
+          modelType: selectedModelType,
+          modelSlug: selectedModelSlug,
+        })}
           requestDetailsHref={buildDashboardHref({
             view: "request-details",
             requestsPage: 1,
             apiKeyId: selectedApiKeyId,
-            analyticsInterval,
-            analyticsRange,
-            modelType: selectedModelType,
-            modelSlug: selectedModelSlug,
-            billingFlow: selectedBillingFlow,
-          })}
+          analyticsInterval,
+          analyticsRange,
+          modelType: selectedModelType,
+          modelSlug: selectedModelSlug,
+        })}
           accountHref={buildDashboardHref({
             view: "account",
             requestsPage: 1,
             apiKeyId: selectedApiKeyId,
-            analyticsInterval,
-            analyticsRange,
-            modelType: selectedModelType,
-            modelSlug: selectedModelSlug,
-            billingFlow: selectedBillingFlow,
-          })}
+          analyticsInterval,
+          analyticsRange,
+          modelType: selectedModelType,
+          modelSlug: selectedModelSlug,
+        })}
         />
         <div className="mt-2 xl:mt-4">
           <section className="min-h-[calc(100vh-108px)] min-w-0">
@@ -831,7 +814,6 @@ export default async function DashboardPage({
                           analyticsRange,
                           modelType: selectedModelType,
                           modelSlug: selectedModelSlug,
-                          billingFlow: "incoming",
                         })}
                         aria-disabled={normalizedBillingPage <= 1}
                         className={cn(
@@ -858,7 +840,6 @@ export default async function DashboardPage({
                                   analyticsRange,
                                   modelType: selectedModelType,
                                   modelSlug: selectedModelSlug,
-                                  billingFlow: "incoming",
                                 })}
                                 className={cn(
                                   "inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors",
@@ -883,7 +864,6 @@ export default async function DashboardPage({
                           analyticsRange,
                           modelType: selectedModelType,
                           modelSlug: selectedModelSlug,
-                          billingFlow: "incoming",
                         })}
                         aria-disabled={normalizedBillingPage >= billingTotalPages}
                         className={cn(

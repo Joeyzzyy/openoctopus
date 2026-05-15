@@ -299,7 +299,8 @@ as $$
   );
 $$;
 
-create or replace view public.v_api_key_spend_summary as
+create or replace view public.v_api_key_spend_summary
+with (security_invoker = true) as
 select
   k.id as api_key_id,
   k.workspace_id,
@@ -315,7 +316,8 @@ from public.api_keys k
 left join public.usage_events u on u.api_key_id = k.id
 group by k.id;
 
-create or replace view public.v_model_spend_summary as
+create or replace view public.v_model_spend_summary
+with (security_invoker = true) as
 select
   u.workspace_id,
   m.id as model_id,
@@ -329,7 +331,8 @@ join public.supported_models m on m.id = u.model_id
 where date_trunc('month', u.created_at) = date_trunc('month', timezone('utc', now()))
 group by u.workspace_id, m.id, m.display_name, m.provider;
 
-create or replace view public.v_workspace_daily_spend as
+create or replace view public.v_workspace_daily_spend
+with (security_invoker = true) as
 select
   u.workspace_id,
   date_trunc('day', u.created_at)::date as usage_day,

@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import { env } from "./config.js";
+import { isGatewayValidationError, sendGatewayError } from "./lib/gateway-errors.js";
 import {
   processNextInferenceJob,
   processNextPollingJob,
@@ -20,6 +21,22 @@ const app = Fastify({
             target: "pino-pretty",
           },
   },
+});
+
+app.setErrorHandler(async (error, request, reply) => {
+  request.log.error(error);
+
+  if (isGatewayValidationError(error)) {
+    return sendGatewayError(reply, {
+      code: "invalid_request",
+      statusCode: 400,
+    });
+  }
+
+  return sendGatewayError(reply, {
+    code: "internal_error",
+    statusCode: 500,
+  });
 });
 
 await registerHealthRoute(app);

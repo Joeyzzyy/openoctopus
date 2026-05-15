@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
+import { sendGatewayError } from "../lib/gateway-errors.js";
 import { decryptProviderSecret } from "../lib/provider-secret-crypto.js";
 import { getStream } from "../lib/http.js";
 import { supabaseAdmin } from "../lib/supabase.js";
@@ -145,11 +146,9 @@ export async function registerFileRoutes(app: FastifyInstance) {
     }
 
     if (!requestRow) {
-      return reply.code(404).send({
-        error: {
-          code: "file_not_found",
-          message: "Generated file not found",
-        },
+      return sendGatewayError(reply, {
+        code: "file_not_found",
+        statusCode: 404,
       });
     }
 
@@ -169,11 +168,9 @@ export async function registerFileRoutes(app: FastifyInstance) {
     }
 
     if (!sourceUrl || !isAllowedGeminiDownloadUrl(sourceUrl)) {
-      return reply.code(404).send({
-        error: {
-          code: "file_not_found",
-          message: "Generated file is not available through this proxy",
-        },
+      return sendGatewayError(reply, {
+        code: "file_not_found",
+        statusCode: 404,
       });
     }
 
@@ -191,11 +188,9 @@ export async function registerFileRoutes(app: FastifyInstance) {
 
     const credential = credentialRows?.[0];
     if (!credential?.secret_ciphertext || !credential.secret_iv || !credential.secret_auth_tag) {
-      return reply.code(503).send({
-        error: {
-          code: "provider_credential_unavailable",
-          message: "Provider credential secret is unavailable",
-        },
+      return sendGatewayError(reply, {
+        code: "provider_credential_unavailable",
+        statusCode: 503,
       });
     }
 

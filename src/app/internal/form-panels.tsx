@@ -81,6 +81,7 @@ type ExecutionConfigFormState = {
   docSubmitResponseExampleJson: string;
   docNormalizedOutputExampleJson: string;
   docSourceUrl: string;
+  docReadmeMarkdown: string;
 };
 
 type SchemaFieldState = {
@@ -114,6 +115,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
       docSubmitResponseExampleJson: "",
       docNormalizedOutputExampleJson: "",
       docSourceUrl: "",
+      docReadmeMarkdown: "",
     };
   }
   if (slug === "upload-async-poll-v1") {
@@ -173,8 +175,54 @@ const ASPECT_RATIO_CANDIDATES = [
   "21:9",
 ];
 
+const RESOLUTION_CANDIDATES = ["1k", "2k", "3k", "4k"];
+
+const README_MARKDOWN_PROMPT = `Generate a clean SEO-friendly README in RAW MARKDOWN SOURCE format.
+
+Requirements:
+- Output raw markdown source only
+- The entire response MUST be wrapped inside a single quadruple-backtick markdown code block
+- Do not output any explanation before or after the markdown
+- Do not use HTML
+- Preserve proper markdown syntax exactly as written
+- Use exactly one H1 title
+- Use H2 sections with ##
+- Use H3 subsections only when necessary
+- Keep the tone factual, concise, and product-oriented
+- Do not mention competitors
+- Do not include placeholder text
+
+Structure:
+# <Model Name>
+
+> Short SEO summary
+
+## Overview
+
+## Why it looks great
+
+## Limits and Performance
+
+## Pricing
+
+### Billing Rule
+
+## How to Use
+
+## Input Parameters
+
+## Output Format
+
+## Pro tips for best quality
+
+## Note`;
+
 function randomFieldId() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+function isResolutionFieldName(value: string) {
+  return value.trim().toLowerCase() === "resolution";
 }
 
 function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields") {
@@ -506,6 +554,40 @@ function SchemaFieldEditor({
                 className={`${formInputClassName} h-9 text-xs md:col-span-2`}
                 placeholder='可选值（逗号分隔），如 1:1, 16:9, 9:16, 4:3, 3:4'
               />
+              {isResolutionFieldName(draft.name) ? (
+                <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
+                  <p className="mb-2 text-[11px] text-black/60">常用分辨率（可多选）</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {RESOLUTION_CANDIDATES.map((resolution) => {
+                      const checked = draft.enumValues.includes(resolution);
+                      return (
+                        <label key={resolution} className="inline-flex items-center gap-2 text-xs text-black/75">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) =>
+                              setDraft((current) => {
+                                const set = new Set(current.enumValues);
+                                if (event.target.checked) {
+                                  set.add(resolution);
+                                } else {
+                                  set.delete(resolution);
+                                }
+                                return {
+                                  ...current,
+                                  enumValues: Array.from(set),
+                                };
+                              })
+                            }
+                            className="size-3.5"
+                          />
+                          {resolution}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
               {draft.name.trim() === "aspect_ratio" ? (
                 <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
                   <p className="mb-2 text-[11px] text-black/60">常用比例（可多选）</p>
@@ -623,6 +705,13 @@ function buildDocExamplesFromSchemas(inputSchemaText: string, outputSchemaText: 
     const example = item.example;
     if (example !== undefined) {
       requestInput[name] = example;
+      continue;
+    }
+    const enumValues = Array.isArray(item.enum)
+      ? item.enum.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      : [];
+    if (enumValues.length > 0) {
+      requestInput[name] = enumValues[0];
       continue;
     }
     const type = typeof item.type === "string" ? item.type : "string";
@@ -818,6 +907,7 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
     docSubmitResponseExampleJson: "",
     docNormalizedOutputExampleJson: "",
     docSourceUrl: "",
+    docReadmeMarkdown: "",
   };
 
   if (!initialValue) {
@@ -903,6 +993,10 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
         parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).sourceUrl === "string"
           ? ((parsed.doc as Record<string, unknown>).sourceUrl as string)
           : fallback.docSourceUrl,
+      docReadmeMarkdown:
+        parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).readmeMarkdown === "string"
+          ? ((parsed.doc as Record<string, unknown>).readmeMarkdown as string)
+          : fallback.docReadmeMarkdown,
     };
   } catch {
     return fallback;
@@ -944,6 +1038,7 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
     requestExampleJson: state.docRequestExampleJson.trim() || undefined,
     submitResponseExampleJson: state.docSubmitResponseExampleJson.trim() || undefined,
     normalizedOutputExampleJson: state.docNormalizedOutputExampleJson.trim() || undefined,
+    readmeMarkdown: state.docReadmeMarkdown.trim() || undefined,
   };
   result.doc = doc;
   return JSON.stringify(result);
@@ -1285,6 +1380,10 @@ export function CreateProviderModelForm({
   defaultExecutionTemplate = "rest-async-poll-v1",
   defaultExecutionConfig = '{"submitPath":"/v1/models/{upstreamModel}:generate","pollPath":"/v1/operations/{taskId}","taskIdPath":"name","statusPath":"done","resultUrlPath":"response.outputUrl"}',
   defaultActive = true,
+  defaultShowcaseCoverUrl = null,
+  defaultShowcaseGalleryUrls = [],
+  defaultShowcaseCoverPrompt = "",
+  defaultShowcaseGalleryPrompts = [],
   providerModelId,
   disabled,
   onSuccess,
@@ -1307,6 +1406,10 @@ export function CreateProviderModelForm({
   defaultExecutionTemplate?: string;
   defaultExecutionConfig?: string;
   defaultActive?: boolean;
+  defaultShowcaseCoverUrl?: string | null;
+  defaultShowcaseGalleryUrls?: string[];
+  defaultShowcaseCoverPrompt?: string;
+  defaultShowcaseGalleryPrompts?: string[];
   providerModelId?: string;
   disabled: boolean;
   onSuccess?: () => void;
@@ -1322,6 +1425,8 @@ export function CreateProviderModelForm({
     | "input-params"
     | "output-params"
     | "doc-examples"
+    | "readme-doc"
+    | "showcase-assets"
     | "cost";
   const fallbackSupportedModelId = supportedModels[0]?.id ?? "";
   const templateSupportedModelId =
@@ -1379,6 +1484,12 @@ export function CreateProviderModelForm({
     executionTemplate === "rest-async-poll-v1" || executionTemplate === "upload-async-poll-v1";
   const isAsyncMode = executionConfigState.mode === "async" || (executionConfigState.mode === "auto" && templateIsAsync);
   const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("ai-autofill");
+  void defaultActive;
+  const [selectedCoverFileName, setSelectedCoverFileName] = useState("");
+  const [selectedGalleryFileNames, setSelectedGalleryFileNames] = useState<string[]>([]);
+  const galleryPromptPlaceholder = defaultShowcaseGalleryPrompts
+    .map((prompt, index) => `${index + 1}. ${prompt}`)
+    .join("\n");
   const sectionRefs = useRef<Record<ProviderModelFormTab, HTMLDivElement | null>>({
     "ai-autofill": null,
     basic: null,
@@ -1386,6 +1497,8 @@ export function CreateProviderModelForm({
     "input-params": null,
     "output-params": null,
     "doc-examples": null,
+    "readme-doc": null,
+    "showcase-assets": null,
     cost: null,
   });
   const tabItems = useMemo(
@@ -1396,6 +1509,8 @@ export function CreateProviderModelForm({
       { key: "input-params" as const, label: "输入参数" },
       { key: "output-params" as const, label: "输出参数" },
       { key: "doc-examples" as const, label: "示例配置" },
+      { key: "readme-doc" as const, label: "README 文档配置" },
+      { key: "showcase-assets" as const, label: "效果素材图" },
       { key: "cost" as const, label: "供应商成本配置" },
     ],
     []
@@ -2320,7 +2435,7 @@ export function CreateProviderModelForm({
                 一键生成示例 JSON
               </button>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3">
               <label className="block md:col-span-2">
                 <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">请求示例 JSON</span>
                 <textarea
@@ -2366,6 +2481,170 @@ export function CreateProviderModelForm({
             </div>
           </div>
         </div>
+        <div
+          ref={(node) => {
+            sectionRefs.current["readme-doc"] = node;
+          }}
+          className={activeTab === "readme-doc" ? "" : "hidden"}
+        >
+          <div className="grid gap-3">
+            <label className="block">
+              <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">README Markdown（工具页底部 SEO 内容）</span>
+              <textarea
+                value={executionConfigState.docReadmeMarkdown}
+                onChange={(event) =>
+                  setExecutionConfigState((current) => ({ ...current, docReadmeMarkdown: event.target.value }))
+                }
+                disabled={disabled}
+                className={formTextAreaClassName}
+                rows={16}
+                placeholder={"# google/imagen4\n\n> Short model summary for SEO and user education.\n\n## Overview\n\n- **Endpoint**: `https://api.example.com/...`\n- **Model ID**: `google/imagen4`"}
+              />
+            </label>
+            <div className="rounded-xl border border-black/[0.08] bg-white p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[11px] tracking-[0.35px] text-black/60">README 生成提示词（复制给模型生成 markdown）</p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(README_MARKDOWN_PROMPT);
+                      toast.success("README 提示词已复制");
+                    } catch {
+                      toast.error("复制失败，请手动复制");
+                    }
+                  }}
+                  className="inline-flex h-7 items-center rounded border border-black/[0.12] bg-white px-2 text-[11px] text-black/70 hover:bg-black/[0.03]"
+                >
+                  复制提示词
+                </button>
+              </div>
+              <textarea
+                value={README_MARKDOWN_PROMPT}
+                readOnly
+                className={formTextAreaClassName}
+                rows={18}
+              />
+            </div>
+          </div>
+        </div>
+        <div
+          ref={(node) => {
+            sectionRefs.current["showcase-assets"] = node;
+          }}
+          className={activeTab === "showcase-assets" ? "" : "hidden"}
+        >
+          <div className="rounded-xl border border-black/[0.08] bg-white p-3">
+            <div className="mb-3">
+              <p className="text-[11px] tracking-[0.35px] text-black/60">效果图素材（工具页封面与作品轮播）</p>
+            </div>
+            {defaultShowcaseCoverUrl ? (
+              <div className="mb-3">
+                <p className="mb-2 text-[11px] text-black/55">当前封面</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={defaultShowcaseCoverUrl}
+                  alt="Current model cover"
+                  className="h-28 w-28 rounded-lg border border-black/[0.08] object-cover"
+                />
+                {defaultShowcaseCoverPrompt ? (
+                  <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-black/60">
+                    当前提示词：{defaultShowcaseCoverPrompt}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {defaultShowcaseGalleryUrls.length > 0 ? (
+              <div className="mb-3">
+                <p className="mb-2 text-[11px] text-black/55">当前作品图</p>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {defaultShowcaseGalleryUrls.map((url, index) => (
+                    <div key={url} className="rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-2">
+                      <p className="mb-2 text-[11px] text-black/45">作品图 {index + 1}</p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt="Current showcase asset"
+                        className="h-20 w-20 rounded-lg border border-black/[0.08] object-cover"
+                      />
+                      {defaultShowcaseGalleryPrompts[index] ? (
+                        <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-black/60">
+                          {defaultShowcaseGalleryPrompts[index]}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上传封面（单张）</span>
+                <input
+                  type="file"
+                  name="showcaseCoverFile"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={(event) =>
+                    setSelectedCoverFileName(event.target.files?.[0]?.name ?? "")
+                  }
+                  className="block w-full text-xs text-black/65 file:mr-3 file:rounded-md file:border-0 file:bg-black file:px-3 file:py-2 file:text-xs file:font-medium file:text-white hover:file:bg-black/90"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">封面提示词</span>
+                <textarea
+                  name="showcaseCoverPrompt"
+                  defaultValue={defaultShowcaseCoverPrompt}
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={5}
+                  placeholder="这张封面图对应的提示词，会在前台 hover 时展示并可复制。"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上传作品图（可多张）</span>
+                <input
+                  type="file"
+                  name="showcaseGalleryFiles"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  multiple
+                  onChange={(event) =>
+                    setSelectedGalleryFileNames(
+                      Array.from(event.target.files ?? []).map((file) => file.name)
+                    )
+                  }
+                  className="block w-full text-xs text-black/65 file:mr-3 file:rounded-md file:border-0 file:bg-black file:px-3 file:py-2 file:text-xs file:font-medium file:text-white hover:file:bg-black/90"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">作品图提示词（每行对应一张，按上传顺序）</span>
+                <textarea
+                  name="showcaseGalleryPromptsText"
+                  defaultValue={defaultShowcaseGalleryPrompts.join("\n")}
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={6}
+                  placeholder={
+                    galleryPromptPlaceholder ||
+                    "第 1 行对应第 1 张图，第 2 行对应第 2 张图。留空则该图片不展示提示词。"
+                  }
+                />
+              </label>
+              <label className="inline-flex items-center gap-2 text-xs text-black/70">
+                <input type="checkbox" name="removeShowcaseCover" className="size-3.5" />
+                清空当前封面
+              </label>
+              <label className="inline-flex items-center gap-2 text-xs text-black/70">
+                <input type="checkbox" name="replaceShowcaseGallery" className="size-3.5" />
+                用新上传图片替换当前作品图
+              </label>
+            </div>
+            <ShowcaseUploadStatus
+              coverFileName={selectedCoverFileName}
+              galleryFileNames={selectedGalleryFileNames}
+            />
+          </div>
+        </div>
         </div>
       </div>
       ) : null}
@@ -2373,6 +2652,11 @@ export function CreateProviderModelForm({
         <div className="mt-4">
           <SubmitButton
             label={submitLabel}
+            pendingLabel={
+              selectedCoverFileName || selectedGalleryFileNames.length > 0
+                ? "上传并保存中..."
+                : "保存中..."
+            }
             disabled={disabled || !selectedSupportedModel?.capability}
           />
         </div>
@@ -2602,4 +2886,42 @@ function FormAutoClose({
   }, [onSuccess, pending, submitted, successMessage]);
 
   return null;
+}
+
+function ShowcaseUploadStatus({
+  coverFileName,
+  galleryFileNames,
+}: {
+  coverFileName: string;
+  galleryFileNames: string[];
+}) {
+  const { pending } = useFormStatus();
+  const hasSelectedFiles = Boolean(coverFileName) || galleryFileNames.length > 0;
+
+  if (pending && hasSelectedFiles) {
+    return (
+      <div className="rounded-xl border border-[#F3D9B4] bg-[#FFF8EC] px-3 py-2.5 text-xs leading-5 text-[#8A4B16]">
+        正在上传素材图并保存配置。当前提交流程会在完成后一次性返回，所以这里不显示百分比进度。
+      </div>
+    );
+  }
+
+  if (!hasSelectedFiles) {
+    return (
+      <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] px-3 py-2.5 text-xs leading-5 text-black/55">
+        图片会在点击保存后，随整张表单一起上传到 Supabase Storage；现在不是选中文件后立即上传。
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-[#D8E8D9] bg-[#F3FBF4] px-3 py-2.5 text-xs leading-5 text-[#245C31]">
+      已选择待上传素材：
+      {coverFileName ? ` 封面 1 张（${coverFileName}）` : ""}
+      {galleryFileNames.length > 0
+        ? ` 作品图 ${galleryFileNames.length} 张（${galleryFileNames.join("、")}）`
+        : ""}
+      。点击保存后开始上传。
+    </div>
+  );
 }

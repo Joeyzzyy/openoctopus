@@ -14,6 +14,14 @@ type SupportedModelRow = {
   created_at: string;
 };
 
+type ProviderModelShowcaseAssetRow = {
+  provider_model_id: string;
+  asset_kind: "cover" | "gallery";
+  public_url: string;
+  alt_text: string | null;
+  sort_order: number;
+};
+
 export const metadata = {
   title: "Models — OpenOctopus",
   description: "Model catalog, API docs, and live pricing sourced from internal model configuration.",
@@ -75,6 +83,13 @@ async function loadModelsPageData() {
     .order("created_at", { ascending: false });
   if (providerModelError) throw new Error(providerModelError.message);
 
+  const { data: showcaseAssetRows, error: showcaseAssetError } = await supabase
+    .from("provider_model_showcase_assets")
+    .select("provider_model_id, asset_kind, public_url, alt_text, sort_order")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (showcaseAssetError) throw new Error(showcaseAssetError.message);
+
   const providerModelsBySupportedId = new Map<string, Array<Record<string, unknown>>>();
   for (const row of providerModelRows ?? []) {
     const supportedId = typeof row.supported_model_id === "string" ? row.supported_model_id : null;
@@ -83,6 +98,15 @@ async function loadModelsPageData() {
     list.push((row as unknown) as Record<string, unknown>);
     providerModelsBySupportedId.set(supportedId, list);
   }
+  const showcaseAssetsByProviderModelId = ((showcaseAssetRows ?? []) as ProviderModelShowcaseAssetRow[]).reduce(
+    (map, asset) => {
+      const list = map.get(asset.provider_model_id) ?? [];
+      list.push(asset);
+      map.set(asset.provider_model_id, list);
+      return map;
+    },
+    new Map<string, ProviderModelShowcaseAssetRow[]>()
+  );
 
   const models = (data ?? []) as SupportedModelRow[];
   const modelDocRows = models.map((model) => {
@@ -90,6 +114,14 @@ async function loadModelsPageData() {
     const inputSchema = mapping && typeof mapping.input_schema === "object" ? (mapping.input_schema as Record<string, unknown>) : {};
     const outputSchema = mapping && typeof mapping.output_schema === "object" ? (mapping.output_schema as Record<string, unknown>) : {};
     const executionConfig = mapping && typeof mapping.execution_config === "object" ? (mapping.execution_config as Record<string, unknown>) : {};
+    const executionDoc =
+      executionConfig.doc && typeof executionConfig.doc === "object" && !Array.isArray(executionConfig.doc)
+        ? (executionConfig.doc as Record<string, unknown>)
+        : {};
+    const showcaseAssets =
+      mapping && typeof mapping.id === "string"
+        ? showcaseAssetsByProviderModelId.get(mapping.id) ?? []
+        : [];
     return {
       id: model.id,
       publicModel: model.model_slug,
@@ -99,11 +131,33 @@ async function loadModelsPageData() {
       capability: mapping && typeof mapping.capability === "string" ? mapping.capability : (model.capability ?? "image_generation"),
       inputSchemaText: JSON.stringify(inputSchema ?? {}, null, 2),
       outputSchemaText: JSON.stringify(outputSchema ?? {}, null, 2),
-      officialDocUrl: null,
+      officialDocUrl:
+        typeof executionDoc.sourceUrl === "string" ? executionDoc.sourceUrl : null,
       executionConfigText: JSON.stringify(executionConfig ?? {}, null, 2),
-      requestExampleJson: null,
-      submitResponseExampleJson: null,
-      normalizedOutputExampleJson: null,
+      requestExampleJson:
+        typeof executionDoc.requestExampleJson === "string"
+          ? executionDoc.requestExampleJson
+          : null,
+      submitResponseExampleJson:
+        typeof executionDoc.submitResponseExampleJson === "string"
+          ? executionDoc.submitResponseExampleJson
+          : null,
+      normalizedOutputExampleJson:
+        typeof executionDoc.normalizedOutputExampleJson === "string"
+          ? executionDoc.normalizedOutputExampleJson
+          : null,
+      readmeMarkdown:
+        typeof executionDoc.readmeMarkdown === "string" ? executionDoc.readmeMarkdown : null,
+      coverImageUrl:
+        showcaseAssets.find((asset) => asset.asset_kind === "cover")?.public_url ?? null,
+      coverImagePrompt:
+        showcaseAssets.find((asset) => asset.asset_kind === "cover")?.alt_text ?? null,
+      showcaseImageUrls: showcaseAssets
+        .filter((asset) => asset.asset_kind === "gallery")
+        .map((asset) => asset.public_url),
+      showcaseImagePrompts: showcaseAssets
+        .filter((asset) => asset.asset_kind === "gallery")
+        .map((asset) => asset.alt_text ?? null),
       modelTypeLabel: readMetaField(model.billing_config, "modelType"),
       priceLabel: billingSummary(model.billing_config),
       modelDescription: readMetaField(model.billing_config, "modelDescription"),
