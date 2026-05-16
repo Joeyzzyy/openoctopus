@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { parseBillingConfig } from "../lib/billing-config.js";
+import { parseBillingConfig, resolveBillingBreakdown } from "../lib/billing-config.js";
 import {
   pickRuntimeCredential,
   type RuntimeProviderCredential,
@@ -190,13 +190,27 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     );
   }
 
+  let customerBillingConfig;
   try {
-    parseBillingConfig(supportedModelRow.billing_config);
+    customerBillingConfig = parseBillingConfig(supportedModelRow.billing_config);
   } catch {
     throw new RequestValidationError(
       `Model ${input.model} is missing a valid billing configuration`,
       409,
       "model_billing_not_configured"
+    );
+  }
+
+  const estimatedCustomerCharge = resolveBillingBreakdown({
+    config: customerBillingConfig,
+    requestInput: input.input,
+  }).total;
+
+  if (estimatedCustomerCharge > walletBalance) {
+    throw new RequestValidationError(
+      "Insufficient balance. Please top up your wallet before making API requests.",
+      402,
+      "insufficient_balance"
     );
   }
 

@@ -43,6 +43,12 @@ import { useFormStatus } from "react-dom";
 
 type CapabilityOption = { value: string; label: string };
 type ProviderStatusOption = { value: string; label: string };
+type PaginationSummary = {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+};
 
 type SupportedModelSummary = {
   id: string;
@@ -1005,6 +1011,11 @@ function SupportedModelDetailsForm({
   close: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<"basic" | "pricing">("basic");
+  const [pricingSeed, setPricingSeed] = useState(model.billingConfigText);
+
+  useEffect(() => {
+    setPricingSeed(model.billingConfigText);
+  }, [model.billingConfigText]);
 
   return (
     <ManagedDialogForm action={updateSupportedModelDetails} close={close} className="grid gap-4">
@@ -1093,7 +1104,14 @@ function SupportedModelDetailsForm({
                       <span className="min-w-0 truncate text-black/65">
                         {mapping.providerName} / {mapping.upstream_model_slug}
                       </span>
-                      <span className="shrink-0 font-medium text-black/75">{mapping.pricingSummary}</span>
+                      <span className="ml-auto shrink-0 font-medium text-black/75">{mapping.pricingSummary}</span>
+                      <button
+                        type="button"
+                        onClick={() => setPricingSeed(mapping.pricingText)}
+                        className="shrink-0 rounded-md border border-black/[0.08] bg-white px-2 py-1 text-[11px] font-medium text-black/65 hover:bg-black/[0.03]"
+                      >
+                        同步到售价
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1101,7 +1119,7 @@ function SupportedModelDetailsForm({
                 <p className="mt-2 text-xs text-black/45">当前可售模型还没有供应商映射成本配置。</p>
               )}
             </div>
-            <BillingConfigEditor initialValue={model.billingConfigText} />
+            <BillingConfigEditor initialValue={pricingSeed} />
           </div>
         </div>
       </div>
@@ -1176,6 +1194,9 @@ function ActiveCheckbox({
 
 export function PublicModelsPanel({
   models,
+  modelPagination,
+  modelTypeFilter = "all",
+  modelStatusFilter = "all",
   providerModels = [],
   routingRules = [],
   providers = [],
@@ -1184,6 +1205,9 @@ export function PublicModelsPanel({
   capabilityOptions,
 }: {
   models: SupportedModelSummary[];
+  modelPagination?: PaginationSummary;
+  modelTypeFilter?: string;
+  modelStatusFilter?: "all" | "active" | "inactive";
   providerModels?: ProviderModelSummary[];
   routingRules?: RoutingRuleSummary[];
   providers?: ProviderSummary[];
@@ -1191,8 +1215,8 @@ export function PublicModelsPanel({
   modelVendors?: ModelVendorSummary[];
   capabilityOptions: readonly CapabilityOption[];
 }) {
-  const [activeModelTypeFilter, setActiveModelTypeFilter] = useState<string>("all");
-  const [activeStatusFilter, setActiveStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const activeModelTypeFilter = modelTypeFilter;
+  const activeStatusFilter = modelStatusFilter;
   const safeModelVendors = Array.isArray(modelVendors) ? modelVendors : [];
   const safeProviderModels = Array.isArray(providerModels) ? providerModels : [];
   const safeRoutingRules = Array.isArray(routingRules) ? routingRules : [];
@@ -1224,6 +1248,7 @@ export function PublicModelsPanel({
     modelSlug: item.model_slug,
     displayName: item.display_name,
     capability: item.capability,
+    billingConfigText: item.billingConfigText,
   }));
   const executionConfigPresets = safeProviderModels.map((item) => ({
     id: item.id,
@@ -1276,10 +1301,7 @@ export function PublicModelsPanel({
   const modelCategoryLabel = (value: string) => (value === "uncategorized" ? "未分类" : value);
   const modelTypeFilterOptions = [
     { value: "all", label: "全部类型" },
-    ...modelGroups.map((group) => ({
-      value: group.category,
-      label: modelCategoryLabel(group.category),
-    })),
+    ...SUPPORTED_MODEL_TYPE_OPTIONS.map((item) => ({ value: item, label: item })),
   ];
   const visibleModelGroups =
     activeModelTypeFilter === "all"
@@ -1296,6 +1318,20 @@ export function PublicModelsPanel({
             ),
     }))
     .filter((group) => group.models.length > 0);
+  const modelPage = modelPagination?.page ?? 1;
+  const modelTotalPages = modelPagination?.totalPages ?? 1;
+  const modelTotalCount = modelPagination?.totalCount ?? models.length;
+  const modelPageSize = modelPagination?.pageSize ?? 10;
+  const modelPageStart = modelTotalCount === 0 ? 0 : (modelPage - 1) * modelPageSize + 1;
+  const modelPageEnd = Math.min(modelPage * modelPageSize, modelTotalCount);
+  const getModelHref = (input: { page?: number; modelType?: string; status?: string }) => {
+    const params = new URLSearchParams();
+    params.set("tab", "public-models");
+    if ((input.page ?? 1) > 1) params.set("modelPage", String(input.page));
+    if (input.modelType && input.modelType !== "all") params.set("modelType", input.modelType);
+    if (input.status && input.status !== "all") params.set("modelStatus", input.status);
+    return `/internal?${params.toString()}`;
+  };
 
   return (
     <div className="space-y-4">
@@ -1309,10 +1345,9 @@ export function PublicModelsPanel({
                   {modelTypeFilterOptions.map((option) => {
                     const active = activeModelTypeFilter === option.value;
                     return (
-                      <button
+                      <a
                         key={option.value}
-                        type="button"
-                        onClick={() => setActiveModelTypeFilter(option.value)}
+                        href={getModelHref({ page: 1, modelType: option.value, status: activeStatusFilter })}
                         className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs transition-colors ${
                           active
                             ? "border-black bg-black text-white"
@@ -1320,7 +1355,7 @@ export function PublicModelsPanel({
                         }`}
                       >
                         {option.label}
-                      </button>
+                      </a>
                     );
                   })}
                 </div>
@@ -1335,10 +1370,9 @@ export function PublicModelsPanel({
                   ].map((option) => {
                     const active = activeStatusFilter === option.value;
                     return (
-                      <button
+                      <a
                         key={option.value}
-                        type="button"
-                        onClick={() => setActiveStatusFilter(option.value)}
+                        href={getModelHref({ page: 1, modelType: activeModelTypeFilter, status: option.value })}
                         className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs transition-colors ${
                           active
                             ? "border-black bg-black text-white"
@@ -1346,7 +1380,7 @@ export function PublicModelsPanel({
                         }`}
                       >
                         {option.label}
-                      </button>
+                      </a>
                     );
                   })}
                 </div>
@@ -1676,6 +1710,39 @@ export function PublicModelsPanel({
               当前筛选下没有可售模型。
             </div>
           ) : null}
+          <div className="flex items-center justify-between rounded-2xl border border-black/[0.06] bg-white px-4 py-3">
+            <p className="text-xs text-black/45">
+              Showing {modelPageStart}-{modelPageEnd} of {modelTotalCount}
+            </p>
+            <div className="flex items-center gap-2">
+              <a
+                aria-disabled={modelPage <= 1}
+                href={getModelHref({
+                  page: Math.max(1, modelPage - 1),
+                  modelType: activeModelTypeFilter,
+                  status: activeStatusFilter,
+                })}
+                className={`h-8 rounded-md border border-black/[0.08] bg-white px-3 py-2 text-xs text-black/65 ${
+                  modelPage <= 1 ? "pointer-events-none opacity-40" : "hover:bg-black/[0.03]"
+                }`}
+              >
+                Previous
+              </a>
+              <a
+                aria-disabled={modelPage >= modelTotalPages}
+                href={getModelHref({
+                  page: Math.min(modelTotalPages, modelPage + 1),
+                  modelType: activeModelTypeFilter,
+                  status: activeStatusFilter,
+                })}
+                className={`h-8 rounded-md border border-black/[0.08] bg-white px-3 py-2 text-xs text-black/65 ${
+                  modelPage >= modelTotalPages ? "pointer-events-none opacity-40" : "hover:bg-black/[0.03]"
+                }`}
+              >
+                Next
+              </a>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
@@ -2003,6 +2070,7 @@ export function EconomicsPanel({
     modelSlug: item.model_slug,
     displayName: item.display_name,
     capability: item.capability,
+    billingConfigText: item.billingConfigText,
   }));
   const providerOptions = safeProviders.map((item) => ({
     id: item.id,
@@ -2898,6 +2966,7 @@ export function ModelsPanel({
     modelSlug: item.model_slug,
     displayName: item.display_name,
     capability: item.capability,
+    billingConfigText: item.billingConfigText,
   }));
 
   const providerOptions = providers.map((item) => ({
@@ -3040,19 +3109,27 @@ export function ModelsPanel({
 
 export function InternalModelAiUsageLogsPanel({
   logs,
+  pagination,
 }: {
   logs: InternalModelAiUsageLogSummary[];
+  pagination?: PaginationSummary;
 }) {
   const totalCost = logs.reduce((sum, row) => sum + Number(row.estimatedCostUsd ?? 0), 0);
   const succeeded = logs.filter((row) => row.status === "succeeded").length;
   const failed = logs.filter((row) => row.status === "failed").length;
+  const page = pagination?.page ?? 1;
+  const totalPages = pagination?.totalPages ?? 1;
+  const totalCount = pagination?.totalCount ?? logs.length;
+  const pageSize = pagination?.pageSize ?? 10;
+  const pageStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const pageEnd = Math.min(page * pageSize, totalCount);
 
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-black/[0.08] bg-white p-3">
           <p className="text-[11px] tracking-[0.35px] text-black/45">总调用次数</p>
-          <p className="mt-1 text-lg font-semibold text-black">{logs.length}</p>
+          <p className="mt-1 text-lg font-semibold text-black">{totalCount}</p>
         </div>
         <div className="rounded-xl border border-black/[0.08] bg-white p-3">
           <p className="text-[11px] tracking-[0.35px] text-black/45">成功 / 失败</p>
@@ -3127,6 +3204,31 @@ export function InternalModelAiUsageLogsPanel({
           </tbody>
         </table>
       </div>
+      <div className="flex items-center justify-between rounded-2xl border border-black/[0.06] bg-white px-4 py-3">
+        <p className="text-xs text-black/45">
+          Showing {pageStart}-{pageEnd} of {totalCount}
+        </p>
+        <div className="flex items-center gap-2">
+          <a
+            aria-disabled={page <= 1}
+            href={`/internal?tab=internal-model-ai-usage-logs&aiUsagePage=${Math.max(1, page - 1)}`}
+            className={`h-8 rounded-md border border-black/[0.08] bg-white px-3 py-2 text-xs text-black/65 ${
+              page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-black/[0.03]"
+            }`}
+          >
+            Previous
+          </a>
+          <a
+            aria-disabled={page >= totalPages}
+            href={`/internal?tab=internal-model-ai-usage-logs&aiUsagePage=${Math.min(totalPages, page + 1)}`}
+            className={`h-8 rounded-md border border-black/[0.08] bg-white px-3 py-2 text-xs text-black/65 ${
+              page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-black/[0.03]"
+            }`}
+          >
+            Next
+          </a>
+        </div>
+      </div>
     </div>
   );
 }
@@ -3147,6 +3249,7 @@ export function RoutesPanel({
     modelSlug: item.model_slug,
     displayName: item.display_name,
     capability: item.capability,
+    billingConfigText: item.billingConfigText,
   }));
   const providerModelOptions = providerModels.map((item) => ({
     id: item.id,
@@ -3286,6 +3389,7 @@ export function CreateRoutingRuleButton({
     modelSlug: item.model_slug,
     displayName: item.display_name,
     capability: item.capability,
+    billingConfigText: item.billingConfigText,
   }));
   const providerModelOptions = providerModels.map((item) => ({
     id: item.id,

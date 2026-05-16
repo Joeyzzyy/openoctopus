@@ -64,6 +64,25 @@ function resolveAppBaseUrl() {
   return "http://localhost:3000";
 }
 
+async function isSystemPlaygroundKey(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  workspaceId: string;
+  keyId: string;
+}) {
+  const { data, error } = await input.supabase
+    .from("workspace_playground_keys")
+    .select("api_key_id")
+    .eq("workspace_id", input.workspaceId)
+    .eq("api_key_id", input.keyId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return Boolean(data?.api_key_id);
+}
+
 // ---------- Create API Key ----------
 
 const createKeySchema = z.object({
@@ -140,6 +159,10 @@ export async function deleteApiKey(keyId: string): Promise<ActionResult> {
 
     const { supabase, workspaceId } = await getAuthedWorkspace();
 
+    if (await isSystemPlaygroundKey({ supabase, workspaceId, keyId })) {
+      return { success: false, error: "System generated playground keys cannot be deleted." };
+    }
+
     const { error } = await supabase
       .from("api_keys")
       .delete()
@@ -178,6 +201,10 @@ export async function updateApiKey(input: {
 
     const { supabase, workspaceId } = await getAuthedWorkspace();
     const { keyId, name, monthlyBudget } = parsed.data;
+
+    if (await isSystemPlaygroundKey({ supabase, workspaceId, keyId })) {
+      return { success: false, error: "System generated playground keys cannot be edited." };
+    }
 
     const updates: Record<string, unknown> = {};
     if (name !== undefined) updates.name = name;
@@ -219,6 +246,10 @@ export async function toggleApiKeyStatus(
     }
 
     const { supabase, workspaceId } = await getAuthedWorkspace();
+
+    if (await isSystemPlaygroundKey({ supabase, workspaceId, keyId })) {
+      return { success: false, error: "System generated playground keys cannot be paused." };
+    }
 
     const { error } = await supabase
       .from("api_keys")

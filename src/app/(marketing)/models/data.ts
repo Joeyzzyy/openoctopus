@@ -48,6 +48,12 @@ export type ModelDocRow = {
   billingCurrency: string;
   primaryPriceValue: number | null;
   primaryPriceLabel: string | null;
+  priceTiers: Array<{
+    resolution: string;
+    quality: string;
+    price: number;
+    label: string;
+  }>;
 };
 
 export type GatewayErrorDocRow = {
@@ -103,18 +109,71 @@ function readKeywordList(value: unknown) {
     });
 }
 
+const QUALITY_ORDER = ["low", "medium", "high"];
+
+function formatUsd(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: value >= 0.1 ? 2 : 3,
+    maximumFractionDigits: value >= 0.1 ? 2 : 3,
+  }).format(value);
+}
+
+function splitCombinationKey(key: string) {
+  const [resolution, quality] = key.split("__");
+  return {
+    resolution: resolution || "default",
+    quality: quality || "default",
+  };
+}
+
+function readPriceTiers(value: unknown) {
+  try {
+    const normalized = normalizeBillingConfig(parseBillingConfig(value));
+    return Object.entries(normalized.parameterPrices?.combinations ?? {})
+      .map(([key, price]) => {
+        const numericPrice = Number(price);
+        if (!Number.isFinite(numericPrice) || numericPrice <= 0) return null;
+        const labels = splitCombinationKey(key);
+        return {
+          ...labels,
+          price: numericPrice,
+          label: `Resolution: ${labels.resolution} output resolution · Quality: ${labels.quality} generation quality · ${formatUsd(numericPrice)} / image`,
+        };
+      })
+      .filter((item): item is { resolution: string; quality: string; price: number; label: string } => Boolean(item))
+      .sort((a, b) =>
+        a.resolution.localeCompare(b.resolution, "en-US", { numeric: true }) ||
+        (QUALITY_ORDER.indexOf(a.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(a.quality)) -
+          (QUALITY_ORDER.indexOf(b.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(b.quality)) ||
+        a.quality.localeCompare(b.quality, "en-US", { numeric: true })
+      );
+  } catch {
+    return [];
+  }
+}
+
 function billingSummary(value: unknown) {
   try {
     const normalized = normalizeBillingConfig(parseBillingConfig(value));
     const parts: string[] = [];
     const { charges, currency } = normalized;
+    const tiers = readPriceTiers(value);
     if (charges.perRequest) parts.push(`per request ${charges.perRequest}`);
-    if (charges.perImage) parts.push(`per image ${charges.perImage}`);
-    if (charges.perVideo) parts.push(`per video ${charges.perVideo}`);
+    if (tiers.length > 0) {
+      const prices = tiers.map((tier) => tier.price);
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      parts.push(min === max ? `${formatUsd(min)} per image` : `${formatUsd(min)}-${formatUsd(max)} per image`);
+    } else if (charges.perImage) {
+      parts.push(`per image ${charges.perImage}`);
+    }
+    if (tiers.length === 0 && charges.perVideo) parts.push(`per video ${charges.perVideo}`);
     if (charges.perSecond) parts.push(`per second ${charges.perSecond}`);
     if (charges.inputTextTokensPerMillion) parts.push(`per 1M input tokens ${charges.inputTextTokensPerMillion}`);
     if (charges.outputTextTokensPerMillion) parts.push(`per 1M output tokens ${charges.outputTextTokensPerMillion}`);
-    return `${currency} ${parts.join(" + ")}`;
+    return parts.some((part) => part.includes("$")) ? parts.join(" + ") : `${currency} ${parts.join(" + ")}`;
   } catch {
     return "Invalid pricing configuration";
   }
@@ -124,6 +183,17 @@ function readPrimaryPrice(value: unknown) {
   try {
     const normalized = normalizeBillingConfig(parseBillingConfig(value));
     const { charges, currency } = normalized;
+    const tiers = readPriceTiers(value);
+    if (tiers.length > 0) {
+      const prices = tiers.map((tier) => tier.price);
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      return {
+        billingCurrency: currency,
+        primaryPriceValue: min,
+        primaryPriceLabel: min === max ? "per image" : `${formatUsd(min)}-${formatUsd(max)} per image`,
+      };
+    }
     if (charges.perImage) return { billingCurrency: currency, primaryPriceValue: charges.perImage, primaryPriceLabel: "per image" };
     if (charges.perVideo) return { billingCurrency: currency, primaryPriceValue: charges.perVideo, primaryPriceLabel: "per video" };
     if (charges.perRequest) return { billingCurrency: currency, primaryPriceValue: charges.perRequest, primaryPriceLabel: "per request" };
@@ -368,6 +438,7 @@ export const loadModelsPageData = cache(async () => {
         ? showcaseAssetsByProviderModelId.get(mapping.id) ?? []
         : [];
     const primaryPrice = readPrimaryPrice(model.billing_config);
+    const priceTiers = readPriceTiers(model.billing_config);
 
     return {
       id: model.id,
@@ -412,6 +483,7 @@ export const loadModelsPageData = cache(async () => {
       billingCurrency: primaryPrice.billingCurrency,
       primaryPriceValue: primaryPrice.primaryPriceValue,
       primaryPriceLabel: primaryPrice.primaryPriceLabel,
+      priceTiers,
     };
   });
 

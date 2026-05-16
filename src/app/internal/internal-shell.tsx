@@ -21,7 +21,6 @@ type TabItem = {
   key: InternalTabKey;
   label: string;
   group: "static" | "dynamic" | "overview";
-  count?: number;
 };
 
 function buildHref(tab: InternalTabKey, selectedTemplateKey?: string) {
@@ -41,7 +40,7 @@ export function InternalShell({
 }: {
   activeTab: InternalTabKey;
   selectedTemplateKey?: string;
-  tabs: TabItem[];
+  tabs: readonly TabItem[];
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -72,19 +71,8 @@ export function InternalShell({
                 : "border-black/[0.08] bg-[#FCFCFA] text-black/75 hover:bg-white"
             }`}
           >
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs font-medium leading-5">{tab.label}</p>
-              </div>
-              {typeof tab.count === "number" ? (
-                <span
-                  className={`inline-flex min-w-7 items-center justify-center rounded-md px-1.5 py-0.5 text-[10px] ${
-                    active ? "bg-white/12 text-white" : "bg-white text-black/55"
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              ) : null}
+            <div className="min-w-0">
+              <p className="text-xs font-medium leading-5">{tab.label}</p>
             </div>
           </Link>
         );

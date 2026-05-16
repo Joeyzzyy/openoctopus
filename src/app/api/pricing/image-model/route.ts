@@ -17,7 +17,8 @@ export async function GET() {
         pricing.costUsd === null
           ? "Unavailable"
           : formatPricingLabel(pricing.costUsd, pricing.billingUnit),
-      sellLabel: formatPricingLabel(pricing.sellUsd, pricing.billingUnit),
+      sellLabel: pricing.sellLabel,
+      priceTiers: pricing.priceTiers,
     });
   } catch (error) {
     console.error("Failed to load marketing pricing", error);

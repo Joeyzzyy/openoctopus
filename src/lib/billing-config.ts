@@ -43,14 +43,7 @@ const hybridChargesSchema = z
     inputTextTokensPerMillion: positivePriceSchema.optional(),
     outputTextTokensPerMillion: positivePriceSchema.optional(),
   })
-  .superRefine((value, ctx) => {
-    if (!Object.values(value).some((item) => item !== undefined)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "At least one hybrid billing charge is required",
-      });
-    }
-  });
+  .default({});
 
 const parameterMultipliersSchema = z
   .object({
@@ -59,12 +52,32 @@ const parameterMultipliersSchema = z
   })
   .optional();
 
-const hybridBillingSchema = z.object({
-  billingMode: z.literal("hybrid"),
-  currency: currencySchema,
-  charges: hybridChargesSchema,
-  parameterMultipliers: parameterMultipliersSchema,
-});
+const parameterPricesSchema = z
+  .object({
+    combinations: z.record(z.string(), z.coerce.number().positive().max(1000000)).optional(),
+  })
+  .optional();
+
+const hybridBillingSchema = z
+  .object({
+    billingMode: z.literal("hybrid"),
+    currency: currencySchema,
+    charges: hybridChargesSchema,
+    parameterMultipliers: parameterMultipliersSchema,
+    parameterPrices: parameterPricesSchema,
+  })
+  .superRefine((value, ctx) => {
+    const hasCharge = Object.values(value.charges).some((item) => item !== undefined);
+    const hasCombinationPrices =
+      value.parameterPrices?.combinations &&
+      Object.keys(value.parameterPrices.combinations).length > 0;
+    if (!hasCharge && !hasCombinationPrices) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "At least one billing charge or parameter price is required",
+      });
+    }
+  });
 
 export const billingConfigSchema = z.union([
   hybridBillingSchema,
@@ -153,9 +166,10 @@ function resolveRequestedAssetCount(
   if (type === "image") {
     return (
       readNumericCandidate(input.n) ??
+      readNumericCandidate(input.num_images) ??
       readNumericCandidate(input.imageCount) ??
       readNumericCandidate(input.images) ??
-      0
+      1
     );
   }
 
@@ -302,6 +316,14 @@ export function normalizeBillingConfig(config: BillingConfig): HybridBillingConf
 export function deriveLegacyBillingFields(config: BillingConfig) {
   const normalized = normalizeBillingConfig(config);
   const charges = normalized.charges;
+  const combinationPrices = Object.values(normalized.parameterPrices?.combinations ?? {});
+
+  if (combinationPrices.length > 0) {
+    return {
+      unitLabel: "combination",
+      defaultUnitCost: Math.min(...combinationPrices),
+    };
+  }
 
   if (charges.perImage) {
     return {
@@ -343,14 +365,23 @@ export function summarizeBillingConfig(config: BillingConfig) {
   const normalized = normalizeBillingConfig(config);
   const parts: string[] = [];
   const { charges } = normalized;
+  const combinationPrices = Object.values(normalized.parameterPrices?.combinations ?? {});
 
   if (charges.perRequest) {
     parts.push(`每次请求 ${charges.perRequest}`);
   }
-  if (charges.perImage) {
+  if (combinationPrices.length > 0) {
+    const min = Math.min(...combinationPrices);
+    const max = Math.max(...combinationPrices);
+    parts.push(
+      min === max
+        ? `组合阶梯 ${combinationPrices.length} 档 · ${min}`
+        : `组合阶梯 ${combinationPrices.length} 档 · ${min}-${max}`
+    );
+  } else if (charges.perImage) {
     parts.push(`每张图片 ${charges.perImage}`);
   }
-  if (charges.perVideo) {
+  if (combinationPrices.length === 0 && charges.perVideo) {
     parts.push(`每个视频 ${charges.perVideo}`);
   }
   if (charges.perSecond) {
@@ -418,11 +449,30 @@ export function resolveBillingBreakdown(input: {
       ? config.parameterMultipliers.quality[normalizedQuality]
       : 1;
   const outputPriceMultiplier = resolutionMultiplier * qualityMultiplier;
+  const combinationKey =
+    normalizedResolution && normalizedQuality
+      ? `${normalizedResolution}__${normalizedQuality}`
+      : "";
+  const combinationUnitPrice =
+    combinationKey &&
+    config.parameterPrices?.combinations &&
+    typeof config.parameterPrices.combinations[combinationKey] === "number"
+      ? config.parameterPrices.combinations[combinationKey]
+      : config.parameterPrices?.combinations &&
+          Object.keys(config.parameterPrices.combinations).length > 0
+        ? Math.min(...Object.values(config.parameterPrices.combinations))
+      : null;
+  const perImageUnitPrice =
+    combinationUnitPrice ?? (config.charges.perImage ?? 0) * outputPriceMultiplier;
+  const perVideoUnitPrice =
+    metrics.imageCount > 0
+      ? (config.charges.perVideo ?? 0) * outputPriceMultiplier
+      : combinationUnitPrice ?? (config.charges.perVideo ?? 0) * outputPriceMultiplier;
 
   const components = {
     perRequest: config.charges.perRequest ?? 0,
-    perImage: metrics.imageCount * (config.charges.perImage ?? 0) * outputPriceMultiplier,
-    perVideo: metrics.videoCount * (config.charges.perVideo ?? 0) * outputPriceMultiplier,
+    perImage: metrics.imageCount * perImageUnitPrice,
+    perVideo: metrics.videoCount * perVideoUnitPrice,
     perSecond: metrics.durationSeconds * (config.charges.perSecond ?? 0),
     inputTextTokens:
       (metrics.inputTokens / 1_000_000) * (config.charges.inputTextTokensPerMillion ?? 0),

@@ -12,21 +12,44 @@ const hybridChargesSchema = z
     inputTextTokensPerMillion: positivePriceSchema.optional(),
     outputTextTokensPerMillion: positivePriceSchema.optional(),
   })
+  .default({});
+
+const parameterMultipliersSchema = z
+  .object({
+    resolution: z.record(z.string(), z.coerce.number().positive().max(100)).optional(),
+    quality: z.record(z.string(), z.coerce.number().positive().max(100)).optional(),
+  })
+  .optional();
+
+const parameterPricesSchema = z
+  .object({
+    combinations: z.record(z.string(), z.coerce.number().positive().max(1000000)).optional(),
+  })
+  .optional();
+
+const hybridBillingSchema = z
+  .object({
+    billingMode: z.literal("hybrid"),
+    currency: currencySchema,
+    charges: hybridChargesSchema,
+    parameterMultipliers: parameterMultipliersSchema,
+    parameterPrices: parameterPricesSchema,
+  })
   .superRefine((value, ctx) => {
-    if (!Object.values(value).some((item) => item !== undefined)) {
+    const hasCharge = Object.values(value.charges).some((item) => item !== undefined);
+    const hasCombinationPrices =
+      value.parameterPrices?.combinations &&
+      Object.keys(value.parameterPrices.combinations).length > 0;
+    if (!hasCharge && !hasCombinationPrices) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "At least one hybrid billing charge is required",
+        message: "At least one billing charge or parameter price is required",
       });
     }
   });
 
 const billingConfigSchema = z.union([
-  z.object({
-    billingMode: z.literal("hybrid"),
-    currency: currencySchema,
-    charges: hybridChargesSchema,
-  }),
+  hybridBillingSchema,
   z.object({
     billingMode: z.literal("per_request"),
     currency: currencySchema,
@@ -138,9 +161,10 @@ function resolveRequestedAssetCount(
   if (type === "image") {
     return (
       readNumericCandidate(input.n) ??
+      readNumericCandidate(input.num_images) ??
       readNumericCandidate(input.imageCount) ??
       readNumericCandidate(input.images) ??
-      0
+      1
     );
   }
 
@@ -245,24 +269,32 @@ export function normalizeBillingConfig(config: BillingConfig): HybridBillingConf
         billingMode: "hybrid",
         currency: config.currency,
         charges: { perRequest: config.costPerRequest },
+        parameterMultipliers: undefined,
+        parameterPrices: undefined,
       };
     case "per_image":
       return {
         billingMode: "hybrid",
         currency: config.currency,
         charges: { perImage: config.costPerImage },
+        parameterMultipliers: undefined,
+        parameterPrices: undefined,
       };
     case "per_video":
       return {
         billingMode: "hybrid",
         currency: config.currency,
         charges: { perVideo: config.costPerVideo },
+        parameterMultipliers: undefined,
+        parameterPrices: undefined,
       };
     case "per_second":
       return {
         billingMode: "hybrid",
         currency: config.currency,
         charges: { perSecond: config.costPerSecond },
+        parameterMultipliers: undefined,
+        parameterPrices: undefined,
       };
     case "per_million_tokens":
       return {
@@ -272,8 +304,14 @@ export function normalizeBillingConfig(config: BillingConfig): HybridBillingConf
           inputTextTokensPerMillion: config.inputCostPerMillion,
           outputTextTokensPerMillion: config.outputCostPerMillion,
         },
+        parameterMultipliers: undefined,
+        parameterPrices: undefined,
       };
   }
+}
+
+function normalizeParameterValue(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : "";
 }
 
 export function resolveBillingMetrics(input: {
@@ -305,10 +343,45 @@ export function resolveBillingMetrics(input: {
 export function resolveBillingBreakdown(input: ResolveChargeContext): BillingResolution {
   const config = normalizeBillingConfig(input.config);
   const metrics = resolveBillingMetrics(input);
+  const requestInput = input.requestInput ?? null;
+  const normalizedResolution = normalizeParameterValue(requestInput?.resolution);
+  const normalizedQuality = normalizeParameterValue(requestInput?.quality);
+  const resolutionMultiplier =
+    normalizedResolution &&
+    config.parameterMultipliers?.resolution &&
+    typeof config.parameterMultipliers.resolution[normalizedResolution] === "number"
+      ? config.parameterMultipliers.resolution[normalizedResolution]
+      : 1;
+  const qualityMultiplier =
+    normalizedQuality &&
+    config.parameterMultipliers?.quality &&
+    typeof config.parameterMultipliers.quality[normalizedQuality] === "number"
+      ? config.parameterMultipliers.quality[normalizedQuality]
+      : 1;
+  const outputPriceMultiplier = resolutionMultiplier * qualityMultiplier;
+  const combinationKey =
+    normalizedResolution && normalizedQuality
+      ? `${normalizedResolution}__${normalizedQuality}`
+      : "";
+  const combinationUnitPrice =
+    combinationKey &&
+    config.parameterPrices?.combinations &&
+    typeof config.parameterPrices.combinations[combinationKey] === "number"
+      ? config.parameterPrices.combinations[combinationKey]
+      : config.parameterPrices?.combinations &&
+          Object.keys(config.parameterPrices.combinations).length > 0
+        ? Math.min(...Object.values(config.parameterPrices.combinations))
+      : null;
+  const perImageUnitPrice =
+    combinationUnitPrice ?? (config.charges.perImage ?? 0) * outputPriceMultiplier;
+  const perVideoUnitPrice =
+    metrics.imageCount > 0
+      ? (config.charges.perVideo ?? 0) * outputPriceMultiplier
+      : combinationUnitPrice ?? (config.charges.perVideo ?? 0) * outputPriceMultiplier;
   const components = {
     perRequest: config.charges.perRequest ?? 0,
-    perImage: metrics.imageCount * (config.charges.perImage ?? 0),
-    perVideo: metrics.videoCount * (config.charges.perVideo ?? 0),
+    perImage: metrics.imageCount * perImageUnitPrice,
+    perVideo: metrics.videoCount * perVideoUnitPrice,
     perSecond: metrics.durationSeconds * (config.charges.perSecond ?? 0),
     inputTextTokens:
       (metrics.inputTokens / 1_000_000) * (config.charges.inputTextTokensPerMillion ?? 0),

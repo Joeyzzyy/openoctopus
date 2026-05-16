@@ -285,9 +285,15 @@ function buildMonitoringHref(input: {
   return `/internal?${params.toString()}`;
 }
 
+function readMonitoringCount(request: { count?: number }) {
+  return Number.isFinite(request.count) && typeof request.count === "number"
+    ? Math.max(0, request.count)
+    : 1;
+}
+
 function buildMonitoringSeries(
   modelLabels: Map<string, string>,
-  requests: Array<{ public_model_slug: string; created_at: string; status: string }>,
+  requests: Array<{ public_model_slug: string; created_at: string; status: string; count?: number }>,
   interval: MonitoringInterval,
   range: MonitoringRange
 ) {
@@ -320,7 +326,7 @@ function buildMonitoringSeries(
 
     const currentSeries =
       seriesMap.get(request.public_model_slug) ?? createEmptyPoints();
-    currentSeries[bucketIndex] += 1;
+    currentSeries[bucketIndex] += readMonitoringCount(request);
     seriesMap.set(request.public_model_slug, currentSeries);
   }
 
@@ -380,7 +386,7 @@ function formatElapsedDuration(value: string) {
 
 function buildMonitoringHealthByModel(
   modelLabels: Map<string, string>,
-  requests: Array<{ public_model_slug: string; status: string }>
+  requests: Array<{ public_model_slug: string; status: string; count?: number }>
 ) {
   const statsMap = new Map<
     string,
@@ -406,6 +412,7 @@ function buildMonitoringHealthByModel(
   }
 
   for (const request of requests) {
+    const count = readMonitoringCount(request);
     const current = statsMap.get(request.public_model_slug) ?? {
       total: 0,
       settled: 0,
@@ -415,19 +422,19 @@ function buildMonitoringHealthByModel(
       inflight: 0,
     };
 
-    current.total += 1;
+    current.total += count;
 
     if (request.status === "succeeded") {
-      current.succeeded += 1;
-      current.settled += 1;
+      current.succeeded += count;
+      current.settled += count;
     } else if (request.status === "failed") {
-      current.failed += 1;
-      current.settled += 1;
+      current.failed += count;
+      current.settled += count;
     } else if (request.status === "cancelled") {
-      current.cancelled += 1;
-      current.settled += 1;
+      current.cancelled += count;
+      current.settled += count;
     } else {
-      current.inflight += 1;
+      current.inflight += count;
     }
 
     statsMap.set(request.public_model_slug, current);
@@ -781,6 +788,26 @@ export default async function InternalPage({
   const selectedRequestPage = Number.isFinite(selectedRequestPageRaw) && selectedRequestPageRaw >= 1
     ? Math.floor(selectedRequestPageRaw)
     : 1;
+  const selectedUserPageRaw = Number(getSearchValue(resolvedSearchParams, "userPage") ?? "1");
+  const selectedUserPage = Number.isFinite(selectedUserPageRaw) && selectedUserPageRaw >= 1
+    ? Math.floor(selectedUserPageRaw)
+    : 1;
+  const selectedUserSearch = getSearchValue(resolvedSearchParams, "userSearch") ?? "";
+  const selectedModelPageRaw = Number(getSearchValue(resolvedSearchParams, "modelPage") ?? "1");
+  const selectedModelPage = Number.isFinite(selectedModelPageRaw) && selectedModelPageRaw >= 1
+    ? Math.floor(selectedModelPageRaw)
+    : 1;
+  const selectedModelType = getSearchValue(resolvedSearchParams, "modelType") ?? "all";
+  const selectedModelStatusRaw = getSearchValue(resolvedSearchParams, "modelStatus") ?? "all";
+  const selectedModelStatus =
+    selectedModelStatusRaw === "active" || selectedModelStatusRaw === "inactive"
+      ? selectedModelStatusRaw
+      : "all";
+  const selectedInternalAiUsagePageRaw = Number(getSearchValue(resolvedSearchParams, "aiUsagePage") ?? "1");
+  const selectedInternalAiUsagePage =
+    Number.isFinite(selectedInternalAiUsagePageRaw) && selectedInternalAiUsagePageRaw >= 1
+      ? Math.floor(selectedInternalAiUsagePageRaw)
+      : 1;
   const data = await getInternalAdminData({
     monitoringLookbackMs: parseMonitoringRangeMs(selectedMonitoringRange),
     monitoringStatus: selectedMonitoringStatus,
@@ -789,6 +816,15 @@ export default async function InternalPage({
     requestScope: selectedRequestScope,
     requestPage: selectedRequestPage,
     requestPageSize: 20,
+    userPage: selectedUserPage,
+    userPageSize: 10,
+    userSearch: selectedUserSearch,
+    modelPage: selectedModelPage,
+    modelPageSize: 10,
+    modelTypeFilter: selectedModelType,
+    modelStatusFilter: selectedModelStatus,
+    internalAiUsagePage: selectedInternalAiUsagePage,
+    internalAiUsagePageSize: 10,
     activeTab,
     bypassAuth: true,
   });
@@ -796,32 +832,6 @@ export default async function InternalPage({
   if (!data.authorized) redirect("/login");
 
   const selectedTemplateKey = getSearchValue(resolvedSearchParams, "template");
-  const modelVendorCount = new Set(
-    [
-      ...data.modelVendors.map((vendor) => vendor.name.trim().toLowerCase()),
-      ...data.supportedModels
-        .map((model) => model.provider.trim().toLowerCase())
-        .filter((name) => name.length > 0 && name !== "openoctopus"),
-    ]
-  ).size;
-  const workerTemplateCount = (data.workerTemplates ?? []).length;
-  const sidebarTabs = tabs.map((tab) => ({
-    ...tab,
-    count:
-      tab.key === "public-models"
-        ? data.metrics.publicModels
-        : tab.key === "providers"
-          ? data.metrics.providers
-        : tab.key === "model-vendors"
-            ? modelVendorCount
-            : tab.key === "worker-templates"
-              ? workerTemplateCount
-            : tab.key === "gateway-error-definitions"
-              ? data.gatewayErrorDefinitions.length
-            : tab.key === "internal-model-ai-usage-logs"
-              ? data.internalModelAiUsageLogs.length
-              : undefined,
-  }));
   const filteredRequests = data.requests;
   const requestScopeOptions = [
     { value: "all", label: "全部用户 / 全部 Key" },
@@ -950,7 +960,7 @@ export default async function InternalPage({
 
       <div className="relative mx-auto w-full max-w-[1960px] px-3 pb-10 pt-[72px] xl:px-4">
         <section className="min-h-[calc(100vh-108px)] py-4">
-          <InternalShell activeTab={activeTab} selectedTemplateKey={selectedTemplateKey} tabs={sidebarTabs}>
+          <InternalShell activeTab={activeTab} selectedTemplateKey={selectedTemplateKey} tabs={tabs}>
           {activeTab === "public-models" ? (
             <>
               <section className="mb-6">
@@ -970,6 +980,9 @@ export default async function InternalPage({
                 >
                 <PublicModelsPanel
                   models={data.supportedModels}
+                  modelPagination={data.supportedModelPagination}
+                  modelTypeFilter={selectedModelType}
+                  modelStatusFilter={selectedModelStatus}
                   providerModels={data.providerModels}
                   routingRules={data.routingRules}
                   providers={data.providers}
@@ -1061,7 +1074,10 @@ export default async function InternalPage({
                 title="内部 AI 消费记录"
                 description="仅 internal 使用：记录文档 URL 自动解析的调用轨迹、token 与估算成本。"
               >
-                <InternalModelAiUsageLogsPanel logs={data.internalModelAiUsageLogs} />
+                <InternalModelAiUsageLogsPanel
+                  logs={data.internalModelAiUsageLogs}
+                  pagination={data.internalModelAiUsageLogPagination}
+                />
               </SectionShell>
             </section>
           ) : null}
@@ -1268,20 +1284,13 @@ export default async function InternalPage({
                 ) : null}
 
                 {effectiveMonitoringView === "requests" ? (
-                  <>
-                    {data.registeredUsers.length > 0 ? (
-                      <RegisteredUsersTable
-                        users={data.registeredUsers}
-                        addUserBalanceAction={addUserBalance}
-                        deleteRegisteredUserAction={deleteRegisteredUser}
-                      />
-                    ) : (
-                      <EmptyState
-                        title="还没有注册用户"
-                        detail="用户注册后会出现在这里，可在后台给指定用户的 workspace 手动加余额。"
-                      />
-                    )}
-                  </>
+                  <RegisteredUsersTable
+                    users={data.registeredUsers}
+                    userPagination={data.registeredUserPagination}
+                    userSearch={selectedUserSearch}
+                    addUserBalanceAction={addUserBalance}
+                    deleteRegisteredUserAction={deleteRegisteredUser}
+                  />
                 ) : null}
 
               </SectionShell>

@@ -15,6 +15,7 @@ type SupportedModelOption = {
   modelSlug: string;
   displayName: string;
   capability: "image_generation" | "image_edit" | "video_generation" | null;
+  billingConfigText?: string;
 };
 
 type ProviderOption = {
@@ -52,6 +53,7 @@ type BillingFormState = {
   chargePerImage: boolean;
   chargePerVideo: boolean;
   chargePerSecond: boolean;
+  chargeCombinationPrices: boolean;
   chargeInputTokens: boolean;
   chargeOutputTokens: boolean;
   costPerRequest: string;
@@ -62,6 +64,7 @@ type BillingFormState = {
   outputCostPerMillion: string;
   resolutionMultipliersJson: string;
   qualityMultipliersJson: string;
+  combinationPricesJson: string;
 };
 
 type ExecutionConfigFormState = {
@@ -328,7 +331,17 @@ function hasPositivePricingCharge(pricingText: string) {
     pricing.charges && typeof pricing.charges === "object" && !Array.isArray(pricing.charges)
       ? (pricing.charges as Record<string, unknown>)
       : {};
-  return Object.values(charges).some((value) => {
+  const parameterPrices =
+    pricing.parameterPrices && typeof pricing.parameterPrices === "object" && !Array.isArray(pricing.parameterPrices)
+      ? (pricing.parameterPrices as Record<string, unknown>)
+      : {};
+  const combinationPrices =
+    parameterPrices.combinations &&
+    typeof parameterPrices.combinations === "object" &&
+    !Array.isArray(parameterPrices.combinations)
+      ? (parameterPrices.combinations as Record<string, unknown>)
+      : {};
+  return [...Object.values(charges), ...Object.values(combinationPrices)].some((value) => {
     const numeric = Number(value);
     return Number.isFinite(numeric) && numeric > 0;
   });
@@ -967,6 +980,7 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     chargePerImage: true,
     chargePerVideo: false,
     chargePerSecond: false,
+    chargeCombinationPrices: false,
     chargeInputTokens: false,
     chargeOutputTokens: false,
     costPerRequest: "0.04",
@@ -977,6 +991,7 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     outputCostPerMillion: "1.5",
     resolutionMultipliersJson: "{}",
     qualityMultipliersJson: "{}",
+    combinationPricesJson: "{}",
   };
   const emptyState = {
     ...fallback,
@@ -984,6 +999,7 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     chargePerImage: false,
     chargePerVideo: false,
     chargePerSecond: false,
+    chargeCombinationPrices: false,
     chargeInputTokens: false,
     chargeOutputTokens: false,
   };
@@ -1000,15 +1016,18 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     const parsed = JSON.parse(initialValue) as Record<string, unknown>;
     if (parsed.billingMode === "hybrid" && parsed.charges && typeof parsed.charges === "object") {
       const charges = parsed.charges as Record<string, unknown>;
+      const combinationPrices = readParameterPricesCombinations(parsed);
+      const hasCombinationPrices = Object.keys(combinationPrices).length > 0;
       return {
         ...fallback,
         currency: typeof parsed.currency === "string" ? parsed.currency : fallback.currency,
         chargePerRequest: hasPositiveCharge(charges.perRequest),
-        chargePerImage: hasPositiveCharge(charges.perImage),
-        chargePerVideo: hasPositiveCharge(charges.perVideo),
-        chargePerSecond: hasPositiveCharge(charges.perSecond),
+        chargePerImage: !hasCombinationPrices && hasPositiveCharge(charges.perImage),
+        chargePerVideo: !hasCombinationPrices && hasPositiveCharge(charges.perVideo),
+        chargePerSecond: !hasCombinationPrices && hasPositiveCharge(charges.perSecond),
+        chargeCombinationPrices: hasCombinationPrices,
         chargeInputTokens: hasPositiveCharge(charges.inputTextTokensPerMillion),
-        chargeOutputTokens: hasPositiveCharge(charges.outputTextTokensPerMillion),
+        chargeOutputTokens: !hasCombinationPrices && hasPositiveCharge(charges.outputTextTokensPerMillion),
         costPerRequest: String(charges.perRequest ?? fallback.costPerRequest),
         costPerImage: String(charges.perImage ?? fallback.costPerImage),
         costPerVideo: String(charges.perVideo ?? fallback.costPerVideo),
@@ -1043,6 +1062,13 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
           null,
           2
         ),
+        combinationPricesJson: JSON.stringify(
+          Object.keys(combinationPrices).length > 0
+            ? combinationPrices
+            : buildLegacyCombinationPrices(parsed, fallback),
+          null,
+          2
+        ),
       };
     }
 
@@ -1060,6 +1086,7 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
       chargePerImage: parsed.billingMode === "per_image" && hasPositiveCharge(parsed.costPerImage ?? parsed.costPerUnit),
       chargePerVideo: parsed.billingMode === "per_video" && hasPositiveCharge(parsed.costPerVideo ?? parsed.costPerUnit),
       chargePerSecond: parsed.billingMode === "per_second" && hasPositiveCharge(parsed.costPerSecond ?? parsed.costPerUnit),
+      chargeCombinationPrices: fallback.chargeCombinationPrices,
       chargeInputTokens: parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.inputCostPerMillion),
       chargeOutputTokens: parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.outputCostPerMillion),
       costPerRequest: String(parsed.costPerRequest ?? parsed.costPerUnit ?? fallback.costPerRequest),
@@ -1070,13 +1097,14 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
       outputCostPerMillion: String(parsed.outputCostPerMillion ?? fallback.outputCostPerMillion),
       resolutionMultipliersJson: fallback.resolutionMultipliersJson,
       qualityMultipliersJson: fallback.qualityMultipliersJson,
+      combinationPricesJson: fallback.combinationPricesJson,
     };
   } catch {
     return fallback;
   }
 }
 
-function safeParseNumberMap(value: string) {
+function safeParseLooseNumberMap(value: string) {
   try {
     const parsed = JSON.parse(value) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -1084,7 +1112,20 @@ function safeParseNumberMap(value: string) {
     }
     return Object.fromEntries(
       Object.entries(parsed as Record<string, unknown>)
-        .map(([key, raw]) => [key.trim(), Number(raw)] as const)
+        .map(([key, raw]) => [key.trim(), typeof raw === "string" ? raw : String(raw)] as const)
+        .filter(([key]) => key.length > 0)
+    );
+  } catch {
+    return {};
+  }
+}
+
+function safeParseNumberMap(value: string) {
+  try {
+    const parsed = safeParseLooseNumberMap(value);
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([key, raw]) => [key, Number(raw)] as const)
         .filter(([key, num]) => key.length > 0 && Number.isFinite(num) && num > 0)
     );
   } catch {
@@ -1095,6 +1136,73 @@ function safeParseNumberMap(value: string) {
 function stringifyNumberMap(value: Record<string, number>) {
   const entries = Object.entries(value).sort((a, b) => a[0].localeCompare(b[0], "en-US"));
   return JSON.stringify(Object.fromEntries(entries), null, 2);
+}
+
+function stringifyLooseNumberMap(value: Record<string, string>) {
+  const entries = Object.entries(value).sort((a, b) => a[0].localeCompare(b[0], "en-US"));
+  return JSON.stringify(Object.fromEntries(entries), null, 2);
+}
+
+function buildCombinationKey(resolution: string, quality: string) {
+  return `${resolution}__${quality}`;
+}
+
+function readParameterPricesCombinations(parsed: Record<string, unknown>) {
+  const parameterPrices =
+    parsed.parameterPrices &&
+    typeof parsed.parameterPrices === "object" &&
+    !Array.isArray(parsed.parameterPrices)
+      ? (parsed.parameterPrices as Record<string, unknown>)
+      : null;
+  const combinations =
+    parameterPrices?.combinations &&
+    typeof parameterPrices.combinations === "object" &&
+    !Array.isArray(parameterPrices.combinations)
+      ? (parameterPrices.combinations as Record<string, unknown>)
+      : null;
+  return combinations ?? {};
+}
+
+function buildLegacyCombinationPrices(parsed: Record<string, unknown>, fallback: BillingFormState) {
+  const charges =
+    parsed.charges && typeof parsed.charges === "object" && !Array.isArray(parsed.charges)
+      ? (parsed.charges as Record<string, unknown>)
+      : {};
+  const baseOutputPrice = Number(charges.perImage ?? charges.perVideo ?? fallback.costPerImage);
+  if (!Number.isFinite(baseOutputPrice) || baseOutputPrice <= 0) {
+    return {};
+  }
+  const parameterMultipliers =
+    parsed.parameterMultipliers &&
+    typeof parsed.parameterMultipliers === "object" &&
+    !Array.isArray(parsed.parameterMultipliers)
+      ? (parsed.parameterMultipliers as Record<string, unknown>)
+      : {};
+  const resolutionMultipliers =
+    parameterMultipliers.resolution &&
+    typeof parameterMultipliers.resolution === "object" &&
+    !Array.isArray(parameterMultipliers.resolution)
+      ? safeParseNumberMap(JSON.stringify(parameterMultipliers.resolution))
+      : {};
+  const qualityMultipliers =
+    parameterMultipliers.quality &&
+    typeof parameterMultipliers.quality === "object" &&
+    !Array.isArray(parameterMultipliers.quality)
+      ? safeParseNumberMap(JSON.stringify(parameterMultipliers.quality))
+      : {};
+  const resolutions = Object.keys(resolutionMultipliers);
+  const qualities = Object.keys(qualityMultipliers);
+  if (resolutions.length === 0 || qualities.length === 0) {
+    return {};
+  }
+  return Object.fromEntries(
+    resolutions.flatMap((resolution) =>
+      qualities.map((quality) => [
+        buildCombinationKey(resolution, quality),
+        Number((baseOutputPrice * resolutionMultipliers[resolution] * qualityMultipliers[quality]).toFixed(8)),
+      ])
+    )
+  );
 }
 
 function buildBillingConfigValue(state: BillingFormState) {
@@ -1121,6 +1229,9 @@ function buildBillingConfigValue(state: BillingFormState) {
 
   const resolutionMultipliers = safeParseNumberMap(state.resolutionMultipliersJson);
   const qualityMultipliers = safeParseNumberMap(state.qualityMultipliersJson);
+  const combinationPrices = state.chargeCombinationPrices
+    ? safeParseNumberMap(state.combinationPricesJson)
+    : {};
   const parameterMultipliers: Record<string, Record<string, number>> = {};
   if (Object.keys(resolutionMultipliers).length > 0) {
     parameterMultipliers.resolution = resolutionMultipliers;
@@ -1128,12 +1239,17 @@ function buildBillingConfigValue(state: BillingFormState) {
   if (Object.keys(qualityMultipliers).length > 0) {
     parameterMultipliers.quality = qualityMultipliers;
   }
+  const parameterPrices: Record<string, Record<string, number>> = {};
+  if (Object.keys(combinationPrices).length > 0) {
+    parameterPrices.combinations = combinationPrices;
+  }
 
   return JSON.stringify({
     billingMode: "hybrid",
     currency: state.currency.trim() || "USD",
     charges,
     ...(Object.keys(parameterMultipliers).length > 0 ? { parameterMultipliers } : {}),
+    ...(Object.keys(parameterPrices).length > 0 ? { parameterPrices } : {}),
   });
 }
 
@@ -1475,8 +1591,7 @@ export function BillingConfigEditor({
     setState(parseBillingFormState(initialValue));
   }, [initialValue]);
   const hiddenValue = buildBillingConfigValue(state);
-  const resolutionMultiplierMap = safeParseNumberMap(state.resolutionMultipliersJson);
-  const qualityMultiplierMap = safeParseNumberMap(state.qualityMultipliersJson);
+  const combinationPriceMap = safeParseLooseNumberMap(state.combinationPricesJson);
   const inputMethod = state.chargeInputTokens
     ? "input_tokens"
     : state.chargePerRequest
@@ -1484,7 +1599,9 @@ export function BillingConfigEditor({
       : "none";
   const outputMethod = state.chargeOutputTokens
     ? "output_tokens"
-    : state.chargePerImage
+    : state.chargeCombinationPrices
+      ? "combination_prices"
+      : state.chargePerImage
       ? "per_image"
       : state.chargePerVideo
         ? "per_video"
@@ -1504,28 +1621,22 @@ export function BillingConfigEditor({
     setState((current) => ({
       ...current,
       chargeOutputTokens: method === "output_tokens",
+      chargeCombinationPrices: method === "combination_prices",
       chargePerImage: method === "per_image",
       chargePerVideo: method === "per_video",
       chargePerSecond: method === "per_second",
     }));
   };
 
-  const updateMultiplier = (target: "resolution" | "quality", key: string, value?: number) => {
-    const currentMap =
-      target === "resolution"
-        ? safeParseNumberMap(state.resolutionMultipliersJson)
-        : safeParseNumberMap(state.qualityMultipliersJson);
-    if (value === undefined || !Number.isFinite(value) || value <= 0) {
+  const updateCombinationPrice = (key: string, value?: string) => {
+    const currentMap = safeParseLooseNumberMap(state.combinationPricesJson);
+    if (value === undefined) {
       delete currentMap[key];
     } else {
       currentMap[key] = value;
     }
-    const nextJson = stringifyNumberMap(currentMap);
-    setState((current) =>
-      target === "resolution"
-        ? { ...current, resolutionMultipliersJson: nextJson }
-        : { ...current, qualityMultipliersJson: nextJson }
-    );
+    const nextJson = stringifyLooseNumberMap(currentMap);
+    setState((current) => ({ ...current, combinationPricesJson: nextJson }));
   };
 
   return (
@@ -1572,6 +1683,7 @@ export function BillingConfigEditor({
                 <option value="none">不计费</option>
                 <option value="per_image">按图片</option>
                 <option value="per_video">按视频</option>
+                <option value="combination_prices">按 resolution + quality 组合阶梯</option>
                 <option value="per_second">按秒</option>
                 <option value="output_tokens">按输出 Token（每百万）</option>
               </select>
@@ -1627,68 +1739,60 @@ export function BillingConfigEditor({
         ) : null}
       </div>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
-          <p className="text-[11px] tracking-[0.35px] text-black/60">resolution 价格系数（可选）</p>
-          <div className="mt-2 grid gap-2">
-            {RESOLUTION_CANDIDATES.map((key) => {
-              const enabled = key in resolutionMultiplierMap;
-              const numericValue = resolutionMultiplierMap[key] ?? 1;
-              return (
-                <label key={key} className="flex items-center gap-2 text-xs text-black/75">
-                  <input
-                    type="checkbox"
-                    checked={enabled}
-                    onChange={(event) => updateMultiplier("resolution", key, event.target.checked ? numericValue : undefined)}
-                    className="size-3.5"
-                  />
-                  <span className="w-12">{key}</span>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={numericValue}
-                    disabled={!enabled}
-                    onChange={(event) => updateMultiplier("resolution", key, Number(event.target.value))}
-                    className="h-8 w-20 rounded-md border border-black/[0.08] bg-white px-2 text-xs disabled:bg-black/[0.03]"
-                  />
-                </label>
-              );
-            })}
-          </div>
-          <FieldHint help="按输入参数 resolution 应用到输出单价（perImage/perVideo）的乘数。" />
+      {outputMethod === "combination_prices" ? (
+      <div className="mt-3 rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+        <p className="text-[11px] tracking-[0.35px] text-black/60">resolution + quality 组合阶梯单价</p>
+        <div className="mt-2 overflow-x-auto rounded-lg border border-black/[0.06] bg-white">
+          <table className="min-w-[560px] w-full text-left text-xs">
+            <thead className="bg-[#FAFAF9] text-black/45">
+              <tr>
+                <th className="px-2 py-2 font-medium">启用</th>
+                <th className="px-2 py-2 font-medium">resolution</th>
+                <th className="px-2 py-2 font-medium">quality</th>
+                <th className="px-2 py-2 font-medium">输出单价</th>
+              </tr>
+            </thead>
+            <tbody>
+              {RESOLUTION_CANDIDATES.flatMap((resolution) =>
+                QUALITY_CANDIDATES.map((quality) => {
+                  const key = buildCombinationKey(resolution, quality);
+                  const enabled = key in combinationPriceMap;
+                  const inputValue = combinationPriceMap[key] ?? String(Number(state.costPerImage || state.costPerVideo || 1));
+                  return (
+                    <tr key={key} className="border-t border-black/[0.05]">
+                      <td className="px-2 py-1.5">
+                        <input
+                          type="checkbox"
+                          checked={enabled}
+                          onChange={(event) =>
+                            updateCombinationPrice(key, event.target.checked ? inputValue : undefined)
+                          }
+                          className="size-3.5"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 text-black/70">{resolution}</td>
+                      <td className="px-2 py-1.5 text-black/70">{quality}</td>
+                      <td className="px-2 py-1.5">
+                        <input
+                          type="number"
+                          min="0.000001"
+                          step="0.000001"
+                          value={inputValue}
+                          disabled={!enabled}
+                          onChange={(event) => updateCombinationPrice(key, event.target.value)}
+                          className="h-8 w-28 rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black disabled:bg-black/[0.03] disabled:text-black/35"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-        <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
-          <p className="text-[11px] tracking-[0.35px] text-black/60">quality 价格系数（可选）</p>
-          <div className="mt-2 grid gap-2">
-            {QUALITY_CANDIDATES.map((key) => {
-              const enabled = key in qualityMultiplierMap;
-              const numericValue = qualityMultiplierMap[key] ?? 1;
-              return (
-                <label key={key} className="flex items-center gap-2 text-xs text-black/75">
-                  <input
-                    type="checkbox"
-                    checked={enabled}
-                    onChange={(event) => updateMultiplier("quality", key, event.target.checked ? numericValue : undefined)}
-                    className="size-3.5"
-                  />
-                  <span className="w-12">{key}</span>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={numericValue}
-                    disabled={!enabled}
-                    onChange={(event) => updateMultiplier("quality", key, Number(event.target.value))}
-                    className="h-8 w-20 rounded-md border border-black/[0.08] bg-white px-2 text-xs disabled:bg-black/[0.03]"
-                  />
-                </label>
-              );
-            })}
-          </div>
-          <FieldHint help="按输入参数 quality 应用到输出单价（perImage/perVideo）的乘数。" />
-        </div>
+        <FieldHint help="选择组合阶梯计价后，基础 perImage/perVideo 不再参与输出计价；命中的 resolution + quality 组合会直接作为每张图片/每个视频的输出单价。" />
       </div>
+      ) : null}
 
       <div className="mt-3 rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
         <p className="text-[11px] tracking-[0.35px] text-black/45">{generatedLabel}</p>
@@ -2678,7 +2782,21 @@ export function CreateProviderModelForm({
           className={activeTab === "cost" ? "grid gap-2.5" : "hidden"}
         >
         <div className="block">
-          <span className="mb-1.5 block text-[11px] tracking-[0.35px] text-black/60">供应商成本配置</span>
+          <div className="mb-1.5 flex items-center justify-between gap-3">
+            <span className="block text-[11px] tracking-[0.35px] text-black/60">供应商成本配置</span>
+            {selectedSupportedModel?.billingConfigText ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSeedPricingText(selectedSupportedModel.billingConfigText ?? "");
+                  toast.success("已从当前可售模型售价同步");
+                }}
+                className="rounded-md border border-black/[0.08] bg-white px-2.5 py-1 text-[11px] font-medium text-black/65 hover:bg-black/[0.03]"
+              >
+                从可售模型售价同步
+              </button>
+            ) : null}
+          </div>
           <BillingConfigEditor
             name="pricing"
             initialValue={seedPricingText || defaultPricing}

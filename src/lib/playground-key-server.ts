@@ -46,10 +46,10 @@ async function createWorkspacePlaygroundKey(
     .from("api_keys")
     .insert({
       workspace_id: workspaceId,
-      name: "Playground Key",
+      name: "System Playground Key",
       key_prefix: keyPrefix,
       secret_hash: secretHash,
-      environment: "Production",
+      environment: "System",
       monthly_budget: 0,
       status: "active",
       created_by: userId,
@@ -129,6 +129,30 @@ export async function getOrCreateWorkspacePlaygroundKey(workspaceId: string, use
   }
 
   if (stored?.encrypted_secret) {
+    const { data: apiKeyRow } = stored.api_key_id
+      ? await supabaseAdmin
+          .from("api_keys")
+          .select("id, status, name, environment")
+          .eq("id", stored.api_key_id)
+          .eq("workspace_id", workspaceId)
+          .maybeSingle()
+      : { data: null };
+
+    if (!apiKeyRow || apiKeyRow.status !== "active") {
+      return createWorkspacePlaygroundKey(workspaceId, userId, stored.api_key_id as string | null);
+    }
+
+    if (apiKeyRow.name !== "System Playground Key" || apiKeyRow.environment !== "System") {
+      await supabaseAdmin
+        .from("api_keys")
+        .update({
+          name: "System Playground Key",
+          environment: "System",
+        })
+        .eq("id", stored.api_key_id)
+        .eq("workspace_id", workspaceId);
+    }
+
     try {
       return {
         secret: decryptSecret(stored.encrypted_secret),

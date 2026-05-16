@@ -698,6 +698,8 @@ const ASPECT_RATIO_OPTIONS = [
 ];
 
 const RESOLUTION_OPTIONS = ["1k", "2k", "3k", "4k"];
+const PLAYGROUND_POLL_TIMEOUT_MS = 10 * 60 * 1000;
+const PLAYGROUND_POLL_INTERVAL_MS = 1800;
 
 function isAspectRatioEnum(values?: string[]) {
   if (!values || values.length === 0) return false;
@@ -706,6 +708,20 @@ function isAspectRatioEnum(values?: string[]) {
 
 function isResolutionField(key: string) {
   return key.trim().toLowerCase() === "resolution";
+}
+
+function formatUsd(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: value >= 0.1 ? 2 : 3,
+    maximumFractionDigits: value >= 0.1 ? 2 : 3,
+  }).format(value);
+}
+
+function readPositiveNumber(value: unknown) {
+  const number = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(number) && number > 0 ? number : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -935,6 +951,8 @@ export function ModelsBrowser({
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailCopied, setDetailCopied] = useState(false);
   const [resultModalOpen, setResultModalOpen] = useState(false);
+  const [authRequiredModalOpen, setAuthRequiredModalOpen] = useState(false);
+  const [topUpRequiredModalOpen, setTopUpRequiredModalOpen] = useState(false);
   const [resultCopied, setResultCopied] = useState(false);
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
@@ -1009,7 +1027,6 @@ export function ModelsBrowser({
     [selectedModel?.publicModel, visibleRows]
   );
   const capabilityTag = selectedModel?.modelTypeLabel || "uncategorized";
-  const priceTag = selectedModel?.priceLabel || "";
   const modelSlugTail = selectedModel?.upstreamModelSlug || selectedModel?.publicModel || "model";
   const parsedFields = useMemo(
     () =>
@@ -1019,6 +1036,34 @@ export function ModelsBrowser({
     [selectedModel?.inputSchemaText]
   );
   const isSubmitting = taskStatus === "submitting" || taskStatus === "queued" || taskStatus === "processing";
+  const priceTag = useMemo(() => {
+    if (!selectedModel) return "";
+    const tiers = selectedModel.priceTiers ?? [];
+    if (tiers.length === 0) return selectedModel.priceLabel || "";
+    const resolutionField = parsedFields.find((field) => isResolutionField(field.key));
+    const qualityField = parsedFields.find((field) => field.key.trim().toLowerCase() === "quality");
+    const resolution =
+      (resolutionField ? playgroundForm[resolutionField.key] : "") ||
+      resolutionField?.enumValues?.[0] ||
+      RESOLUTION_OPTIONS[0];
+    const quality =
+      (qualityField ? playgroundForm[qualityField.key] : "") ||
+      qualityField?.enumValues?.[0] ||
+      "medium";
+    const tier =
+      tiers.find((item) => item.resolution === resolution && item.quality === quality) ??
+      tiers.find((item) => item.resolution === resolution) ??
+      tiers[0];
+    const imageCount =
+      readPositiveNumber(playgroundForm.num_images) ??
+      readPositiveNumber(playgroundForm.n) ??
+      readPositiveNumber(playgroundForm.images) ??
+      1;
+    const total = tier.price * imageCount;
+    return imageCount > 1
+      ? `${formatUsd(total)} total · ${formatUsd(tier.price)} / image`
+      : `${formatUsd(tier.price)} / image`;
+  }, [parsedFields, playgroundForm, selectedModel]);
 
   useEffect(() => {
     setPlaygroundForm((current) => {
@@ -1152,6 +1197,20 @@ export function ModelsBrowser({
       };
 
       if (!submitRes.ok || !submitJson.id) {
+        const errorCode =
+          submitJson.error && typeof submitJson.error === "object" && !Array.isArray(submitJson.error)
+            ? submitJson.error.code
+            : "";
+        if (submitRes.status === 401 || errorCode === "unauthorized") {
+          setTaskStatus("idle");
+          setAuthRequiredModalOpen(true);
+          return;
+        }
+        if (submitRes.status === 402 || errorCode === "insufficient_balance") {
+          setTaskStatus("idle");
+          setTopUpRequiredModalOpen(true);
+          return;
+        }
         const hasPromptField = parsedFields.some((field) => field.key === "prompt");
         const browserProxyUrl =
           typeof window !== "undefined"
@@ -1196,8 +1255,8 @@ export function ModelsBrowser({
       setTaskStatus("queued");
 
       const startedAt = Date.now();
-      while (Date.now() - startedAt < 180000) {
-        await new Promise((resolve) => setTimeout(resolve, 1800));
+      while (Date.now() - startedAt < PLAYGROUND_POLL_TIMEOUT_MS) {
+        await new Promise((resolve) => setTimeout(resolve, PLAYGROUND_POLL_INTERVAL_MS));
         const statusRes = await fetch("/api/playground", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -1216,6 +1275,20 @@ export function ModelsBrowser({
         };
 
         if (!statusRes.ok) {
+          const errorCode =
+            statusJson.error && typeof statusJson.error === "object" && !Array.isArray(statusJson.error)
+              ? statusJson.error.code
+              : "";
+          if (statusRes.status === 401 || errorCode === "unauthorized") {
+            setTaskStatus("idle");
+            setAuthRequiredModalOpen(true);
+            return;
+          }
+          if (statusRes.status === 402 || errorCode === "insufficient_balance") {
+            setTaskStatus("idle");
+            setTopUpRequiredModalOpen(true);
+            return;
+          }
           capturedErrorDetail = {
             stage: "status",
             taskId: submitJson.id,
@@ -1781,6 +1854,66 @@ export function ModelsBrowser({
             <pre className="max-h-[65vh] overflow-auto rounded-md border border-black/[0.08] bg-[#FAFAFA] p-3 text-xs text-black/80">
               {formatDetailText(playgroundOutput)}
             </pre>
+          </div>
+        </div>
+      ) : null}
+
+      {authRequiredModalOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-md rounded-xl border border-black/[0.1] bg-white p-5 shadow-2xl">
+            <h4 className="text-base font-semibold text-black">Sign in required</h4>
+            <p className="mt-2 text-sm leading-6 text-black/60">
+              Please sign in before starting a generation task. Playground usage is billed to your own workspace.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAuthRequiredModalOpen(false)}
+                className="h-9 rounded border border-black/[0.12] px-3 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextPath =
+                    typeof window !== "undefined"
+                      ? `${window.location.pathname}${window.location.search}`
+                      : pathname;
+                  router.push(`/login?next=${encodeURIComponent(nextPath)}`);
+                }}
+                className="h-9 rounded bg-black px-3 text-xs font-medium text-white hover:bg-black/85"
+              >
+                Sign in
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {topUpRequiredModalOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-md rounded-xl border border-black/[0.1] bg-white p-5 shadow-2xl">
+            <h4 className="text-base font-semibold text-black">Balance required</h4>
+            <p className="mt-2 text-sm leading-6 text-black/60">
+              Your wallet balance is insufficient for this generation. Add balance in the dashboard and then try again.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setTopUpRequiredModalOpen(false)}
+                className="h-9 rounded border border-black/[0.12] px-3 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard")}
+                className="h-9 rounded bg-black px-3 text-xs font-medium text-white hover:bg-black/85"
+              >
+                Go to dashboard
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

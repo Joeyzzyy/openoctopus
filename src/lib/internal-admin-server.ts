@@ -166,6 +166,7 @@ type MonitoringRequestRow = {
   public_model_slug: string;
   status: string;
   created_at: string;
+  count?: number;
 };
 
 type GlobalMonitoringRequestRow = {
@@ -207,6 +208,26 @@ type AttemptRow = {
   created_at: string;
 };
 
+type InternalUserRequestSummary = {
+  id: string;
+  status: string;
+  capability: string;
+  public_model_slug: string;
+  sourceLabel: string;
+  apiKeyName: string;
+  apiKeyPrefix: string;
+  apiKeyEnvironment: string;
+  customerChargeLabel: string;
+  providerCostLabel: string;
+  profitLabel: string;
+  createdLabel: string;
+  completedLabel: string;
+  error_code: string | null;
+  error_message: string | null;
+  upstreamRawText: string;
+  packagedOutputText: string;
+};
+
 type MonitoringAttemptRow = {
   request_id: string;
   attempt_no: number;
@@ -227,19 +248,6 @@ type ApiKeyRow = {
   environment: string;
   status: string;
   created_at: string;
-};
-
-type ApiKeySpendSummaryRow = {
-  api_key_id: string;
-  workspace_id: string;
-  current_month_spend: number | null;
-  current_month_requests: number | null;
-};
-
-type RequestCostRow = {
-  api_key_id: string | null;
-  estimated_provider_cost: number | null;
-  actual_provider_cost: number | null;
 };
 
 type UsageEventRow = {
@@ -306,6 +314,15 @@ type InternalAdminDataOptions = {
   requestScope?: string;
   requestPage?: number;
   requestPageSize?: number;
+  userPage?: number;
+  userPageSize?: number;
+  userSearch?: string | null;
+  modelPage?: number;
+  modelPageSize?: number;
+  modelTypeFilter?: string | null;
+  modelStatusFilter?: "all" | "active" | "inactive";
+  internalAiUsagePage?: number;
+  internalAiUsagePageSize?: number;
   activeTab?: string;
   bypassAuth?: boolean;
 };
@@ -361,6 +378,15 @@ function formatCurrency(value: number | null | undefined) {
     minimumFractionDigits: 2,
     maximumFractionDigits: fractionDigits,
   }).format(normalizedValue);
+}
+
+function formatInternalBalance(value: number | null | undefined) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  }).format(value ?? 0);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -482,6 +508,96 @@ function labelBreakdownKey(key: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function summarizeInternalRequest(input: {
+  request: RequestRow;
+  apiKey: ApiKeyRow | null;
+  attempts: AttemptRow[];
+  usageEvent: UsageEventRow | null;
+}) {
+  const { request, apiKey, attempts: relatedAttempts, usageEvent } = input;
+  const economics = asRecord(usageEvent?.metadata)?.economics;
+  const economicsRecord = asRecord(economics);
+  const customerBreakdown = asRecord(economicsRecord?.customer);
+  const providerBreakdown = asRecord(economicsRecord?.provider);
+  const customerComponents = asRecord(customerBreakdown?.components);
+  const providerComponents = asRecord(providerBreakdown?.components);
+  const metricsRecord = asRecord(customerBreakdown?.metrics) ?? asRecord(providerBreakdown?.metrics);
+  const customerCharge = Number(
+    request.actual_customer_charge ?? request.actual_cost ?? request.estimated_customer_charge ?? request.estimated_cost ?? 0
+  );
+  const providerCost = Number(
+    request.actual_provider_cost ?? request.estimated_provider_cost ?? 0
+  );
+  const profit = Number(
+    request.actual_profit ??
+      request.estimated_profit ??
+      customerCharge - providerCost
+  );
+  const usageBreakdown = Object.entries(metricsRecord ?? {})
+    .map(([key, rawValue]) => {
+      const value = readNumber(rawValue);
+      if (value === null || value <= 0) return null;
+      return {
+        label: labelBreakdownKey(key),
+        value: formatMetricValue(key, value),
+      };
+    })
+    .filter((item) => item !== null);
+  const customerComponentBreakdown = Object.entries(customerComponents ?? {})
+    .map(([key, rawValue]) => {
+      const value = readNumber(rawValue);
+      if (value === null || value <= 0) return null;
+      return {
+        label: labelBreakdownKey(key),
+        value: formatCurrency(value),
+      };
+    })
+    .filter((item) => item !== null);
+  const providerComponentBreakdown = Object.entries(providerComponents ?? {})
+    .map(([key, rawValue]) => {
+      const value = readNumber(rawValue);
+      if (value === null || value <= 0) return null;
+      return {
+        label: labelBreakdownKey(key),
+        value: formatCurrency(value),
+      };
+    })
+    .filter((item) => item !== null);
+  const outputPayloadFromRequest = asRecord(request.output_payload);
+  const outputPayloadFromUsage = extractOutputPayloadFromUsageMetadata(usageEvent?.metadata);
+  const packagedOutputPayload =
+    sanitizeOutputPayloadForCustomer(outputPayloadFromRequest) ??
+    sanitizeOutputPayloadForCustomer(outputPayloadFromUsage);
+  const upstreamRawPayload =
+    outputPayloadFromRequest?.raw ??
+    extractUpstreamPayloadFromUsageMetadata(usageEvent?.metadata) ??
+    relatedAttempts.find((attempt) => attempt.response_payload)?.response_payload ??
+    null;
+
+  return {
+    ...request,
+    sourceLabel: request.request_source === "playground" ? "Playground" : "API",
+    apiKeyName: apiKey?.name ?? "Unknown key",
+    apiKeyPrefix: apiKey?.key_prefix ?? "unknown",
+    apiKeyEnvironment: apiKey?.environment ?? "unknown",
+    attemptCount: relatedAttempts.length,
+    lastAttempt: relatedAttempts[0] ?? null,
+    customerCharge,
+    providerCost,
+    profit,
+    customerChargeLabel: formatCurrency(customerCharge),
+    providerCostLabel: formatCurrency(providerCost),
+    profitLabel: formatCurrency(profit),
+    usageBreakdown,
+    customerComponentBreakdown,
+    providerComponentBreakdown,
+    upstreamRawText: formatUnknownJson(upstreamRawPayload) ?? "null",
+    packagedOutputText: formatUnknownJson(packagedOutputPayload) ?? "null",
+    createdLabel: formatRelativeTimestamp(request.created_at),
+    completedLabel: formatRelativeTimestamp(request.completed_at),
+  };
+}
+
 async function fetchMonitoringRequests(
   supabase: Awaited<ReturnType<typeof createClient>>,
   lookbackMs: number,
@@ -493,11 +609,35 @@ async function fetchMonitoringRequests(
       | "cancelled"
       | "inflight";
     modelSlug?: string | null;
+    interval?: "minute" | "hour" | "day";
   } = {}
 ) {
-  const batchSize = 2000;
-  const maxBatches = 6;
   const sinceIso = new Date(Date.now() - lookbackMs).toISOString();
+  const aggregateResponse = await supabase.rpc("get_internal_monitoring_buckets", {
+    p_since: sinceIso,
+    p_interval: filters.interval ?? "hour",
+    p_status: filters.status ?? "all",
+    p_model_slug: filters.modelSlug?.trim() || null,
+  });
+
+  if (!aggregateResponse.error) {
+    return ((aggregateResponse.data ?? []) as Array<{
+      public_model_slug: string | null;
+      status: string | null;
+      bucket_start: string | null;
+      total_count: number | string | null;
+    }>).map((row, index) => ({
+      id: `aggregate-${index}`,
+      capability: "",
+      public_model_slug: row.public_model_slug ?? "unknown",
+      status: row.status ?? "unknown",
+      created_at: row.bucket_start ?? sinceIso,
+      count: Number(row.total_count ?? 0),
+    }));
+  }
+
+  const batchSize = 2000;
+  const maxBatches = 1;
   const rows: MonitoringRequestRow[] = [];
 
   for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
@@ -740,7 +880,18 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const requestScope = options.requestScope ?? "all";
   const requestPageSize = Math.min(Math.max(options.requestPageSize ?? 20, 1), 100);
   const requestPage = Math.max(Math.floor(options.requestPage ?? 1), 1);
+  const userPageSize = Math.min(Math.max(options.userPageSize ?? 10, 1), 50);
+  const userPage = Math.max(Math.floor(options.userPage ?? 1), 1);
+  const userSearch = options.userSearch?.trim() ?? "";
+  const modelPageSize = Math.min(Math.max(options.modelPageSize ?? 10, 1), 50);
+  const modelPage = Math.max(Math.floor(options.modelPage ?? 1), 1);
+  const modelTypeFilter = options.modelTypeFilter?.trim() ?? "all";
+  const modelStatusFilter = options.modelStatusFilter ?? "all";
+  const internalAiUsagePageSize = Math.min(Math.max(options.internalAiUsagePageSize ?? 10, 1), 50);
+  const internalAiUsagePage = Math.max(Math.floor(options.internalAiUsagePage ?? 1), 1);
   const activeTab = options.activeTab ?? "public-models";
+  const shouldPaginatePublicModels = activeTab === "public-models";
+  const shouldPaginateInternalAiUsageLogs = activeTab === "internal-model-ai-usage-logs";
   const shouldLoadMonitoring =
     activeTab === "monitoring" ||
     activeTab === "monitoring-overview" ||
@@ -765,14 +916,10 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     routingRulesResponse,
     requestsResponse,
     apiKeysResponse,
-    apiKeySpendSummaryResponse,
-    requestCostResponse,
     usageEventsResponse,
     attemptsResponse,
     adminAuditLogsResponse,
     internalModelAiUsageLogsResponse,
-    walletTransactionsResponse,
-    financeRequestsResponse,
   ] =
     await Promise.all([
       shouldLoadManagementData
@@ -784,12 +931,24 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
             .order("created_at", { ascending: true })
         : Promise.resolve({ data: [], error: null }),
       shouldLoadManagementData
-        ? supabase
-            .from("supported_models")
-            .select(
-              "id, provider, model_slug, display_name, modality, capability, billing_config, unit_label, default_unit_cost, active, created_at"
-            )
-            .order("created_at", { ascending: true })
+        ? (() => {
+            let query = supabase
+              .from("supported_models")
+              .select(
+                "id, provider, model_slug, display_name, modality, capability, billing_config, unit_label, default_unit_cost, active, created_at",
+                shouldPaginatePublicModels ? { count: "exact" } : undefined
+              )
+              .order("created_at", { ascending: true });
+            if (shouldPaginatePublicModels && modelStatusFilter !== "all") {
+              query = query.eq("active", modelStatusFilter === "active");
+            }
+            if (shouldPaginatePublicModels && modelTypeFilter !== "all") {
+              query = query.filter("billing_config->metadata->>modelType", "eq", modelTypeFilter);
+            }
+            return shouldPaginatePublicModels
+              ? query.range((modelPage - 1) * modelPageSize, modelPage * modelPageSize - 1)
+              : query;
+          })()
         : Promise.resolve({ data: [], error: null }),
       shouldLoadManagementData
         ? supabase
@@ -835,19 +994,23 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
             .order("created_at", { ascending: false })
         : Promise.resolve({ data: [], error: null }),
       shouldLoadManagementData
-        ? supabase
-            .from("provider_models")
-            .select(
-              "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, input_schema, output_schema, execution_template, execution_config, created_at"
-            )
-            .order("created_at", { ascending: true })
+        ? (shouldPaginatePublicModels
+            ? Promise.resolve({ data: [], error: null })
+            : supabase
+                .from("provider_models")
+                .select(
+                  "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, input_schema, output_schema, execution_template, execution_config, created_at"
+                )
+                .order("created_at", { ascending: true }))
         : Promise.resolve({ data: [], error: null }),
       shouldLoadManagementData
-        ? supabase
-            .from("provider_model_showcase_assets")
-            .select("id, provider_model_id, asset_kind, storage_bucket, storage_path, public_url, alt_text, sort_order, created_at")
-            .order("sort_order", { ascending: true })
-            .order("created_at", { ascending: true })
+        ? (shouldPaginatePublicModels
+            ? Promise.resolve({ data: [], error: null })
+            : supabase
+                .from("provider_model_showcase_assets")
+                .select("id, provider_model_id, asset_kind, storage_bucket, storage_path, public_url, alt_text, sort_order, created_at")
+                .order("sort_order", { ascending: true })
+                .order("created_at", { ascending: true }))
         : Promise.resolve({ data: [], error: null }),
       shouldLoadManagementData
         ? (bypassAuth
@@ -869,20 +1032,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         ? Promise.resolve({ data: [], error: null })
         : Promise.resolve({ data: [], error: null }),
       shouldLoadRequestRecords
-        ? supabase
-            .from("api_keys")
-            .select("id, workspace_id, created_by, name, key_prefix, environment, status, created_at")
-            .order("created_at", { ascending: false })
+        ? Promise.resolve({ data: [], error: null })
         : Promise.resolve({ data: [], error: null }),
-      shouldLoadManagementData
-        ? supabase
-            .from("v_api_key_spend_summary")
-            .select("api_key_id, workspace_id, current_month_spend, current_month_requests")
-        : Promise.resolve({ data: [], error: null }),
-      supabase
-        .from("inference_requests")
-        .select("api_key_id, estimated_provider_cost, actual_provider_cost")
-        .gte("created_at", monitoringSinceIso),
       shouldLoadRequestRecords
         ? Promise.resolve({ data: [], error: null })
         : Promise.resolve({ data: [], error: null }),
@@ -906,43 +1057,36 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
                 .limit(40))
         : Promise.resolve({ data: [], error: null }),
       shouldLoadManagementData
-        ? (bypassAuth
-            ? supabase
-                .from("internal_model_ai_usage_logs")
-                .select(
-                  "id, workspace_id, actor_user_id, source_url, model, status, input_tokens, output_tokens, total_tokens, estimated_cost_usd, latency_ms, error_message, created_at"
+        ? (() => {
+            let query = supabase
+              .from("internal_model_ai_usage_logs")
+              .select(
+                "id, workspace_id, actor_user_id, source_url, model, status, input_tokens, output_tokens, total_tokens, estimated_cost_usd, latency_ms, error_message, created_at",
+                shouldPaginateInternalAiUsageLogs ? { count: "exact" } : undefined
+              )
+              .order("created_at", { ascending: false });
+            if (!bypassAuth) {
+              query = query.or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`);
+            }
+            return shouldPaginateInternalAiUsageLogs
+              ? query.range(
+                  (internalAiUsagePage - 1) * internalAiUsagePageSize,
+                  internalAiUsagePage * internalAiUsagePageSize - 1
                 )
-                .order("created_at", { ascending: false })
-                .limit(200)
-            : supabase
-                .from("internal_model_ai_usage_logs")
-                .select(
-                  "id, workspace_id, actor_user_id, source_url, model, status, input_tokens, output_tokens, total_tokens, estimated_cost_usd, latency_ms, error_message, created_at"
-                )
-                .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
-                .order("created_at", { ascending: false })
-                .limit(200))
-        : Promise.resolve({ data: [], error: null }),
-      shouldLoadRequestRecords
-        ? supabase
-            .from("wallet_transactions")
-            .select("workspace_id, entry_type, amount_delta, created_at")
-            .gte("created_at", monitoringSinceIso)
-        : Promise.resolve({ data: [], error: null }),
-      shouldLoadRequestRecords
-        ? supabase
-            .from("inference_requests")
-            .select(
-              "actual_provider_cost, estimated_provider_cost, actual_customer_charge, estimated_customer_charge, actual_profit, estimated_profit"
-            )
-            .gte("created_at", monitoringSinceIso)
+              : query.limit(200);
+          })()
         : Promise.resolve({ data: [], error: null }),
     ]);
 
   const providers = (providersResponse.error ? [] : providersResponse.data ?? []) as ProviderRow[];
-  const supportedModels = (supportedModelsResponse.error
+  let supportedModels = (supportedModelsResponse.error
     ? []
     : supportedModelsResponse.data ?? []) as SupportedModelRow[];
+  const supportedModelTotalCount = supportedModelsResponse.error
+    ? 0
+    : "count" in supportedModelsResponse
+      ? supportedModelsResponse.count ?? supportedModels.length
+      : supportedModels.length;
   const modelVendors = (modelVendorsResponse.error
     ? []
     : modelVendorsResponse.data ?? []) as ModelVendorRow[];
@@ -961,11 +1105,36 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const providerCredentials = (providerCredentialsResponse.error
     ? []
     : providerCredentialsResponse.data ?? []) as ProviderCredentialRow[];
-  const providerModels = (providerModelsResponse.error ? [] : providerModelsResponse.data ?? []) as ProviderModelRow[];
-  const providerModelShowcaseAssets =
+  let providerModels = (providerModelsResponse.error ? [] : providerModelsResponse.data ?? []) as ProviderModelRow[];
+  let providerModelShowcaseAssets =
     (providerModelShowcaseAssetsResponse.error
       ? []
       : providerModelShowcaseAssetsResponse.data ?? []) as ProviderModelShowcaseAssetRow[];
+  if (shouldPaginatePublicModels && supportedModels.length > 0) {
+    const supportedModelIdsForPage = supportedModels.map((model) => model.id);
+    const pageProviderModelsResponse = await supabase
+      .from("provider_models")
+      .select(
+        "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, input_schema, output_schema, execution_template, execution_config, created_at"
+      )
+      .in("supported_model_id", supportedModelIdsForPage)
+      .order("created_at", { ascending: true });
+    providerModels = (pageProviderModelsResponse.error
+      ? []
+      : pageProviderModelsResponse.data ?? []) as ProviderModelRow[];
+    const providerModelIdsForPage = providerModels.map((model) => model.id);
+    if (providerModelIdsForPage.length > 0) {
+      const pageShowcaseAssetsResponse = await supabase
+        .from("provider_model_showcase_assets")
+        .select("id, provider_model_id, asset_kind, storage_bucket, storage_path, public_url, alt_text, sort_order, created_at")
+        .in("provider_model_id", providerModelIdsForPage)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+      providerModelShowcaseAssets = (pageShowcaseAssetsResponse.error
+        ? []
+        : pageShowcaseAssetsResponse.data ?? []) as ProviderModelShowcaseAssetRow[];
+    }
+  }
   const derivedWorkerTemplates =
     workerTemplates.length > 0
       ? workerTemplates
@@ -991,13 +1160,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   void requestsResponse;
   let requests: RequestRow[] = [];
   let requestTotalCount = 0;
-  const apiKeys = (apiKeysResponse.error ? [] : apiKeysResponse.data ?? []) as ApiKeyRow[];
-  const apiKeySpendSummaries = (apiKeySpendSummaryResponse.error
-    ? []
-    : apiKeySpendSummaryResponse.data ?? []) as ApiKeySpendSummaryRow[];
-  const requestCosts = (requestCostResponse.error
-    ? []
-    : requestCostResponse.data ?? []) as RequestCostRow[];
+  let registeredUserTotalCount = 0;
+  let apiKeys = (apiKeysResponse.error ? [] : apiKeysResponse.data ?? []) as ApiKeyRow[];
   let usageEvents = (usageEventsResponse.error
     ? []
     : usageEventsResponse.data ?? []) as UsageEventRow[];
@@ -1008,29 +1172,22 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const internalModelAiUsageLogs = (internalModelAiUsageLogsResponse.error
     ? []
     : internalModelAiUsageLogsResponse.data ?? []) as InternalModelAiUsageLogRow[];
-  const walletTransactions = (walletTransactionsResponse.error
-    ? []
-    : walletTransactionsResponse.data ?? []) as Array<{
-    workspace_id: string | null;
-    entry_type: string | null;
-    amount_delta: number | string | null;
-    created_at?: string | null;
-  }>;
-  const financeRequests = (financeRequestsResponse.error
-    ? []
-    : financeRequestsResponse.data ?? []) as Array<{
-    actual_provider_cost: number | null;
-    estimated_provider_cost: number | null;
-    actual_customer_charge: number | null;
-    estimated_customer_charge: number | null;
-    actual_profit: number | null;
-    estimated_profit: number | null;
-  }>;
+  const internalModelAiUsageLogTotalCount = internalModelAiUsageLogsResponse.error
+    ? 0
+    : "count" in internalModelAiUsageLogsResponse
+      ? internalModelAiUsageLogsResponse.count ?? internalModelAiUsageLogs.length
+      : internalModelAiUsageLogs.length;
   const monitoringRequests =
     shouldLoadMonitoring && monitoringView === "overview"
       ? await fetchMonitoringRequests(supabase, monitoringLookbackMs, {
           status: monitoringStatus,
           modelSlug: monitoringModelSlug,
+          interval:
+            monitoringLookbackMs <= 90 * 60 * 1000
+              ? "minute"
+              : monitoringLookbackMs <= 48 * 60 * 60 * 1000
+                ? "hour"
+                : "day",
         })
       : [];
 
@@ -1055,31 +1212,33 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     map.set(asset.provider_model_id, list);
     return map;
   }, new Map<string, ProviderModelShowcaseAssetRow[]>());
-  const apiKeyById = new Map(apiKeys.map((row) => [row.id, row]));
-  const apiKeySpendById = new Map(apiKeySpendSummaries.map((row) => [row.api_key_id, row]));
-  const apiKeyWorkspaceById = new Map(
-    apiKeys.map((row) => [row.id, row.workspace_id] as const)
-  );
-
   const userProfileById = new Map<string, { id: string; email: string | null; name: string }>();
-  const requestUserIds = requests
-    .map((request) => request.user_id)
-    .filter((value): value is string => Boolean(value));
-  const apiKeyOwnerUserIds = apiKeys
-    .map((apiKey) => apiKey.created_by)
-    .filter((value): value is string => Boolean(value));
-  const requestActorUserIds = Array.from(new Set([...requestUserIds, ...apiKeyOwnerUserIds]));
   if (shouldLoadRequestRecords) {
-    const authUsersResponse = await supabase.auth.admin.listUsers({
-      page: 1,
-      perPage: 500,
-    });
-    const authUsers = authUsersResponse.error ? [] : authUsersResponse.data.users;
-    for (const row of authUsers) {
-      const metadata = asRecord(row.user_metadata);
+    const userFrom = (userPage - 1) * userPageSize;
+    const userTo = userFrom + userPageSize - 1;
+    const normalizedUserSearch = userSearch.replace(/[%,]/g, " ").trim();
+    let profilesQuery = supabase
+      .from("profiles")
+      .select("id, email, full_name", { count: "exact" })
+      .order("created_at", { ascending: false });
+
+    if (normalizedUserSearch) {
+      profilesQuery = profilesQuery.or(
+        `email.ilike.%${normalizedUserSearch}%,full_name.ilike.%${normalizedUserSearch}%`
+      );
+    }
+
+    const profilesResponse = await profilesQuery.range(userFrom, userTo);
+    const profileRows = profilesResponse.error ? [] : profilesResponse.data ?? [];
+    registeredUserTotalCount = profilesResponse.error
+      ? 0
+      : profilesResponse.count ?? profileRows.length;
+
+    for (const row of profileRows) {
       const name =
-        (typeof metadata?.full_name === "string" ? metadata.full_name : null) ??
-        (typeof metadata?.name === "string" ? metadata.name : null) ??
+        (typeof row.full_name === "string" && row.full_name.trim()
+          ? row.full_name.trim()
+          : null) ??
         row.email?.split("@")[0] ??
         `用户 ${row.id.slice(0, 8)}`;
       userProfileById.set(row.id, {
@@ -1087,36 +1246,6 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         email: row.email ?? null,
         name,
       });
-    }
-    const missingActorUserIds = requestActorUserIds.filter((userId) => !userProfileById.has(userId));
-    if (missingActorUserIds.length > 0) {
-      const missingUsersResponses = await Promise.all(
-        missingActorUserIds.map((userId) => supabase.auth.admin.getUserById(userId))
-      );
-      for (const response of missingUsersResponses) {
-        const row = response.error ? null : response.data.user;
-        if (!row) continue;
-        const metadata = asRecord(row.user_metadata);
-        const name =
-          (typeof metadata?.full_name === "string" ? metadata.full_name : null) ??
-          (typeof metadata?.name === "string" ? metadata.name : null) ??
-          row.email?.split("@")[0] ??
-          `用户 ${row.id.slice(0, 8)}`;
-        userProfileById.set(row.id, {
-          id: row.id,
-          email: row.email ?? null,
-          name,
-        });
-      }
-    }
-    for (const userId of requestActorUserIds) {
-      if (!userProfileById.has(userId)) {
-        userProfileById.set(userId, {
-          id: userId,
-          email: null,
-          name: `用户 ${userId.slice(0, 8)}`,
-        });
-      }
     }
   }
 
@@ -1190,19 +1319,6 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     }
   }
 
-  const usageEventByRequestId = new Map(
-    usageEvents
-      .filter((row) => row.external_request_id)
-      .map((row) => [row.external_request_id as string, row])
-  );
-
-  const requestAttempts = new Map<string, AttemptRow[]>();
-  for (const attempt of attempts) {
-    const list = requestAttempts.get(attempt.request_id) ?? [];
-    list.push(attempt);
-    requestAttempts.set(attempt.request_id, list);
-  }
-
   const userMemberships =
     shouldLoadRequestRecords && userProfileById.size > 0
       ? await supabase
@@ -1231,42 +1347,58 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const userWorkspaceIds = Array.from(
     new Set(userMembershipRows.map((row) => row.workspace_id).filter(Boolean))
   );
-  const userWalletTransactions =
+  if (shouldLoadRequestRecords && userProfileById.size > 0) {
+    const pageUserIds = Array.from(userProfileById.keys());
+    const [workspaceApiKeysResponse, ownerApiKeysResponse] = await Promise.all([
+      userWorkspaceIds.length > 0
+        ? supabase
+            .from("api_keys")
+            .select("id, workspace_id, created_by, name, key_prefix, environment, status, created_at")
+            .in("workspace_id", userWorkspaceIds)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from("api_keys")
+        .select("id, workspace_id, created_by, name, key_prefix, environment, status, created_at")
+        .in("created_by", pageUserIds)
+        .order("created_at", { ascending: false }),
+    ]);
+    const apiKeysByIdForPage = new Map<string, ApiKeyRow>();
+    for (const row of (workspaceApiKeysResponse.error ? [] : workspaceApiKeysResponse.data ?? []) as ApiKeyRow[]) {
+      apiKeysByIdForPage.set(row.id, row);
+    }
+    for (const row of (ownerApiKeysResponse.error ? [] : ownerApiKeysResponse.data ?? []) as ApiKeyRow[]) {
+      apiKeysByIdForPage.set(row.id, row);
+    }
+    apiKeys = Array.from(apiKeysByIdForPage.values());
+  }
+  const userWalletSummary =
     shouldLoadRequestRecords && userWorkspaceIds.length > 0
       ? await supabase
-          .from("wallet_transactions")
-          .select("workspace_id, amount_delta, entry_type, created_at")
+          .from("v_workspace_wallet_summary")
+          .select("workspace_id, balance, topup, system_credit, usage")
           .in("workspace_id", userWorkspaceIds)
       : { data: [], error: null };
-  const walletRowsForUsers = (userWalletTransactions.error
+  const walletSummaryRowsForUsers = (userWalletSummary.error
     ? []
-    : userWalletTransactions.data ?? []) as Array<{
+    : userWalletSummary.data ?? []) as Array<{
     workspace_id: string;
-    amount_delta: number | string | null;
-    entry_type: string | null;
-    created_at: string | null;
+    balance: number | string | null;
+    topup: number | string | null;
+    system_credit: number | string | null;
+    usage: number | string | null;
   }>;
-  const balanceByWorkspaceId = walletRowsForUsers.reduce((map, row) => {
-    map.set(row.workspace_id, (map.get(row.workspace_id) ?? 0) + Number(row.amount_delta ?? 0));
-    return map;
-  }, new Map<string, number>());
-  const walletBreakdownByWorkspaceId = walletRowsForUsers.reduce((map, row) => {
-    const current = map.get(row.workspace_id) ?? {
-      topup: 0,
-      systemCredit: 0,
-      usage: 0,
-    };
-    const amount = Number(row.amount_delta ?? 0);
-    if (row.entry_type === "topup" && amount > 0) {
-      current.topup += amount;
-    } else if (amount > 0) {
-      current.systemCredit += amount;
-    } else if (amount < 0) {
-      current.usage += Math.abs(amount);
-    }
-    map.set(row.workspace_id, current);
-    return map;
-  }, new Map<string, { topup: number; systemCredit: number; usage: number }>());
+  const walletSummaryByWorkspaceId = new Map(
+    walletSummaryRowsForUsers.map((row) => [
+      row.workspace_id,
+      {
+        balance: Number(row.balance ?? 0),
+        topup: Number(row.topup ?? 0),
+        systemCredit: Number(row.system_credit ?? 0),
+        usage: Number(row.usage ?? 0),
+      },
+    ])
+  );
   const apiKeysByWorkspaceId = apiKeys.reduce((map, apiKey) => {
     const list = map.get(apiKey.workspace_id) ?? [];
     list.push(apiKey);
@@ -1280,22 +1412,37 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     map.set(apiKey.created_by, list);
     return map;
   }, new Map<string, ApiKeyRow[]>());
-  const registeredUsers = Array.from(userProfileById.values())
+  const usageEventByRequestId = new Map(
+    usageEvents
+      .filter((row) => row.external_request_id)
+      .map((row) => [row.external_request_id as string, row])
+  );
+  const apiKeyById = new Map(apiKeys.map((row) => [row.id, row]));
+  const apiKeyWorkspaceById = new Map(
+    apiKeys.map((row) => [row.id, row.workspace_id] as const)
+  );
+
+  const requestAttempts = new Map<string, AttemptRow[]>();
+  for (const attempt of attempts) {
+    const list = requestAttempts.get(attempt.request_id) ?? [];
+    list.push(attempt);
+    requestAttempts.set(attempt.request_id, list);
+  }
+
+  const registeredUserBase = Array.from(userProfileById.values())
     .map((profile) => {
       const membership = primaryMembershipByUserId.get(profile.id) ?? null;
       const workspace = Array.isArray(membership?.workspaces)
         ? membership?.workspaces[0] ?? null
         : membership?.workspaces ?? null;
-      const balance = membership?.workspace_id
-        ? balanceByWorkspaceId.get(membership.workspace_id) ?? 0
-        : 0;
-      const walletBreakdown = membership?.workspace_id
-        ? walletBreakdownByWorkspaceId.get(membership.workspace_id) ?? {
+      const walletSummary = membership?.workspace_id
+        ? walletSummaryByWorkspaceId.get(membership.workspace_id) ?? {
+            balance: 0,
             topup: 0,
             systemCredit: 0,
             usage: 0,
           }
-        : { topup: 0, systemCredit: 0, usage: 0 };
+        : { balance: 0, topup: 0, systemCredit: 0, usage: 0 };
       const userApiKeyMap = new Map<string, ApiKeyRow>();
       for (const apiKey of apiKeysByOwnerUserId.get(profile.id) ?? []) {
         userApiKeyMap.set(apiKey.id, apiKey);
@@ -1318,15 +1465,15 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         workspaceName: workspace?.name ?? "未创建 workspace",
         workspaceSlug: workspace?.slug ?? null,
         role: membership?.role ?? "none",
-        balance,
-        balanceLabel: formatCurrency(balance),
+        balance: walletSummary.balance,
+        balanceLabel: formatInternalBalance(walletSummary.balance),
         walletBreakdown: {
-          topup: walletBreakdown.topup,
-          topupLabel: formatCurrency(walletBreakdown.topup),
-          systemCredit: walletBreakdown.systemCredit,
-          systemCreditLabel: formatCurrency(walletBreakdown.systemCredit),
-          usage: walletBreakdown.usage,
-          usageLabel: formatCurrency(walletBreakdown.usage),
+          topup: walletSummary.topup,
+          topupLabel: formatInternalBalance(walletSummary.topup),
+          systemCredit: walletSummary.systemCredit,
+          systemCreditLabel: formatInternalBalance(walletSummary.systemCredit),
+          usage: walletSummary.usage,
+          usageLabel: formatInternalBalance(walletSummary.usage),
         },
         apiKeys: userApiKeys.map((apiKey) => ({
           id: apiKey.id,
@@ -1337,8 +1484,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
           createdLabel: formatRelativeTimestamp(apiKey.created_at),
         })),
       };
-    })
-    .sort((a, b) => (a.email ?? a.name).localeCompare(b.email ?? b.name, "en-US"));
+    });
 
   const providerSummaries = providers.map((provider) => {
     const models = providerModels.filter((item) => item.provider_id === provider.id);
@@ -1473,7 +1619,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     };
   });
 
-  const recentRequestSummaries = requests.map((request) => {
+  const summarizeRequest = (request: RequestRow) => {
     const provider = request.provider_id ? providerById.get(request.provider_id) ?? null : null;
     const providerModel = request.provider_model_id
       ? providerModelById.get(request.provider_model_id) ?? null
@@ -1565,8 +1711,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       extractUpstreamPayloadFromUsageMetadata(usageEvent?.metadata) ??
       relatedAttempts.find((attempt) => attempt.response_payload)?.response_payload ??
       null;
-    const upstreamRawText = formatUnknownJson(upstreamRawPayload);
-    const packagedOutputText = formatUnknownJson(packagedOutputPayload);
+    const upstreamRawText = formatUnknownJson(upstreamRawPayload) ?? "null";
+    const packagedOutputText = formatUnknownJson(packagedOutputPayload) ?? "null";
 
     return {
       ...request,
@@ -1600,7 +1746,12 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       createdLabel: formatRelativeTimestamp(request.created_at),
       completedLabel: formatRelativeTimestamp(request.completed_at),
     };
-  });
+  };
+  const recentRequestSummaries = requests.map(summarizeRequest);
+  const registeredUsers = registeredUserBase.map((user) => ({
+    ...user,
+    recentRequests: [],
+  }));
 
   const providerCredentialSummaries = providerCredentials.map((credential) => {
     const provider = providerById.get(credential.provider_id);
@@ -1663,41 +1814,6 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     };
   });
 
-  const requestCostByApiKeyId = requestCosts.reduce((map, request) => {
-    if (!request.api_key_id) {
-      return map;
-    }
-
-    map.set(
-      request.api_key_id,
-      (map.get(request.api_key_id) ?? 0) +
-        Number(request.actual_provider_cost ?? request.estimated_provider_cost ?? 0)
-    );
-
-    return map;
-  }, new Map<string, number>());
-
-  const keyEconomics = apiKeys.map((apiKey) => {
-    const spendSummary = apiKeySpendById.get(apiKey.id);
-    const cost = requestCostByApiKeyId.get(apiKey.id) ?? 0;
-    const revenue = Number(spendSummary?.current_month_spend ?? 0);
-    const requestCount = Number(spendSummary?.current_month_requests ?? 0);
-
-    return {
-      id: apiKey.id,
-      workspaceId: apiKey.workspace_id,
-      name: apiKey.name,
-      keyPrefix: apiKey.key_prefix,
-      environment: apiKey.environment,
-      status: apiKey.status,
-      revenue,
-      cost,
-      profit: revenue - cost,
-      requestCount,
-      createdLabel: formatRelativeTimestamp(apiKey.created_at),
-    };
-  });
-
   const globalMonitoring = {
     videoInflightRequests: [],
     recentVideoRequests: [],
@@ -1710,113 +1826,6 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     },
     recentImageRequests: [],
   };
-  const financeSummary = {
-    totalTopup: walletTransactions.reduce((sum, row) => {
-      if (row.entry_type !== "topup") return sum;
-      const amount = Number(row.amount_delta ?? 0);
-      return amount > 0 ? sum + amount : sum;
-    }, 0),
-    totalProviderCost: financeRequests.reduce(
-      (sum, row) =>
-        sum + Number(row.actual_provider_cost ?? row.estimated_provider_cost ?? 0),
-      0
-    ),
-    totalCustomerCharge: financeRequests.reduce(
-      (sum, row) =>
-        sum + Number(row.actual_customer_charge ?? row.estimated_customer_charge ?? 0),
-      0
-    ),
-    totalProfit: financeRequests.reduce(
-      (sum, row) =>
-        sum +
-        Number(
-          row.actual_profit ??
-            row.estimated_profit ??
-            Number(row.actual_customer_charge ?? row.estimated_customer_charge ?? 0) -
-              Number(row.actual_provider_cost ?? row.estimated_provider_cost ?? 0)
-        ),
-      0
-    ),
-    pendingProviderCost: financeRequests.reduce((sum, row) => {
-      if (row.actual_provider_cost !== null && row.actual_provider_cost !== undefined) {
-        return sum;
-      }
-      return sum + Number(row.estimated_provider_cost ?? 0);
-    }, 0),
-  };
-
-  const workspaceNameById = new Map(
-    recentRequestSummaries.map((request) => [
-      request.workspaceId,
-      { name: request.customerName, slug: request.workspaceSlug },
-    ])
-  );
-
-  const customerFinanceMap = new Map<
-    string,
-    {
-      workspaceId: string;
-      workspaceName: string;
-      workspaceSlug: string;
-      totalTopup: number;
-      totalSystemCredit: number;
-      totalConsumption: number;
-      totalProviderCost: number;
-      totalProfit: number;
-      requestCount: number;
-    }
-  >();
-
-  for (const tx of walletTransactions) {
-    if (!tx.workspace_id) continue;
-    const workspaceMeta = workspaceNameById.get(tx.workspace_id) ?? {
-      name: tx.workspace_id,
-      slug: tx.workspace_id,
-    };
-    const current = customerFinanceMap.get(tx.workspace_id) ?? {
-      workspaceId: tx.workspace_id,
-      workspaceName: workspaceMeta.name,
-      workspaceSlug: workspaceMeta.slug,
-      totalTopup: 0,
-      totalSystemCredit: 0,
-      totalConsumption: 0,
-      totalProviderCost: 0,
-      totalProfit: 0,
-      requestCount: 0,
-    };
-    const amount = Number(tx.amount_delta ?? 0);
-    if (tx.entry_type === "topup" && amount > 0) {
-      current.totalTopup += amount;
-    } else if (amount > 0) {
-      current.totalSystemCredit += amount;
-    }
-    customerFinanceMap.set(tx.workspace_id, current);
-  }
-
-  for (const request of recentRequestSummaries) {
-    const workspaceId = request.workspaceId ?? request.workspaceSlug;
-    const current = customerFinanceMap.get(workspaceId) ?? {
-      workspaceId,
-      workspaceName: request.customerName,
-      workspaceSlug: request.workspaceSlug,
-      totalTopup: 0,
-      totalSystemCredit: 0,
-      totalConsumption: 0,
-      totalProviderCost: 0,
-      totalProfit: 0,
-      requestCount: 0,
-    };
-    current.totalConsumption += request.customerCharge;
-    current.totalProviderCost += request.providerCost;
-    current.totalProfit += request.profit;
-    current.requestCount += 1;
-    customerFinanceMap.set(workspaceId, current);
-  }
-
-  const customerFinances = Array.from(customerFinanceMap.values()).sort(
-    (a, b) => b.totalConsumption - a.totalConsumption
-  );
-
   return {
     authorized: true as const,
     user: {
@@ -1844,7 +1853,6 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         (item) => item.status === "queued" || item.status === "processing"
       ).length,
     },
-    financeSummary,
     providers: providerSummaries,
     modelVendors: modelVendors.map((vendor) => ({
       ...vendor,
@@ -1877,11 +1885,24 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       createdLabel: formatRelativeTimestamp(alias.created_at),
     })),
     supportedModels: supportedModelSummaries,
+    supportedModelPagination: {
+      page: modelPage,
+      pageSize: modelPageSize,
+      totalCount: supportedModelTotalCount,
+      totalPages: Math.max(1, Math.ceil(supportedModelTotalCount / modelPageSize)),
+    },
     providerCredentials: providerCredentialSummaries,
     providerModels: providerModelSummaries,
     routingRules: routingRuleSummaries,
     requests: recentRequestSummaries,
     registeredUsers,
+    registeredUserPagination: {
+      page: userPage,
+      pageSize: userPageSize,
+      totalCount: registeredUserTotalCount,
+      totalPages: Math.max(1, Math.ceil(registeredUserTotalCount / userPageSize)),
+      search: userSearch,
+    },
     requestPagination: {
       page: requestPage,
       pageSize: requestPageSize,
@@ -1892,6 +1913,12 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     globalMonitoring,
     auditLogs: auditLogSummaries,
     internalModelAiUsageLogs: internalModelAiUsageLogSummaries,
+    internalModelAiUsageLogPagination: {
+      page: internalAiUsagePage,
+      pageSize: internalAiUsagePageSize,
+      totalCount: internalModelAiUsageLogTotalCount,
+      totalPages: Math.max(1, Math.ceil(internalModelAiUsageLogTotalCount / internalAiUsagePageSize)),
+    },
     requestFilters: {
       customers: Array.from(userProfileById.values())
         .map((profile) => ({
@@ -1919,6 +1946,115 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         .map(([, value]) => value)
         .sort((a, b) => a.name.localeCompare(b.name, "en-US")),
     },
-    customerFinances,
+  };
+}
+
+export async function getInternalUserRequests(input: {
+  userId: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const pageSize = Math.min(Math.max(input.pageSize ?? 10, 1), 50);
+  const page = Math.max(Math.floor(input.page ?? 1), 1);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const supabase = createAdminClient();
+
+  const membershipResponse = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", input.userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (membershipResponse.error) {
+    throw new Error(membershipResponse.error.message);
+  }
+
+  const workspaceId = membershipResponse.data?.workspace_id as string | undefined;
+  if (!workspaceId) {
+    return {
+      rows: [] as InternalUserRequestSummary[],
+      pagination: { page, pageSize, totalCount: 0, totalPages: 1 },
+    };
+  }
+
+  const requestsResponse = await supabase
+    .from("inference_requests")
+    .select(
+      "id, workspace_id, user_id, api_key_id, request_source, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at",
+      { count: "exact" }
+    )
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (requestsResponse.error) {
+    throw new Error(requestsResponse.error.message);
+  }
+
+  const requests = (requestsResponse.data ?? []) as RequestRow[];
+  const requestIds = requests.map((request) => request.id);
+  const apiKeyIds = Array.from(
+    new Set(requests.map((request) => request.api_key_id).filter((value): value is string => Boolean(value)))
+  );
+  const [usageEventsResponse, attemptsResponse, apiKeysResponse] =
+    requestIds.length > 0
+      ? await Promise.all([
+          supabase
+            .from("usage_events")
+            .select("external_request_id, metadata")
+            .in("external_request_id", requestIds),
+          supabase
+            .from("provider_attempts")
+            .select(
+              "id, request_id, provider_id, provider_model_id, attempt_no, status, upstream_request_id, upstream_task_id, latency_ms, response_payload, error_message, created_at"
+            )
+            .in("request_id", requestIds)
+            .order("created_at", { ascending: false }),
+          apiKeyIds.length > 0
+            ? supabase
+                .from("api_keys")
+                .select("id, workspace_id, created_by, name, key_prefix, environment, status, created_at")
+                .in("id", apiKeyIds)
+            : Promise.resolve({ data: [], error: null }),
+        ])
+      : [
+          { data: [], error: null },
+          { data: [], error: null },
+          { data: [], error: null },
+        ];
+
+  const usageEvents = (usageEventsResponse.error ? [] : usageEventsResponse.data ?? []) as UsageEventRow[];
+  const attempts = (attemptsResponse.error ? [] : attemptsResponse.data ?? []) as AttemptRow[];
+  const apiKeys = (apiKeysResponse.error ? [] : apiKeysResponse.data ?? []) as ApiKeyRow[];
+  const usageEventByRequestId = new Map(
+    usageEvents
+      .filter((row) => row.external_request_id)
+      .map((row) => [row.external_request_id as string, row])
+  );
+  const attemptsByRequestId = attempts.reduce((map, attempt) => {
+    const list = map.get(attempt.request_id) ?? [];
+    list.push(attempt);
+    map.set(attempt.request_id, list);
+    return map;
+  }, new Map<string, AttemptRow[]>());
+  const apiKeyById = new Map(apiKeys.map((apiKey) => [apiKey.id, apiKey]));
+
+  return {
+    rows: requests.map((request) =>
+      summarizeInternalRequest({
+        request,
+        apiKey: request.api_key_id ? apiKeyById.get(request.api_key_id) ?? null : null,
+        attempts: attemptsByRequestId.get(request.id) ?? [],
+        usageEvent: usageEventByRequestId.get(request.id) ?? null,
+      })
+    ),
+    pagination: {
+      page,
+      pageSize,
+      totalCount: requestsResponse.count ?? requests.length,
+      totalPages: Math.max(1, Math.ceil((requestsResponse.count ?? requests.length) / pageSize)),
+    },
   };
 }

@@ -9,6 +9,12 @@ type PricingResponse = {
   billingUnit: string;
   sellUsd: number;
   sellLabel: string;
+  priceTiers?: Array<{
+    resolution: string;
+    quality: string;
+    priceUsd: number;
+    label: string;
+  }>;
 };
 
 function PricingSection({
@@ -116,7 +122,19 @@ export function ImageVideoTable() {
                   </span>
                 </TableCell>
                 <TableCell className="text-[#1C1917]">
-                  {pricing.sellLabel}
+                  <span className="font-medium">{pricing.sellLabel}</span>
+                  {pricing.priceTiers && pricing.priceTiers.length > 0 ? (
+                    <span className="mt-2 grid gap-1.5">
+                      {pricing.priceTiers.map((tier) => (
+                        <span
+                          key={`${tier.resolution}-${tier.quality}`}
+                          className="rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-2 py-1 text-xs text-black/60"
+                        >
+                          {tier.label}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
                 </TableCell>
               </tr>
             ) : (

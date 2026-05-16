@@ -126,6 +126,7 @@ export type DashboardData = {
     status: KeyState;
     rawStatus: string;
     monthlyBudget: number;
+    systemGenerated: boolean;
   }>;
   usageRows: Array<{
     time: string;
@@ -602,6 +603,7 @@ export async function getDashboardData({
       { data: usageEvents },
       { data: walletSummaryRows },
       walletLedgerResponse,
+      playgroundKeysResponse,
       providerResponse,
       providerModelResponse,
       supportedModelResponse,
@@ -621,6 +623,10 @@ export async function getDashboardData({
         .gt("amount_delta", 0)
         .order("created_at", { ascending: false })
         .range(billingFrom, billingTo),
+      supabaseAdmin
+        .from("workspace_playground_keys")
+        .select("api_key_id")
+        .eq("workspace_id", workspace.id),
       supabaseAdmin.from("providers").select("id, name, regions, status"),
       supabaseAdmin
         .from("provider_models")
@@ -632,6 +638,11 @@ export async function getDashboardData({
     ]);
 
     const keyIdSet = new Set((keyRows ?? []).map((row) => row.id));
+    const systemPlaygroundKeyIds = new Set(
+      (playgroundKeysResponse.error ? [] : playgroundKeysResponse.data ?? [])
+        .map((row) => row.api_key_id)
+        .filter((value): value is string => typeof value === "string" && value.length > 0)
+    );
     const walletLedgerRows = walletLedgerResponse.error ? [] : walletLedgerResponse.data ?? [];
     const safeRequestsApiKeyId =
       requestsApiKeyId && keyIdSet.has(requestsApiKeyId) ? requestsApiKeyId : null;
@@ -1033,6 +1044,7 @@ export async function getDashboardData({
                 : "active",
           rawStatus: row.status as string,
           monthlyBudget: budget,
+          systemGenerated: systemPlaygroundKeyIds.has(row.id),
         };
       }),
       usageRows: (usageEvents ?? []).map((row) => ({

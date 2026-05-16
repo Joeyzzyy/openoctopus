@@ -26,7 +26,7 @@ security definer
 set search_path = public
 as $$
 declare
-  workspace_id uuid;
+  v_workspace_id uuid;
   base_slug text;
   derived_slug text;
 begin
@@ -70,10 +70,10 @@ begin
     new.id,
     0
   )
-  returning id into workspace_id;
+  returning id into v_workspace_id;
 
   insert into public.workspace_members (workspace_id, user_id, role)
-  values (workspace_id, new.id, 'owner')
+  values (v_workspace_id, new.id, 'owner')
   on conflict (workspace_id, user_id) do nothing;
 
   return new;

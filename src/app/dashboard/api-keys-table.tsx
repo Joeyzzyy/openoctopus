@@ -26,6 +26,7 @@ type ApiKey = {
   status: "active" | "warning" | "paused";
   rawStatus: string;
   monthlyBudget: number;
+  systemGenerated: boolean;
 };
 
 const keyToneStyles = {
@@ -48,6 +49,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
   const [isPending, startTransition] = useTransition();
 
   const startEdit = (key: ApiKey) => {
+    if (key.systemGenerated) return;
     setEditingId(key.id);
     setEditName(key.name);
     setEditBudget(String(key.monthlyBudget));
@@ -88,6 +90,11 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
   };
 
   const handleToggle = (keyId: string, currentRawStatus: string) => {
+    const key = apiKeys.find((item) => item.id === keyId);
+    if (key?.systemGenerated) {
+      toast.error("System generated keys cannot be paused.");
+      return;
+    }
     const newStatus = currentRawStatus === "paused" ? "active" : "paused";
     startTransition(async () => {
       const result = await toggleApiKeyStatus(keyId, newStatus);
@@ -133,6 +140,11 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                   <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-[#6B7280]">
                     {key.prefix} · {key.environment}
                   </p>
+                  {key.systemGenerated ? (
+                    <span className="mt-2 inline-flex rounded-full border border-[#D7EADB] bg-[#EDF8F0] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.8px] text-[#167A3D]">
+                      System generated
+                    </span>
+                  ) : null}
                 </div>
                 <span
                   className={cn(
@@ -209,13 +221,14 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                   <>
                     <button
                       onClick={() => startEdit(key)}
+                      disabled={key.systemGenerated}
                       className={`${secondaryButtonClassName} h-9 flex-1 justify-center px-3 text-[10px] uppercase tracking-[0.5px]`}
                     >
                       <Pencil className="h-3 w-3" /> Edit
                     </button>
                     <button
                       onClick={() => handleToggle(key.id, key.rawStatus)}
-                      disabled={isPending}
+                      disabled={isPending || key.systemGenerated}
                       className={`${secondaryButtonClassName} h-9 flex-1 justify-center px-3 text-[10px] uppercase tracking-[0.5px] disabled:cursor-not-allowed disabled:opacity-50`}
                     >
                       {key.rawStatus === "paused" ? (
@@ -230,7 +243,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                     </button>
                     <button
                       onClick={() => setDeleteTarget({ id: key.id, name: key.name })}
-                      disabled={isPending}
+                      disabled={isPending || key.systemGenerated}
                       className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-1 rounded-md border border-[#F1D2CC] bg-white px-3 text-[10px] uppercase tracking-[0.5px] text-[#B54432] transition-colors hover:bg-[#FFF7F5] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:flex-none"
                     >
                       <Trash2 className="h-3 w-3" /> Delete
@@ -282,13 +295,18 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                         className={`${inputClassName} w-36 font-semibold`}
                       />
                     ) : (
-                      <p className="font-mono text-sm font-semibold text-[#162319]">
-                        {key.name}
-                      </p>
+                    <p className="font-mono text-sm font-semibold text-[#162319]">
+                      {key.name}
+                    </p>
                     )}
                     <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-[#7b8778]">
                       {key.prefix}
                     </p>
+                    {key.systemGenerated ? (
+                      <span className="mt-2 inline-flex rounded-full border border-[#D7EADB] bg-[#EDF8F0] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.8px] text-[#167A3D]">
+                        System generated
+                      </span>
+                    ) : null}
                   </td>
                   <td className="border-y border-black/[0.08] px-3 py-3.5 text-sm text-[#4B5563]">
                     {key.environment}
@@ -348,6 +366,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                         <>
                           <button
                             onClick={() => startEdit(key)}
+                            disabled={key.systemGenerated}
                             className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]"
                             title="Edit name & budget"
                           >
@@ -355,7 +374,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                           </button>
                           <button
                             onClick={() => handleToggle(key.id, key.rawStatus)}
-                            disabled={isPending}
+                            disabled={isPending || key.systemGenerated}
                             className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA] disabled:cursor-not-allowed disabled:opacity-50"
                             title={key.rawStatus === "paused" ? "Resume key" : "Pause key"}
                           >
@@ -367,7 +386,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                           </button>
                           <button
                             onClick={() => setDeleteTarget({ id: key.id, name: key.name })}
-                            disabled={isPending}
+                            disabled={isPending || key.systemGenerated}
                             className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#F1D2CC] bg-white text-[#B54432] transition-colors hover:bg-[#FFF7F5] disabled:cursor-not-allowed disabled:opacity-50"
                             title="Delete key"
                           >

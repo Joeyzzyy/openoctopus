@@ -4,6 +4,7 @@ import { normalizeBillingConfig, parseBillingConfig } from "@/lib/billing-config
 import { createClient } from "@/lib/supabase/server";
 
 const IMAGE_OUTPUT_TOKENS_PER_IMAGE = 1290;
+const QUALITY_ORDER = ["low", "medium", "high"];
 
 type ProviderModelPricing = Record<string, unknown> | null;
 type SupportedModelBillingConfig = Record<string, unknown> | null;
@@ -13,6 +14,13 @@ export type MarketingImagePricing = {
   billingUnit: "image";
   costUsd: number | null;
   sellUsd: number;
+  sellLabel: string;
+  priceTiers: Array<{
+    resolution: string;
+    quality: string;
+    priceUsd: number;
+    label: string;
+  }>;
   publicModelSlug: string | null;
 };
 
@@ -29,6 +37,53 @@ function readNumeric(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function splitCombinationKey(key: string) {
+  const [resolution, quality] = key.split("__");
+  return {
+    resolution: resolution || "default",
+    quality: quality || "default",
+  };
+}
+
+function formatResolutionLabel(value: string) {
+  return `${value} output resolution`;
+}
+
+function formatQualityLabel(value: string) {
+  return `${value} generation quality`;
+}
+
+function extractCombinationPrices(config: ProviderModelPricing | SupportedModelBillingConfig) {
+  if (!config) {
+    return [];
+  }
+
+  try {
+    const normalized = normalizeBillingConfig(parseBillingConfig(config));
+    const combinations = normalized.parameterPrices?.combinations ?? {};
+    return Object.entries(combinations)
+      .map(([key, value]) => {
+        const price = readNumeric(value);
+        if (price === null || price <= 0) {
+          return null;
+        }
+        return {
+          ...splitCombinationKey(key),
+          price,
+        };
+      })
+      .filter((item): item is { resolution: string; quality: string; price: number } => Boolean(item))
+      .sort((a, b) =>
+        a.resolution.localeCompare(b.resolution, "en-US", { numeric: true }) ||
+        (QUALITY_ORDER.indexOf(a.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(a.quality)) -
+          (QUALITY_ORDER.indexOf(b.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(b.quality)) ||
+        a.quality.localeCompare(b.quality, "en-US", { numeric: true })
+      );
+  } catch {
+    return [];
+  }
+}
+
 function extractProviderModelCost(pricing: ProviderModelPricing) {
   if (!pricing) {
     return null;
@@ -36,6 +91,10 @@ function extractProviderModelCost(pricing: ProviderModelPricing) {
 
   try {
     const normalized = normalizeBillingConfig(parseBillingConfig(pricing));
+    const combinationPrices = Object.values(normalized.parameterPrices?.combinations ?? {});
+    if (combinationPrices.length > 0) {
+      return Math.min(...combinationPrices);
+    }
     const charges = normalized.charges;
     const perImage = readNumeric(charges.perImage);
 
@@ -76,6 +135,10 @@ function extractSupportedModelCost(
   if (billingConfig) {
     try {
       const normalized = normalizeBillingConfig(parseBillingConfig(billingConfig));
+      const combinationPrices = Object.values(normalized.parameterPrices?.combinations ?? {});
+      if (combinationPrices.length > 0) {
+        return Math.min(...combinationPrices);
+      }
       const charges = normalized.charges;
       const perImage = readNumeric(charges.perImage);
 
@@ -120,6 +183,18 @@ export function formatPricingLabel(value: number, unit: string) {
   return `${formatUsd(value)} / ${unit}`;
 }
 
+function formatPricingTiersLabel(tiers: Array<{ price: number }>, fallbackValue: number, unit: string) {
+  if (tiers.length === 0) {
+    return formatPricingLabel(fallbackValue, unit);
+  }
+  const prices = tiers.map((tier) => tier.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return min === max
+    ? formatPricingLabel(min, unit)
+    : `${formatUsd(min)}-${formatUsd(max)} / ${unit}`;
+}
+
 export async function getMarketingImagePricing(): Promise<MarketingImagePricing> {
   const supabase = await createClient();
 
@@ -156,12 +231,23 @@ export async function getMarketingImagePricing(): Promise<MarketingImagePricing>
     (supportedModel?.billing_config as SupportedModelBillingConfig) ?? null,
     supportedModel?.default_unit_cost
   );
+  const sellTiers = extractCombinationPrices(
+    (supportedModel?.billing_config as SupportedModelBillingConfig) ?? null
+  );
+  const sellUsd = supportedModelCost ?? 0;
 
   return {
     name: supportedModel?.display_name ?? providerModel?.upstream_model_slug ?? "Unknown image model",
     billingUnit: "image",
     costUsd: providerModelCost ?? supportedModelCost,
-    sellUsd: supportedModelCost ?? 0,
+    sellUsd,
+    sellLabel: formatPricingTiersLabel(sellTiers, sellUsd, "image"),
+    priceTiers: sellTiers.map((tier) => ({
+      resolution: tier.resolution,
+      quality: tier.quality,
+      priceUsd: tier.price,
+      label: `Resolution: ${formatResolutionLabel(tier.resolution)} · Quality: ${formatQualityLabel(tier.quality)} · ${formatUsd(tier.price)} / image`,
+    })),
     publicModelSlug: route?.public_model_slug ?? supportedModel?.model_slug ?? null,
   };
 }
