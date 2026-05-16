@@ -7,6 +7,7 @@ import { clearApiKeyRequestRecords, unlockInternalAccess } from "./actions";
 import { INTERNAL_ACCESS_COOKIE, INTERNAL_ACCESS_COOKIE_VALUE } from "@/lib/internal-access";
 import { InternalShell } from "./internal-shell";
 import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
+import { MonitoringLineChart } from "./monitoring-line-chart";
 import { ImageResponseContractPanel } from "./image-response-contract-panel";
 import {
   CreateProviderButton,
@@ -414,21 +415,6 @@ function buildMonitoringHealthByModel(
   return statsMap;
 }
 
-function buildLinePath(points: number[], width: number, height: number) {
-  if (points.length === 0) {
-    return "";
-  }
-
-  const maxValue = Math.max(...points, 1);
-  return points
-    .map((point, index) => {
-      const x = points.length === 1 ? width / 2 : (index / (points.length - 1)) * width;
-      const y = height - (point / maxValue) * height;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(" ");
-}
-
 function OverviewCard({
   title,
   value,
@@ -491,52 +477,6 @@ function EmptyState({
   );
 }
 
-function RequestMetricCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-xl border border-black/[0.06] bg-white px-3 py-2.5">
-      <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">{label}</p>
-      <p className="mt-1 text-sm font-medium text-black">{value}</p>
-    </div>
-  );
-}
-
-function RequestBreakdownSection({
-  title,
-  items,
-  emptyLabel,
-}: {
-  title: string;
-  items: Array<{ label: string; value: string }>;
-  emptyLabel: string;
-}) {
-  return (
-    <section className="rounded-xl border border-black/[0.06] bg-white px-3 py-3">
-      <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">{title}</p>
-      {items.length > 0 ? (
-        <div className="mt-3 grid gap-2">
-          {items.map((item) => (
-            <div
-              key={`${title}-${item.label}`}
-              className="flex items-center justify-between gap-3 rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-3 py-2 text-xs"
-            >
-              <span className="text-black/58">{item.label}</span>
-              <span className="font-mono text-black">{item.value}</span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-3 text-xs text-black/45">{emptyLabel}</p>
-      )}
-    </section>
-  );
-}
-
 function MonitoringChartCard({
   title,
   points,
@@ -560,9 +500,6 @@ function MonitoringChartCard({
   settledCount: number;
   inflightCount: number;
 }) {
-  const width = 520;
-  const height = 180;
-  const path = buildLinePath(points, width, height);
   const maxValue = Math.max(...points, 1);
 
   return (
@@ -593,71 +530,57 @@ function MonitoringChartCard({
       </div>
 
       <div className="mt-4 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="h-44 w-full"
-          role="img"
-          aria-label={`${title} usage chart`}
-        >
-          {[0.25, 0.5, 0.75, 1].map((ratio) => (
-            <line
-              key={ratio}
-              x1="0"
-              x2={width}
-              y1={height - height * ratio}
-              y2={height - height * ratio}
-              stroke="rgba(17,17,17,0.08)"
-              strokeDasharray="4 6"
-            />
-          ))}
-          <path
-            d={path}
-            fill="none"
-            stroke="#111111"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <div className="mt-3 flex items-center justify-between gap-4 text-[11px] text-black/45">
-          <span>{labels[0] ?? ""}</span>
-          <span>{labels[Math.floor(labels.length / 2)] ?? ""}</span>
-          <span>{labels[labels.length - 1] ?? ""}</span>
-        </div>
+        <MonitoringLineChart title={title} points={points} labels={labels} />
       </div>
     </div>
   );
 }
 
-function VideoTaskMonitoringCard({
+function UnifiedTaskCard({
   request,
+  showFinancial = false,
 }: {
   request: {
     id: string;
-    publicModelSlug: string;
+    capability: string;
+    modelSlug: string;
     status: string;
-    workspaceName: string;
-    workspaceSlug: string;
-    createdAt: string;
+    createdAt?: string;
     createdLabel: string;
-    startedLabel: string;
-    completedLabel: string;
-    errorMessage: string | null;
-    lastAttempt: {
+    startedLabel?: string;
+    completedLabel?: string;
+    workspaceName?: string;
+    workspaceSlug?: string;
+    providerLabel?: string;
+    callerLabel?: string;
+    errorMessage?: string | null;
+    lastAttempt?: {
       attemptNo: number;
       status: string;
-      upstreamTaskId: string | null;
-      latencyMs: number | null;
-      errorMessage: string | null;
-      updatedLabel: string;
+      upstreamTaskId?: string | null;
+      latencyMs?: number | null;
+      errorMessage?: string | null;
+      updatedLabel?: string;
     } | null;
+    upstreamRawText?: string | null;
+    packagedOutputText?: string | null;
+    customerChargeLabel?: string;
+    providerCostLabel?: string;
+    profitLabel?: string;
   };
+  showFinancial?: boolean;
 }) {
   const inflight = isInflightRequestStatus(request.status);
-  const elapsedLabel = inflight ? formatElapsedDuration(request.createdAt) : request.completedLabel;
+  const elapsedLabel =
+    inflight && request.createdAt
+      ? formatElapsedDuration(request.createdAt)
+      : request.completedLabel ?? "等待中";
+  const attempt = request.lastAttempt ?? null;
+  const startedDisplayLabel =
+    request.startedLabel ?? (request.status === "failed" ? "未开始（提交失败）" : "等待中");
 
   return (
-    <article className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+    <article className="rounded-xl border border-black/[0.08] bg-white px-3 py-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -673,108 +596,103 @@ function VideoTaskMonitoringCard({
               {request.status}
             </span>
             <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
-              video_generation
-            </span>
-          </div>
-          <p className="mt-3 break-all text-sm font-medium text-black">{request.publicModelSlug}</p>
-          <p className="mt-1 text-xs text-black/50">
-            {request.workspaceName} · {request.workspaceSlug}
-          </p>
-          <p className="mt-2 break-all font-mono text-[11px] text-black/45">{request.id}</p>
-        </div>
-
-        <div className="grid min-w-[300px] gap-2 sm:grid-cols-2 lg:w-[420px]">
-          <RequestMetricCard label="创建时间" value={request.createdLabel} />
-          <RequestMetricCard label="已运行" value={elapsedLabel} />
-          <RequestMetricCard label="开始处理" value={request.startedLabel} />
-          <RequestMetricCard
-            label="最后尝试"
-            value={
-              request.lastAttempt
-                ? `#${request.lastAttempt.attemptNo} · ${request.lastAttempt.status}`
-                : "无尝试"
-            }
-          />
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <section className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-          <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">上游轮询</p>
-          {request.lastAttempt ? (
-            <div className="mt-3 space-y-2 text-xs text-black/60">
-              <p>最近回写：{request.lastAttempt.updatedLabel}</p>
-              <p>提交延迟：{request.lastAttempt.latencyMs ?? "等待中"} ms</p>
-              <p className="break-all font-mono text-[11px] text-black/45">
-                {request.lastAttempt.upstreamTaskId ?? "尚无 upstream task id"}
-              </p>
-            </div>
-          ) : (
-            <p className="mt-3 text-xs text-black/45">还没有 provider_attempts 记录。</p>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-          <p className="text-[10px] uppercase tracking-[0.8px] text-black/40">错误 / 诊断</p>
-          {request.errorMessage || request.lastAttempt?.errorMessage ? (
-            <p className="mt-3 break-all text-xs leading-5 text-[#b54432]">
-              {request.errorMessage ?? request.lastAttempt?.errorMessage}
-            </p>
-          ) : (
-            <p className="mt-3 text-xs text-black/45">
-              {inflight ? "当前没有错误，正在等待上游结果。" : "当前没有错误信息。"}
-            </p>
-          )}
-        </section>
-      </div>
-    </article>
-  );
-}
-
-function ImageTaskLogRow({
-  request,
-}: {
-  request: {
-    id: string;
-    capability: string;
-    publicModelSlug: string;
-    status: string;
-    workspaceSlug: string;
-    createdLabel: string;
-    errorMessage: string | null;
-  };
-}) {
-  return (
-    <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
-                request.status === "failed"
-                  ? "border-[#F4C9C4] bg-[#FDF0EE] text-[#B54432]"
-                  : request.status === "succeeded"
-                    ? "border-[#BFE5CC] bg-[#EDF9F1] text-[#1F7A44]"
-                    : "border-[#E9E1CF] bg-[#F6F1E7] text-[#6F5B27]"
-              }`}
-            >
-              {request.status}
-            </span>
-            <span className="inline-flex h-6 items-center rounded-md border border-[#D7EADB] bg-[#EDF8F0] px-2 text-[11px] text-[#436B39]">
               {request.capability}
             </span>
+            <span className="inline-flex h-6 items-center rounded-md border border-black/[0.08] bg-white px-2 text-[11px] text-black/55">
+              {request.createdLabel}
+            </span>
           </div>
-          <p className="mt-2 break-all text-sm font-medium text-black">{request.publicModelSlug}</p>
+          <p className="mt-1 break-all text-sm font-medium text-black">{request.modelSlug}</p>
+          {request.providerLabel ? (
+            <p className="mt-0.5 break-all text-xs text-black/50">{request.providerLabel}</p>
+          ) : null}
+          {request.callerLabel ? (
+            <p className="mt-0.5 text-xs text-black/45">{request.callerLabel}</p>
+          ) : null}
+          {!request.callerLabel && request.workspaceName ? (
+            <p className="mt-0.5 text-xs text-black/45">
+              {request.workspaceName} · {request.workspaceSlug}
+            </p>
+          ) : null}
           <p className="mt-1 text-xs text-black/45">
-            {request.workspaceSlug} · {request.createdLabel}
+            创建时间：{request.createdLabel}
+            <span className="px-1.5 text-black/30">·</span>
+            已运行：{elapsedLabel}
+            <span className="px-1.5 text-black/30">·</span>
+            开始处理：{startedDisplayLabel}
+            <span className="px-1.5 text-black/30">·</span>
+            最后尝试：{attempt ? `#${attempt.attemptNo} · ${attempt.status}` : "无尝试"}
           </p>
-          <p className="mt-1 break-all font-mono text-[11px] text-black/40">{request.id}</p>
+          {request.status === "failed" && (request.errorMessage || attempt?.errorMessage) ? (
+            <p className="mt-1 line-clamp-2 break-all text-xs leading-5 text-[#b54432]">
+              {request.errorMessage ?? attempt?.errorMessage}
+            </p>
+          ) : null}
         </div>
-        <div className="max-w-md break-all text-xs leading-5 text-black/55">
-          {request.errorMessage ?? "无错误，整体状态正常。"}
+
+        <div className="rounded-md border border-black/[0.06] bg-[#FCFCFA] px-2.5 py-1.5 text-[11px] text-black/55">
+          <span className="font-medium text-black/60">请求 ID：</span>
+          <span className="font-mono">{request.id}</span>
         </div>
       </div>
-    </div>
+
+      {showFinancial ? (
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+          <span className="text-black/60">
+            客户收费 <span className="font-semibold text-black">{request.customerChargeLabel}</span>
+          </span>
+          <span className="text-black/60">
+            供应商成本 <span className="font-semibold text-black">{request.providerCostLabel}</span>
+          </span>
+          <span className="text-black/60">
+            利润 <span className="font-semibold text-black">{request.profitLabel}</span>
+          </span>
+        </div>
+      ) : null}
+
+      <div className="mt-3 rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
+          {attempt ? (
+            <div className="mt-3 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-xs">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-black/58">最后一次尝试 #{attempt.attemptNo}</span>
+                <span className="text-black/50">{attempt.updatedLabel ?? "等待中"}</span>
+              </div>
+              <p className="mt-2 break-all font-mono text-[11px] text-black/45">
+                {attempt.upstreamTaskId ?? "尚无 upstream task id"}
+              </p>
+              {request.errorMessage || attempt.errorMessage ? (
+                <div className="mt-2 rounded-md border border-[#F4C9C4] bg-[#FDF0EE] px-2.5 py-2">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.5px] text-[#B54432]">
+                    上游原始错误
+                  </p>
+                  <pre className="mt-1 max-h-44 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-[#B54432]">
+                    {request.errorMessage ?? attempt.errorMessage}
+                  </pre>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <details className="rounded-lg border border-black/[0.06] bg-white px-3 py-2">
+              <summary className="cursor-pointer list-none text-[11px] font-medium uppercase tracking-[0.5px] text-black/55">
+                上游完整返回
+              </summary>
+              <pre className="mt-1 max-h-52 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-black/75">
+                {request.upstreamRawText ?? "null"}
+              </pre>
+            </details>
+            <details className="rounded-lg border border-black/[0.06] bg-white px-3 py-2">
+              <summary className="cursor-pointer list-none text-[11px] font-medium uppercase tracking-[0.5px] text-black/55">
+                对客返回（封装后）
+              </summary>
+              <pre className="mt-1 max-h-52 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-black/75">
+                {request.packagedOutputText ?? "null"}
+              </pre>
+            </details>
+          </div>
+      </div>
+    </article>
   );
 }
 
@@ -1408,7 +1326,25 @@ export default async function InternalPage({
                       {globalVideoInflightRequests.length > 0 ? (
                         <div className="grid gap-3">
                           {globalVideoInflightRequests.map((request) => (
-                            <VideoTaskMonitoringCard key={request.id} request={request} />
+                            <UnifiedTaskCard
+                              key={request.id}
+                              request={{
+                                id: request.id,
+                                capability: request.capability,
+                                modelSlug: request.publicModelSlug,
+                                status: request.status,
+                                createdAt: request.createdAt,
+                                createdLabel: request.createdLabel,
+                                startedLabel: request.startedLabel,
+                                completedLabel: request.completedLabel,
+                                workspaceName: request.workspaceName,
+                                workspaceSlug: request.workspaceSlug,
+                                errorMessage: request.errorMessage,
+                                lastAttempt: request.lastAttempt,
+                                upstreamRawText: request.upstreamRawText ?? null,
+                                packagedOutputText: request.packagedOutputText ?? null,
+                              }}
+                            />
                           ))}
                         </div>
                       ) : (
@@ -1430,7 +1366,25 @@ export default async function InternalPage({
                       {recentVideoSettledRequests.length > 0 ? (
                         <div className="grid gap-3">
                           {recentVideoSettledRequests.slice(0, 10).map((request) => (
-                            <VideoTaskMonitoringCard key={request.id} request={request} />
+                            <UnifiedTaskCard
+                              key={request.id}
+                              request={{
+                                id: request.id,
+                                capability: request.capability,
+                                modelSlug: request.publicModelSlug,
+                                status: request.status,
+                                createdAt: request.createdAt,
+                                createdLabel: request.createdLabel,
+                                startedLabel: request.startedLabel,
+                                completedLabel: request.completedLabel,
+                                workspaceName: request.workspaceName,
+                                workspaceSlug: request.workspaceSlug,
+                                errorMessage: request.errorMessage,
+                                lastAttempt: request.lastAttempt,
+                                upstreamRawText: request.upstreamRawText ?? null,
+                                packagedOutputText: request.packagedOutputText ?? null,
+                              }}
+                            />
                           ))}
                         </div>
                       ) : (
@@ -1479,7 +1433,25 @@ export default async function InternalPage({
                       {imageRecentLogs.length > 0 ? (
                         <div className="grid gap-2">
                           {imageRecentLogs.map((request) => (
-                            <ImageTaskLogRow key={request.id} request={request} />
+                            <UnifiedTaskCard
+                              key={request.id}
+                              request={{
+                                id: request.id,
+                                capability: request.capability,
+                                modelSlug: request.publicModelSlug,
+                                status: request.status,
+                                createdAt: request.createdAt,
+                                createdLabel: request.createdLabel,
+                                startedLabel: request.startedLabel,
+                                completedLabel: request.completedLabel,
+                                workspaceName: request.workspaceName,
+                                workspaceSlug: request.workspaceSlug,
+                                errorMessage: request.errorMessage,
+                                lastAttempt: request.lastAttempt,
+                                upstreamRawText: request.upstreamRawText ?? null,
+                                packagedOutputText: request.packagedOutputText ?? null,
+                              }}
+                            />
                           ))}
                         </div>
                       ) : (
@@ -1569,7 +1541,7 @@ export default async function InternalPage({
                       </div>
 
                       <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-                        <p className="text-[11px] tracking-[0.35px] text-black/45">API Key 筛选</p>
+                        <p className="text-[11px] tracking-[0.35px] text-black/45">调用密钥筛选</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <a
                             href={buildRequestsFilterHref({
@@ -1696,133 +1668,35 @@ export default async function InternalPage({
                         {hasPagedRequests ? (
                           <div className="space-y-3">
                             {pagedRequests.map((request) => (
-                              <article key={request.id} className="rounded-xl border border-black/[0.08] bg-white px-3 py-3">
-                                <div className="flex flex-col gap-2.5">
-                                  <div className="flex flex-wrap items-start justify-between gap-2.5">
-                                    <div className="min-w-0">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <span
-                                          className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
-                                            request.status === "failed"
-                                              ? "border-[#F4C9C4] bg-[#FDF0EE] text-[#B54432]"
-                                              : request.status === "succeeded"
-                                                ? "border-[#BFE5CC] bg-[#EDF9F1] text-[#1F7A44]"
-                                                : "border-[#E9E1CF] bg-[#F6F1E7] text-[#6F5B27]"
-                                          }`}
-                                        >
-                                          {request.status}
-                                        </span>
-                                        <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
-                                          {request.capability}
-                                        </span>
-                                        <span className="inline-flex h-6 items-center rounded-md border border-black/[0.08] bg-white px-2 text-[11px] text-black/55">
-                                          {request.createdLabel}
-                                        </span>
-                                      </div>
-                                      <p className="mt-1 truncate text-sm font-medium text-black">{request.public_model_slug}</p>
-                                      <p className="mt-0.5 break-all text-xs text-black/50">
-                                        上游：{request.providerName} / {request.upstreamModelSlug}
-                                      </p>
-                                      <p className="mt-0.5 text-xs text-black/45">
-                                        调用方：{request.customerName} · {request.apiKeyName} · {request.apiKeyPrefix}
-                                      </p>
-                                      {request.status === "failed" &&
-                                      (request.error_message || request.lastAttempt.error_message) ? (
-                                        <p className="mt-1 line-clamp-2 break-all text-xs leading-5 text-[#b54432]">
-                                          {request.error_message ?? request.lastAttempt.error_message}
-                                        </p>
-                                      ) : null}
-                                    </div>
-                                    <div className="rounded-md border border-black/[0.06] bg-[#FCFCFA] px-2.5 py-1.5 text-[11px] text-black/55">
-                                      <span className="font-medium text-black/60">请求 ID：</span>
-                                      <span className="font-mono">{request.id}</span>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                                    <span className="text-black/60">
-                                      客户收费 <span className="font-semibold text-black">{request.customerChargeLabel}</span>
-                                    </span>
-                                    <span className="text-black/60">
-                                      供应商成本 <span className="font-semibold text-black">{request.providerCostLabel}</span>
-                                    </span>
-                                    <span className="text-black/60">
-                                      利润 <span className="font-semibold text-black">{request.profitLabel}</span>
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <details className="mt-3 group rounded-lg border border-black/[0.06] bg-[#FCFCFA]">
-                                  <summary className="cursor-pointer list-none px-3 py-2 text-xs text-black/70">
-                                    <span className="inline-flex items-center gap-2">
-                                      <span className="text-black/50 group-open:hidden">展开明细</span>
-                                      <span className="hidden text-black/50 group-open:inline">收起明细</span>
-                                      <span className="text-black/40">·</span>
-                                      <span>完成时间：{request.completedLabel}</span>
-                                      <span className="text-black/40">·</span>
-                                      <span>尝试次数：{request.attemptCount}</span>
-                                      <span className="text-black/40">·</span>
-                                      <span>
-                                        最后延迟：
-                                        {request.lastAttempt
-                                          ? ` ${request.lastAttempt.latency_ms ?? "等待中"} ms`
-                                          : " 无尝试"}
-                                      </span>
-                                    </span>
-                                  </summary>
-
-                                  <div className="border-t border-black/[0.06] px-3 py-2.5">
-                                    {request.lastAttempt ? (
-                                      <div className="mb-3 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-xs">
-                                        <div className="flex items-center justify-between gap-3">
-                                          <span className="text-black/58">
-                                            最后一次尝试 #{request.lastAttempt.attempt_no}
-                                          </span>
-                                          <span
-                                            className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] font-medium ${
-                                              request.lastAttempt.status === "failed"
-                                                ? "border-[#F4C9C4] bg-[#FDF0EE] text-[#B54432]"
-                                                : request.lastAttempt.status === "succeeded"
-                                                  ? "border-[#BFE5CC] bg-[#EDF9F1] text-[#1F7A44]"
-                                                  : "border-[#E9E1CF] bg-[#F6F1E7] text-[#6F5B27]"
-                                            }`}
-                                          >
-                                            {request.lastAttempt.status}
-                                          </span>
-                                        </div>
-                                        {request.error_message || request.lastAttempt.error_message ? (
-                                          <div className="mt-2 rounded-md border border-[#F4C9C4] bg-[#FDF0EE] px-2.5 py-2">
-                                            <p className="text-[11px] font-medium uppercase tracking-[0.5px] text-[#B54432]">
-                                              Upstream raw error
-                                            </p>
-                                            <pre className="mt-1 max-h-44 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-[#B54432]">
-                                              {request.error_message ?? request.lastAttempt.error_message}
-                                            </pre>
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                    ) : null}
-
-                                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                                      <RequestBreakdownSection
-                                        title="使用量指标"
-                                        items={request.usageBreakdown}
-                                        emptyLabel="没有记录到使用量指标"
-                                      />
-                                      <RequestBreakdownSection
-                                        title="客户侧计费"
-                                        items={request.customerComponentBreakdown}
-                                        emptyLabel="没有客户侧可计费组件"
-                                      />
-                                      <RequestBreakdownSection
-                                        title="供应商成本"
-                                        items={request.providerComponentBreakdown}
-                                        emptyLabel="没有供应商侧成本拆分"
-                                      />
-                                    </div>
-                                  </div>
-                                </details>
-                              </article>
+                              <UnifiedTaskCard
+                                key={request.id}
+                                showFinancial
+                                request={{
+                                  id: request.id,
+                                  capability: request.capability,
+                                  modelSlug: request.public_model_slug,
+                                  status: request.status,
+                                  createdLabel: request.createdLabel,
+                                  completedLabel: request.completedLabel,
+                                  providerLabel: `上游：${request.providerName} / ${request.upstreamModelSlug}`,
+                                  callerLabel: `调用方：${request.customerName} · ${request.apiKeyName} · ${request.apiKeyPrefix}`,
+                                  errorMessage: request.error_message,
+                                  lastAttempt: request.lastAttempt
+                                    ? {
+                                        attemptNo: request.lastAttempt.attempt_no,
+                                        status: request.lastAttempt.status,
+                                        upstreamTaskId: request.lastAttempt.upstream_task_id,
+                                        latencyMs: request.lastAttempt.latency_ms,
+                                        errorMessage: request.lastAttempt.error_message,
+                                      }
+                                    : null,
+                                  upstreamRawText: request.upstreamRawText ?? null,
+                                  packagedOutputText: request.packagedOutputText ?? null,
+                                  customerChargeLabel: request.customerChargeLabel,
+                                  providerCostLabel: request.providerCostLabel,
+                                  profitLabel: request.profitLabel,
+                                }}
+                              />
                             ))}
                           </div>
                         ) : null}

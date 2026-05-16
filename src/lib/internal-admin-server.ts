@@ -142,6 +142,7 @@ type RequestRow = {
   actual_profit: number | null;
   error_code: string | null;
   error_message: string | null;
+  output_payload: Record<string, unknown> | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -173,6 +174,7 @@ type GlobalMonitoringRequestRow = {
   status: string;
   error_code: string | null;
   error_message: string | null;
+  output_payload: Record<string, unknown> | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -198,6 +200,7 @@ type AttemptRow = {
   upstream_request_id: string | null;
   upstream_task_id: string | null;
   latency_ms: number | null;
+  response_payload: Record<string, unknown> | null;
   error_message: string | null;
   created_at: string;
 };
@@ -351,6 +354,68 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function formatUnknownJson(value: unknown) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function sanitizeOutputPayloadForCustomer(value: unknown) {
+  const payload = asRecord(value);
+  if (!payload) return null;
+  const { raw: _raw, ...rest } = payload;
+  const assets = Array.isArray(rest.assets)
+    ? rest.assets.map((item) => {
+        const asset = asRecord(item);
+        if (!asset) return item;
+        const { sourceUrl: _sourceUrl, ...assetRest } = asset;
+        return assetRest;
+      })
+    : rest.assets;
+  return { ...rest, assets };
+}
+
+function extractOutputPayloadFromUsageMetadata(metadata: unknown) {
+  const record = asRecord(metadata);
+  if (!record) return null;
+  const candidates = [
+    record.output_payload,
+    record.outputPayload,
+    record.customer_output_payload,
+    asRecord(record.response)?.output_payload,
+    asRecord(record.result)?.output_payload,
+  ];
+  for (const candidate of candidates) {
+    const payload = asRecord(candidate);
+    if (payload) return payload;
+  }
+  return null;
+}
+
+function extractUpstreamPayloadFromUsageMetadata(metadata: unknown) {
+  const record = asRecord(metadata);
+  if (!record) return null;
+  const candidates = [
+    record.upstream_raw,
+    record.upstream_response,
+    record.provider_response,
+    record.raw,
+    asRecord(record.response)?.upstream_raw,
+    asRecord(record.result)?.upstream_raw,
+  ];
+  for (const candidate of candidates) {
+    if (candidate !== null && candidate !== undefined) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 function readNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -444,7 +509,7 @@ async function fetchGlobalMonitoringData(
       supabase
         .from("inference_requests")
         .select(
-          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, created_at, started_at, completed_at, workspaces(name, slug)"
+          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)"
         )
         .eq("capability", "video_generation")
         .in("status", ["queued", "submitted", "processing"])
@@ -453,7 +518,7 @@ async function fetchGlobalMonitoringData(
       supabase
         .from("inference_requests")
         .select(
-          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, created_at, started_at, completed_at, workspaces(name, slug)"
+          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)"
         )
         .eq("capability", "video_generation")
         .order("created_at", { ascending: false })
@@ -461,7 +526,7 @@ async function fetchGlobalMonitoringData(
       supabase
         .from("inference_requests")
         .select(
-          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, created_at, started_at, completed_at, workspaces(name, slug)"
+          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)"
         )
         .in("capability", ["image_generation", "image_edit"])
         .order("created_at", { ascending: false })
@@ -524,6 +589,10 @@ async function fetchGlobalMonitoringData(
       completedLabel: formatRelativeTimestamp(request.completed_at),
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
+      upstreamRawText: formatUnknownJson(asRecord(request.output_payload)?.raw ?? null),
+      packagedOutputText: formatUnknownJson(
+        sanitizeOutputPayloadForCustomer(request.output_payload)
+      ),
       lastAttempt: lastAttempt
         ? {
             attemptNo: lastAttempt.attempt_no,
@@ -737,7 +806,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       supabase
         .from("inference_requests")
         .select(
-          "id, workspace_id, api_key_id, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, created_at, started_at, completed_at, workspaces(name, slug)"
+          "id, workspace_id, api_key_id, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)"
         )
         .order("created_at", { ascending: false })
         .limit(80),
@@ -756,14 +825,14 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         .from("usage_events")
         .select("external_request_id, metadata")
         .order("created_at", { ascending: false })
-        .limit(400),
+        .limit(1200),
       supabase
         .from("provider_attempts")
         .select(
-          "id, request_id, provider_id, provider_model_id, attempt_no, status, upstream_request_id, upstream_task_id, latency_ms, error_message, created_at"
+          "id, request_id, provider_id, provider_model_id, attempt_no, status, upstream_request_id, upstream_task_id, latency_ms, response_payload, error_message, created_at"
         )
         .order("created_at", { ascending: false })
-        .limit(50),
+        .limit(400),
       bypassAuth
         ? supabase
             .from("admin_audit_logs")
@@ -855,7 +924,19 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
           ).values()
         );
   const routingRules = (routingRulesResponse.error ? [] : routingRulesResponse.data ?? []) as RoutingRuleRow[];
-  const requests = (requestsResponse.error ? [] : requestsResponse.data ?? []) as RequestRow[];
+  let requests = (requestsResponse.error ? [] : requestsResponse.data ?? []) as RequestRow[];
+  if (requestsResponse.error) {
+    const fallbackRequestsResponse = await supabase
+      .from("inference_requests")
+      .select(
+        "id, workspace_id, api_key_id, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)"
+      )
+      .order("created_at", { ascending: false })
+      .limit(200);
+    requests = (fallbackRequestsResponse.error
+      ? []
+      : fallbackRequestsResponse.data ?? []) as RequestRow[];
+  }
   const apiKeys = (apiKeysResponse.error ? [] : apiKeysResponse.data ?? []) as ApiKeyRow[];
   const apiKeySpendSummaries = (apiKeySpendSummaryResponse.error
     ? []
@@ -1130,6 +1211,18 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         };
       })
       .filter((item) => item !== null);
+    const outputPayloadFromRequest = asRecord(request.output_payload);
+    const outputPayloadFromUsage = extractOutputPayloadFromUsageMetadata(usageEvent?.metadata);
+    const packagedOutputPayload =
+      sanitizeOutputPayloadForCustomer(outputPayloadFromRequest) ??
+      sanitizeOutputPayloadForCustomer(outputPayloadFromUsage);
+    const upstreamRawPayload =
+      outputPayloadFromRequest?.raw ??
+      extractUpstreamPayloadFromUsageMetadata(usageEvent?.metadata) ??
+      relatedAttempts.find((attempt) => attempt.response_payload)?.response_payload ??
+      null;
+    const upstreamRawText = formatUnknownJson(upstreamRawPayload);
+    const packagedOutputText = formatUnknownJson(packagedOutputPayload);
 
     return {
       ...request,
@@ -1152,6 +1245,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       usageBreakdown,
       customerComponentBreakdown,
       providerComponentBreakdown,
+      upstreamRawText,
+      packagedOutputText,
       createdLabel: formatRelativeTimestamp(request.created_at),
       completedLabel: formatRelativeTimestamp(request.completed_at),
     };
@@ -1445,13 +1540,22 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       )
         .map(([, value]) => value)
         .sort((a, b) => a.name.localeCompare(b.name, "en-US")),
-      apiKeys: keyEconomics.map((key) => ({
-        id: key.id,
-        workspaceId: key.workspaceId,
-        name: key.name,
-        keyPrefix: key.keyPrefix,
-        environment: key.environment,
-      })),
+      apiKeys: Array.from(
+        recentRequestSummaries.reduce((map, request) => {
+          if (!request.api_key_id) return map;
+          if (map.has(request.api_key_id)) return map;
+          map.set(request.api_key_id, {
+            id: request.api_key_id,
+            workspaceId: request.workspaceId ?? "",
+            name: request.apiKeyName,
+            keyPrefix: request.apiKeyPrefix,
+            environment: request.apiKeyEnvironment,
+          });
+          return map;
+        }, new Map<string, { id: string; workspaceId: string; name: string; keyPrefix: string; environment: string }>())
+      )
+        .map(([, value]) => value)
+        .sort((a, b) => a.name.localeCompare(b.name, "en-US")),
     },
     customerFinances,
   };

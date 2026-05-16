@@ -698,7 +698,6 @@ const ASPECT_RATIO_OPTIONS = [
 ];
 
 const RESOLUTION_OPTIONS = ["1k", "2k", "3k", "4k"];
-const ROUTE_SWITCH_MIN_LOADING_MS = 220;
 
 function isAspectRatioEnum(values?: string[]) {
   if (!values || values.length === 0) return false;
@@ -929,12 +928,6 @@ export function ModelsBrowser({
   }, [selectedModel]);
 
   const [mainTab, setMainTab] = useState<"playground" | "api">("playground");
-  const [mountedTabs, setMountedTabs] = useState<Record<"playground" | "api", boolean>>({
-    playground: true,
-    api: false,
-  });
-  const [tabSkeleton, setTabSkeleton] = useState<"playground" | "api" | null>(null);
-  const mountTimerRef = useRef<number | null>(null);
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const [taskId, setTaskId] = useState<string | null>(null);
   const [playgroundError, setPlaygroundError] = useState<string | null>(null);
@@ -946,11 +939,6 @@ export function ModelsBrowser({
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [activeShowcaseIndex, setActiveShowcaseIndex] = useState(0);
-  const [previousShowcaseIndex, setPreviousShowcaseIndex] = useState<number | null>(null);
-  const [showcaseImageVisible, setShowcaseImageVisible] = useState(true);
-  const [isRouteSwitching, setIsRouteSwitching] = useState(false);
-  const routeSwitchStartedAtRef = useRef<number | null>(null);
   const playgroundImageUrls = useMemo(
     () => extractImageUrls(playgroundOutput),
     [playgroundOutput]
@@ -958,52 +946,13 @@ export function ModelsBrowser({
   useEffect(() => {
     setPlaygroundForm({});
   }, [effectiveModelSlug]);
-  useEffect(() => {
-    setActiveShowcaseIndex(0);
-    setPreviousShowcaseIndex(null);
-    setShowcaseImageVisible(true);
-  }, [selectedModel?.publicModel]);
-  useEffect(() => {
-    if (showcaseItems.length <= 1) return;
-    const timer = window.setInterval(() => {
-      setActiveShowcaseIndex((current) => {
-        const next = current >= showcaseItems.length - 1 ? 0 : current + 1;
-        setPreviousShowcaseIndex(current);
-        setShowcaseImageVisible(false);
-        if (typeof window !== "undefined") {
-          window.requestAnimationFrame(() => {
-            window.requestAnimationFrame(() => setShowcaseImageVisible(true));
-          });
-        } else {
-          setShowcaseImageVisible(true);
-        }
-        return next;
-      });
-    }, 3000);
-    return () => window.clearInterval(timer);
-  }, [showcaseItems.length]);
-  useEffect(() => {
-    if (previousShowcaseIndex === null) return;
-    const timer = window.setTimeout(() => {
-      setPreviousShowcaseIndex(null);
-    }, 750);
-    return () => window.clearTimeout(timer);
-  }, [previousShowcaseIndex, activeShowcaseIndex]);
   const handleProviderChange = (nextProvider: string) => {
-    if (nextProvider !== selectedProvider) {
-      routeSwitchStartedAtRef.current = Date.now();
-      setIsRouteSwitching(true);
-    }
     setSelectedProvider(nextProvider);
     const nextRows = rowsByProvider.find(([provider]) => provider === nextProvider)?.[1] ?? [];
     setSelectedModelSlug(nextRows[0]?.publicModel ?? null);
   };
 
   const handleModelChange = (nextModelSlug: string | null) => {
-    if (nextModelSlug && nextModelSlug !== effectiveModelSlug) {
-      routeSwitchStartedAtRef.current = Date.now();
-      setIsRouteSwitching(true);
-    }
     setSelectedModelSlug(nextModelSlug);
   };
 
@@ -1037,60 +986,10 @@ export function ModelsBrowser({
     router.replace(nextHref, { scroll: false });
   }, [pathname, router, selectedModel, selectedProvider]);
 
-  useEffect(() => {
-    if (!selectedModel || !selectedProvider) {
-      setIsRouteSwitching(false);
-      return;
-    }
-
-    if (
-      isRouteSyncedWithSelection({
-        pathname,
-        selectedProvider,
-        selectedModelPublicSlug: selectedModel.publicModel,
-      })
-    ) {
-      const startedAt = routeSwitchStartedAtRef.current;
-      const elapsed = startedAt ? Date.now() - startedAt : ROUTE_SWITCH_MIN_LOADING_MS;
-      const remaining = Math.max(0, ROUTE_SWITCH_MIN_LOADING_MS - elapsed);
-
-      if (remaining === 0) {
-        routeSwitchStartedAtRef.current = null;
-        setIsRouteSwitching(false);
-        return;
-      }
-
-      const timer = window.setTimeout(() => {
-        routeSwitchStartedAtRef.current = null;
-        setIsRouteSwitching(false);
-      }, remaining);
-
-      return () => window.clearTimeout(timer);
-    }
-  }, [pathname, selectedModel, selectedProvider]);
-
   const handleMainTabChange = (tab: "playground" | "api") => {
     if (tab === mainTab) return;
     setMainTab(tab);
-    if (mountedTabs[tab]) return;
-    setTabSkeleton(tab);
-    if (mountTimerRef.current !== null) {
-      window.clearTimeout(mountTimerRef.current);
-    }
-    mountTimerRef.current = window.setTimeout(() => {
-      setMountedTabs((current) => ({ ...current, [tab]: true }));
-      setTabSkeleton((current) => (current === tab ? null : current));
-      mountTimerRef.current = null;
-    }, 30);
   };
-
-  useEffect(() => {
-    return () => {
-      if (mountTimerRef.current !== null) {
-        window.clearTimeout(mountTimerRef.current);
-      }
-    };
-  }, []);
 
   const modelsByCapability = useMemo(() => {
     const map = new Map<string, ModelDocRow[]>();
@@ -1112,9 +1011,6 @@ export function ModelsBrowser({
   const capabilityTag = selectedModel?.modelTypeLabel || "uncategorized";
   const priceTag = selectedModel?.priceLabel || "";
   const modelSlugTail = selectedModel?.upstreamModelSlug || selectedModel?.publicModel || "model";
-  const activeShowcaseImage = showcaseItems[activeShowcaseIndex] ?? null;
-  const previousShowcaseImage =
-    previousShowcaseIndex === null ? null : showcaseItems[previousShowcaseIndex] ?? null;
   const parsedFields = useMemo(
     () =>
       parseInputSchemaText(selectedModel?.inputSchemaText ?? "").filter(
@@ -1495,18 +1391,7 @@ export function ModelsBrowser({
       </div>
 
       <div className="relative">
-        {isRouteSwitching ? (
-          <div className="absolute inset-0 z-30 flex items-start justify-center rounded-[28px] bg-[rgba(252,252,250,0.72)] px-4 py-24 backdrop-blur-[2px]">
-            <div className="rounded-xl border border-black/[0.08] bg-white px-4 py-3 shadow-[0_18px_40px_rgba(17,24,39,0.08)]">
-              <div className="flex items-center gap-3 text-sm text-black/70">
-                <span className="inline-flex size-4 animate-spin rounded-full border-2 border-black/15 border-t-[#E58A35]" />
-                Loading model content...
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        <div className={`space-y-4 ${isRouteSwitching ? "pointer-events-none opacity-55" : ""}`}>
+        <div className="space-y-4">
       <section className="rounded-2xl border border-black/[0.08] bg-white p-2.5 shadow-sm sm:p-3">
         <div className="mb-2 border-b border-black/[0.08] pb-1.5">
           <div className="flex items-center gap-1">
@@ -1526,25 +1411,8 @@ export function ModelsBrowser({
             ))}
           </div>
         </div>
-
+        <div className="relative">
         {mainTab === "playground" ? (
-          tabSkeleton === "playground" || !mountedTabs.playground ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              <section className="rounded-xl border border-black/[0.08] bg-white p-4">
-                <div className="mb-3 h-4 w-20 animate-pulse rounded bg-black/[0.08]" />
-                <div className="space-y-3">
-                  <div className="h-16 animate-pulse rounded-md bg-black/[0.06]" />
-                  <div className="h-16 animate-pulse rounded-md bg-black/[0.06]" />
-                  <div className="h-16 animate-pulse rounded-md bg-black/[0.06]" />
-                </div>
-                <div className="mt-4 h-10 w-36 animate-pulse rounded-md bg-black/[0.08]" />
-              </section>
-              <section className="rounded-xl border border-black/[0.08] bg-[#FAFAFA] p-4">
-                <div className="mb-3 h-4 w-28 animate-pulse rounded bg-black/[0.08]" />
-                <div className="min-h-[280px] animate-pulse rounded-md border border-black/[0.08] bg-white" />
-              </section>
-            </div>
-          ) : (
           <div className="grid gap-4 md:grid-cols-2">
             <section className="rounded-xl border border-black/[0.08] bg-white p-4">
               <h3 className="mb-3 text-sm font-medium text-black">Input</h3>
@@ -1763,14 +1631,6 @@ export function ModelsBrowser({
               )}
             </section>
           </div>
-          )
-        ) : tabSkeleton === "api" || !mountedTabs.api ? (
-          <div className="space-y-3 rounded-xl border border-black/[0.08] bg-white p-4">
-            <div className="h-5 w-44 animate-pulse rounded bg-black/[0.08]" />
-            <div className="h-10 animate-pulse rounded-md bg-black/[0.06]" />
-            <div className="h-28 animate-pulse rounded-md bg-black/[0.06]" />
-            <div className="h-28 animate-pulse rounded-md bg-black/[0.06]" />
-          </div>
         ) : (
           <ApiQuickstartCard
             models={visibleRows}
@@ -1778,55 +1638,36 @@ export function ModelsBrowser({
             gatewayErrorDocs={gatewayErrorDocs}
           />
         )}
+        </div>
       </section>
 
-      {mainTab === "playground" ? (
+      {mainTab === "playground" && showcaseItems.length > 0 ? (
         <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
             <div className="mb-3">
               <h2 className="text-base font-semibold text-black">Examples</h2>
             </div>
-            {activeShowcaseImage ? (
-              <div className="relative h-[220px] overflow-hidden rounded-[16px] border border-black/[0.08] bg-[#FAFAFA] sm:h-[240px]">
-                {previousShowcaseImage ? (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={buildDisplayImageUrl(previousShowcaseImage.url)}
-                      alt={`${selectedModel?.displayName ?? "Model"} example previous`}
-                      className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-700 ease-out ${
-                        showcaseImageVisible ? "opacity-0" : "opacity-100"
-                      }`}
-                    />
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={buildDisplayImageUrl(activeShowcaseImage.url)}
-                      alt={`${selectedModel?.displayName ?? "Model"} example`}
-                      className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-700 ease-out ${
-                        showcaseImageVisible ? "opacity-100" : "opacity-0"
-                      }`}
-                    />
-                  </>
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={buildDisplayImageUrl(activeShowcaseImage.url)}
-                    alt={`${selectedModel?.displayName ?? "Model"} example`}
-                    className="h-full w-full object-contain"
-                  />
-                )}
-                <button
-                  type="button"
-                  onClick={() => openModelWithPrompt(activeShowcaseImage.prompt)}
-                  className="absolute bottom-3 right-3 inline-flex h-9 items-center justify-center rounded-full border border-white/40 bg-black/35 px-3 text-xs font-medium text-white transition-colors hover:bg-black/50"
+            <div className="flex flex-wrap items-start gap-2">
+              {showcaseItems.map((item, index) => (
+                <div
+                  key={`${item.url}-${index}`}
+                  className="relative h-24 w-24 overflow-hidden rounded-md border border-black/[0.08] bg-[#FAFAFA]"
                 >
-                  Go try
-                </button>
-              </div>
-            ) : (
-              <div className="flex h-[220px] items-center justify-center rounded-[16px] border border-dashed border-black/[0.12] px-6 text-center text-sm text-black/45 sm:h-[240px]">
-                Showcase assets have not been uploaded for this model yet.
-              </div>
-            )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={buildDisplayImageUrl(item.url)}
+                    alt={`${selectedModel?.displayName ?? "Model"} example ${index + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => openModelWithPrompt(item.prompt)}
+                    className="absolute bottom-1 right-1 inline-flex h-5 items-center justify-center rounded-sm border border-white/40 bg-black/45 px-1.5 text-[10px] font-medium text-white transition-colors hover:bg-black/60"
+                  >
+                    Go try
+                  </button>
+                </div>
+              ))}
+            </div>
           </section>
       ) : null}
 

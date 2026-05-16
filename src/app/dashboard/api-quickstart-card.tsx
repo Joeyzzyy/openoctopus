@@ -44,6 +44,48 @@ function safeParseJsonObject(value: string | null | undefined) {
   }
 }
 
+function normalizeRequestExampleForDocs(
+  raw: string | null | undefined
+): string | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const next: Record<string, unknown> = {};
+    if (typeof parsed.model === "string") next.model = parsed.model;
+
+    const input =
+      parsed.input && typeof parsed.input === "object" && !Array.isArray(parsed.input)
+        ? ({ ...(parsed.input as Record<string, unknown>) } as Record<string, unknown>)
+        : {};
+
+    const topPrompt =
+      typeof parsed.prompt === "string"
+        ? parsed.prompt
+        : typeof input.prompt === "string"
+          ? input.prompt
+          : undefined;
+    if (topPrompt) next.prompt = topPrompt;
+    if ("prompt" in input) delete input.prompt;
+
+    // normalize common scalar types for docs
+    if (typeof input.num_images === "string" && /^-?\d+(\.\d+)?$/.test(input.num_images)) {
+      input.num_images = Number(input.num_images);
+    }
+    if (typeof input.seed === "string" && /^-?\d+(\.\d+)?$/.test(input.seed)) {
+      input.seed = Number(input.seed);
+    }
+    if (typeof input.enable_base64_output === "string") {
+      if (input.enable_base64_output === "true") input.enable_base64_output = true;
+      if (input.enable_base64_output === "false") input.enable_base64_output = false;
+    }
+
+    next.input = input;
+    return JSON.stringify(next, null, 2);
+  } catch {
+    return raw;
+  }
+}
+
 type FieldDoc = {
   name: string;
   type?: string;
@@ -66,6 +108,9 @@ function extractFieldDocs(schema: Record<string, unknown>, key: "params" | "fiel
       const row = item as Record<string, unknown>;
       const name = typeof row.name === "string" ? row.name.trim() : "";
       if (!name) {
+        return acc;
+      }
+      if (key === "params" && name === "prompt") {
         return acc;
       }
       acc.push({
@@ -184,6 +229,20 @@ function buildPayload(model: string, capability: string) {
   "model": "${model}",
   "prompt": "a premium octopus mascot, orange and black, clean background"
 }`;
+}
+
+function sanitizeProviderInputSchemaForDocs(schema: Record<string, unknown>) {
+  const next = { ...schema };
+  if (Array.isArray(next.params)) {
+    next.params = next.params.filter((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return true;
+      const name = typeof (item as Record<string, unknown>).name === "string"
+        ? ((item as Record<string, unknown>).name as string).trim()
+        : "";
+      return name !== "prompt";
+    });
+  }
+  return next;
 }
 
 function buildEndpoint(capability: string) {
@@ -376,7 +435,9 @@ export function ApiQuickstartCard({
     safeModels.find((item) => item.publicModel === selectedModelSlug) ?? safeModels[0] ?? null;
 
   const capability = selectedModel?.capability ?? "image generation";
-  const providerInputSchema = safeParseJsonObject(selectedModel?.inputSchemaText);
+  const providerInputSchema = sanitizeProviderInputSchemaForDocs(
+    safeParseJsonObject(selectedModel?.inputSchemaText)
+  );
   const providerOutputSchema = safeParseJsonObject(selectedModel?.outputSchemaText);
   const inputFieldDocs = extractFieldDocs(providerInputSchema, "params");
   const outputFieldDocs = extractFieldDocs(providerOutputSchema, "fields");
@@ -394,12 +455,80 @@ export function ApiQuickstartCard({
         : "Auto";
 
   const [copiedBlock, setCopiedBlock] = useState<string | null>(null);
+  const [copiedAll, setCopiedAll] = useState(false);
 
   const copyText = async (value: string, block: string) => {
     await navigator.clipboard.writeText(value);
     setCopiedBlock(block);
     toast.success("Copied");
     window.setTimeout(() => setCopiedBlock(null), 1600);
+  };
+
+  const buildFullApiDocText = () => {
+    const header = [
+      `Model: ${selectedModel?.displayName ?? fallbackModel}`,
+      `Public Model: ${selectedModel?.publicModel ?? fallbackModel}`,
+      `Capability: ${capability}`,
+      `Request Mode: ${protocolModeLabel}`,
+      "",
+      "=== Step 1 · Create Request ===",
+      currentCreateExample,
+      "",
+      "=== Step 2 · Poll Task Status (cURL) ===",
+      taskExample,
+      "",
+      "=== Step 2 · Poll Task Status (Node.js) ===",
+      pollingExamples.nodejs,
+      "",
+      "=== Step 2 · Poll Task Status (Python) ===",
+      pollingExamples.python,
+      "",
+    ];
+
+    const examples = [
+      normalizedRequestExampleJson
+        ? ["=== Request Example (From Internal) ===", normalizedRequestExampleJson, ""]
+        : [],
+      selectedModel?.submitResponseExampleJson
+        ? ["=== Submit Response Example ===", selectedModel.submitResponseExampleJson, ""]
+        : [],
+      selectedModel?.normalizedOutputExampleJson
+        ? ["=== Step 3 · Final Output Example (Normalized) ===", selectedModel.normalizedOutputExampleJson, ""]
+        : [],
+    ].flat();
+
+    const schemas = [
+      "=== Reference · Input Schema ===",
+      embeddedInputSchema,
+      "",
+      "=== Reference · Output Schema ===",
+      embeddedOutputSchema,
+      "",
+    ];
+
+    const errorRows = safeGatewayErrorDocs
+      .map(
+        (row) =>
+          `${row.code} | http=${row.httpStatus} | retryable=${row.retryable ? "yes" : "no"} | category=${row.category} | ${row.publicMessage}`
+      )
+      .join("\n");
+
+    const errors = [
+      "=== Step 4 · Error Handling ===",
+      errorRows,
+      "",
+      "Rule: when task.status=failed, use error.code and only retry when retryable=true.",
+      "Rule: output_payload.raw is optional debug data sanitized by OpenOctopus, not an upstream passthrough contract.",
+    ];
+
+    return [...header, ...examples, ...schemas, ...errors].join("\n");
+  };
+
+  const copyAllApiDoc = async () => {
+    await navigator.clipboard.writeText(buildFullApiDocText());
+    setCopiedAll(true);
+    toast.success("API doc copied");
+    window.setTimeout(() => setCopiedAll(false), 1600);
   };
 
   const tabClass = (active: boolean) =>
@@ -442,7 +571,7 @@ export function ApiQuickstartCard({
         output_payload: {
           format: "openoctopus.image.output.v1 | openoctopus.video.output.v1",
           assets: "normalized output assets",
-          raw: "optional provider raw payload (may be omitted depending on endpoint policy)",
+          raw: "optional sanitized debug payload (may be omitted depending on endpoint policy)",
         },
       },
       providerExtension: providerOutputSchema,
@@ -452,6 +581,9 @@ export function ApiQuickstartCard({
   );
 
   const currentCreateExample = createExamples[languageTab];
+  const normalizedRequestExampleJson = normalizeRequestExampleForDocs(
+    selectedModel?.requestExampleJson
+  );
   const safeGatewayErrorDocs =
     gatewayErrorDocs && gatewayErrorDocs.length > 0
       ? gatewayErrorDocs
@@ -493,6 +625,16 @@ export function ApiQuickstartCard({
           {headerControls}
         </div>
       ) : null}
+      <div className="mb-3 flex justify-end">
+        <button
+          type="button"
+          onClick={copyAllApiDoc}
+          className="inline-flex h-8 items-center gap-1 rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/75 transition-colors hover:bg-black/[0.03]"
+        >
+          <Copy className="h-3.5 w-3.5" />
+          {copiedAll ? "Copied all" : "Copy full API doc"}
+        </button>
+      </div>
       <div className="grid items-start gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
         <aside className="h-fit rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-2 md:sticky md:top-24 md:self-start max-md:static">
           <nav className="space-y-1">
@@ -589,12 +731,12 @@ export function ApiQuickstartCard({
               </div>
             </div>
 
-            {selectedModel?.requestExampleJson ? (
+            {normalizedRequestExampleJson ? (
               <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
                 <p className="text-[10px] uppercase tracking-[1px] text-black/45">Request Example (From Internal)</p>
                 <div className="mt-3">
                   <CodeBlock
-                    code={selectedModel.requestExampleJson}
+                    code={normalizedRequestExampleJson}
                     copyId="doc-request-example"
                     copiedBlock={copiedBlock}
                     onCopy={copyText}
@@ -651,6 +793,9 @@ export function ApiQuickstartCard({
                 </p>
                 <p className="mt-1 text-xs leading-5 text-black/55">
                   Standard output contract merged with provider extension fields.
+                </p>
+                <p className="mt-1 text-xs leading-5 text-black/55">
+                  Note: integrate against <code>output_payload.assets[]</code>. <code>raw</code> is optional and may be omitted by endpoint policy.
                 </p>
               </div>
               {outputFieldDocs.length > 0 ? (

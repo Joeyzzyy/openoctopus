@@ -178,8 +178,10 @@ const ASPECT_RATIO_CANDIDATES = [
 ];
 
 const RESOLUTION_CANDIDATES = ["1k", "2k", "3k", "4k"];
+const SIZE_CANDIDATES = ["1024*1024", "1024*1536", "1536*1024"];
 const QUALITY_CANDIDATES = ["medium", "low", "high"];
 const OUTPUT_FORMAT_CANDIDATES = ["png", "jpeg", "webp"];
+const BACKGROUND_CANDIDATES = ["auto", "transparent", "opaque"];
 
 const README_MARKDOWN_PROMPT = `Generate a clean SEO-friendly README in RAW MARKDOWN SOURCE format.
 
@@ -229,12 +231,20 @@ function isResolutionFieldName(value: string) {
   return value.trim().toLowerCase() === "resolution";
 }
 
+function isSizeFieldName(value: string) {
+  return value.trim().toLowerCase() === "size";
+}
+
 function isQualityFieldName(value: string) {
   return value.trim().toLowerCase() === "quality";
 }
 
 function isOutputFormatFieldName(value: string) {
   return value.trim().toLowerCase() === "output_format";
+}
+
+function isBackgroundFieldName(value: string) {
+  return value.trim().toLowerCase() === "background";
 }
 
 function defaultEnumValuesForKnownInputField(fieldName: string) {
@@ -244,6 +254,12 @@ function defaultEnumValuesForKnownInputField(fieldName: string) {
   }
   if (normalized === "output_format") {
     return ["png", "jpeg", "webp"];
+  }
+  if (normalized === "size") {
+    return ["1024*1024", "1024*1536", "1536*1024"];
+  }
+  if (normalized === "background") {
+    return ["auto", "transparent", "opaque"];
   }
   return [];
 }
@@ -499,7 +515,15 @@ function SchemaFieldEditor({
                 </button>
                 <button
                   type="button"
-                  onClick={() => removeRow(row.id)}
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      const confirmed = window.confirm(`确认删除参数「${row.name}」吗？此操作不可撤销。`);
+                      if (!confirmed) {
+                        return;
+                      }
+                    }
+                    removeRow(row.id);
+                  }}
                   disabled={disabled}
                   className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-black/[0.04] disabled:opacity-50"
                 >
@@ -567,7 +591,7 @@ function SchemaFieldEditor({
                 className={`${formInputClassName} h-9 text-xs md:col-span-2`}
                 placeholder="示例值"
               />
-              {!isQualityFieldName(draft.name) && !isOutputFormatFieldName(draft.name) ? (
+              {!isQualityFieldName(draft.name) && !isOutputFormatFieldName(draft.name) && !isSizeFieldName(draft.name) && !isBackgroundFieldName(draft.name) ? (
                 <input
                   value={draft.enumValues.join(", ")}
                   onChange={(event) =>
@@ -618,6 +642,40 @@ function SchemaFieldEditor({
                   </div>
                 </div>
               ) : null}
+              {isSizeFieldName(draft.name) ? (
+                <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
+                  <p className="mb-2 text-[11px] text-black/60">size 可选值（可多选）</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {SIZE_CANDIDATES.map((value) => {
+                      const checked = draft.enumValues.includes(value);
+                      return (
+                        <label key={value} className="inline-flex items-center gap-2 text-xs text-black/75">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) =>
+                              setDraft((current) => {
+                                const set = new Set(current.enumValues);
+                                if (event.target.checked) {
+                                  set.add(value);
+                                } else {
+                                  set.delete(value);
+                                }
+                                return {
+                                  ...current,
+                                  enumValues: Array.from(set),
+                                };
+                              })
+                            }
+                            className="size-3.5"
+                          />
+                          {value}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
               {isQualityFieldName(draft.name) ? (
                 <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
                   <p className="mb-2 text-[11px] text-black/60">quality 可选值（可多选）</p>
@@ -657,6 +715,40 @@ function SchemaFieldEditor({
                   <p className="mb-2 text-[11px] text-black/60">output_format 可选值（可多选）</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {OUTPUT_FORMAT_CANDIDATES.map((value) => {
+                      const checked = draft.enumValues.includes(value);
+                      return (
+                        <label key={value} className="inline-flex items-center gap-2 text-xs text-black/75">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) =>
+                              setDraft((current) => {
+                                const set = new Set(current.enumValues);
+                                if (event.target.checked) {
+                                  set.add(value);
+                                } else {
+                                  set.delete(value);
+                                }
+                                return {
+                                  ...current,
+                                  enumValues: Array.from(set),
+                                };
+                              })
+                            }
+                            className="size-3.5"
+                          />
+                          {value}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+              {isBackgroundFieldName(draft.name) ? (
+                <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
+                  <p className="mb-2 text-[11px] text-black/60">background 可选值（可多选）</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {BACKGROUND_CANDIDATES.map((value) => {
                       const checked = draft.enumValues.includes(value);
                       return (
                         <label key={value} className="inline-flex items-center gap-2 text-xs text-black/75">

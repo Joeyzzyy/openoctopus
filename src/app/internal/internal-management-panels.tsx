@@ -820,12 +820,20 @@ function ManagementDialog({
   description?: string;
   headerActions?: React.ReactNode;
   disabled?: boolean;
-  children: React.ReactNode | ((controls: { close: () => void }) => React.ReactNode);
+  children: React.ReactNode | ((controls: { close: () => void; openVersion: number }) => React.ReactNode);
 }) {
   const [open, setOpen] = useState(false);
+  const [openVersion, setOpenVersion] = useState(0);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      setOpenVersion((current) => current + 1);
+    }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen} disablePointerDismissal>
+    <Dialog open={open} onOpenChange={handleOpenChange} disablePointerDismissal>
       <DialogTrigger disabled={disabled}>{trigger}</DialogTrigger>
       <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] [&>button]:hidden sm:max-w-5xl">
         <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5">
@@ -856,8 +864,9 @@ function ManagementDialog({
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-5">
           {typeof children === "function"
-            ? (children as (controls: { close: () => void }) => React.ReactNode)({
+            ? (children as (controls: { close: () => void; openVersion: number }) => React.ReactNode)({
                 close: () => setOpen(false),
+                openVersion,
               })
             : children}
         </div>
@@ -1439,37 +1448,42 @@ export function PublicModelsPanel({
                     </ManagementDialog>
                     <ManagementDialog
                       trigger={<ModalButton tone="secondary">配置路由</ModalButton>}
-                      disabled={mappings.length === 0}
                       title={`配置路由：${model.display_name}`}
                       description="为当前可售模型设置主路由和回退路由。"
                     >
                       {({ close }) => (
-                        <CreateRoutingRuleForm
-                          action={activeRoutingRule ? updateRoutingRule : createRoutingRule}
-                          routingRuleId={activeRoutingRule?.id}
-                          supportedModels={supportedModelOptions}
-                          providerModels={safeProviderModels.map((item) => ({
-                            id: item.id,
-                            providerName: item.providerName,
-                            supportedModelName: item.supportedModelName,
-                            upstreamModelSlug: item.upstream_model_slug,
-                            capability: item.capability,
-                            supportedModelId: item.supported_model_id ?? "",
-                          }))}
-                          defaultSupportedModelId={model.id}
-                          defaultPrimaryProviderModelId={activeRoutingRule?.primary_provider_model_id}
-                          defaultFallbackProviderModelId={activeRoutingRule?.fallback_provider_model_id ?? ""}
-                          defaultStrategy={activeRoutingRule?.route_strategy ?? "primary_only"}
-                          defaultWorkspaceScope={
-                            activeRoutingRule?.scopeLabel.includes("工作区") ? "workspace" : "global"
-                          }
-                          defaultActive={activeRoutingRule?.active ?? true}
-                          allowWorkspaceScope={false}
-                          lockSupportedModel
-                          submitLabel={activeRoutingRule ? "保存路由" : "创建路由"}
-                          onSuccess={close}
-                          disabled={false}
-                        />
+                        mappings.length === 0 ? (
+                          <div className="rounded-xl border border-[#EBC7BF] bg-[#FFF4F1] px-4 py-3 text-xs leading-6 text-[#A14B3B]">
+                            当前可售模型还没有可用的供应商模型映射，请先在“编辑可售模型”里添加映射，再配置路由。
+                          </div>
+                        ) : (
+                          <CreateRoutingRuleForm
+                            action={activeRoutingRule ? updateRoutingRule : createRoutingRule}
+                            routingRuleId={activeRoutingRule?.id}
+                            supportedModels={supportedModelOptions}
+                            providerModels={safeProviderModels.map((item) => ({
+                              id: item.id,
+                              providerName: item.providerName,
+                              supportedModelName: item.supportedModelName,
+                              upstreamModelSlug: item.upstream_model_slug,
+                              capability: item.capability,
+                              supportedModelId: item.supported_model_id ?? "",
+                            }))}
+                            defaultSupportedModelId={model.id}
+                            defaultPrimaryProviderModelId={activeRoutingRule?.primary_provider_model_id}
+                            defaultFallbackProviderModelId={activeRoutingRule?.fallback_provider_model_id ?? ""}
+                            defaultStrategy={activeRoutingRule?.route_strategy ?? "primary_only"}
+                            defaultWorkspaceScope={
+                              activeRoutingRule?.scopeLabel.includes("工作区") ? "workspace" : "global"
+                            }
+                            defaultActive={activeRoutingRule?.active ?? true}
+                            allowWorkspaceScope={false}
+                            lockSupportedModel
+                            submitLabel={activeRoutingRule ? "保存路由" : "创建路由"}
+                            onSuccess={close}
+                            disabled={false}
+                          />
+                        )
                       )}
                     </ManagementDialog>
                     <ManagementDialog
@@ -1504,8 +1518,9 @@ export function PublicModelsPanel({
                         <DialogFormSubmitButton formId={`provider-model-form-create-for-${model.id}`} />
                       }
                     >
-                      {({ close }) => (
+                      {({ close, openVersion }) => (
                         <CreateProviderModelForm
+                          key={`create-provider-model-form-${model.id}-${openVersion}`}
                           action={createProviderModel}
                           supportedModels={supportedModelOptions}
                           providers={providerOptions}
@@ -1819,6 +1834,40 @@ export function CreateSupportedModelButton({
     vendorNames.length > 0
       ? vendorNames.map((name) => ({ value: name, label: name }))
       : [{ value: "Google", label: "Google" }];
+  const cloneCandidates = safeModels;
+  const defaultBillingTemplate = '{"billingMode":"hybrid","currency":"USD","charges":{"perImage":0.039,"inputTextTokensPerMillion":0.30}}';
+  const [sourceModelId, setSourceModelId] = useState("");
+  const [formSeed, setFormSeed] = useState(0);
+  const [draftValues, setDraftValues] = useState(() => ({
+    provider: "Google",
+    modelSlug: "openoctopus/gemini-2.5-flash-image",
+    displayName: "Gemini Image",
+    seoTitle: "",
+    seoDescription: "",
+    seoKeywords: "",
+    modelType: "text-to-image",
+    modality: "image",
+    capability: "image_generation",
+    billingConfigText: defaultBillingTemplate,
+  }));
+
+  const applyCreateDraftFromSource = () => {
+    const source = cloneCandidates.find((item) => item.id === sourceModelId);
+    if (!source) return;
+    setDraftValues({
+      provider: source.provider,
+      modelSlug: source.model_slug,
+      displayName: source.display_name,
+      seoTitle: readBillingConfigMetadataField(source.billingConfigText, "seoTitle"),
+      seoDescription: readBillingConfigMetadataField(source.billingConfigText, "seoDescription"),
+      seoKeywords: readBillingConfigMetadataField(source.billingConfigText, "seoKeywords"),
+      modelType: readModelTypeFromBillingConfig(source.billingConfigText) || "text-to-image",
+      modality: source.modality,
+      capability: source.capability ?? "image_generation",
+      billingConfigText: source.billingConfigText || defaultBillingTemplate,
+    });
+    setFormSeed((current) => current + 1);
+  };
 
   return (
     <ManagementDialog
@@ -1827,19 +1876,47 @@ export function CreateSupportedModelButton({
       description="在独立弹窗中创建新的客户侧模型定义。"
     >
       {({ close }) => (
-      <ManagedDialogForm action={createSupportedModel} close={close} className="grid gap-4 md:grid-cols-2">
+      <ManagedDialogForm key={`create-supported-model-${formSeed}`} action={createSupportedModel} close={close} className="grid gap-4 md:grid-cols-2">
+        {cloneCandidates.length > 0 ? (
+          <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3 md:col-span-2">
+            <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">从其他可售模型一键套用资料</p>
+            <div className="flex flex-col gap-2 md:flex-row md:items-center">
+              <select
+                value={sourceModelId}
+                onChange={(event) => setSourceModelId(event.target.value)}
+                className={formSelectClassName}
+              >
+                <option value="">请选择来源模型</option>
+                {cloneCandidates.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.display_name} ({item.model_slug})
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={applyCreateDraftFromSource}
+                disabled={!sourceModelId}
+                className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-black/[0.12] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:bg-black/[0.03] disabled:text-black/35"
+              >
+                套用到新建表单
+              </button>
+            </div>
+          </div>
+        ) : null}
         <FormSelect
           label="模型厂商（内部分类）"
           name="provider"
           options={vendorOptions}
-          defaultValue="Google"
+          defaultValue={draftValues.provider}
           help="用于内部分类和测算分组，例如 Google、OpenAI、Anthropic。"
         />
-        <FormField label="可售模型 Slug" name="modelSlug" defaultValue="openoctopus/gemini-2.5-flash-image" required />
-        <FormField label="显示名称" name="displayName" defaultValue="Gemini Image" required />
+        <FormField label="可售模型 Slug" name="modelSlug" defaultValue={draftValues.modelSlug} required />
+        <FormField label="显示名称" name="displayName" defaultValue={draftValues.displayName} required />
         <FormField
           label="SEO Title"
           name="seoTitle"
+          defaultValue={draftValues.seoTitle}
           placeholder="例如：Gemini Image by Google | Pricing, Prompt Guide & API"
           help="可选。用于模型详情页 title、OG 和 Twitter 标题。"
           className="md:col-span-2"
@@ -1847,6 +1924,7 @@ export function CreateSupportedModelButton({
         <FormTextArea
           label="SEO Description"
           name="seoDescription"
+          defaultValue={draftValues.seoDescription}
           placeholder="用于搜索摘要和分享描述。建议 120-180 字符。"
           help="会自动同步为模型介绍文案。"
           className="md:col-span-2"
@@ -1854,6 +1932,7 @@ export function CreateSupportedModelButton({
         <FormTextArea
           label="SEO Keywords"
           name="seoKeywords"
+          defaultValue={draftValues.seoKeywords}
           placeholder="一行或逗号分隔一个关键词，例如 gemini image, google image api, text to image"
           help="可选。会写入 metadata keywords 和结构化数据。"
           className="md:col-span-2"
@@ -1862,7 +1941,7 @@ export function CreateSupportedModelButton({
           label="类型"
           name="modelType"
           options={SUPPORTED_MODEL_TYPE_OPTIONS.map((item) => ({ value: item, label: item }))}
-          defaultValue="text-to-image"
+          defaultValue={draftValues.modelType}
         />
         <FormSelect
           label="模态"
@@ -1872,16 +1951,18 @@ export function CreateSupportedModelButton({
             { value: "video", label: "视频" },
             { value: "audio", label: "音频" },
           ]}
+          defaultValue={draftValues.modality}
         />
         <FormSelect
           label="能力类型"
           name="capability"
           options={[...capabilityOptions]}
-          defaultValue="image_generation"
+          defaultValue={draftValues.capability}
         />
         <div className="md:col-span-2">
           <BillingConfigEditor
-            initialValue={'{"billingMode":"hybrid","currency":"USD","charges":{"perImage":0.039,"inputTextTokensPerMillion":0.30}}'}
+            key={`create-supported-model-billing-${formSeed}`}
+            initialValue={draftValues.billingConfigText}
           />
         </div>
         <input type="hidden" name="active" value="true" />
@@ -2849,8 +2930,9 @@ export function ModelsPanel({
             <DialogFormSubmitButton formId="provider-model-form-create-models" />
           }
         >
-          {({ close }) => (
+          {({ close, openVersion }) => (
             <CreateProviderModelForm
+              key={`create-provider-model-form-models-tab-${openVersion}`}
               supportedModels={supportedModelOptions}
               providers={providerOptions}
               workerTemplates={workerTemplateOptions}
