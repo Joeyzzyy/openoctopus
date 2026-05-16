@@ -3,12 +3,13 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { Logo } from "@/components/layout/Logo";
 import { getInternalAdminData } from "@/lib/internal-admin-server";
-import { clearApiKeyRequestRecords, unlockInternalAccess } from "./actions";
+import { addUserBalance, deleteRegisteredUser, unlockInternalAccess } from "./actions";
 import { INTERNAL_ACCESS_COOKIE, INTERNAL_ACCESS_COOKIE_VALUE } from "@/lib/internal-access";
 import { InternalShell } from "./internal-shell";
 import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
 import { MonitoringLineChart } from "./monitoring-line-chart";
 import { ImageResponseContractPanel } from "./image-response-contract-panel";
+import { RegisteredUserDeleteButton } from "./registered-user-delete-button";
 import {
   CreateProviderButton,
   GatewayErrorDefinitionsPanel,
@@ -20,16 +21,21 @@ import {
   PublicModelsPanel,
   WorkerTemplatesPanel,
 } from "./internal-management-panels";
-import { RequestRecordsClearForm } from "./request-records-clear-form";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 const tabs = [
   {
-    key: "monitoring",
+    key: "monitoring-overview",
     group: "overview",
-    label: "系统使用监控",
-    description: "系统监控与请求记录。",
+    label: "系统用量总览",
+    description: "模型调用趋势与成功率概览。",
+  },
+  {
+    key: "monitoring-requests",
+    group: "overview",
+    label: "用户管理",
+    description: "注册用户、余额与后台加款。",
   },
   {
     key: "internal-model-ai-usage-logs",
@@ -110,12 +116,14 @@ function getSearchValue(
 }
 
 function getTabValue(value: string | undefined): InternalTabKey {
+  if (value === "monitoring") {
+    return "monitoring-overview";
+  }
   return tabs.some((item) => item.key === value) ? (value as InternalTabKey) : "public-models";
 }
 
 function buildRequestsFilterHref(input: {
-  customer?: string;
-  key?: string;
+  scope?: string;
   page?: number;
   monitoringView: MonitoringView;
   monitoringInterval: MonitoringInterval;
@@ -123,16 +131,21 @@ function buildRequestsFilterHref(input: {
   monitoringStatus: MonitoringStatus;
 }) {
   const params = new URLSearchParams();
-  params.set("tab", "monitoring");
+  const tab =
+    input.monitoringView === "video"
+      ? "monitoring-video"
+      : input.monitoringView === "image"
+        ? "monitoring-image"
+        : input.monitoringView === "requests"
+          ? "monitoring-requests"
+          : "monitoring-overview";
+  params.set("tab", tab);
   params.set("monitoringView", input.monitoringView);
   params.set("monitoringInterval", input.monitoringInterval);
   params.set("monitoringRange", input.monitoringRange);
   params.set("monitoringStatus", input.monitoringStatus);
-  if (input.customer && input.customer !== "all") {
-    params.set("requestCustomer", input.customer);
-  }
-  if (input.key && input.key !== "all") {
-    params.set("requestKey", input.key);
+  if (input.scope && input.scope !== "all") {
+    params.set("requestScope", input.scope);
   }
   if ((input.page ?? 1) > 1) {
     params.set("requestPage", String(input.page));
@@ -253,7 +266,15 @@ function buildMonitoringHref(input: {
   model?: string | null;
 }) {
   const params = new URLSearchParams();
-  params.set("tab", "monitoring");
+  const tab =
+    input.view === "video"
+      ? "monitoring-video"
+      : input.view === "image"
+        ? "monitoring-image"
+        : input.view === "requests"
+          ? "monitoring-requests"
+          : "monitoring-overview";
+  params.set("tab", tab);
   params.set("monitoringView", input.view);
   params.set("monitoringInterval", input.interval);
   params.set("monitoringRange", input.range);
@@ -741,25 +762,40 @@ export default async function InternalPage({
   const selectedMonitoringStatus = parseMonitoringStatus(
     getSearchValue(resolvedSearchParams, "monitoringStatus")
   );
-  const selectedMonitoringView = parseMonitoringView(
+  const requestedMonitoringView = parseMonitoringView(
     getSearchValue(resolvedSearchParams, "monitoringView")
   );
   const requestedMonitoringModel = getSearchValue(resolvedSearchParams, "monitoringModel") ?? "";
+  const activeTab = getTabValue(getSearchValue(resolvedSearchParams, "tab"));
+  const effectiveMonitoringView: MonitoringView =
+    activeTab === "monitoring-requests"
+          ? "requests"
+          : activeTab === "monitoring-overview"
+            ? "overview"
+            : requestedMonitoringView;
+  const selectedRequestScope = getSearchValue(resolvedSearchParams, "requestScope") ?? "all";
+  const selectedRequestKey = selectedRequestScope.startsWith("k:")
+    ? selectedRequestScope.slice(2)
+    : "all";
+  const selectedRequestPageRaw = Number(getSearchValue(resolvedSearchParams, "requestPage") ?? "1");
+  const selectedRequestPage = Number.isFinite(selectedRequestPageRaw) && selectedRequestPageRaw >= 1
+    ? Math.floor(selectedRequestPageRaw)
+    : 1;
   const data = await getInternalAdminData({
     monitoringLookbackMs: parseMonitoringRangeMs(selectedMonitoringRange),
+    monitoringStatus: selectedMonitoringStatus,
+    monitoringModelSlug: requestedMonitoringModel,
+    monitoringView: effectiveMonitoringView,
+    requestScope: selectedRequestScope,
+    requestPage: selectedRequestPage,
+    requestPageSize: 20,
+    activeTab,
     bypassAuth: true,
   });
   if (!data) redirect("/login");
   if (!data.authorized) redirect("/login");
 
   const selectedTemplateKey = getSearchValue(resolvedSearchParams, "template");
-  const activeTab = getTabValue(getSearchValue(resolvedSearchParams, "tab"));
-  const selectedRequestCustomer = getSearchValue(resolvedSearchParams, "requestCustomer") ?? "all";
-  const selectedRequestKey = getSearchValue(resolvedSearchParams, "requestKey") ?? "all";
-  const selectedRequestPageRaw = Number(getSearchValue(resolvedSearchParams, "requestPage") ?? "1");
-  const selectedRequestPage = Number.isFinite(selectedRequestPageRaw) && selectedRequestPageRaw >= 1
-    ? Math.floor(selectedRequestPageRaw)
-    : 1;
   const modelVendorCount = new Set(
     [
       ...data.modelVendors.map((vendor) => vendor.name.trim().toLowerCase()),
@@ -786,41 +822,28 @@ export default async function InternalPage({
               ? data.internalModelAiUsageLogs.length
               : undefined,
   }));
-  const filteredRequests = data.requests.filter((request) => {
-    const matchesCustomer =
-      selectedRequestCustomer === "all" ||
-      request.workspaceSlug === selectedRequestCustomer;
-    const matchesKey =
-      selectedRequestKey === "all" ||
-      request.api_key_id === selectedRequestKey;
-
-    return matchesCustomer && matchesKey;
-  });
+  const filteredRequests = data.requests;
+  const requestScopeOptions = [
+    { value: "all", label: "全部用户 / 全部 Key" },
+    ...data.requestFilters.customers.map((customer) => ({
+      value: `u:${customer.id}`,
+      label: `${customer.name} / 全部 Key`,
+    })),
+    ...data.requestFilters.apiKeys.map((item) => ({
+      value: `k:${item.id}`,
+      label: `${item.ownerName ?? "未标识调用方"} / ${item.name}`,
+    })),
+  ];
   const requestSummary = {
     customerCharge: filteredRequests.reduce((sum, request) => sum + request.customerCharge, 0),
     providerCost: filteredRequests.reduce((sum, request) => sum + request.providerCost, 0),
     profit: filteredRequests.reduce((sum, request) => sum + request.profit, 0),
     requestCount: filteredRequests.length,
   };
-  const filteredCustomerFinances = data.customerFinances.filter((item) =>
-    selectedRequestCustomer === "all" ? true : item.workspaceSlug === selectedRequestCustomer
-  );
-  const requestFinanceSummary = {
-    totalTopup: filteredCustomerFinances.reduce((sum, item) => sum + item.totalTopup, 0),
-    totalSystemCredit: filteredCustomerFinances.reduce((sum, item) => sum + item.totalSystemCredit, 0),
-    totalConsumption: filteredCustomerFinances.reduce((sum, item) => sum + item.totalConsumption, 0),
-    totalProviderCost: filteredCustomerFinances.reduce((sum, item) => sum + item.totalProviderCost, 0),
-    totalProfit: filteredCustomerFinances.reduce((sum, item) => sum + item.totalProfit, 0),
-  };
   const hasFilteredRequests = filteredRequests.length > 0;
-  const requestPageSize = 20;
-  const requestTotalPages = Math.max(1, Math.ceil(filteredRequests.length / requestPageSize));
-  const requestCurrentPage = Math.min(selectedRequestPage, requestTotalPages);
-  const requestPageStartIndex = (requestCurrentPage - 1) * requestPageSize;
-  const pagedRequests = filteredRequests.slice(
-    requestPageStartIndex,
-    requestPageStartIndex + requestPageSize
-  );
+  const requestTotalPages = data.requestPagination.totalPages;
+  const requestCurrentPage = data.requestPagination.page;
+  const pagedRequests = filteredRequests;
   const hasPagedRequests = pagedRequests.length > 0;
   const selectedRequestKeyRecord =
     selectedRequestKey === "all"
@@ -891,19 +914,6 @@ export default async function InternalPage({
   const selectedMonitoringStatusLabel =
     monitoringStatusOptions.find((option) => option.value === selectedMonitoringStatus)?.label ??
     "全部请求";
-  const globalVideoInflightRequests = data.globalMonitoring.videoInflightRequests;
-  const recentVideoSettledRequests = data.globalMonitoring.recentVideoRequests.filter(
-    (request) => !isInflightRequestStatus(request.status)
-  );
-  const recentVideoFailedCount = recentVideoSettledRequests.filter(
-    (request) => request.status === "failed"
-  ).length;
-  const recentVideoSucceededCount = recentVideoSettledRequests.filter(
-    (request) => request.status === "succeeded"
-  ).length;
-  const imageMonitoringSummary = data.globalMonitoring.imageSummary;
-  const imageRecentLogs = data.globalMonitoring.recentImageRequests.slice(0, 12);
-
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#FCFCFA] text-[#111111]">
       <header className="fixed left-0 right-0 top-0 z-50 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
@@ -1056,50 +1066,17 @@ export default async function InternalPage({
             </section>
           ) : null}
 
-          {activeTab === "monitoring" ? (
+          {activeTab === "monitoring-overview" ||
+          activeTab === "monitoring-requests" ? (
             <section>
-                <SectionShell
+              <SectionShell
                 id="monitoring-panel"
-                title="系统使用监控"
-                description=" "
+                title=""
+                description=""
               >
-                <MonitoringAutoRefresh enabled={activeTab === "monitoring" && selectedMonitoringView === "video"} />
+                <MonitoringAutoRefresh enabled={false} />
 
-                <div className="mb-4 flex flex-wrap gap-2 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
-                  {monitoringViewOptions.map((option) => (
-                    <a
-                      key={option.value}
-                      href={buildMonitoringHref({
-                        view: option.value,
-                        interval: selectedMonitoringInterval,
-                        range: selectedMonitoringRange,
-                        status: selectedMonitoringStatus,
-                        model: selectedMonitoringModel,
-                      })}
-                      className={`inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium transition-colors ${
-                        selectedMonitoringView === option.value
-                          ? "border-black bg-black text-white"
-                          : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                      }`}
-                    >
-                      {option.label}
-                    </a>
-                  ))}
-                  <a
-                    href={buildMonitoringHref({
-                      view: selectedMonitoringView,
-                      interval: selectedMonitoringInterval,
-                      range: selectedMonitoringRange,
-                      status: selectedMonitoringStatus,
-                      model: selectedMonitoringModel,
-                    })}
-                    className="ml-auto inline-flex h-9 items-center rounded-md border border-black/[0.12] bg-white px-3 text-sm font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
-                  >
-                    刷新
-                  </a>
-                </div>
-
-                {selectedMonitoringView === "overview" ? (
+                {effectiveMonitoringView === "overview" ? (
                   <>
                     <div className="mb-4 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
                       <div className="grid gap-3 lg:grid-cols-4">
@@ -1110,7 +1087,7 @@ export default async function InternalPage({
                               <a
                                 key={option.value}
                                 href={buildMonitoringHref({
-                                  view: selectedMonitoringView,
+                                  view: effectiveMonitoringView,
                                   interval: option.value,
                                   range: selectedMonitoringRange,
                                   status: selectedMonitoringStatus,
@@ -1135,7 +1112,7 @@ export default async function InternalPage({
                               <a
                                 key={option.value}
                                 href={buildMonitoringHref({
-                                  view: selectedMonitoringView,
+                                  view: effectiveMonitoringView,
                                   interval: selectedMonitoringInterval,
                                   range: option.value,
                                   status: selectedMonitoringStatus,
@@ -1160,7 +1137,7 @@ export default async function InternalPage({
                               <a
                                 key={option.value}
                                 href={buildMonitoringHref({
-                                  view: selectedMonitoringView,
+                                  view: effectiveMonitoringView,
                                   interval: selectedMonitoringInterval,
                                   range: selectedMonitoringRange,
                                   status: option.value,
@@ -1181,8 +1158,8 @@ export default async function InternalPage({
                         <div>
                           <p className="text-[11px] tracking-[0.35px] text-black/45">模型</p>
                           <form action="/internal" className="mt-2 flex gap-1.5">
-                            <input type="hidden" name="tab" value="monitoring" />
-                            <input type="hidden" name="monitoringView" value={selectedMonitoringView} />
+                            <input type="hidden" name="tab" value={activeTab} />
+                            <input type="hidden" name="monitoringView" value={effectiveMonitoringView} />
                             <input type="hidden" name="monitoringInterval" value={selectedMonitoringInterval} />
                             <input type="hidden" name="monitoringRange" value={selectedMonitoringRange} />
                             <input type="hidden" name="monitoringStatus" value={selectedMonitoringStatus} />
@@ -1245,7 +1222,7 @@ export default async function InternalPage({
                   </>
                 ) : null}
 
-                {selectedMonitoringView === "overview" ? (
+                {effectiveMonitoringView === "overview" ? (
                   <>
                     {selectedMonitoringSeries ? (
                       <div className="grid gap-5">
@@ -1290,421 +1267,82 @@ export default async function InternalPage({
                   </>
                 ) : null}
 
-                {selectedMonitoringView === "video" ? (
+                {effectiveMonitoringView === "requests" ? (
                   <>
-                    <div className="mb-5 grid gap-3 md:grid-cols-3">
-                      <OverviewCard
-                        title="进行中视频任务"
-                        value={globalVideoInflightRequests.length}
-                        note="全系统当前 queued / processing 的视频请求"
-                      />
-                      <OverviewCard
-                        title="近期成功视频"
-                        value={recentVideoSucceededCount}
-                        note="最近抓取到的已结算视频任务"
-                      />
-                      <OverviewCard
-                        title="近期失败视频"
-                        value={recentVideoFailedCount}
-                        note="用于排查上游 provider 错误"
-                      />
-                    </div>
-
-                    <section className="mb-6 rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-5 shadow-sm">
-                      <div className="mb-4 flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-black">全局视频任务实时监控</p>
-                          <p className="mt-1 text-xs leading-5 text-black/50">
-                            这里只盯全系统“正在发生中的”视频任务，展示 task id、workspace、最近一次 provider attempt 和上游 task id。
-                          </p>
-                        </div>
-                        <div className="rounded-md border border-black/[0.08] bg-white px-3 py-2 text-[11px] text-black/55">
-                          30 秒自动刷新
-                        </div>
-                      </div>
-
-                      {globalVideoInflightRequests.length > 0 ? (
-                        <div className="grid gap-3">
-                          {globalVideoInflightRequests.map((request) => (
-                            <UnifiedTaskCard
-                              key={request.id}
-                              request={{
-                                id: request.id,
-                                capability: request.capability,
-                                modelSlug: request.publicModelSlug,
-                                status: request.status,
-                                createdAt: request.createdAt,
-                                createdLabel: request.createdLabel,
-                                startedLabel: request.startedLabel,
-                                completedLabel: request.completedLabel,
-                                workspaceName: request.workspaceName,
-                                workspaceSlug: request.workspaceSlug,
-                                errorMessage: request.errorMessage,
-                                lastAttempt: request.lastAttempt,
-                                upstreamRawText: request.upstreamRawText ?? null,
-                                packagedOutputText: request.packagedOutputText ?? null,
-                              }}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <EmptyState
-                          title="当前没有进行中的视频任务"
-                          detail="新的全局 video_generation 请求进入 queued / processing 后会自动出现在这里。"
-                        />
-                      )}
-                    </section>
-
-                    <section className="mb-6 rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-5 shadow-sm">
-                      <div className="mb-4">
-                        <p className="text-sm font-medium text-black">最近完成的视频任务日志</p>
-                        <p className="mt-1 text-xs leading-5 text-black/50">
-                          用于确认新部署后的 polling 是否能把视频任务正确推进到最终成功或最终失败。
-                        </p>
-                      </div>
-
-                      {recentVideoSettledRequests.length > 0 ? (
-                        <div className="grid gap-3">
-                          {recentVideoSettledRequests.slice(0, 10).map((request) => (
-                            <UnifiedTaskCard
-                              key={request.id}
-                              request={{
-                                id: request.id,
-                                capability: request.capability,
-                                modelSlug: request.publicModelSlug,
-                                status: request.status,
-                                createdAt: request.createdAt,
-                                createdLabel: request.createdLabel,
-                                startedLabel: request.startedLabel,
-                                completedLabel: request.completedLabel,
-                                workspaceName: request.workspaceName,
-                                workspaceSlug: request.workspaceSlug,
-                                errorMessage: request.errorMessage,
-                                lastAttempt: request.lastAttempt,
-                                upstreamRawText: request.upstreamRawText ?? null,
-                                packagedOutputText: request.packagedOutputText ?? null,
-                              }}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <EmptyState
-                          title="最近还没有已结算的视频任务"
-                          detail="新的视频任务完成后，会在这里保留成功或失败日志。"
-                        />
-                      )}
-                    </section>
-                  </>
-                ) : null}
-
-                {selectedMonitoringView === "image" ? (
-                  <>
-                    <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      <OverviewCard
-                        title="图片总量"
-                        value={imageMonitoringSummary.total}
-                        note="最近抓取窗口内图片请求总数"
-                      />
-                      <OverviewCard
-                        title="图片进行中"
-                        value={imageMonitoringSummary.inflight}
-                        note="queued / processing"
-                      />
-                      <OverviewCard
-                        title="图片成功"
-                        value={imageMonitoringSummary.succeeded}
-                        note="最近抓取窗口内 succeeded"
-                      />
-                      <OverviewCard
-                        title="图片失败"
-                        value={imageMonitoringSummary.failed}
-                        note="最近抓取窗口内 failed"
-                      />
-                    </div>
-
-                    <section className="mb-6 rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-5 shadow-sm">
-                      <div className="mb-4">
-                        <p className="text-sm font-medium text-black">图片任务汇总与整体日志</p>
-                        <p className="mt-1 text-xs leading-5 text-black/50">
-                          图片任务不做逐任务实时盯盘，只保留总量、状态拆分和最近整体状态日志。
-                        </p>
-                      </div>
-
-                      {imageRecentLogs.length > 0 ? (
-                        <div className="grid gap-2">
-                          {imageRecentLogs.map((request) => (
-                            <UnifiedTaskCard
-                              key={request.id}
-                              request={{
-                                id: request.id,
-                                capability: request.capability,
-                                modelSlug: request.publicModelSlug,
-                                status: request.status,
-                                createdAt: request.createdAt,
-                                createdLabel: request.createdLabel,
-                                startedLabel: request.startedLabel,
-                                completedLabel: request.completedLabel,
-                                workspaceName: request.workspaceName,
-                                workspaceSlug: request.workspaceSlug,
-                                errorMessage: request.errorMessage,
-                                lastAttempt: request.lastAttempt,
-                                upstreamRawText: request.upstreamRawText ?? null,
-                                packagedOutputText: request.packagedOutputText ?? null,
-                              }}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <EmptyState
-                          title="最近没有图片任务日志"
-                          detail="当前窗口内还没有 image_generation 或 image_edit 请求。"
-                        />
-                      )}
-                    </section>
-                  </>
-                ) : null}
-
-                {selectedMonitoringView === "requests" ? (
-                  <>
-                    <div className="mb-4 grid gap-3 md:grid-cols-5">
-                      <OverviewCard
-                        title="用户充值"
-                        value={formatCurrency(requestFinanceSummary.totalTopup)}
-                        note="wallet_transactions · topup"
-                      />
-                      <OverviewCard
-                        title="系统加款"
-                        value={formatCurrency(requestFinanceSummary.totalSystemCredit)}
-                        note="wallet_transactions · 非 topup 正向入账"
-                      />
-                      <OverviewCard
-                        title="用户消耗"
-                        value={formatCurrency(requestFinanceSummary.totalConsumption)}
-                        note="inference_requests · customer charge"
-                      />
-                      <OverviewCard
-                        title="上游成本"
-                        value={formatCurrency(requestFinanceSummary.totalProviderCost)}
-                        note="inference_requests · provider cost"
-                      />
-                      <OverviewCard
-                        title="用户盈亏"
-                        value={formatCurrency(requestFinanceSummary.totalProfit)}
-                        note="用户消耗 - 上游成本"
-                      />
-                    </div>
-
-                    <div className="mb-4 grid gap-3 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                      <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-                        <p className="text-[11px] tracking-[0.35px] text-black/45">客户</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <a
-                            href={buildRequestsFilterHref({
-                              customer: "all",
-                              key: selectedRequestKey,
-                              page: 1,
-                              monitoringView: selectedMonitoringView,
-                              monitoringInterval: selectedMonitoringInterval,
-                              monitoringRange: selectedMonitoringRange,
-                              monitoringStatus: selectedMonitoringStatus,
-                            })}
-                            className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
-                              selectedRequestCustomer === "all"
-                                ? "border-black bg-black text-white"
-                                : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                            }`}
-                          >
-                            全部客户
-                          </a>
-                          {data.requestFilters.customers.map((customer) => (
-                            <a
-                              key={customer.slug}
-                              href={buildRequestsFilterHref({
-                                customer: customer.slug,
-                                key: selectedRequestKey,
-                                page: 1,
-                                monitoringView: selectedMonitoringView,
-                                monitoringInterval: selectedMonitoringInterval,
-                                monitoringRange: selectedMonitoringRange,
-                                monitoringStatus: selectedMonitoringStatus,
-                              })}
-                              className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
-                                selectedRequestCustomer === customer.slug
-                                  ? "border-black bg-black text-white"
-                                  : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                              }`}
-                            >
-                              {customer.name}
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
-                        <p className="text-[11px] tracking-[0.35px] text-black/45">调用密钥筛选</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <a
-                            href={buildRequestsFilterHref({
-                              customer: selectedRequestCustomer,
-                              key: "all",
-                              page: 1,
-                              monitoringView: selectedMonitoringView,
-                              monitoringInterval: selectedMonitoringInterval,
-                              monitoringRange: selectedMonitoringRange,
-                              monitoringStatus: selectedMonitoringStatus,
-                            })}
-                            className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
-                              selectedRequestKey === "all"
-                                ? "border-black bg-black text-white"
-                                : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                            }`}
-                          >
-                            全部 Key
-                          </a>
-                          {data.requestFilters.apiKeys.map((item) => (
-                            <a
-                              key={item.id}
-                              href={buildRequestsFilterHref({
-                                customer: selectedRequestCustomer,
-                                key: item.id,
-                                page: 1,
-                                monitoringView: selectedMonitoringView,
-                                monitoringInterval: selectedMonitoringInterval,
-                                monitoringRange: selectedMonitoringRange,
-                                monitoringStatus: selectedMonitoringStatus,
-                              })}
-                              className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
-                                selectedRequestKey === item.id
-                                  ? "border-black bg-black text-white"
-                                  : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                              }`}
-                            >
-                              {item.name}
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-
-                  </div>
-
-                    {selectedRequestKeyRecord ? (
-                      selectedRequestKeyRecord.workspaceId === data.workspace.id ? (
-                        <RequestRecordsClearForm
-                          action={clearApiKeyRequestRecords}
-                          apiKeyId={selectedRequestKeyRecord.id}
-                          apiKeyName={selectedRequestKeyRecord.name}
-                        />
-                      ) : null
-                    ) : null}
-
-                    <div className="mb-4 grid gap-3 md:grid-cols-4">
-                      <OverviewCard
-                        title="请求数"
-                        value={requestSummary.requestCount}
-                        note="当前筛选条件下的请求行数"
-                      />
-                      <OverviewCard
-                        title="客户收费"
-                        value={formatCurrency(requestSummary.customerCharge)}
-                        note="来源：inference_requests 客户收费字段"
-                      />
-                      <OverviewCard
-                        title="供应商成本"
-                        value={formatCurrency(requestSummary.providerCost)}
-                        note="来源：inference_requests 供应商成本字段"
-                      />
-                      <OverviewCard
-                        title="利润"
-                        value={formatCurrency(requestSummary.profit)}
-                        note="客户收费减去供应商成本"
-                      />
-                    </div>
-
-                    {hasFilteredRequests ? (
-                      <>
-                        <div className="mb-3 flex items-center justify-between rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5 text-xs text-black/55">
-                          <span>
-                            第 {requestCurrentPage}/{requestTotalPages} 页 · 共 {filteredRequests.length} 条
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <a
-                              href={buildRequestsFilterHref({
-                                customer: selectedRequestCustomer,
-                                key: selectedRequestKey,
-                                page: Math.max(1, requestCurrentPage - 1),
-                                monitoringView: selectedMonitoringView,
-                                monitoringInterval: selectedMonitoringInterval,
-                                monitoringRange: selectedMonitoringRange,
-                                monitoringStatus: selectedMonitoringStatus,
-                              })}
-                              className={`inline-flex h-7 items-center rounded-md border px-2.5 ${
-                                requestCurrentPage > 1
-                                  ? "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                                  : "pointer-events-none border-black/[0.06] bg-[#F3F3F2] text-black/35"
-                              }`}
-                            >
-                              上一页
-                            </a>
-                            <a
-                              href={buildRequestsFilterHref({
-                                customer: selectedRequestCustomer,
-                                key: selectedRequestKey,
-                                page: Math.min(requestTotalPages, requestCurrentPage + 1),
-                                monitoringView: selectedMonitoringView,
-                                monitoringInterval: selectedMonitoringInterval,
-                                monitoringRange: selectedMonitoringRange,
-                                monitoringStatus: selectedMonitoringStatus,
-                              })}
-                              className={`inline-flex h-7 items-center rounded-md border px-2.5 ${
-                                requestCurrentPage < requestTotalPages
-                                  ? "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
-                                  : "pointer-events-none border-black/[0.06] bg-[#F3F3F2] text-black/35"
-                              }`}
-                            >
-                              下一页
-                            </a>
-                          </div>
-                        </div>
-                        {hasPagedRequests ? (
-                          <div className="space-y-3">
-                            {pagedRequests.map((request) => (
-                              <UnifiedTaskCard
-                                key={request.id}
-                                showFinancial
-                                request={{
-                                  id: request.id,
-                                  capability: request.capability,
-                                  modelSlug: request.public_model_slug,
-                                  status: request.status,
-                                  createdLabel: request.createdLabel,
-                                  completedLabel: request.completedLabel,
-                                  providerLabel: `上游：${request.providerName} / ${request.upstreamModelSlug}`,
-                                  callerLabel: `调用方：${request.customerName} · ${request.apiKeyName} · ${request.apiKeyPrefix}`,
-                                  errorMessage: request.error_message,
-                                  lastAttempt: request.lastAttempt
-                                    ? {
-                                        attemptNo: request.lastAttempt.attempt_no,
-                                        status: request.lastAttempt.status,
-                                        upstreamTaskId: request.lastAttempt.upstream_task_id,
-                                        latencyMs: request.lastAttempt.latency_ms,
-                                        errorMessage: request.lastAttempt.error_message,
-                                      }
-                                    : null,
-                                  upstreamRawText: request.upstreamRawText ?? null,
-                                  packagedOutputText: request.packagedOutputText ?? null,
-                                  customerChargeLabel: request.customerChargeLabel,
-                                  providerCostLabel: request.providerCostLabel,
-                                  profitLabel: request.profitLabel,
-                                }}
-                              />
+                    {data.registeredUsers.length > 0 ? (
+                      <div className="overflow-hidden rounded-2xl border border-black/[0.06] bg-[#FCFCFA]">
+                        <table className="w-full min-w-[920px] border-collapse text-left">
+                          <thead className="bg-black/[0.025] text-[11px] uppercase tracking-[0.35px] text-black/45">
+                            <tr>
+                              <th className="px-4 py-3 font-medium">用户</th>
+                              <th className="px-4 py-3 font-medium">Workspace</th>
+                              <th className="px-4 py-3 font-medium">角色</th>
+                              <th className="px-4 py-3 font-medium">余额</th>
+                              <th className="px-4 py-3 font-medium">后台加余额</th>
+                              <th className="px-4 py-3 font-medium">操作</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-black/[0.06] text-sm">
+                            {data.registeredUsers.map((user) => (
+                              <tr key={user.id}>
+                                <td className="px-4 py-3">
+                                  <p className="font-medium text-black">{user.name}</p>
+                                  <p className="mt-1 text-xs text-black/50">{user.email ?? user.id}</p>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <p className="text-black/75">{user.workspaceName}</p>
+                                  <p className="mt-1 text-xs text-black/40">{user.workspaceId ?? "无 workspace"}</p>
+                                </td>
+                                <td className="px-4 py-3 text-black/65">{user.role}</td>
+                                <td className="px-4 py-3 font-medium text-black">{user.balanceLabel}</td>
+                                <td className="px-4 py-3">
+                                  {user.workspaceId ? (
+                                    <form action={addUserBalance} className="flex min-w-[300px] gap-2">
+                                      <input type="hidden" name="userId" value={user.id} />
+                                      <input
+                                        name="amount"
+                                        type="number"
+                                        min="0.01"
+                                        step="0.01"
+                                        placeholder="金额 USD"
+                                        className="h-8 w-24 rounded-md border border-black/10 bg-white px-2 text-xs outline-none"
+                                      />
+                                      <input
+                                        name="description"
+                                        placeholder="备注（可选）"
+                                        className="h-8 min-w-0 flex-1 rounded-md border border-black/10 bg-white px-2 text-xs outline-none"
+                                      />
+                                      <button
+                                        type="submit"
+                                        className="h-8 shrink-0 rounded-md bg-black px-3 text-xs font-medium text-white hover:bg-black/85"
+                                      >
+                                        加款
+                                      </button>
+                                    </form>
+                                  ) : (
+                                    <span className="text-xs text-black/40">无 workspace，不能加款</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <RegisteredUserDeleteButton
+                                    action={deleteRegisteredUser}
+                                    userId={user.id}
+                                    email={user.email ?? user.id}
+                                    disabled={Boolean(user.workspaceId)}
+                                  />
+                                  {user.workspaceId ? (
+                                    <p className="mt-1 text-[11px] text-black/35">有关联 workspace，不允许直接删除</p>
+                                  ) : null}
+                                </td>
+                              </tr>
                             ))}
-                          </div>
-                        ) : null}
-                      </>
+                          </tbody>
+                        </table>
+                      </div>
                     ) : (
                       <EmptyState
-                        title="当前筛选条件下没有请求"
-                        detail="调整客户或 API Key 筛选条件，或者通过 gateway 发送新流量。结算后这里会展示请求级经济数据。"
+                        title="还没有注册用户"
+                        detail="用户注册后会出现在这里，可在后台给指定用户的 workspace 手动加余额。"
                       />
                     )}
                   </>

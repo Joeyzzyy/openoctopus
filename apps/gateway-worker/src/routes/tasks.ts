@@ -51,6 +51,7 @@ function redactOutputAssetSourceUrl(outputPayload: unknown) {
 }
 import { enqueueInferenceJob } from "../queue/runner.js";
 import {
+  authenticateApiKey,
   createQueuedRequest,
   RequestValidationError,
 } from "../services/request-service.js";
@@ -260,11 +261,26 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get("/v1/tasks/:id", async (request) => {
+  app.get("/v1/tasks/:id", async (request, reply) => {
     const params = z.object({ id: z.string().uuid() }).parse(request.params);
+    const authHeader = request.headers.authorization;
+    const apiKey = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
+    let auth;
+    try {
+      auth = await authenticateApiKey(apiKey);
+    } catch (error) {
+      if (error instanceof RequestValidationError) {
+        return sendGatewayError(reply, {
+          code: error.code,
+          statusCode: error.statusCode,
+        });
+      }
+      throw error;
+    }
+
     const { data, error } = await supabaseAdmin
       .from("inference_requests")
-      .select("id, status, capability, public_model_slug, output_payload, error_code, error_message, created_at, completed_at")
+      .select("id, workspace_id, api_key_id, status, capability, public_model_slug, output_payload, error_code, error_message, created_at, completed_at")
       .eq("id", params.id)
       .maybeSingle();
 
@@ -273,6 +289,20 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     }
 
     if (!data) {
+      const notFound = await buildGatewayErrorResponse({
+        code: "task_not_found",
+        statusCode: 404,
+      });
+      return {
+        id: params.id,
+        status: "not_found",
+        error_code: notFound.error.code,
+        error_message: notFound.error.message,
+        error: notFound.error,
+      };
+    }
+
+    if (data.workspace_id !== auth.workspace_id || data.api_key_id !== auth.id) {
       const notFound = await buildGatewayErrorResponse({
         code: "task_not_found",
         statusCode: 404,

@@ -512,6 +512,27 @@ function assertNoRpcError(error: { message?: string } | null | undefined, action
   }
 }
 
+function queueMessageMatchesRequest(
+  message: QueueMessage | PollingMessage,
+  requestRow: {
+    workspace_id: string;
+    api_key_id: string | null;
+    provider_model_id: string | null;
+    capability: string;
+    public_model_slug: string;
+    endpoint: string | null;
+  }
+) {
+  return (
+    requestRow.workspace_id === message.workspaceId &&
+    requestRow.api_key_id === message.apiKeyId &&
+    requestRow.provider_model_id === message.providerModelId &&
+    requestRow.capability === message.capability &&
+    requestRow.public_model_slug === message.publicModelSlug &&
+    requestRow.endpoint === message.endpoint
+  );
+}
+
 async function sendQueueMessage(input: {
   queueName: QueueName;
   message: QueueMessage | PollingMessage;
@@ -714,12 +735,21 @@ export async function processNextInferenceJob() {
   const attemptStartedAt = Date.now();
   const { data: requestRow, error: requestRowError } = await supabaseAdmin
     .from("inference_requests")
-    .select("provider_id, provider_model_id, status")
+    .select("workspace_id, api_key_id, provider_id, provider_model_id, capability, public_model_slug, endpoint, status")
     .eq("id", message.requestId)
     .maybeSingle();
 
   if (requestRowError) {
     throw new Error(requestRowError.message);
+  }
+
+  if (!requestRow || !queueMessageMatchesRequest(message, requestRow)) {
+    await deleteQueueMessage({
+      queueName: "inference_jobs",
+      messageId: row.msg_id,
+    });
+
+    return true;
   }
 
   if (
@@ -1080,12 +1110,21 @@ export async function processNextPollingJob() {
   const adapter = getProviderAdapter(await resolveProviderAdapterSlug(message.providerSlug));
   const { data: requestRow, error: requestRowError } = await supabaseAdmin
     .from("inference_requests")
-    .select("status")
+    .select("workspace_id, api_key_id, provider_model_id, capability, public_model_slug, endpoint, status")
     .eq("id", message.requestId)
     .maybeSingle();
 
   if (requestRowError) {
     throw new Error(requestRowError.message);
+  }
+
+  if (!requestRow || !queueMessageMatchesRequest(message, requestRow)) {
+    await deleteQueueMessage({
+      queueName: "inference_polling",
+      messageId: row.msg_id,
+    });
+
+    return true;
   }
 
   if (

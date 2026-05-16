@@ -38,6 +38,29 @@ export class RequestValidationError extends Error {
   }
 }
 
+export async function authenticateApiKey(apiKey: string) {
+  const secretHash = crypto
+    .createHash("sha256")
+    .update(apiKey)
+    .digest("hex");
+
+  const { data: apiKeyRow, error: apiKeyError } = await supabaseAdmin
+    .from("api_keys")
+    .select("id, workspace_id, created_by, status, key_prefix")
+    .eq("secret_hash", secretHash)
+    .maybeSingle();
+
+  if (apiKeyError) {
+    throw new Error(apiKeyError.message);
+  }
+
+  if (!apiKeyRow || apiKeyRow.status !== "active") {
+    throw new RequestValidationError("Invalid or inactive API key", 401, "invalid_api_key");
+  }
+
+  return apiKeyRow;
+}
+
 function resolveRuntimeCredential(rows: ProviderCredentialRow[]) {
   const runtimeCredentials: RuntimeProviderCredential[] = rows.map((row) => ({
     id: row.id,
@@ -104,24 +127,7 @@ async function resolveProviderAdapterSlug(slug: string) {
 }
 
 export async function createQueuedRequest(input: UnifiedRequestInput) {
-  const secretHash = crypto
-    .createHash("sha256")
-    .update(input.apiKey)
-    .digest("hex");
-
-  const { data: apiKeyRow, error: apiKeyError } = await supabaseAdmin
-    .from("api_keys")
-    .select("id, workspace_id, status, key_prefix")
-    .eq("secret_hash", secretHash)
-    .maybeSingle();
-
-  if (apiKeyError) {
-    throw new Error(apiKeyError.message);
-  }
-
-  if (!apiKeyRow || apiKeyRow.status !== "active") {
-    throw new RequestValidationError("Invalid or inactive API key", 401, "invalid_api_key");
-  }
+  const apiKeyRow = await authenticateApiKey(input.apiKey);
 
   const { data: walletRows, error: walletError } = await supabaseAdmin
     .from("wallet_transactions")
@@ -278,6 +284,7 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
   const { error: insertError } = await supabaseAdmin.from("inference_requests").insert({
     id: requestId,
     workspace_id: apiKeyRow.workspace_id,
+    user_id: apiKeyRow.created_by,
     api_key_id: apiKeyRow.id,
     capability: input.capability,
     public_model_slug: input.model,

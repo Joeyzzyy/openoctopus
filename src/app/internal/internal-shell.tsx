@@ -13,6 +13,8 @@ type InternalTabKey =
   | "image-response-contracts"
   | "providers"
   | "monitoring"
+  | "monitoring-overview"
+  | "monitoring-requests"
   | "internal-model-ai-usage-logs";
 
 type TabItem = {

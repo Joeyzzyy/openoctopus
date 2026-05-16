@@ -41,6 +41,25 @@ function normalizeOptionalText(value: FormDataEntryValue | null) {
   return normalized.length > 0 ? normalized : null;
 }
 
+function toReadableSupabaseError(error: unknown, fallback: string) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "object" && error !== null && "message" in error
+        ? String((error as { message?: unknown }).message ?? "")
+        : String(error ?? "");
+
+  if (message.includes("<!DOCTYPE html") || message.includes("522: Connection timed out")) {
+    return `${fallback}：Supabase 服务连接超时（Cloudflare 522），请稍后重试。`;
+  }
+
+  if (message.includes("fetch failed") || message.includes("network error")) {
+    return `${fallback}：Supabase 网络请求失败，请稍后重试。`;
+  }
+
+  return message || fallback;
+}
+
 function parseBooleanField(value: FormDataEntryValue | null) {
   return value === "on" || value === "true";
 }
@@ -320,7 +339,7 @@ function formatRuntimeDiagnosticsForError(summary: string, diagnostics: string[]
 }
 
 function buildInternalAlertHref(input: {
-  tab: "public-models" | "economics";
+  tab: "public-models" | "economics" | "monitoring-requests";
   message: string;
   level: "success" | "warning" | "error" | "info";
 }) {
@@ -814,6 +833,189 @@ export async function updateProvider(formData: FormData) {
   });
 
   revalidatePath("/internal");
+}
+
+const addUserBalanceSchema = z.object({
+  userId: z.string().uuid(),
+  amount: z.coerce.number().positive().max(100000),
+  description: z.string().trim().max(240).optional(),
+});
+
+export async function addUserBalance(formData: FormData) {
+  const context = await getInternalAdminContext();
+  const supabase = createAdminClient();
+  const parsed = addUserBalanceSchema.parse({
+    userId: formData.get("userId"),
+    amount: formData.get("amount"),
+    description: formData.get("description"),
+  });
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("workspace_members")
+    .select("workspace_id, role, created_at")
+    .eq("user_id", parsed.userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (membershipError) {
+    throw new Error(membershipError.message);
+  }
+
+  if (!membership?.workspace_id) {
+    throw new Error("该用户还没有 workspace，不能加余额");
+  }
+
+  const { data: existingTransactions, error: balanceError } = await supabase
+    .from("wallet_transactions")
+    .select("amount_delta")
+    .eq("workspace_id", membership.workspace_id);
+
+  if (balanceError) {
+    throw new Error(balanceError.message);
+  }
+
+  const currentBalance = (existingTransactions ?? []).reduce(
+    (sum, row) => sum + Number(row.amount_delta ?? 0),
+    0
+  );
+  const amount = Number(parsed.amount.toFixed(2));
+  const description =
+    parsed.description?.trim() ||
+    `Internal manual balance adjustment +${amount.toFixed(2)} USD`;
+
+  const { error: insertError } = await supabase.from("wallet_transactions").insert({
+    workspace_id: membership.workspace_id,
+    entry_type: "adjustment",
+    amount_delta: amount,
+    balance_after: Number((currentBalance + amount).toFixed(2)),
+    description,
+    metadata: {
+      source: "internal_user_management",
+      target_user_id: parsed.userId,
+      operator_user_id: context.userId,
+    },
+    created_by: context.userId === "internal-password-access" ? null : context.userId,
+  });
+
+  if (insertError) {
+    throw new Error(insertError.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId: context.userId,
+    workspaceId: membership.workspace_id,
+    action: "user.balance.add",
+    targetType: "user",
+    targetId: parsed.userId,
+    summary: `Added ${amount.toFixed(2)} USD balance to user workspace`,
+    details: {
+      targetUserId: parsed.userId,
+      workspaceId: membership.workspace_id,
+      amount,
+      balanceAfter: Number((currentBalance + amount).toFixed(2)),
+      description,
+    },
+  });
+
+  revalidatePath("/internal");
+}
+
+const deleteRegisteredUserSchema = z.object({
+  userId: z.string().uuid(),
+  email: z.string().trim().min(1),
+});
+
+export async function deleteRegisteredUser(formData: FormData) {
+  const context = await getInternalAdminContext();
+  const supabase = createAdminClient();
+  const parsed = deleteRegisteredUserSchema.parse({
+    userId: formData.get("userId"),
+    email: formData.get("email"),
+  });
+
+  const { data: memberships, error: membershipError } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", parsed.userId);
+
+  if (membershipError) {
+    throw new Error(membershipError.message);
+  }
+
+  if ((memberships ?? []).length > 0) {
+    throw new Error("该用户仍有关联 workspace，不能直接删除");
+  }
+
+  const { data: ownedWorkspaces, error: ownedWorkspaceError } = await supabase
+    .from("workspaces")
+    .select("id")
+    .eq("owner_user_id", parsed.userId);
+
+  if (ownedWorkspaceError) {
+    throw new Error(ownedWorkspaceError.message);
+  }
+
+  if ((ownedWorkspaces ?? []).length > 0) {
+    throw new Error("该用户仍是 workspace owner，不能直接删除");
+  }
+
+  let authUserResponse: Awaited<ReturnType<typeof supabase.auth.admin.getUserById>>;
+  try {
+    authUserResponse = await supabase.auth.admin.getUserById(parsed.userId);
+  } catch (error) {
+    throw new Error(toReadableSupabaseError(error, "读取用户失败"));
+  }
+  const { data: authUser, error: authUserError } = authUserResponse;
+
+  if (authUserError) {
+    throw new Error(toReadableSupabaseError(authUserError, "读取用户失败"));
+  }
+
+  if (!authUser.user) {
+    throw new Error("用户不存在");
+  }
+
+  if (authUser.user.email !== parsed.email) {
+    throw new Error("用户邮箱不匹配，已取消删除");
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId: context.userId,
+    workspaceId: null,
+    action: "user.delete",
+    targetType: "user",
+    targetId: parsed.userId,
+    summary: `Deleted registered user ${parsed.email}`,
+    details: {
+      targetUserId: parsed.userId,
+      email: parsed.email,
+      reason: "orphan_user_cleanup",
+    },
+  });
+
+  let deleteResponse: Awaited<ReturnType<typeof supabase.auth.admin.deleteUser>>;
+  try {
+    deleteResponse = await supabase.auth.admin.deleteUser(parsed.userId);
+  } catch (error) {
+    throw new Error(toReadableSupabaseError(error, "删除用户失败"));
+  }
+  const { error: deleteError } = deleteResponse;
+
+  if (deleteError) {
+    throw new Error(toReadableSupabaseError(deleteError, "删除用户失败"));
+  }
+
+  revalidatePath("/internal");
+  redirect(
+    buildInternalAlertHref({
+      tab: "monitoring-requests",
+      message: `已删除用户 ${parsed.email}`,
+      level: "success",
+    })
+  );
 }
 
 export async function deleteProvider(formData: FormData) {

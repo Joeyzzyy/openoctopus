@@ -126,7 +126,9 @@ type RoutingRuleRow = {
 type RequestRow = {
   id: string;
   workspace_id: string | null;
+  user_id: string | null;
   api_key_id: string | null;
+  request_source: string | null;
   capability: string;
   public_model_slug: string;
   provider_id: string | null;
@@ -219,6 +221,7 @@ type MonitoringAttemptRow = {
 type ApiKeyRow = {
   id: string;
   workspace_id: string;
+  created_by: string | null;
   name: string;
   key_prefix: string;
   environment: string;
@@ -292,6 +295,18 @@ type InternalModelAiUsageLogRow = {
 
 type InternalAdminDataOptions = {
   monitoringLookbackMs?: number;
+  monitoringStatus?:
+    | "all"
+    | "succeeded"
+    | "failed"
+    | "cancelled"
+    | "inflight";
+  monitoringModelSlug?: string | null;
+  monitoringView?: "overview" | "video" | "image" | "requests";
+  requestScope?: string;
+  requestPage?: number;
+  requestPageSize?: number;
+  activeTab?: string;
   bypassAuth?: boolean;
 };
 
@@ -469,22 +484,44 @@ function labelBreakdownKey(key: string) {
 
 async function fetchMonitoringRequests(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  lookbackMs: number
+  lookbackMs: number,
+  filters: {
+    status?:
+      | "all"
+      | "succeeded"
+      | "failed"
+      | "cancelled"
+      | "inflight";
+    modelSlug?: string | null;
+  } = {}
 ) {
-  const batchSize = 5000;
-  const maxBatches = 20;
+  const batchSize = 2000;
+  const maxBatches = 6;
   const sinceIso = new Date(Date.now() - lookbackMs).toISOString();
   const rows: MonitoringRequestRow[] = [];
 
   for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
     const from = batchIndex * batchSize;
     const to = from + batchSize - 1;
-    const response = await supabase
+    let query = supabase
       .from("inference_requests")
       .select("id, capability, public_model_slug, status, created_at")
       .gte("created_at", sinceIso)
-      .order("created_at", { ascending: false })
-      .range(from, to);
+      .order("created_at", { ascending: false });
+
+    if (filters.modelSlug && filters.modelSlug.trim().length > 0) {
+      query = query.eq("public_model_slug", filters.modelSlug.trim());
+    }
+
+    if (filters.status && filters.status !== "all") {
+      if (filters.status === "inflight") {
+        query = query.in("status", ["queued", "submitted", "processing"]);
+      } else {
+        query = query.eq("status", filters.status);
+      }
+    }
+
+    const response = await query.range(from, to);
 
     if (response.error) {
       break;
@@ -502,42 +539,40 @@ async function fetchMonitoringRequests(
 }
 
 async function fetchGlobalMonitoringData(
-  supabase: Awaited<ReturnType<typeof createClient>>
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  lookbackMs: number
 ) {
-  const [videoInflightResponse, videoRecentResponse, imageRecentResponse, attemptResponse] =
+  const sinceIso = new Date(Date.now() - lookbackMs).toISOString();
+  const [videoInflightResponse, videoRecentResponse, imageRecentResponse] =
     await Promise.all([
       supabase
         .from("inference_requests")
         .select(
-          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)"
+          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, output_payload, created_at, started_at, completed_at"
         )
         .eq("capability", "video_generation")
+        .gte("created_at", sinceIso)
         .in("status", ["queued", "submitted", "processing"])
         .order("created_at", { ascending: false })
         .limit(200),
       supabase
         .from("inference_requests")
         .select(
-          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)"
+          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, output_payload, created_at, started_at, completed_at"
         )
         .eq("capability", "video_generation")
+        .gte("created_at", sinceIso)
         .order("created_at", { ascending: false })
         .limit(80),
       supabase
         .from("inference_requests")
         .select(
-          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)"
+          "id, workspace_id, capability, public_model_slug, status, error_code, error_message, output_payload, created_at, started_at, completed_at"
         )
         .in("capability", ["image_generation", "image_edit"])
+        .gte("created_at", sinceIso)
         .order("created_at", { ascending: false })
         .limit(120),
-      supabase
-        .from("provider_attempts")
-        .select(
-          "request_id, attempt_no, status, upstream_request_id, upstream_task_id, latency_ms, error_message, updated_at"
-        )
-        .order("created_at", { ascending: false })
-        .limit(400),
     ]);
 
   const videoInflightRequests = (videoInflightResponse.error
@@ -549,16 +584,7 @@ async function fetchGlobalMonitoringData(
   const recentImageRequests = (imageRecentResponse.error
     ? []
     : imageRecentResponse.data ?? []) as GlobalMonitoringRequestRow[];
-  const monitoringAttempts = (attemptResponse.error
-    ? []
-    : attemptResponse.data ?? []) as MonitoringAttemptRow[];
-
   const latestAttemptByRequestId = new Map<string, MonitoringAttemptRow>();
-  for (const attempt of monitoringAttempts) {
-    if (!latestAttemptByRequestId.has(attempt.request_id)) {
-      latestAttemptByRequestId.set(attempt.request_id, attempt);
-    }
-  }
 
   const toWorkspace = (
     value: GlobalMonitoringRequestRow["workspaces"]
@@ -707,6 +733,20 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     : membership.workspaces;
   const monitoringLookbackMs =
     options.monitoringLookbackMs ?? 90 * 24 * 60 * 60 * 1000;
+  const monitoringSinceIso = new Date(Date.now() - monitoringLookbackMs).toISOString();
+  const monitoringStatus = options.monitoringStatus ?? "all";
+  const monitoringModelSlug = options.monitoringModelSlug ?? null;
+  const monitoringView = options.monitoringView ?? "overview";
+  const requestScope = options.requestScope ?? "all";
+  const requestPageSize = Math.min(Math.max(options.requestPageSize ?? 20, 1), 100);
+  const requestPage = Math.max(Math.floor(options.requestPage ?? 1), 1);
+  const activeTab = options.activeTab ?? "public-models";
+  const shouldLoadMonitoring =
+    activeTab === "monitoring" ||
+    activeTab === "monitoring-overview" ||
+    activeTab === "monitoring-requests";
+  const shouldLoadManagementData = !shouldLoadMonitoring;
+  const shouldLoadRequestRecords = shouldLoadMonitoring && monitoringView === "requests";
   const currentMonthStart = new Date();
   currentMonthStart.setUTCDate(1);
   currentMonthStart.setUTCHours(0, 0, 0, 0);
@@ -735,144 +775,168 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     financeRequestsResponse,
   ] =
     await Promise.all([
-      supabase
-        .from("providers")
-        .select(
-          "id, name, slug, base_url, status, regions, credentials_ref, config, created_at"
-        )
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("supported_models")
-        .select(
-          "id, provider, model_slug, display_name, modality, capability, billing_config, unit_label, default_unit_cost, active, created_at"
-        )
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("model_vendors")
-        .select("id, name, active, sort_order, created_at")
-        .order("sort_order", { ascending: true })
-        .order("name", { ascending: true }),
-      supabase
-        .from("worker_templates")
-        .select("id, display_name, slug, config, active, created_at")
-        .eq("active", true)
-        .order("slug", { ascending: true }),
-      supabase
-        .from("gateway_error_definitions")
-        .select("id, code, category, http_status, public_message, retryable, active, sort_order, operator_notes, created_at, updated_at")
-        .order("sort_order", { ascending: true })
-        .order("code", { ascending: true }),
-      supabase
-        .from("provider_adapter_catalog")
-        .select("id, slug, active, created_at")
-        .eq("active", true)
-        .order("slug", { ascending: true }),
-      supabase
-        .from("provider_adapter_aliases")
-        .select("id, alias_slug, adapter_slug, active, created_at")
-        .eq("active", true)
-        .order("alias_slug", { ascending: true }),
-      supabase
-        .from("provider_credentials")
-        .select(
-          "id, provider_id, label, secret_ref, secret_mask, secret_source, secret_ciphertext, secret_iv, secret_auth_tag, secret_last_updated_at, environment, is_active, notes, metadata, created_at"
-        )
-        .order("created_at", { ascending: false }),
-      supabase
-      .from("provider_models")
-      .select(
-          "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, input_schema, output_schema, execution_template, execution_config, created_at"
-        )
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("provider_model_showcase_assets")
-        .select("id, provider_model_id, asset_kind, storage_bucket, storage_path, public_url, alt_text, sort_order, created_at")
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: true }),
-      bypassAuth
+      shouldLoadManagementData
         ? supabase
-            .from("routing_rules")
+            .from("providers")
             .select(
-              "id, workspace_id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy, active, created_at"
+              "id, name, slug, base_url, status, regions, credentials_ref, config, created_at"
             )
             .order("created_at", { ascending: true })
-        : supabase
-            .from("routing_rules")
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? supabase
+            .from("supported_models")
             .select(
-              "id, workspace_id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy, active, created_at"
+              "id, provider, model_slug, display_name, modality, capability, billing_config, unit_label, default_unit_cost, active, created_at"
             )
-            .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
-            .order("created_at", { ascending: true }),
-      supabase
-        .from("inference_requests")
-        .select(
-          "id, workspace_id, api_key_id, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)"
-        )
-        .order("created_at", { ascending: false })
-        .limit(80),
-      supabase
-        .from("api_keys")
-        .select("id, workspace_id, name, key_prefix, environment, status, created_at")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("v_api_key_spend_summary")
-        .select("api_key_id, workspace_id, current_month_spend, current_month_requests"),
+            .order("created_at", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? supabase
+            .from("model_vendors")
+            .select("id, name, active, sort_order, created_at")
+            .order("sort_order", { ascending: true })
+            .order("name", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? supabase
+            .from("worker_templates")
+            .select("id, display_name, slug, config, active, created_at")
+            .eq("active", true)
+            .order("slug", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? supabase
+            .from("gateway_error_definitions")
+            .select("id, code, category, http_status, public_message, retryable, active, sort_order, operator_notes, created_at, updated_at")
+            .order("sort_order", { ascending: true })
+            .order("code", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? supabase
+            .from("provider_adapter_catalog")
+            .select("id, slug, active, created_at")
+            .eq("active", true)
+            .order("slug", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? supabase
+            .from("provider_adapter_aliases")
+            .select("id, alias_slug, adapter_slug, active, created_at")
+            .eq("active", true)
+            .order("alias_slug", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? supabase
+            .from("provider_credentials")
+            .select(
+              "id, provider_id, label, secret_ref, secret_mask, secret_source, secret_ciphertext, secret_iv, secret_auth_tag, secret_last_updated_at, environment, is_active, notes, metadata, created_at"
+            )
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? supabase
+            .from("provider_models")
+            .select(
+              "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, input_schema, output_schema, execution_template, execution_config, created_at"
+            )
+            .order("created_at", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? supabase
+            .from("provider_model_showcase_assets")
+            .select("id, provider_model_id, asset_kind, storage_bucket, storage_path, public_url, alt_text, sort_order, created_at")
+            .order("sort_order", { ascending: true })
+            .order("created_at", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? (bypassAuth
+            ? supabase
+                .from("routing_rules")
+                .select(
+                  "id, workspace_id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy, active, created_at"
+                )
+                .order("created_at", { ascending: true })
+            : supabase
+                .from("routing_rules")
+                .select(
+                  "id, workspace_id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy, active, created_at"
+                )
+                .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
+                .order("created_at", { ascending: true }))
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadRequestRecords
+        ? Promise.resolve({ data: [], error: null })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadRequestRecords
+        ? supabase
+            .from("api_keys")
+            .select("id, workspace_id, created_by, name, key_prefix, environment, status, created_at")
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? supabase
+            .from("v_api_key_spend_summary")
+            .select("api_key_id, workspace_id, current_month_spend, current_month_requests")
+        : Promise.resolve({ data: [], error: null }),
       supabase
         .from("inference_requests")
         .select("api_key_id, estimated_provider_cost, actual_provider_cost")
-        .gte("created_at", currentMonthStart.toISOString()),
-      supabase
-        .from("usage_events")
-        .select("external_request_id, metadata")
-        .order("created_at", { ascending: false })
-        .limit(1200),
-      supabase
-        .from("provider_attempts")
-        .select(
-          "id, request_id, provider_id, provider_model_id, attempt_no, status, upstream_request_id, upstream_task_id, latency_ms, response_payload, error_message, created_at"
-        )
-        .order("created_at", { ascending: false })
-        .limit(400),
-      bypassAuth
+        .gte("created_at", monitoringSinceIso),
+      shouldLoadRequestRecords
+        ? Promise.resolve({ data: [], error: null })
+        : Promise.resolve({ data: [], error: null }),
+      Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? (bypassAuth
+            ? supabase
+                .from("admin_audit_logs")
+                .select(
+                  "id, actor_user_id, workspace_id, action, target_type, target_id, summary, details, created_at"
+                )
+                .order("created_at", { ascending: false })
+                .limit(40)
+            : supabase
+                .from("admin_audit_logs")
+                .select(
+                  "id, actor_user_id, workspace_id, action, target_type, target_id, summary, details, created_at"
+                )
+                .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
+                .order("created_at", { ascending: false })
+                .limit(40))
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? (bypassAuth
+            ? supabase
+                .from("internal_model_ai_usage_logs")
+                .select(
+                  "id, workspace_id, actor_user_id, source_url, model, status, input_tokens, output_tokens, total_tokens, estimated_cost_usd, latency_ms, error_message, created_at"
+                )
+                .order("created_at", { ascending: false })
+                .limit(200)
+            : supabase
+                .from("internal_model_ai_usage_logs")
+                .select(
+                  "id, workspace_id, actor_user_id, source_url, model, status, input_tokens, output_tokens, total_tokens, estimated_cost_usd, latency_ms, error_message, created_at"
+                )
+                .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
+                .order("created_at", { ascending: false })
+                .limit(200))
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadRequestRecords
         ? supabase
-            .from("admin_audit_logs")
-            .select(
-              "id, actor_user_id, workspace_id, action, target_type, target_id, summary, details, created_at"
-            )
-            .order("created_at", { ascending: false })
-            .limit(40)
-        : supabase
-            .from("admin_audit_logs")
-            .select(
-              "id, actor_user_id, workspace_id, action, target_type, target_id, summary, details, created_at"
-            )
-            .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
-            .order("created_at", { ascending: false })
-            .limit(40),
-      bypassAuth
+            .from("wallet_transactions")
+            .select("workspace_id, entry_type, amount_delta, created_at")
+            .gte("created_at", monitoringSinceIso)
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadRequestRecords
         ? supabase
-            .from("internal_model_ai_usage_logs")
+            .from("inference_requests")
             .select(
-              "id, workspace_id, actor_user_id, source_url, model, status, input_tokens, output_tokens, total_tokens, estimated_cost_usd, latency_ms, error_message, created_at"
+              "actual_provider_cost, estimated_provider_cost, actual_customer_charge, estimated_customer_charge, actual_profit, estimated_profit"
             )
-            .order("created_at", { ascending: false })
-            .limit(200)
-        : supabase
-            .from("internal_model_ai_usage_logs")
-            .select(
-              "id, workspace_id, actor_user_id, source_url, model, status, input_tokens, output_tokens, total_tokens, estimated_cost_usd, latency_ms, error_message, created_at"
-            )
-            .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
-            .order("created_at", { ascending: false })
-            .limit(200),
-      supabase
-        .from("wallet_transactions")
-        .select("workspace_id, entry_type, amount_delta"),
-      supabase
-        .from("inference_requests")
-        .select(
-          "actual_provider_cost, estimated_provider_cost, actual_customer_charge, estimated_customer_charge, actual_profit, estimated_profit"
-        ),
+            .gte("created_at", monitoringSinceIso)
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
   const providers = (providersResponse.error ? [] : providersResponse.data ?? []) as ProviderRow[];
@@ -924,19 +988,9 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
           ).values()
         );
   const routingRules = (routingRulesResponse.error ? [] : routingRulesResponse.data ?? []) as RoutingRuleRow[];
-  let requests = (requestsResponse.error ? [] : requestsResponse.data ?? []) as RequestRow[];
-  if (requestsResponse.error) {
-    const fallbackRequestsResponse = await supabase
-      .from("inference_requests")
-      .select(
-        "id, workspace_id, api_key_id, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)"
-      )
-      .order("created_at", { ascending: false })
-      .limit(200);
-    requests = (fallbackRequestsResponse.error
-      ? []
-      : fallbackRequestsResponse.data ?? []) as RequestRow[];
-  }
+  void requestsResponse;
+  let requests: RequestRow[] = [];
+  let requestTotalCount = 0;
   const apiKeys = (apiKeysResponse.error ? [] : apiKeysResponse.data ?? []) as ApiKeyRow[];
   const apiKeySpendSummaries = (apiKeySpendSummaryResponse.error
     ? []
@@ -944,10 +998,10 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const requestCosts = (requestCostResponse.error
     ? []
     : requestCostResponse.data ?? []) as RequestCostRow[];
-  const usageEvents = (usageEventsResponse.error
+  let usageEvents = (usageEventsResponse.error
     ? []
     : usageEventsResponse.data ?? []) as UsageEventRow[];
-  const attempts = (attemptsResponse.error ? [] : attemptsResponse.data ?? []) as AttemptRow[];
+  let attempts = (attemptsResponse.error ? [] : attemptsResponse.data ?? []) as AttemptRow[];
   const adminAuditLogs = (adminAuditLogsResponse.error
     ? []
     : adminAuditLogsResponse.data ?? []) as AdminAuditLogRow[];
@@ -960,6 +1014,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     workspace_id: string | null;
     entry_type: string | null;
     amount_delta: number | string | null;
+    created_at?: string | null;
   }>;
   const financeRequests = (financeRequestsResponse.error
     ? []
@@ -971,7 +1026,13 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     actual_profit: number | null;
     estimated_profit: number | null;
   }>;
-  const monitoringRequests = await fetchMonitoringRequests(supabase, monitoringLookbackMs);
+  const monitoringRequests =
+    shouldLoadMonitoring && monitoringView === "overview"
+      ? await fetchMonitoringRequests(supabase, monitoringLookbackMs, {
+          status: monitoringStatus,
+          modelSlug: monitoringModelSlug,
+        })
+      : [];
 
   const providerById = new Map(providers.map((row) => [row.id, row]));
   const providerAdapterAliasMap = new Map(
@@ -996,6 +1057,139 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   }, new Map<string, ProviderModelShowcaseAssetRow[]>());
   const apiKeyById = new Map(apiKeys.map((row) => [row.id, row]));
   const apiKeySpendById = new Map(apiKeySpendSummaries.map((row) => [row.api_key_id, row]));
+  const apiKeyWorkspaceById = new Map(
+    apiKeys.map((row) => [row.id, row.workspace_id] as const)
+  );
+
+  const userProfileById = new Map<string, { id: string; email: string | null; name: string }>();
+  const requestUserIds = requests
+    .map((request) => request.user_id)
+    .filter((value): value is string => Boolean(value));
+  const apiKeyOwnerUserIds = apiKeys
+    .map((apiKey) => apiKey.created_by)
+    .filter((value): value is string => Boolean(value));
+  const requestActorUserIds = Array.from(new Set([...requestUserIds, ...apiKeyOwnerUserIds]));
+  if (shouldLoadRequestRecords) {
+    const authUsersResponse = await supabase.auth.admin.listUsers({
+      page: 1,
+      perPage: 500,
+    });
+    const authUsers = authUsersResponse.error ? [] : authUsersResponse.data.users;
+    for (const row of authUsers) {
+      const metadata = asRecord(row.user_metadata);
+      const name =
+        (typeof metadata?.full_name === "string" ? metadata.full_name : null) ??
+        (typeof metadata?.name === "string" ? metadata.name : null) ??
+        row.email?.split("@")[0] ??
+        `用户 ${row.id.slice(0, 8)}`;
+      userProfileById.set(row.id, {
+        id: row.id,
+        email: row.email ?? null,
+        name,
+      });
+    }
+    const missingActorUserIds = requestActorUserIds.filter((userId) => !userProfileById.has(userId));
+    if (missingActorUserIds.length > 0) {
+      const missingUsersResponses = await Promise.all(
+        missingActorUserIds.map((userId) => supabase.auth.admin.getUserById(userId))
+      );
+      for (const response of missingUsersResponses) {
+        const row = response.error ? null : response.data.user;
+        if (!row) continue;
+        const metadata = asRecord(row.user_metadata);
+        const name =
+          (typeof metadata?.full_name === "string" ? metadata.full_name : null) ??
+          (typeof metadata?.name === "string" ? metadata.name : null) ??
+          row.email?.split("@")[0] ??
+          `用户 ${row.id.slice(0, 8)}`;
+        userProfileById.set(row.id, {
+          id: row.id,
+          email: row.email ?? null,
+          name,
+        });
+      }
+    }
+    for (const userId of requestActorUserIds) {
+      if (!userProfileById.has(userId)) {
+        userProfileById.set(userId, {
+          id: userId,
+          email: null,
+          name: `用户 ${userId.slice(0, 8)}`,
+        });
+      }
+    }
+  }
+
+  if (shouldLoadRequestRecords) {
+    const requestFrom = (requestPage - 1) * requestPageSize;
+    const requestTo = requestFrom + requestPageSize - 1;
+    const selectedRequestUserId = requestScope.startsWith("u:")
+      ? requestScope.slice(2)
+      : null;
+    const selectedRequestKeyId = requestScope.startsWith("k:")
+      ? requestScope.slice(2)
+      : null;
+
+    let requestQuery = supabase
+      .from("inference_requests")
+      .select(
+        "id, workspace_id, user_id, api_key_id, request_source, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at",
+        { count: "exact" }
+      )
+      .gte("created_at", monitoringSinceIso)
+      .order("created_at", { ascending: false });
+
+    if (monitoringStatus !== "all") {
+      if (monitoringStatus === "inflight") {
+        requestQuery = requestQuery.in("status", ["queued", "submitted", "processing"]);
+      } else {
+        requestQuery = requestQuery.eq("status", monitoringStatus);
+      }
+    }
+
+    if (selectedRequestKeyId) {
+      requestQuery = requestQuery.eq("api_key_id", selectedRequestKeyId);
+    } else if (selectedRequestUserId) {
+      const userApiKeyIds = apiKeys
+        .filter((apiKey) => apiKey.created_by === selectedRequestUserId)
+        .map((apiKey) => apiKey.id);
+      if (userApiKeyIds.length > 0) {
+        requestQuery = requestQuery.or(
+          `user_id.eq.${selectedRequestUserId},api_key_id.in.(${userApiKeyIds.join(",")})`
+        );
+      } else {
+        requestQuery = requestQuery.eq("user_id", selectedRequestUserId);
+      }
+    }
+
+    const requestsPageResponse = await requestQuery.range(requestFrom, requestTo);
+    requests = (requestsPageResponse.error ? [] : requestsPageResponse.data ?? []) as RequestRow[];
+    requestTotalCount = requestsPageResponse.error ? 0 : requestsPageResponse.count ?? requests.length;
+
+    const requestIds = requests.map((request) => request.id);
+    if (requestIds.length > 0) {
+      const [usageEventsPageResponse, attemptsPageResponse] = await Promise.all([
+        supabase
+          .from("usage_events")
+          .select("external_request_id, metadata")
+          .in("external_request_id", requestIds),
+        supabase
+          .from("provider_attempts")
+          .select(
+            "id, request_id, provider_id, provider_model_id, attempt_no, status, upstream_request_id, upstream_task_id, latency_ms, response_payload, error_message, created_at"
+          )
+          .in("request_id", requestIds)
+          .order("created_at", { ascending: false }),
+      ]);
+      usageEvents = (usageEventsPageResponse.error
+        ? []
+        : usageEventsPageResponse.data ?? []) as UsageEventRow[];
+      attempts = (attemptsPageResponse.error
+        ? []
+        : attemptsPageResponse.data ?? []) as AttemptRow[];
+    }
+  }
+
   const usageEventByRequestId = new Map(
     usageEvents
       .filter((row) => row.external_request_id)
@@ -1008,6 +1202,76 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     list.push(attempt);
     requestAttempts.set(attempt.request_id, list);
   }
+
+  const userMemberships =
+    shouldLoadRequestRecords && userProfileById.size > 0
+      ? await supabase
+          .from("workspace_members")
+          .select("workspace_id, user_id, role, created_at, workspaces(id, name, slug)")
+          .in("user_id", Array.from(userProfileById.keys()))
+      : { data: [], error: null };
+  const userMembershipRows = (userMemberships.error
+    ? []
+    : userMemberships.data ?? []) as Array<{
+    workspace_id: string;
+    user_id: string;
+    role: string;
+    created_at: string;
+    workspaces:
+      | { id: string; name: string | null; slug: string | null }
+      | Array<{ id: string; name: string | null; slug: string | null }>
+      | null;
+  }>;
+  const primaryMembershipByUserId = new Map<string, (typeof userMembershipRows)[number]>();
+  for (const row of userMembershipRows) {
+    if (!primaryMembershipByUserId.has(row.user_id)) {
+      primaryMembershipByUserId.set(row.user_id, row);
+    }
+  }
+  const userWorkspaceIds = Array.from(
+    new Set(userMembershipRows.map((row) => row.workspace_id).filter(Boolean))
+  );
+  const userWalletTransactions =
+    shouldLoadRequestRecords && userWorkspaceIds.length > 0
+      ? await supabase
+          .from("wallet_transactions")
+          .select("workspace_id, amount_delta, entry_type, created_at")
+          .in("workspace_id", userWorkspaceIds)
+      : { data: [], error: null };
+  const walletRowsForUsers = (userWalletTransactions.error
+    ? []
+    : userWalletTransactions.data ?? []) as Array<{
+    workspace_id: string;
+    amount_delta: number | string | null;
+    entry_type: string | null;
+    created_at: string | null;
+  }>;
+  const balanceByWorkspaceId = walletRowsForUsers.reduce((map, row) => {
+    map.set(row.workspace_id, (map.get(row.workspace_id) ?? 0) + Number(row.amount_delta ?? 0));
+    return map;
+  }, new Map<string, number>());
+  const registeredUsers = Array.from(userProfileById.values())
+    .map((profile) => {
+      const membership = primaryMembershipByUserId.get(profile.id) ?? null;
+      const workspace = Array.isArray(membership?.workspaces)
+        ? membership?.workspaces[0] ?? null
+        : membership?.workspaces ?? null;
+      const balance = membership?.workspace_id
+        ? balanceByWorkspaceId.get(membership.workspace_id) ?? 0
+        : 0;
+      return {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        workspaceId: membership?.workspace_id ?? null,
+        workspaceName: workspace?.name ?? "未创建 workspace",
+        workspaceSlug: workspace?.slug ?? null,
+        role: membership?.role ?? "none",
+        balance,
+        balanceLabel: formatCurrency(balance),
+      };
+    })
+    .sort((a, b) => (a.email ?? a.name).localeCompare(b.email ?? b.name, "en-US"));
 
   const providerSummaries = providers.map((provider) => {
     const models = providerModels.filter((item) => item.provider_id === provider.id);
@@ -1160,6 +1424,19 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     const workspaceRow = Array.isArray(request.workspaces)
       ? request.workspaces[0] ?? null
       : request.workspaces;
+    const workspaceId =
+      request.workspace_id ??
+      (request.api_key_id ? apiKeyWorkspaceById.get(request.api_key_id) ?? null : null);
+    const actorUserId = request.user_id ?? apiKey?.created_by ?? null;
+    const actorUser = actorUserId ? userProfileById.get(actorUserId) ?? null : null;
+    const requestSource = request.request_source === "playground" ? "playground" : "api";
+    const actorName =
+      actorUser?.name ??
+      (requestSource === "playground" ? "Playground" : null) ??
+      (apiKey?.name ? `Key: ${apiKey.name}` : null) ??
+      workspaceRow?.name ??
+      "未标识调用方";
+    const sourceLabel = requestSource === "playground" ? "Playground" : "API";
 
     const customerCharge = Number(
       request.actual_customer_charge ?? request.actual_cost ?? request.estimated_customer_charge ?? request.estimated_cost ?? 0
@@ -1228,9 +1505,15 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       ...request,
       providerName: provider?.name ?? "Unknown provider",
       upstreamModelSlug: providerModel?.upstream_model_slug ?? "unknown",
-      customerName: workspaceRow?.name ?? "Workspace",
+      customerName: actorName,
       workspaceSlug: workspaceRow?.slug ?? "workspace",
-      workspaceId: request.workspace_id,
+      workspaceId,
+      customerUserId: actorUserId,
+      customerUserName: actorName,
+      actorUserId,
+      actorName,
+      sourceLabel,
+      requestSource,
       apiKeyName: apiKey?.name ?? "Unknown key",
       apiKeyPrefix: apiKey?.key_prefix ?? "unknown",
       apiKeyEnvironment: apiKey?.environment ?? "unknown",
@@ -1348,7 +1631,18 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     };
   });
 
-  const globalMonitoring = await fetchGlobalMonitoringData(supabase);
+  const globalMonitoring = {
+    videoInflightRequests: [],
+    recentVideoRequests: [],
+    imageSummary: {
+      total: 0,
+      inflight: 0,
+      succeeded: 0,
+      failed: 0,
+      cancelled: 0,
+    },
+    recentImageRequests: [],
+  };
   const financeSummary = {
     totalTopup: walletTransactions.reduce((sum, row) => {
       if (row.entry_type !== "topup") return sum;
@@ -1520,25 +1814,24 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     providerModels: providerModelSummaries,
     routingRules: routingRuleSummaries,
     requests: recentRequestSummaries,
+    registeredUsers,
+    requestPagination: {
+      page: requestPage,
+      pageSize: requestPageSize,
+      totalCount: requestTotalCount,
+      totalPages: Math.max(1, Math.ceil(requestTotalCount / requestPageSize)),
+    },
     monitoringRequests,
     globalMonitoring,
     auditLogs: auditLogSummaries,
     internalModelAiUsageLogs: internalModelAiUsageLogSummaries,
     requestFilters: {
-      customers: Array.from(
-        recentRequestSummaries.reduce((map, request) => {
-          if (!request.workspaceSlug) {
-            return map;
-          }
-          map.set(request.workspaceSlug, {
-            id: request.workspaceId ?? request.workspaceSlug,
-            name: request.customerName,
-            slug: request.workspaceSlug,
-          });
-          return map;
-        }, new Map<string, { id: string; name: string; slug: string }>())
-      )
-        .map(([, value]) => value)
+      customers: Array.from(userProfileById.values())
+        .map((profile) => ({
+          id: profile.id,
+          name: profile.email ? `${profile.name} · ${profile.email}` : profile.name,
+          slug: profile.id,
+        }))
         .sort((a, b) => a.name.localeCompare(b.name, "en-US")),
       apiKeys: Array.from(
         recentRequestSummaries.reduce((map, request) => {
@@ -1550,9 +1843,11 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
             name: request.apiKeyName,
             keyPrefix: request.apiKeyPrefix,
             environment: request.apiKeyEnvironment,
+            ownerUserId: request.actorUserId,
+            ownerName: request.actorName,
           });
           return map;
-        }, new Map<string, { id: string; workspaceId: string; name: string; keyPrefix: string; environment: string }>())
+        }, new Map<string, { id: string; workspaceId: string; name: string; keyPrefix: string; environment: string; ownerUserId: string | null; ownerName: string }>())
       )
         .map(([, value]) => value)
         .sort((a, b) => a.name.localeCompare(b.name, "en-US")),
