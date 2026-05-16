@@ -9,7 +9,7 @@ import { InternalShell } from "./internal-shell";
 import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
 import { MonitoringLineChart } from "./monitoring-line-chart";
 import { ImageResponseContractPanel } from "./image-response-contract-panel";
-import { RegisteredUserDeleteButton } from "./registered-user-delete-button";
+import { RegisteredUsersTable } from "./registered-users-table";
 import {
   CreateProviderButton,
   GatewayErrorDefinitionsPanel,
@@ -1270,75 +1270,11 @@ export default async function InternalPage({
                 {effectiveMonitoringView === "requests" ? (
                   <>
                     {data.registeredUsers.length > 0 ? (
-                      <div className="overflow-hidden rounded-2xl border border-black/[0.06] bg-[#FCFCFA]">
-                        <table className="w-full min-w-[920px] border-collapse text-left">
-                          <thead className="bg-black/[0.025] text-[11px] uppercase tracking-[0.35px] text-black/45">
-                            <tr>
-                              <th className="px-4 py-3 font-medium">用户</th>
-                              <th className="px-4 py-3 font-medium">Workspace</th>
-                              <th className="px-4 py-3 font-medium">角色</th>
-                              <th className="px-4 py-3 font-medium">余额</th>
-                              <th className="px-4 py-3 font-medium">后台加余额</th>
-                              <th className="px-4 py-3 font-medium">操作</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-black/[0.06] text-sm">
-                            {data.registeredUsers.map((user) => (
-                              <tr key={user.id}>
-                                <td className="px-4 py-3">
-                                  <p className="font-medium text-black">{user.name}</p>
-                                  <p className="mt-1 text-xs text-black/50">{user.email ?? user.id}</p>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <p className="text-black/75">{user.workspaceName}</p>
-                                  <p className="mt-1 text-xs text-black/40">{user.workspaceId ?? "无 workspace"}</p>
-                                </td>
-                                <td className="px-4 py-3 text-black/65">{user.role}</td>
-                                <td className="px-4 py-3 font-medium text-black">{user.balanceLabel}</td>
-                                <td className="px-4 py-3">
-                                  {user.workspaceId ? (
-                                    <form action={addUserBalance} className="flex min-w-[300px] gap-2">
-                                      <input type="hidden" name="userId" value={user.id} />
-                                      <input
-                                        name="amount"
-                                        type="number"
-                                        min="0.01"
-                                        step="0.01"
-                                        placeholder="金额 USD"
-                                        className="h-8 w-24 rounded-md border border-black/10 bg-white px-2 text-xs outline-none"
-                                      />
-                                      <input
-                                        name="description"
-                                        placeholder="备注（可选）"
-                                        className="h-8 min-w-0 flex-1 rounded-md border border-black/10 bg-white px-2 text-xs outline-none"
-                                      />
-                                      <button
-                                        type="submit"
-                                        className="h-8 shrink-0 rounded-md bg-black px-3 text-xs font-medium text-white hover:bg-black/85"
-                                      >
-                                        加款
-                                      </button>
-                                    </form>
-                                  ) : (
-                                    <span className="text-xs text-black/40">无 workspace，不能加款</span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <RegisteredUserDeleteButton
-                                    action={deleteRegisteredUser}
-                                    userId={user.id}
-                                    email={user.email ?? user.id}
-                                    disabled={Boolean(user.workspaceId)}
-                                  />
-                                  {user.workspaceId ? (
-                                    <p className="mt-1 text-[11px] text-black/35">有关联 workspace，不允许直接删除</p>
-                                  ) : null}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      <RegisteredUsersTable
+                        users={data.registeredUsers}
+                        addUserBalanceAction={addUserBalance}
+                        deleteRegisteredUserAction={deleteRegisteredUser}
+                      />
                     ) : (
                       <EmptyState
                         title="还没有注册用户"

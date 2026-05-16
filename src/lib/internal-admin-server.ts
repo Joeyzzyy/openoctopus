@@ -1250,6 +1250,36 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     map.set(row.workspace_id, (map.get(row.workspace_id) ?? 0) + Number(row.amount_delta ?? 0));
     return map;
   }, new Map<string, number>());
+  const walletBreakdownByWorkspaceId = walletRowsForUsers.reduce((map, row) => {
+    const current = map.get(row.workspace_id) ?? {
+      topup: 0,
+      systemCredit: 0,
+      usage: 0,
+    };
+    const amount = Number(row.amount_delta ?? 0);
+    if (row.entry_type === "topup" && amount > 0) {
+      current.topup += amount;
+    } else if (amount > 0) {
+      current.systemCredit += amount;
+    } else if (amount < 0) {
+      current.usage += Math.abs(amount);
+    }
+    map.set(row.workspace_id, current);
+    return map;
+  }, new Map<string, { topup: number; systemCredit: number; usage: number }>());
+  const apiKeysByWorkspaceId = apiKeys.reduce((map, apiKey) => {
+    const list = map.get(apiKey.workspace_id) ?? [];
+    list.push(apiKey);
+    map.set(apiKey.workspace_id, list);
+    return map;
+  }, new Map<string, ApiKeyRow[]>());
+  const apiKeysByOwnerUserId = apiKeys.reduce((map, apiKey) => {
+    if (!apiKey.created_by) return map;
+    const list = map.get(apiKey.created_by) ?? [];
+    list.push(apiKey);
+    map.set(apiKey.created_by, list);
+    return map;
+  }, new Map<string, ApiKeyRow[]>());
   const registeredUsers = Array.from(userProfileById.values())
     .map((profile) => {
       const membership = primaryMembershipByUserId.get(profile.id) ?? null;
@@ -1259,6 +1289,27 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       const balance = membership?.workspace_id
         ? balanceByWorkspaceId.get(membership.workspace_id) ?? 0
         : 0;
+      const walletBreakdown = membership?.workspace_id
+        ? walletBreakdownByWorkspaceId.get(membership.workspace_id) ?? {
+            topup: 0,
+            systemCredit: 0,
+            usage: 0,
+          }
+        : { topup: 0, systemCredit: 0, usage: 0 };
+      const userApiKeyMap = new Map<string, ApiKeyRow>();
+      for (const apiKey of apiKeysByOwnerUserId.get(profile.id) ?? []) {
+        userApiKeyMap.set(apiKey.id, apiKey);
+      }
+      if (membership?.workspace_id) {
+        for (const apiKey of apiKeysByWorkspaceId.get(membership.workspace_id) ?? []) {
+          userApiKeyMap.set(apiKey.id, apiKey);
+        }
+      }
+      const userApiKeys = Array.from(userApiKeyMap.values()).sort((a, b) => {
+        const byStatus = a.status.localeCompare(b.status, "en-US");
+        if (byStatus !== 0) return byStatus;
+        return b.created_at.localeCompare(a.created_at);
+      });
       return {
         id: profile.id,
         name: profile.name,
@@ -1269,6 +1320,22 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         role: membership?.role ?? "none",
         balance,
         balanceLabel: formatCurrency(balance),
+        walletBreakdown: {
+          topup: walletBreakdown.topup,
+          topupLabel: formatCurrency(walletBreakdown.topup),
+          systemCredit: walletBreakdown.systemCredit,
+          systemCreditLabel: formatCurrency(walletBreakdown.systemCredit),
+          usage: walletBreakdown.usage,
+          usageLabel: formatCurrency(walletBreakdown.usage),
+        },
+        apiKeys: userApiKeys.map((apiKey) => ({
+          id: apiKey.id,
+          name: apiKey.name,
+          keyPrefix: apiKey.key_prefix,
+          environment: apiKey.environment,
+          status: apiKey.status,
+          createdLabel: formatRelativeTimestamp(apiKey.created_at),
+        })),
       };
     })
     .sort((a, b) => (a.email ?? a.name).localeCompare(b.email ?? b.name, "en-US"));

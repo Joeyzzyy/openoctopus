@@ -937,28 +937,20 @@ export async function deleteRegisteredUser(formData: FormData) {
 
   const { data: memberships, error: membershipError } = await supabase
     .from("workspace_members")
-    .select("workspace_id")
+    .select("workspace_id, role")
     .eq("user_id", parsed.userId);
 
   if (membershipError) {
     throw new Error(membershipError.message);
   }
 
-  if ((memberships ?? []).length > 0) {
-    throw new Error("该用户仍有关联 workspace，不能直接删除");
-  }
-
   const { data: ownedWorkspaces, error: ownedWorkspaceError } = await supabase
     .from("workspaces")
-    .select("id")
+    .select("id, name, slug")
     .eq("owner_user_id", parsed.userId);
 
   if (ownedWorkspaceError) {
     throw new Error(ownedWorkspaceError.message);
-  }
-
-  if ((ownedWorkspaces ?? []).length > 0) {
-    throw new Error("该用户仍是 workspace owner，不能直接删除");
   }
 
   let authUserResponse: Awaited<ReturnType<typeof supabase.auth.admin.getUserById>>;
@@ -992,9 +984,23 @@ export async function deleteRegisteredUser(formData: FormData) {
     details: {
       targetUserId: parsed.userId,
       email: parsed.email,
-      reason: "orphan_user_cleanup",
+      reason: "admin_confirmed_delete",
+      memberships: memberships ?? [],
+      ownedWorkspaces: ownedWorkspaces ?? [],
     },
   });
+
+  const ownedWorkspaceIds = (ownedWorkspaces ?? []).map((workspace) => workspace.id);
+  if (ownedWorkspaceIds.length > 0) {
+    const { error: deleteWorkspaceError } = await supabase
+      .from("workspaces")
+      .delete()
+      .in("id", ownedWorkspaceIds);
+
+    if (deleteWorkspaceError) {
+      throw new Error(deleteWorkspaceError.message);
+    }
+  }
 
   let deleteResponse: Awaited<ReturnType<typeof supabase.auth.admin.deleteUser>>;
   try {
