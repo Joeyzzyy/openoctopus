@@ -271,7 +271,7 @@ export async function registerFileRoutes(app: FastifyInstance) {
       if (parsed) {
         await supabaseAdmin.storage
           .from(env.GENERATED_ASSETS_BUCKET)
-          .upload(cachePath, parsed.buffer, {
+          .upload(cachePathBase, parsed.buffer, {
             contentType: parsed.mimeType,
             upsert: true,
           });
