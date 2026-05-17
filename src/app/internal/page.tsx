@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { Logo } from "@/components/layout/Logo";
 import { getInternalAdminData } from "@/lib/internal-admin-server";
+import { getApiSmokeRecords } from "@/lib/api-smoke-records";
 import { addUserBalance, deleteRegisteredUser, unlockInternalAccess } from "./actions";
 import { INTERNAL_ACCESS_COOKIE, INTERNAL_ACCESS_COOKIE_VALUE } from "@/lib/internal-access";
 import { InternalShell } from "./internal-shell";
@@ -10,6 +11,7 @@ import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
 import { MonitoringLineChart } from "./monitoring-line-chart";
 import { ImageResponseContractPanel } from "./image-response-contract-panel";
 import { RegisteredUsersTable } from "./registered-users-table";
+import { ApiSmokePanel } from "./api-smoke-panel";
 import {
   CreateProviderButton,
   GatewayErrorDefinitionsPanel,
@@ -32,6 +34,12 @@ const tabs = [
     description: "模型调用趋势与成功率概览。",
   },
   {
+    key: "monitoring-problems",
+    group: "overview",
+    label: "异常请求快查",
+    description: "后端分页查看 failed / queued 请求。",
+  },
+  {
     key: "monitoring-requests",
     group: "overview",
     label: "用户管理",
@@ -42,6 +50,12 @@ const tabs = [
     group: "overview",
     label: "内部 AI 消费记录",
     description: "记录 URL 自动填充能力的调用、token 与估算成本。",
+  },
+  {
+    key: "api-smoke",
+    group: "overview",
+    label: "API 连通性",
+    description: "查看客户 API smoke 脚本的最近运行记录。",
   },
   {
     key: "worker-templates",
@@ -264,6 +278,7 @@ function buildMonitoringHref(input: {
   range: MonitoringRange;
   status: MonitoringStatus;
   model?: string | null;
+  problemRequestPage?: number;
 }) {
   const params = new URLSearchParams();
   const tab =
@@ -281,6 +296,9 @@ function buildMonitoringHref(input: {
   params.set("monitoringStatus", input.status);
   if (input.model && input.model !== "all") {
     params.set("monitoringModel", input.model);
+  }
+  if (input.problemRequestPage && input.problemRequestPage > 1) {
+    params.set("problemRequestPage", String(input.problemRequestPage));
   }
   return `/internal?${params.toString()}`;
 }
@@ -777,7 +795,7 @@ export default async function InternalPage({
   const effectiveMonitoringView: MonitoringView =
     activeTab === "monitoring-requests"
           ? "requests"
-          : activeTab === "monitoring-overview"
+          : activeTab === "monitoring-overview" || activeTab === "monitoring-problems"
             ? "overview"
             : requestedMonitoringView;
   const selectedRequestScope = getSearchValue(resolvedSearchParams, "requestScope") ?? "all";
@@ -788,6 +806,11 @@ export default async function InternalPage({
   const selectedRequestPage = Number.isFinite(selectedRequestPageRaw) && selectedRequestPageRaw >= 1
     ? Math.floor(selectedRequestPageRaw)
     : 1;
+  const selectedProblemRequestPageRaw = Number(getSearchValue(resolvedSearchParams, "problemRequestPage") ?? "1");
+  const selectedProblemRequestPage =
+    Number.isFinite(selectedProblemRequestPageRaw) && selectedProblemRequestPageRaw >= 1
+      ? Math.floor(selectedProblemRequestPageRaw)
+      : 1;
   const selectedUserPageRaw = Number(getSearchValue(resolvedSearchParams, "userPage") ?? "1");
   const selectedUserPage = Number.isFinite(selectedUserPageRaw) && selectedUserPageRaw >= 1
     ? Math.floor(selectedUserPageRaw)
@@ -816,6 +839,8 @@ export default async function InternalPage({
     requestScope: selectedRequestScope,
     requestPage: selectedRequestPage,
     requestPageSize: 20,
+    problemRequestPage: selectedProblemRequestPage,
+    problemRequestPageSize: 10,
     userPage: selectedUserPage,
     userPageSize: 10,
     userSearch: selectedUserSearch,
@@ -830,6 +855,7 @@ export default async function InternalPage({
   });
   if (!data) redirect("/login");
   if (!data.authorized) redirect("/login");
+  const apiSmokeRecords = activeTab === "api-smoke" ? await getApiSmokeRecords(100) : [];
 
   const selectedTemplateKey = getSearchValue(resolvedSearchParams, "template");
   const filteredRequests = data.requests;
@@ -1082,7 +1108,20 @@ export default async function InternalPage({
             </section>
           ) : null}
 
+          {activeTab === "api-smoke" ? (
+            <section>
+              <SectionShell
+                id="api-smoke-panel"
+                title="API 连通性"
+                description=""
+              >
+                <ApiSmokePanel records={apiSmokeRecords} />
+              </SectionShell>
+            </section>
+          ) : null}
+
           {activeTab === "monitoring-overview" ||
+          activeTab === "monitoring-problems" ||
           activeTab === "monitoring-requests" ? (
             <section>
               <SectionShell
@@ -1092,7 +1131,7 @@ export default async function InternalPage({
               >
                 <MonitoringAutoRefresh enabled={false} />
 
-                {effectiveMonitoringView === "overview" ? (
+                {activeTab === "monitoring-overview" ? (
                   <>
                     <div className="mb-4 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
                       <div className="grid gap-3 lg:grid-cols-4">
@@ -1238,7 +1277,7 @@ export default async function InternalPage({
                   </>
                 ) : null}
 
-                {effectiveMonitoringView === "overview" ? (
+                {activeTab === "monitoring-overview" ? (
                   <>
                     {selectedMonitoringSeries ? (
                       <div className="grid gap-5">
@@ -1280,7 +1319,108 @@ export default async function InternalPage({
                         detail="先创建可售模型，或者等待网关产生新的 inference_requests。这里会按模型筛选展示单张调用折线图。"
                       />
                     )}
+
                   </>
+                ) : null}
+
+                {activeTab === "monitoring-problems" ? (
+                  <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4">
+                      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-black">异常请求快查</p>
+                          <p className="mt-0.5 text-xs text-black/50">
+                            只拉取 failed / queued，后端分页每页 10 条，用于快速定位超时和失败请求。
+                          </p>
+                        </div>
+                        <p className="text-xs text-black/45">
+                          共 {data.problemRequestPagination.totalCount} 条
+                        </p>
+                      </div>
+
+                      {data.problemRequests.length > 0 ? (
+                        <div className="grid gap-3">
+                          {data.problemRequests.map((request) => (
+                            <UnifiedTaskCard
+                              key={request.id}
+                              showFinancial
+                              request={{
+                                id: request.id,
+                                capability: request.capability,
+                                modelSlug: request.public_model_slug,
+                                status: request.status,
+                                createdAt: request.created_at,
+                                createdLabel: request.createdLabel,
+                                startedLabel: request.startedLabel,
+                                completedLabel: request.completedLabel,
+                                providerLabel: `上游：${request.providerName} / ${request.upstreamModelSlug}`,
+                                callerLabel: `调用方：${request.actorName} · ${request.apiKeyName} · ${request.apiKeyPrefix} · ${request.sourceLabel}`,
+                                errorMessage: request.error_message,
+                                lastAttempt: request.lastAttempt,
+                                upstreamRawText: request.upstreamRawText,
+                                packagedOutputText: request.packagedOutputText,
+                                customerChargeLabel: request.customerChargeLabel,
+                                providerCostLabel: request.providerCostLabel,
+                                profitLabel: request.profitLabel,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <EmptyState
+                          title="没有 failed / queued 请求"
+                          detail="当前没有需要优先排查的问题请求。"
+                        />
+                      )}
+
+                      {data.problemRequestPagination.totalPages > 1 ? (
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-black/55">
+                          <span>
+                            第 {data.problemRequestPagination.page} / {data.problemRequestPagination.totalPages} 页
+                          </span>
+                          <div className="flex gap-2">
+                            <a
+                              aria-disabled={data.problemRequestPagination.page <= 1}
+                              href={buildMonitoringHref({
+                                view: "overview",
+                                interval: selectedMonitoringInterval,
+                                range: selectedMonitoringRange,
+                                status: selectedMonitoringStatus,
+                                model: selectedMonitoringModel,
+                                problemRequestPage: Math.max(1, data.problemRequestPagination.page - 1),
+                              })}
+                              className={`rounded-md border border-black/10 px-3 py-1.5 ${
+                                data.problemRequestPagination.page <= 1
+                                  ? "pointer-events-none text-black/25"
+                                  : "bg-white text-black/65 hover:bg-black/[0.03]"
+                              }`}
+                            >
+                              上一页
+                            </a>
+                            <a
+                              aria-disabled={data.problemRequestPagination.page >= data.problemRequestPagination.totalPages}
+                              href={buildMonitoringHref({
+                                view: "overview",
+                                interval: selectedMonitoringInterval,
+                                range: selectedMonitoringRange,
+                                status: selectedMonitoringStatus,
+                                model: selectedMonitoringModel,
+                                problemRequestPage: Math.min(
+                                  data.problemRequestPagination.totalPages,
+                                  data.problemRequestPagination.page + 1
+                                ),
+                              })}
+                              className={`rounded-md border border-black/10 px-3 py-1.5 ${
+                                data.problemRequestPagination.page >= data.problemRequestPagination.totalPages
+                                  ? "pointer-events-none text-black/25"
+                                  : "bg-white text-black/65 hover:bg-black/[0.03]"
+                              }`}
+                            >
+                              下一页
+                            </a>
+                          </div>
+                        </div>
+                          ) : null}
+                    </div>
                 ) : null}
 
                 {effectiveMonitoringView === "requests" ? (

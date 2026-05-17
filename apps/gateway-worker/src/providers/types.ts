@@ -20,6 +20,7 @@ export type SubmitRequestInput = {
 export type PollRequestInput = {
   requestId: string;
   upstreamTaskId: string;
+  input?: Record<string, unknown>;
   provider: ProviderRuntimeContext;
 };
 

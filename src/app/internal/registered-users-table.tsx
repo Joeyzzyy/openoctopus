@@ -412,9 +412,19 @@ export function RegisteredUsersTable({
                               <p className="text-xs font-medium text-black/70">请求排障记录</p>
                               <p className="mt-1 text-[11px] text-black/40">上游返回和对客 JSON 默认折叠。</p>
                             </div>
-                            <p className="text-[11px] text-black/35">
-                              第 {requestPage.page} / {requestPage.totalPages} 页 · 共 {requestPage.totalCount} 条
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-[11px] text-black/35">
+                                第 {requestPage.page} / {requestPage.totalPages} 页 · 共 {requestPage.totalCount} 条
+                              </p>
+                              <button
+                                type="button"
+                                disabled={requestPage.loading}
+                                onClick={() => loadUserRequests(user.id, requestPage.page)}
+                                className="h-8 rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/65 hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                {requestPage.loading ? "刷新中..." : "刷新"}
+                              </button>
+                            </div>
                           </div>
                           {requestPage.error ? (
                             <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-5 text-sm text-[#8F3F33]">

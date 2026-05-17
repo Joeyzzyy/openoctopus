@@ -5,6 +5,7 @@ import {
   processNextInferenceJob,
   processNextPollingJob,
   queueRpcAvailable,
+  recoverStuckQueuedRequests,
   recoverStuckPollingRequests,
 } from "./queue/runner.js";
 import { registerHealthRoute } from "./routes/health.js";
@@ -68,6 +69,10 @@ if (queueEnabled) {
 
   const recoveryPoller = setInterval(async () => {
     try {
+      const queuedRecovered = await recoverStuckQueuedRequests();
+      if (queuedRecovered > 0) {
+        app.log.warn({ recovered: queuedRecovered }, "Recovered stuck queued requests");
+      }
       const recovered = await recoverStuckPollingRequests();
       if (recovered > 0) {
         app.log.warn({ recovered }, "Recovered stuck polling requests");

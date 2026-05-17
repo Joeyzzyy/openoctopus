@@ -206,6 +206,7 @@ type AttemptRow = {
   response_payload: Record<string, unknown> | null;
   error_message: string | null;
   created_at: string;
+  updated_at?: string | null;
 };
 
 type InternalUserRequestSummary = {
@@ -314,6 +315,8 @@ type InternalAdminDataOptions = {
   requestScope?: string;
   requestPage?: number;
   requestPageSize?: number;
+  problemRequestPage?: number;
+  problemRequestPageSize?: number;
   userPage?: number;
   userPageSize?: number;
   userSearch?: string | null;
@@ -482,6 +485,22 @@ function formatMetricValue(key: string, value: number) {
   return value.toFixed(2);
 }
 
+function summarizeAttempt(attempt: AttemptRow | null | undefined) {
+  if (!attempt) {
+    return null;
+  }
+
+  return {
+    attemptNo: attempt.attempt_no,
+    status: attempt.status,
+    upstreamRequestId: attempt.upstream_request_id,
+    upstreamTaskId: attempt.upstream_task_id,
+    latencyMs: attempt.latency_ms,
+    errorMessage: attempt.error_message,
+    updatedLabel: formatRelativeTimestamp(attempt.updated_at ?? attempt.created_at),
+  };
+}
+
 function labelBreakdownKey(key: string) {
   const labels: Record<string, string> = {
     requestCount: "请求数",
@@ -581,7 +600,7 @@ function summarizeInternalRequest(input: {
     apiKeyPrefix: apiKey?.key_prefix ?? "unknown",
     apiKeyEnvironment: apiKey?.environment ?? "unknown",
     attemptCount: relatedAttempts.length,
-    lastAttempt: relatedAttempts[0] ?? null,
+    lastAttempt: summarizeAttempt(relatedAttempts[0]),
     customerCharge,
     providerCost,
     profit,
@@ -594,6 +613,7 @@ function summarizeInternalRequest(input: {
     upstreamRawText: formatUnknownJson(upstreamRawPayload) ?? "null",
     packagedOutputText: formatUnknownJson(packagedOutputPayload) ?? "null",
     createdLabel: formatRelativeTimestamp(request.created_at),
+    startedLabel: formatRelativeTimestamp(request.started_at),
     completedLabel: formatRelativeTimestamp(request.completed_at),
   };
 }
@@ -880,6 +900,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const requestScope = options.requestScope ?? "all";
   const requestPageSize = Math.min(Math.max(options.requestPageSize ?? 20, 1), 100);
   const requestPage = Math.max(Math.floor(options.requestPage ?? 1), 1);
+  const problemRequestPageSize = Math.min(Math.max(options.problemRequestPageSize ?? 10, 1), 20);
+  const problemRequestPage = Math.max(Math.floor(options.problemRequestPage ?? 1), 1);
   const userPageSize = Math.min(Math.max(options.userPageSize ?? 10, 1), 50);
   const userPage = Math.max(Math.floor(options.userPage ?? 1), 1);
   const userSearch = options.userSearch?.trim() ?? "";
@@ -895,9 +917,11 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const shouldLoadMonitoring =
     activeTab === "monitoring" ||
     activeTab === "monitoring-overview" ||
+    activeTab === "monitoring-problems" ||
     activeTab === "monitoring-requests";
   const shouldLoadManagementData = !shouldLoadMonitoring;
   const shouldLoadRequestRecords = shouldLoadMonitoring && monitoringView === "requests";
+  const shouldLoadProblemRequests = activeTab === "monitoring-problems";
   const currentMonthStart = new Date();
   currentMonthStart.setUTCDate(1);
   currentMonthStart.setUTCHours(0, 0, 0, 0);
@@ -922,7 +946,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     internalModelAiUsageLogsResponse,
   ] =
     await Promise.all([
-      shouldLoadManagementData
+      shouldLoadManagementData || shouldLoadProblemRequests
         ? supabase
             .from("providers")
             .select(
@@ -930,7 +954,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
             )
             .order("created_at", { ascending: true })
         : Promise.resolve({ data: [], error: null }),
-      shouldLoadManagementData
+      shouldLoadManagementData || shouldLoadMonitoring
         ? (() => {
             let query = supabase
               .from("supported_models")
@@ -993,7 +1017,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
             )
             .order("created_at", { ascending: false })
         : Promise.resolve({ data: [], error: null }),
-      shouldLoadManagementData
+      shouldLoadManagementData || shouldLoadProblemRequests
         ? (shouldPaginatePublicModels
             ? Promise.resolve({ data: [], error: null })
             : supabase
@@ -1160,6 +1184,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   void requestsResponse;
   let requests: RequestRow[] = [];
   let requestTotalCount = 0;
+  let problemRequests: RequestRow[] = [];
+  let problemRequestTotalCount = 0;
   let registeredUserTotalCount = 0;
   let apiKeys = (apiKeysResponse.error ? [] : apiKeysResponse.data ?? []) as ApiKeyRow[];
   let usageEvents = (usageEventsResponse.error
@@ -1178,7 +1204,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       ? internalModelAiUsageLogsResponse.count ?? internalModelAiUsageLogs.length
       : internalModelAiUsageLogs.length;
   const monitoringRequests =
-    shouldLoadMonitoring && monitoringView === "overview"
+    activeTab === "monitoring-overview"
       ? await fetchMonitoringRequests(supabase, monitoringLookbackMs, {
           status: monitoringStatus,
           modelSlug: monitoringModelSlug,
@@ -1262,7 +1288,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     let requestQuery = supabase
       .from("inference_requests")
       .select(
-        "id, workspace_id, user_id, api_key_id, request_source, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at",
+        "id, workspace_id, user_id, api_key_id, request_source, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)",
         { count: "exact" }
       )
       .gte("created_at", monitoringSinceIso)
@@ -1305,7 +1331,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         supabase
           .from("provider_attempts")
           .select(
-            "id, request_id, provider_id, provider_model_id, attempt_no, status, upstream_request_id, upstream_task_id, latency_ms, response_payload, error_message, created_at"
+            "id, request_id, provider_id, provider_model_id, attempt_no, status, upstream_request_id, upstream_task_id, latency_ms, response_payload, error_message, created_at, updated_at"
           )
           .in("request_id", requestIds)
           .order("created_at", { ascending: false }),
@@ -1316,6 +1342,102 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       attempts = (attemptsPageResponse.error
         ? []
         : attemptsPageResponse.data ?? []) as AttemptRow[];
+    }
+  }
+
+  if (shouldLoadProblemRequests) {
+    const problemFrom = (problemRequestPage - 1) * problemRequestPageSize;
+    const problemTo = problemFrom + problemRequestPageSize - 1;
+    const problemRequestsResponse = await supabase
+      .from("inference_requests")
+      .select(
+        "id, workspace_id, user_id, api_key_id, request_source, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)",
+        { count: "exact" }
+      )
+      .in("status", ["failed", "queued"])
+      .order("created_at", { ascending: false })
+      .range(problemFrom, problemTo);
+
+    problemRequests = (problemRequestsResponse.error
+      ? []
+      : problemRequestsResponse.data ?? []) as RequestRow[];
+    problemRequestTotalCount = problemRequestsResponse.error
+      ? 0
+      : problemRequestsResponse.count ?? problemRequests.length;
+
+    const problemRequestIds = problemRequests.map((request) => request.id);
+    const problemApiKeyIds = Array.from(
+      new Set(
+        problemRequests
+          .map((request) => request.api_key_id)
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
+    if (problemRequestIds.length > 0) {
+      const [usageEventsProblemResponse, attemptsProblemResponse, apiKeysProblemResponse] =
+        await Promise.all([
+          supabase
+            .from("usage_events")
+            .select("external_request_id, metadata")
+            .in("external_request_id", problemRequestIds),
+          supabase
+            .from("provider_attempts")
+            .select(
+              "id, request_id, provider_id, provider_model_id, attempt_no, status, upstream_request_id, upstream_task_id, latency_ms, response_payload, error_message, created_at, updated_at"
+            )
+            .in("request_id", problemRequestIds)
+            .order("created_at", { ascending: false }),
+          problemApiKeyIds.length > 0
+            ? supabase
+                .from("api_keys")
+                .select("id, workspace_id, created_by, name, key_prefix, environment, status, created_at")
+                .in("id", problemApiKeyIds)
+            : Promise.resolve({ data: [], error: null }),
+        ]);
+
+      usageEvents = [
+        ...usageEvents,
+        ...((usageEventsProblemResponse.error
+          ? []
+          : usageEventsProblemResponse.data ?? []) as UsageEventRow[]),
+      ];
+      attempts = [
+        ...attempts,
+        ...((attemptsProblemResponse.error
+          ? []
+          : attemptsProblemResponse.data ?? []) as AttemptRow[]),
+      ];
+
+      const apiKeysByIdForProblems = new Map(apiKeys.map((apiKey) => [apiKey.id, apiKey]));
+      for (const apiKey of (apiKeysProblemResponse.error ? [] : apiKeysProblemResponse.data ?? []) as ApiKeyRow[]) {
+        apiKeysByIdForProblems.set(apiKey.id, apiKey);
+      }
+      apiKeys = Array.from(apiKeysByIdForProblems.values());
+
+      const problemActorUserIds = Array.from(
+        new Set([
+          ...problemRequests.map((request) => request.user_id),
+          ...apiKeys.map((apiKey) => apiKey.created_by),
+        ].filter((id): id is string => Boolean(id)))
+      ).filter((id) => !userProfileById.has(id));
+      if (problemActorUserIds.length > 0) {
+        const profilesProblemResponse = await supabase
+          .from("profiles")
+          .select("id, email, full_name")
+          .in("id", problemActorUserIds);
+        for (const row of (profilesProblemResponse.error ? [] : profilesProblemResponse.data ?? []) as Array<{
+          id: string;
+          email: string | null;
+          full_name: string | null;
+        }>) {
+          userProfileById.set(row.id, {
+            id: row.id,
+            email: row.email,
+            name: row.full_name?.trim() || row.email?.split("@")[0] || `用户 ${row.id.slice(0, 8)}`,
+          });
+        }
+      }
     }
   }
 
@@ -1731,7 +1853,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       apiKeyPrefix: apiKey?.key_prefix ?? "unknown",
       apiKeyEnvironment: apiKey?.environment ?? "unknown",
       attemptCount: relatedAttempts.length,
-      lastAttempt: relatedAttempts[0] ?? null,
+      lastAttempt: summarizeAttempt(relatedAttempts[0]),
       customerCharge,
       providerCost,
       profit,
@@ -1744,10 +1866,12 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       upstreamRawText,
       packagedOutputText,
       createdLabel: formatRelativeTimestamp(request.created_at),
+      startedLabel: formatRelativeTimestamp(request.started_at),
       completedLabel: formatRelativeTimestamp(request.completed_at),
     };
   };
   const recentRequestSummaries = requests.map(summarizeRequest);
+  const problemRequestSummaries = problemRequests.map(summarizeRequest);
   const registeredUsers = registeredUserBase.map((user) => ({
     ...user,
     recentRequests: [],
@@ -1895,6 +2019,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     providerModels: providerModelSummaries,
     routingRules: routingRuleSummaries,
     requests: recentRequestSummaries,
+    problemRequests: problemRequestSummaries,
     registeredUsers,
     registeredUserPagination: {
       page: userPage,
@@ -1908,6 +2033,12 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       pageSize: requestPageSize,
       totalCount: requestTotalCount,
       totalPages: Math.max(1, Math.ceil(requestTotalCount / requestPageSize)),
+    },
+    problemRequestPagination: {
+      page: problemRequestPage,
+      pageSize: problemRequestPageSize,
+      totalCount: problemRequestTotalCount,
+      totalPages: Math.max(1, Math.ceil(problemRequestTotalCount / problemRequestPageSize)),
     },
     monitoringRequests,
     globalMonitoring,

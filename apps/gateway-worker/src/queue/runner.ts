@@ -52,6 +52,8 @@ type QueueName = "inference_jobs" | "inference_polling";
 const POLLING_RECOVERY_STALE_SECONDS = 120;
 const POLLING_TIMEOUT_SECONDS = 20 * 60;
 const POLLING_RECOVERY_BATCH_SIZE = 20;
+const QUEUED_TIMEOUT_SECONDS = 15 * 60;
+const QUEUED_TIMEOUT_BATCH_SIZE = 25;
 const FEISHU_ERROR_WEBHOOK_URL = process.env.FEISHU_BOT_WEBHOOK_URL?.trim() ?? "";
 let hasWarnedMissingFeishuWebhook = false;
 
@@ -640,6 +642,32 @@ async function failRequestAndDeleteQueueMessage(input: {
   });
 }
 
+async function deleteQueueMessageIfRequestAlreadySucceeded(input: {
+  queueName: QueueName;
+  messageId: number;
+  requestId: string;
+}) {
+  const { data, error } = await supabaseAdmin
+    .from("inference_requests")
+    .select("status")
+    .eq("id", input.requestId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (data?.status !== "succeeded") {
+    return false;
+  }
+
+  await deleteQueueMessage({
+    queueName: input.queueName,
+    messageId: input.messageId,
+  });
+  return true;
+}
+
 export async function queueRpcAvailable() {
   const { error } = await supabaseAdmin.rpc("queue_read", {
     queue_name: "inference_jobs",
@@ -1003,6 +1031,14 @@ export async function processNextInferenceJob() {
         }),
       });
     } catch (error) {
+      const alreadySucceeded = await deleteQueueMessageIfRequestAlreadySucceeded({
+        queueName: "inference_jobs",
+        messageId: row.msg_id,
+        requestId: message.requestId,
+      });
+      if (alreadySucceeded) {
+        return true;
+      }
       const reason =
         error instanceof AssetIntegrityError
           ? `asset_integrity_failed(index=${error.assetIndex}, reason=${error.reasonCode})`
@@ -1209,6 +1245,7 @@ export async function processNextPollingJob() {
     result = await adapter.poll({
       requestId: message.requestId,
       upstreamTaskId: message.upstreamTaskId,
+      input: message.input,
       provider: {
         slug: message.providerSlug,
         baseUrl: message.providerBaseUrl,
@@ -1390,6 +1427,14 @@ export async function processNextPollingJob() {
         }),
       });
     } catch (error) {
+      const alreadySucceeded = await deleteQueueMessageIfRequestAlreadySucceeded({
+        queueName: "inference_polling",
+        messageId: row.msg_id,
+        requestId: message.requestId,
+      });
+      if (alreadySucceeded) {
+        return true;
+      }
       const reason =
         error instanceof AssetIntegrityError
           ? `asset_integrity_failed(index=${error.assetIndex}, reason=${error.reasonCode})`
@@ -1589,6 +1634,121 @@ async function markProcessingRequestTimeout(input: {
     errorMessage: "Upstream task timed out during polling.",
     occurredAt: completedAt,
   });
+}
+
+async function markQueuedRequestTimeout(input: {
+  requestId: string;
+  workspaceId: string;
+  apiKeyId: string | null;
+  publicModelSlug: string;
+  endpoint: string;
+  capability: string;
+}) {
+  const completedAt = new Date();
+  const { data: updatedRequest, error: updateError } = await supabaseAdmin
+    .from("inference_requests")
+    .update({
+      status: "failed",
+      error_code: "service_unavailable",
+      error_message: "Queued request timed out before worker processing.",
+      actual_cost: 0,
+      actual_customer_charge: 0,
+      actual_provider_cost: 0,
+      actual_profit: 0,
+      completed_at: completedAt.toISOString(),
+    })
+    .eq("id", input.requestId)
+    .eq("status", "queued")
+    .select("id")
+    .maybeSingle();
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+  if (!updatedRequest) {
+    return false;
+  }
+
+  try {
+    await recordRequestSettlement({
+      requestId: input.requestId,
+      workspaceId: input.workspaceId,
+      apiKeyId: input.apiKeyId,
+      publicModelSlug: input.publicModelSlug,
+      endpoint: input.endpoint,
+      customerCharge: 0,
+      providerCost: 0,
+      statusCode: 503,
+      breakdown: buildSettlementBreakdown({
+        customerCharge: 0,
+        providerCost: 0,
+        profit: 0,
+      }),
+    });
+  } catch {
+    // Never block timeout alerting on settlement write errors.
+  }
+
+  await sendFeishuFailureAlert({
+    phase: "timeout",
+    requestId: input.requestId,
+    workspaceId: input.workspaceId,
+    apiKeyId: input.apiKeyId,
+    capability: input.capability,
+    publicModelSlug: input.publicModelSlug,
+    providerSlug: "unknown-provider",
+    upstreamModelSlug: "unknown-upstream-model",
+    endpoint: input.endpoint,
+    errorCode: "service_unavailable",
+    errorMessage: "Queued request timed out before worker processing.",
+    occurredAt: completedAt,
+  });
+
+  return true;
+}
+
+export async function recoverStuckQueuedRequests() {
+  const timeoutBefore = new Date(Date.now() - QUEUED_TIMEOUT_SECONDS * 1000).toISOString();
+
+  const { data, error } = await supabaseAdmin
+    .from("inference_requests")
+    .select("id, workspace_id, api_key_id, capability, public_model_slug, endpoint, created_at")
+    .eq("status", "queued")
+    .lt("created_at", timeoutBefore)
+    .order("created_at", { ascending: true })
+    .limit(QUEUED_TIMEOUT_BATCH_SIZE);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    workspace_id: string;
+    api_key_id: string | null;
+    capability: string;
+    public_model_slug: string;
+    endpoint: string;
+    created_at: string;
+  }>;
+
+  let recoveredCount = 0;
+
+  for (const row of rows) {
+    const recovered = await markQueuedRequestTimeout({
+      requestId: row.id,
+      workspaceId: row.workspace_id,
+      apiKeyId: row.api_key_id,
+      capability: row.capability,
+      publicModelSlug: row.public_model_slug,
+      endpoint: row.endpoint,
+    });
+    if (recovered) {
+      recoveredCount += 1;
+    }
+  }
+
+  return recoveredCount;
 }
 
 export async function recoverStuckPollingRequests() {

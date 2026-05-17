@@ -11,9 +11,11 @@ type InternalTabKey =
   | "worker-templates"
   | "gateway-error-definitions"
   | "image-response-contracts"
+  | "api-smoke"
   | "providers"
   | "monitoring"
   | "monitoring-overview"
+  | "monitoring-problems"
   | "monitoring-requests"
   | "internal-model-ai-usage-logs";
 

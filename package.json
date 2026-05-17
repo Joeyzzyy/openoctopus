@@ -15,7 +15,9 @@
     "build:all": "npm run build:web && npm run build:worker",
     "start": "next start",
     "lint": "eslint",
-    "lint:web": "eslint"
+    "lint:web": "eslint",
+    "smoke:images": "node tests/api-smoke/scripts/images.generations.mjs",
+    "smoke:api": "npm run smoke:images"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

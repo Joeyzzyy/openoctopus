@@ -64,6 +64,28 @@ function readProviderBaseUrl(provider: SubmitRequestInput["provider"] | PollRequ
   return provider.baseUrl;
 }
 
+function inferRequestedImageMimeType(input: Record<string, unknown>) {
+  const value = input.output_format ?? input.outputFormat;
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "jpg") return "image/jpeg";
+  if (["jpeg", "png", "webp", "gif"].includes(normalized)) {
+    return `image/${normalized}`;
+  }
+  return normalized.includes("/") ? normalized : undefined;
+}
+
+function buildImageAsset(url: string, input: Record<string, unknown>) {
+  const mimeType = inferRequestedImageMimeType(input);
+  return {
+    url,
+    type: "image",
+    ...(mimeType ? { mimeType } : {}),
+  };
+}
+
 export class WaveSpeedImageAdapter implements ProviderAdapter {
   slug = "wavespeed-images";
 
@@ -112,7 +134,7 @@ export class WaveSpeedImageAdapter implements ProviderAdapter {
         upstreamRequestId: requestId,
         output: {
           raw: data,
-          assets: [{ url: resultUrl, type: "image" }],
+          assets: [buildImageAsset(resultUrl, input.input ?? {})],
         },
         estimatedCost: 0,
       };
@@ -153,13 +175,15 @@ export class WaveSpeedImageAdapter implements ProviderAdapter {
     const resultUrl = getByPath(data, executionConfig.resultUrlPath);
 
     if (status === "failed" || status === "error" || status === "canceled") {
+      const upstreamError =
+        getByPath(data, "data.error") ??
+        getByPath(data, "error") ??
+        "WaveSpeed image request failed";
       return {
         done: true,
         success: false,
         errorCode: "upstream_failed",
-        errorMessage: String(
-          getByPath(data, "error") ?? "WaveSpeed image request failed"
-        ),
+        errorMessage: String(upstreamError),
         raw: data,
       };
     }
@@ -170,7 +194,7 @@ export class WaveSpeedImageAdapter implements ProviderAdapter {
         success: true,
         output: {
           raw: data,
-          assets: [{ url: resultUrl, type: "image" }],
+          assets: [buildImageAsset(resultUrl, input.input ?? {})],
         },
         actualCost: 0,
         raw: data,

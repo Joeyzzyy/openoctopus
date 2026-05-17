@@ -1,0 +1,24 @@
+[
+  {
+    "id": "openai-image2-basic",
+    "model": "openoctopus/gpt-image-2-text-input",
+    "endpoint": "/v1/images/generations",
+    "payload": {
+      "model": "openoctopus/gpt-image-2-text-input",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "quality": "medium",
+        "output_format": "png",
+        "enable_sync_mode": false,
+        "enable_base64_output": false
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "assetCountMin": 1
+    }
+  }
+]

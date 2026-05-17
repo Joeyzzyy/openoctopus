@@ -1,0 +1,22 @@
+[
+  {
+    "id": "imagen-4-basic",
+    "model": "openoctopus/imagen-4",
+    "endpoint": "/v1/images/generations",
+    "payload": {
+      "model": "openoctopus/imagen-4",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "num_images": 1,
+        "enable_base64_output": false
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "assetCountMin": 1
+    }
+  }
+]

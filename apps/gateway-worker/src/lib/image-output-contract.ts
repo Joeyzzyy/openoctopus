@@ -21,10 +21,21 @@ function readPath(source: unknown, path: string[]) {
   return current ?? null;
 }
 
-function inferImageMimeType(raw: Record<string, unknown> | null, assetUrl: string) {
+function inferImageMimeType(
+  raw: Record<string, unknown> | null,
+  assetUrl: string,
+  preferredMimeType?: string
+) {
+  if (preferredMimeType?.trim()) {
+    const value = preferredMimeType.trim();
+    return value.includes("/") ? value : `image/${value}`;
+  }
+
   const fromRaw =
     readPath(raw, ["data", "0", "mime_type"]) ??
     readPath(raw, ["data", "0", "mimeType"]) ??
+    readPath(raw, ["data", "output_format"]) ??
+    readPath(raw, ["input", "output_format"]) ??
     readPath(raw, ["output_format"]);
   if (typeof fromRaw === "string" && fromRaw.trim().length > 0) {
     const value = fromRaw.trim();
@@ -39,6 +50,19 @@ function inferImageMimeType(raw: Record<string, unknown> | null, assetUrl: strin
     if (match?.[1]) {
       return match[1];
     }
+  }
+
+  try {
+    const pathname = assetUrl.startsWith("http://") || assetUrl.startsWith("https://")
+      ? new URL(assetUrl).pathname
+      : assetUrl;
+    const extension = pathname.split("?")[0]?.split(".").pop()?.toLowerCase();
+    if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
+    if (extension === "png") return "image/png";
+    if (extension === "webp") return "image/webp";
+    if (extension === "gif") return "image/gif";
+  } catch {
+    // Fall back to the default below.
   }
 
   return "image/png";
@@ -135,7 +159,11 @@ export function normalizeImageOutputPayload(outputPayload: unknown) {
       });
       const width = Number(readPath(raw, ["data", "0", "width"]) ?? readPath(raw, ["width"]));
       const height = Number(readPath(raw, ["data", "0", "height"]) ?? readPath(raw, ["height"]));
-      const mimeType = inferImageMimeType(raw, url);
+      const mimeType = inferImageMimeType(
+        raw,
+        url,
+        typeof assetRecord?.mimeType === "string" ? assetRecord.mimeType : undefined
+      );
       const normalizedUrl = normalizeImageAssetUrl(url, mimeType);
 
       return {

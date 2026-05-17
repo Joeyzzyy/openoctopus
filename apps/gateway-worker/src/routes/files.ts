@@ -109,8 +109,21 @@ function setGeneratedAssetHeaders(
   contentType: string,
   contentLength: number
 ) {
+  const extension =
+    contentType === "image/jpeg"
+      ? "jpg"
+      : contentType === "image/webp"
+        ? "webp"
+        : contentType === "image/gif"
+          ? "gif"
+          : contentType === "video/mp4"
+            ? "mp4"
+            : contentType === "video/webm"
+              ? "webm"
+              : "png";
   reply.header("content-type", contentType);
   reply.header("content-length", String(contentLength));
+  reply.header("content-disposition", `inline; filename="asset.${extension}"`);
   reply.header("cache-control", "public, max-age=3600");
   reply.header("access-control-allow-origin", "*");
   reply.header("cross-origin-resource-policy", "cross-origin");
