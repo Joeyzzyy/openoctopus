@@ -18,6 +18,7 @@ import { Logo } from "@/components/layout/Logo";
 import { HomeMobileMenu } from "@/components/marketing/home-mobile-menu";
 import { HeaderUserMenu } from "@/components/marketing/header-user-menu";
 import { buildAbsoluteUrl } from "./(marketing)/models/data";
+import { loadHeaderWalletBalanceLabel } from "@/lib/header-wallet";
 import { createClient } from "@/lib/supabase/server";
 
 const HEADER_NAV_ITEMS = [
@@ -249,6 +250,7 @@ export default async function Home() {
 
   const destination = user ? "/dashboard" : "/login";
   const destinationLabel = user ? "Dashboard" : "Get API Key";
+  const walletBalanceLabel = user ? await loadHeaderWalletBalanceLabel(user.id) : null;
 
   return (
     <div className="min-h-screen bg-[#FCFCFA] text-[#111827]" style={{ colorScheme: "light" }}>
@@ -310,22 +312,32 @@ export default async function Home() {
 
             <div className="absolute right-0 flex items-center gap-2 lg:static lg:ml-auto">
               <HomeMobileMenu items={HEADER_NAV_ITEMS.map((item) => ({ ...item }))} />
-              <Link
-                href={destination}
-                className="inline-flex h-9 items-center justify-center rounded-md bg-[#111827] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0B1220]"
-              >
-                {destinationLabel}
-              </Link>
               {user ? (
-                <HeaderUserMenu
-                  userLabel={user.email ?? (user.user_metadata?.name as string | undefined) ?? null}
-                  userAvatarUrl={
-                    (user.user_metadata?.avatar_url as string | undefined) ??
-                    (user.user_metadata?.picture as string | undefined) ??
-                    null
-                  }
-                />
-              ) : null}
+                <>
+                  <HeaderUserMenu
+                    userLabel={user.email ?? (user.user_metadata?.name as string | undefined) ?? null}
+                    userAvatarUrl={
+                      (user.user_metadata?.avatar_url as string | undefined) ??
+                      (user.user_metadata?.picture as string | undefined) ??
+                      null
+                    }
+                    walletBalanceLabel={walletBalanceLabel}
+                  />
+                  <Link
+                    href="/dashboard"
+                    className="inline-flex h-9 items-center justify-center rounded-full bg-[#C27B3B] px-4 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[#A6642D]"
+                  >
+                    Dashboard
+                  </Link>
+                </>
+              ) : (
+                <Link
+                  href={destination}
+                  className="inline-flex h-9 items-center justify-center rounded-md bg-[#111827] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0B1220]"
+                >
+                  {destinationLabel}
+                </Link>
+              )}
             </div>
           </div>
         </div>

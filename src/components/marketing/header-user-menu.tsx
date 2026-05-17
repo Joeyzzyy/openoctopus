@@ -34,26 +34,9 @@ export function HeaderUserMenu({
 
   return (
     <div ref={rootRef} className="relative flex items-center gap-2">
-      <span className="hidden max-w-[260px] truncate text-[13px] text-[#6B7280] md:inline">
-        {userLabel ?? "OpenOctopus User"}
-      </span>
-      <button
-        type="button"
-        aria-label="Open account menu"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-black/[0.08] bg-white text-[12px] font-semibold text-black/75 transition-colors hover:bg-black/[0.03]"
-      >
-        {userAvatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={userAvatarUrl} alt={userLabel ?? "User avatar"} className="h-full w-full object-cover" />
-        ) : (
-          <span>{avatarFallback}</span>
-        )}
-      </button>
       {walletBalanceLabel ? (
-        <>
-          <span className="max-w-[120px] truncate text-[12px] font-medium text-[#111827] sm:max-w-none sm:text-[13px]">
+        <div className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#E7C89A] bg-[#FFF8EC] pl-3 pr-1 text-[#9A4F18] shadow-sm">
+          <span className="max-w-[92px] truncate text-[12px] font-semibold sm:max-w-[132px] sm:text-[13px]">
             {walletBalanceLabel}
           </span>
           <button
@@ -65,13 +48,26 @@ export function HeaderUserMenu({
                 router.refresh();
               });
             }}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/[0.08] bg-white text-black/55 transition-colors hover:bg-black/[0.03] hover:text-black disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex size-7 items-center justify-center rounded-full text-[#9A4F18]/65 transition-colors hover:bg-[#F1D5A8]/35 hover:text-[#7A3E12] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
           </button>
-        </>
+        </div>
       ) : null}
-
+      <button
+        type="button"
+        aria-label="Open account menu"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex size-9 items-center justify-center overflow-hidden rounded-full border border-[#E7C89A] bg-white text-[12px] font-semibold text-[#9A4F18] shadow-sm transition-colors hover:bg-[#FFF8EC]"
+      >
+        {userAvatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={userAvatarUrl} alt={userLabel ?? "User avatar"} className="h-full w-full object-cover" />
+        ) : (
+          <span>{avatarFallback}</span>
+        )}
+      </button>
       {open ? (
         <div className="absolute right-0 top-11 z-20 w-64 rounded-xl border border-black/[0.08] bg-white p-3 shadow-xl">
           <p className="truncate text-sm font-medium text-black">{userLabel ?? "OpenOctopus User"}</p>
