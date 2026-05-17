@@ -9,6 +9,7 @@ type ExploreModel = {
   displayName: string;
   providerName: string;
   capability: string;
+  modelTypeLabel: string;
   modelDescription: string;
   priceLabel: string;
   coverImageUrl: string | null;
@@ -32,11 +33,15 @@ function capabilityToCategory(capability: string) {
   return "Other";
 }
 
+function modelToCategory(model: ExploreModel) {
+  return model.modelTypeLabel.trim() || capabilityToCategory(model.capability);
+}
+
 function buildCategoryList(models: ExploreModel[]) {
   const seen = new Set<string>();
   const categories: string[] = [];
   for (const model of models) {
-    const category = capabilityToCategory(model.capability);
+    const category = modelToCategory(model);
     if (!seen.has(category)) {
       seen.add(category);
       categories.push(category);
@@ -64,7 +69,7 @@ export function ExplorePanel({
     const counts = new Map<string, number>();
     for (const model of models) {
       if (activeProvider !== "all" && model.providerName !== activeProvider) continue;
-      const category = capabilityToCategory(model.capability);
+      const category = modelToCategory(model);
       counts.set(category, (counts.get(category) ?? 0) + 1);
     }
     return counts;
@@ -72,7 +77,7 @@ export function ExplorePanel({
 
   const filteredModels = useMemo(() => {
     return models.filter((model) => {
-      const category = capabilityToCategory(model.capability);
+      const category = modelToCategory(model);
       const providerMatched = activeProvider === "all" || model.providerName === activeProvider;
       const categoryMatched = effectiveSelectedCategories.includes(category);
       return providerMatched && categoryMatched;
@@ -154,7 +159,7 @@ export function ExplorePanel({
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {filteredModels.length > 0 ? (
             filteredModels.map((model) => {
-              const category = capabilityToCategory(model.capability);
+              const category = modelToCategory(model);
               return (
                 <a
                   key={model.id}

@@ -630,6 +630,7 @@ export default async function DashboardPage({
                   displayName: model.displayName,
                   providerName: model.providerName,
                   capability: model.capability,
+                  modelTypeLabel: model.modelTypeLabel,
                   modelDescription: model.modelDescription,
                   priceLabel: model.priceLabel,
                   coverImageUrl: model.coverImageUrl,
