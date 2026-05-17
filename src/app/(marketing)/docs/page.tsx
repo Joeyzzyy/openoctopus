@@ -16,7 +16,7 @@ export default async function DocsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const destination = user ? "/dashboard" : "/login";
-  const destinationLabel = user ? "Dashboard" : "Get API Key";
+  const destinationLabel = user ? "Dashboard" : "Sign In";
 
   return (
     <>

@@ -1,18 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
   ChevronRight,
-  Clapperboard,
-  CreditCard,
   ShieldCheck,
   Sparkles,
-  UserRound,
   WandSparkles,
-  Workflow,
-  Zap,
 } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { HomeMobileMenu } from "@/components/marketing/home-mobile-menu";
@@ -34,6 +29,11 @@ const FOOTER_NAV_ITEMS = [
   { label: "Learn More", href: "/resource" },
   { label: "Tools", href: "/tools" },
 ];
+
+const SECTION_X_PADDING = "px-6 md:px-8";
+const SECTION_Y_PADDING = "py-14 md:py-20";
+const CARD_CLASS =
+  "rounded-xl border border-black/[0.08] bg-white shadow-sm transition-all duration-200 hover:border-[#C27B3B]/35 hover:shadow-md";
 
 const CAPABILITY_CARDS = [
   {
@@ -57,7 +57,7 @@ const CAPABILITY_CARDS = [
     variant: "performance",
     title: "Price and Performance",
     description:
-      "Keep costs in check without sacrificing speed. OpenRouter runs at the edge for minimal latency between your users and their inference.",
+      "Keep image and video costs predictable with transparent model pricing and unified wallet billing.",
     href: "/docs",
     cta: "Learn more",
     external: true,
@@ -148,7 +148,7 @@ const AI_MODEL_LOGOS = [
   },
   {
     name: "Sora",
-    image: "https://www.mindvideo.ai/images/ai-models/sora2.webp",
+    image: "https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/light/openai.png",
   },
   {
     name: "Flux",
@@ -164,60 +164,60 @@ const AI_MODEL_LOGOS = [
   },
 ];
 
-const FEATURED_MODELS = [
+const API_POWER_CARDS = [
   {
-    name: "Claude Opus 4.7",
-    provider: "anthropic",
-    byline: "by anthropic",
-    metricLabel: "Tokens",
-    metricValue: "997.0B",
-    trendLabel: "Weekly Trend",
-    trend: "-24.09%",
-    icon: WandSparkles,
+    name: "OpenAI Image2 Edit",
+    image:
+      "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/06882d5f-d093-44c5-a277-63c34c9cfe70/cover-1779005162420-openoctopus-gpt-image-2-image-input-1.webp",
+    href: "/models/azure-openai/openoctopus-gpt-image-2-image-input",
+    tags: ["image-to-image"],
+    description:
+      "Edit images from natural-language instructions with one or more reference images.",
   },
   {
-    name: "GPT-5.5",
-    provider: "openai",
-    byline: "by openai",
-    metricLabel: "Tokens",
-    metricValue: "297.1B",
-    trendLabel: "Weekly Trend",
-    trend: "+88.51%",
-    badge: "New",
-    icon: Clapperboard,
+    name: "Imagen 4",
+    image:
+      "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/f3c761d8-d3a8-46fb-bc28-044821509205/cover-1778847198762-openoctopus-imagen-4-1.png",
+    href: "/models/google/openoctopus-imagen-4",
+    tags: ["text-to-image"],
+    description:
+      "Google's flagship text-to-image model for high-fidelity images and creative control.",
   },
   {
-    name: "Gemini 3.1 Pro Preview",
-    provider: "google",
-    byline: "by google",
-    metricLabel: "Tokens",
-    metricValue: "336.0B",
-    trendLabel: "Weekly Trend",
-    trend: "-16.58%",
-    icon: Sparkles,
-  },
-];
-
-const WORKFLOW_STEPS = [
-  {
-    step: "1",
-    title: "Signup",
-    description: "Create an account to get started. You can set up an org for your team later.",
-    icon: Workflow,
+    name: "Imagen 3",
+    image:
+      "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/9bf1e2d5-caee-4afe-be0d-f154f047a634/cover-1778817993519-openoctopus-imagen-3-fast-1.png",
+    href: "/models/google/openoctopus-imagen-3",
+    tags: ["text-to-image"],
+    description:
+      "Google text-to-image generation for detailed, beautifully lit, photoreal images.",
   },
   {
-    step: "2",
-    title: "Buy credits",
-    description: "Credits can be used with any model or provider.",
-    detailLines: ["Apr 1   $99", "Mar 30   $10"],
-    icon: Zap,
+    name: "Imagen 3 Fast",
+    image:
+      "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/b10d19c6-39f4-4b4a-96e8-f2103867de98/cover-1778840825936-openoctopus-imagen-3-fast-1.png",
+    href: "/models/google/openoctopus-imagen-3-fast",
+    tags: ["text-to-image"],
+    description:
+      "Fast text-to-image generation for richly detailed images with lower latency.",
   },
   {
-    step: "3",
-    title: "Get your API key",
-    description: "Create an API key and start making requests. Fully OpenAI compatible.",
-    detailLines: ["OPENROUTER_API_KEY", "••••••••••••••••"],
-    icon: ShieldCheck,
+    name: "Imagen 4 Fast",
+    image:
+      "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/05a90004-bd34-4e4d-a92e-d07152b80c79/cover-1778840680016-openoctopus-imagen-4-fast-1.png",
+    href: "/models/google/openoctopus-imagen-4-fast",
+    tags: ["text-to-image"],
+    description:
+      "The fast variant of Imagen 4 for high-quality image generation at speed.",
+  },
+  {
+    name: "OpenAI Image2",
+    image:
+      "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/65bb7939-7344-4e5c-ab92-7603e8c6f078/cover-1778850025490-openoctopus-gpt-image-2-text-input-1.png",
+    href: "/models/azure-openai/openoctopus-gpt-image-2-text-input",
+    tags: ["text-to-image"],
+    description:
+      "High-quality image generation from natural-language prompts through OpenAI Image2.",
   },
 ];
 
@@ -250,11 +250,11 @@ export default async function Home() {
   } = await supabase.auth.getUser();
 
   const destination = user ? "/dashboard" : "/login";
-  const destinationLabel = user ? "Dashboard" : "Get API Key";
+  const destinationLabel = user ? "Dashboard" : "Sign In";
   const walletBalanceLabel = user ? await loadHeaderWalletBalanceLabel(user.id) : null;
 
   return (
-    <div className="min-h-screen bg-[#FCFCFA] text-[#111827]" style={{ colorScheme: "light" }}>
+    <div className="min-h-screen bg-white text-[#111827]" style={{ colorScheme: "light" }}>
       <script
         type="application/ld+json"
         suppressHydrationWarning
@@ -287,7 +287,7 @@ export default async function Home() {
           }),
         }}
       />
-      <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-white/95 backdrop-blur-xl">
         <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
           <div className="relative flex h-14 w-full items-center justify-start text-sm md:text-base">
             <Link
@@ -342,142 +342,72 @@ export default async function Home() {
         </div>
       </header>
 
-      <main className="tabular-nums">
-        <section className="relative overflow-hidden bg-[#FCFCFA]">
-          <div
-            aria-hidden="true"
-            className="absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(circle at 50% 0%, rgba(243, 226, 201, 0.58), transparent 34%), radial-gradient(circle at 12% 62%, rgba(194,123,59,0.10), transparent 30%), #FCFCFA",
-            }}
-          />
-          <div
-            aria-hidden="true"
-            className="absolute inset-x-0 top-0 h-[440px] opacity-50"
-            style={{
-              backgroundImage:
-                "linear-gradient(rgba(17,24,39,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(17,24,39,0.035) 1px, transparent 1px)",
-              backgroundSize: "44px 44px",
-              maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)",
-            }}
-          />
-
-          <div className="relative mx-auto flex w-full max-w-7xl flex-col items-center px-6 pb-14 pt-12 md:px-8 md:pb-20 md:pt-20">
-            <div className="pointer-events-none absolute left-8 top-16 h-24 w-24 rounded-full border border-[#C27B3B]/20 bg-[#C27B3B]/10 blur-xl" />
-            <div className="pointer-events-none absolute bottom-20 right-10 h-32 w-32 rounded-full border border-[#4338CA]/10 bg-[#4338CA]/10 blur-2xl" />
-            <div className="z-10 mx-auto flex w-full max-w-7xl flex-col overflow-hidden rounded-xl border border-white/70 bg-white/55 p-6 shadow-[0_30px_100px_rgba(17,24,39,0.18)] backdrop-blur-xl md:p-10 lg:p-16">
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.72),rgba(255,255,255,0.2)_42%,rgba(194,123,59,0.10))]" />
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-              <div className="relative mb-8 flex flex-wrap items-center justify-center gap-2">
-                {["Image", "Video", "Edit", "Routing"].map((item) => (
-                  <span
-                    key={item}
-                    className="rounded-full border border-black/[0.08] bg-white/70 px-3 py-1 text-[11px] font-medium text-[#6B7280] shadow-sm"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-              <div className="relative flex flex-col items-center justify-center gap-6 lg:flex-row lg:gap-10">
-                <h1 className="text-center text-5xl font-semibold tracking-tight text-[#111827] md:text-7xl lg:text-8xl">
-                  Any API
-                </h1>
-                <p className="max-w-md text-center text-sm leading-6 text-[#6B7280] md:text-base lg:text-left">
-                  Discover, integrate, and manage image, video, and multimodal models in one unified API marketplace.
-                  Fast integration, reliable routing, and transparent pricing.
-                </p>
-              </div>
-
-              <div className="relative mt-10 flex flex-col items-center gap-10 lg:flex-row">
-                <HeroModelIconStack />
-                <h2 className="text-center text-5xl font-semibold tracking-tight text-[#111827] md:text-7xl lg:text-8xl">
-                  Any Model
-                </h2>
-              </div>
-
-              <div className="relative mt-10 flex flex-col items-center gap-8 lg:flex-row lg:items-end lg:justify-center">
-                <h2 className="text-center text-5xl font-semibold tracking-tight text-[#111827] underline decoration-[#C27B3B]/60 decoration-4 underline-offset-8 md:text-7xl lg:text-8xl">
-                  Always On
-                </h2>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Link
-                    href="/models"
-                    className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-full bg-[#C27B3B] px-6 text-sm font-bold tracking-wide text-white shadow-lg shadow-[#C27B3B]/25 transition-colors hover:bg-[#A6642D] md:h-14 md:px-8 md:text-[17px]"
-                  >
-                    <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-                    <span className="relative z-10 flex items-center gap-2">
+      <main className="overflow-hidden bg-white tabular-nums">
+        <section className="relative isolate overflow-hidden pb-10 md:pb-14">
+          <div className="home-hero-field" aria-hidden="true">
+            <span className="home-hero-grid" />
+            <span className="home-hero-sweep" />
+            <span className="home-hero-nodes" />
+            <span className="home-hero-trails" />
+            <span className="home-hero-fade" />
+          </div>
+          <div className={`relative z-10 mx-auto flex w-full max-w-7xl flex-col items-center ${SECTION_X_PADDING} pb-12 pt-12 md:pb-16 md:pt-20`}>
+            <div className={`${CARD_CLASS} w-full overflow-hidden bg-white/86 p-6 backdrop-blur-sm md:p-10 lg:p-14`}>
+              <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+                <div className="max-w-2xl">
+                  <div className="mb-6 flex flex-wrap gap-2">
+                    {["Image generation", "Image editing", "Unified billing"].map((item) => (
+                      <span
+                        key={item}
+                        className="rounded-full border border-[#C27B3B]/20 bg-[#C27B3B]/5 px-3 py-1 text-[11px] font-medium text-[#8A552B]"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                  <h1 className="text-4xl font-semibold tracking-tight text-[#111827] md:text-6xl lg:text-7xl">
+                    One API for creative AI models.
+                  </h1>
+                  <p className="mt-6 max-w-xl text-sm leading-6 text-[#6B7280] md:text-base">
+                    Generate and edit images through the models OpenOctopus supports today, with clear pricing,
+                    API keys, playground testing, and account balance in one place.
+                  </p>
+                  <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                    <PrimaryLink href="/models">
                       Explore Models
-                      <ArrowRight className="size-5 transition-transform duration-300 group-hover:translate-x-1" />
-                    </span>
-                  </Link>
-                  <Link
-                    href={destination}
-                    className="inline-flex h-12 items-center justify-center rounded-full border border-black/[0.1] bg-white/70 px-6 text-sm font-semibold text-[#111827] shadow-sm transition-colors hover:bg-white md:h-14 md:px-8 md:text-[17px]"
-                  >
-                    {destinationLabel}
-                  </Link>
+                      <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
+                    </PrimaryLink>
+                    <SecondaryLink href={destination}>{destinationLabel}</SecondaryLink>
+                  </div>
                 </div>
-              </div>
-
-              <div className="relative mt-12 grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
-                <HeroStatCard label="Monthly Tokens" value="80T" />
-                <HeroStatCard label="Global Users" value="8M+" />
-                <HeroStatCard label="Active Providers" value="60+" />
-                <HeroStatCard label="Models" value="400+" highlight />
+                <div className="flex flex-col gap-6 rounded-xl border border-black/[0.06] bg-[#FAFAF9] p-5">
+                  <HeroModelIconStack />
+                  <div className="grid grid-cols-2 gap-3">
+                    <HeroStatCard label="Active models" value="6" />
+                    <HeroStatCard label="Capabilities" value="2" highlight />
+                    <HeroStatCard label="API format" value="REST" />
+                    <HeroStatCard label="Secure payments" value={<StripeLogo />} />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        <ModelLogoMarquee />
+        <HowItWorksSection />
 
-        <section className="mx-auto w-full max-w-7xl space-y-4 px-6 pb-14 md:space-y-8 md:px-8 md:pb-20">
+        <ProviderEcosystemSection />
+
+        <ApiPowerSection />
+
+        <section className={`mx-auto w-full max-w-7xl space-y-8 ${SECTION_X_PADDING} pb-14 md:pb-20`}>
+          <SectionHeader
+            title="Built for model operations"
+            description="Route requests, review pricing, manage API keys, and keep playground testing close to production API usage."
+          />
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
             {CAPABILITY_CARDS.map((card) => (
               <CapabilityCard key={card.title} {...card} />
-            ))}
-          </div>
-        </section>
-
-        <ModelLogoGrid />
-
-        <section className="mx-auto w-full max-w-7xl space-y-6 px-6 pb-14 md:px-8 md:pb-20">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <Link href="/bestof">
-                <div>
-                  <h2 className="mb-1 flex items-center gap-1 text-2xl font-semibold align-baseline text-[#111827]">
-                    Featured Models
-                    <ChevronRight className="inline-block size-5 text-[#6B7280]" />
-                  </h2>
-                </div>
-              </Link>
-              <p className="text-sm text-[#6B7280]">
-                400+ active models on 60+ providers
-              </p>
-            </div>
-            <Link
-              href="/bestof"
-              className="group inline-flex text-sm text-[#6B7280] transition-colors hover:text-[#111827]"
-            >
-              <span className="inline-flex items-center gap-1">
-                <span>View all</span>
-                <ArrowRight className="inline-flex size-3 transition-transform group-hover:translate-x-0.5" />
-              </span>
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            {FEATURED_MODELS.map((model) => (
-              <FeaturedModelCard key={model.name} {...model} />
-            ))}
-          </div>
-        </section>
-
-        <section className="mx-auto w-full max-w-4xl space-y-8 px-6 pb-14 md:space-y-12 md:pb-20">
-          <div className="grid grid-cols-1 gap-12 md:grid-cols-3">
-            {WORKFLOW_STEPS.map((step) => (
-              <HowItWorksCard key={step.title} {...step} />
             ))}
           </div>
         </section>
@@ -486,7 +416,7 @@ export default async function Home() {
 
       </main>
 
-      <footer className="border-t border-black/[0.06] bg-[#FCFCFA]">
+      <footer className="border-t border-black/[0.06] bg-white">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-8 md:flex-row md:items-center md:justify-between md:px-8">
           <div className="flex items-center gap-4">
             <Logo className="text-[#111827]" />
@@ -510,36 +440,153 @@ export default async function Home() {
   );
 }
 
-function ModelLogoMarquee() {
-  const marqueeItems = [...AI_MODEL_LOGOS, ...AI_MODEL_LOGOS];
-
+function ApiPowerSection() {
   return (
-    <section className="w-full overflow-hidden px-0 pb-14 md:pb-20">
-      <div className="group relative flex w-full overflow-hidden py-1 [--gap:6px] [gap:var(--gap)]">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-gradient-to-r from-[#FCFCFA] to-transparent"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-gradient-to-l from-[#FCFCFA] to-transparent"
-        />
-        <div className="flex shrink-0 animate-[marquee_40s_linear_infinite] justify-around [gap:var(--gap)] group-hover:[animation-play-state:paused]">
-          {marqueeItems.map((model, index) => (
-            <div key={`${model.name}-${index}`} className="h-full">
-              <div className="mx-2 flex h-full min-w-[160px] items-center gap-3 overflow-visible rounded-xl border border-black/[0.08] bg-white/70 px-5 py-4 shadow-sm backdrop-blur-md md:mx-4">
+    <section className={`mx-auto w-full max-w-7xl ${SECTION_X_PADDING} ${SECTION_Y_PADDING}`}>
+      <SectionHeader
+        title="Discover the Power of Our APIs"
+        description="Explore the image generation and editing models currently available on OpenOctopus."
+      />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        {API_POWER_CARDS.map((model) => (
+          <Link key={model.name} href={model.href} className="group block h-full w-full p-2">
+            <div className={`${CARD_CLASS} h-full overflow-hidden group-hover:-translate-y-1`}>
+              <div className="p-4">
+                <div className="overflow-hidden rounded-lg border border-black/[0.04] bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={model.image}
+                    alt={model.name}
+                    className="h-[200px] w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.03]"
+                    loading="lazy"
+                  />
+                </div>
+                <h3 className="mt-4 text-xl font-bold tracking-wide text-[#C27B3B]">
+                  {model.name}
+                </h3>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {model.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex rounded-full bg-[#C27B3B] px-3 py-1 text-xs font-medium text-white"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-3 text-sm leading-6 tracking-wide text-[#6B7280]">
+                  {model.description}
+                </p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+      <Link
+        href="/models"
+        className="group mx-auto mt-10 flex w-fit items-center justify-center gap-1 text-sm font-medium text-[#6B7280] transition-colors hover:text-[#111827] hover:underline"
+      >
+        View More
+        <ChevronRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
+      </Link>
+    </section>
+  );
+}
+
+function SectionHeader({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="mx-auto mb-8 w-full max-w-3xl text-center md:mb-10">
+      <h2 className="text-3xl font-semibold tracking-tight text-[#111827] md:text-4xl">
+        {title}
+      </h2>
+      <p className="mt-3 text-sm leading-6 text-[#6B7280] md:text-base">{description}</p>
+    </div>
+  );
+}
+
+function PrimaryLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#C27B3B] px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#A6642D]"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function SecondaryLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex h-11 items-center justify-center rounded-lg border border-black/[0.1] bg-white px-5 text-sm font-semibold text-[#111827] shadow-sm transition-colors hover:bg-[#F9FAFB]"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function ProviderEcosystemSection() {
+  return (
+    <section className="relative overflow-hidden border-y border-black/[0.06] bg-[radial-gradient(circle_at_50%_0%,rgba(194,123,59,0.14),transparent_34rem),linear-gradient(180deg,#ffffff_0%,rgba(250,250,249,0.82)_48%,#ffffff_100%)] py-14">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(255,255,255,0.88),transparent)]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(0deg,rgba(255,255,255,0.9),transparent)]" />
+      <div className={`relative z-10 mx-auto w-full max-w-7xl ${SECTION_X_PADDING}`}>
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-[#6B7280]">
+              Top model ecosystems, one API
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#111827] sm:text-3xl">
+              Production model providers on OpenOctopus
+            </h2>
+          </div>
+          <Link
+            href="/models"
+            className="group inline-flex items-center gap-2 text-sm font-semibold text-[#C27B3B] transition-colors hover:text-[#A6642D]"
+          >
+            View all providers
+            <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+          {AI_MODEL_LOGOS.slice(0, 14).map((model) => (
+            <Link
+              key={model.name}
+              href="/models"
+              className="group flex min-h-[72px] min-w-0 items-center gap-3 rounded-xl border border-black/[0.08] bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#C27B3B]/40 hover:shadow-md"
+            >
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-black/[0.08] bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={model.image}
                   alt={model.name}
-                  className="h-10 w-10 shrink-0 object-contain"
+                  className="size-6 object-contain"
                   loading="lazy"
                 />
-                <span className="whitespace-nowrap text-sm font-semibold text-[#111827]">
-                  {model.name}
-                </span>
               </div>
-            </div>
+              <h3 className="min-w-0 truncate text-xs font-bold text-[#111827]">
+                {model.name}
+              </h3>
+            </Link>
           ))}
         </div>
       </div>
@@ -557,7 +604,7 @@ function HeroModelIconStack() {
       {AI_MODEL_LOGOS.slice(0, 5).map((model, index) => (
         <div
           key={model.name}
-          className={`${index >= 2 ? "hidden md:flex" : "flex"} relative size-16 items-center justify-center rounded-full border border-black/[0.08] bg-white p-4 shadow-2xl transition-transform duration-300 hover:-translate-y-1 md:size-20 md:p-5`}
+          className={`${index >= 2 ? "hidden md:flex" : "flex"} relative size-16 items-center justify-center rounded-full border border-black/[0.08] bg-white p-4 shadow-sm transition-transform duration-300 hover:-translate-y-1 md:size-20 md:p-5`}
           title={model.name}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -573,41 +620,6 @@ function HeroModelIconStack() {
   );
 }
 
-function ModelLogoGrid() {
-  return (
-    <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-4 md:px-8 md:pb-24 md:pt-8">
-      <div className="mx-auto mb-10 w-full max-w-3xl text-center">
-        <p className="mx-auto max-w-3xl text-sm leading-6 text-[#6B7280] md:text-base">
-          OpenOctopus provides access to Kling AI, Runway, Luma AI, Veo, Sora, Flux, and more, all in one place.
-          Create stunning visuals using the best AI models available.
-        </p>
-      </div>
-      <div className="grid grid-cols-4 gap-4 sm:grid-cols-5 md:grid-cols-6 md:gap-6 lg:grid-cols-8">
-        {AI_MODEL_LOGOS.map((model) => (
-          <Link
-            key={model.name}
-            href="/models"
-            className="group flex min-w-0 flex-col items-center gap-2"
-          >
-            <div className="flex size-16 items-center justify-center overflow-hidden rounded-2xl border border-black/[0.08] bg-white/70 p-3 shadow-sm transition-all group-hover:scale-105 group-hover:border-[#C27B3B]/35 group-hover:shadow-md md:size-20">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={model.image}
-                alt={model.name}
-                className="h-full w-full object-contain"
-                loading="lazy"
-              />
-            </div>
-            <span className="max-w-full text-center text-xs leading-tight text-[#6B7280] md:text-sm">
-              {model.name}
-            </span>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function BottomPricingCta({
   destination,
   destinationLabel,
@@ -616,48 +628,37 @@ function BottomPricingCta({
   destinationLabel: string;
 }) {
   return (
-    <section className="mx-auto w-full max-w-7xl px-6 pb-20 md:px-8">
-      <div className="relative h-[30rem] overflow-hidden rounded-2xl border border-white/10 bg-[#111827] shadow-2xl">
+    <section className={`mx-auto w-full max-w-7xl ${SECTION_X_PADDING} pb-20`}>
+      <div className="relative overflow-hidden rounded-xl border border-[#2B3445] bg-[#111827] shadow-sm">
         <div
           aria-hidden="true"
-          className="absolute inset-0"
+          className="absolute inset-0 opacity-80"
           style={{
             background:
-              "radial-gradient(circle at 24% 20%, rgba(194,123,59,0.46), transparent 28%), radial-gradient(circle at 78% 70%, rgba(67,56,202,0.28), transparent 30%), linear-gradient(135deg, #111827 0%, #17120E 58%, #2A160C 100%)",
+              "linear-gradient(135deg, #111827 0%, #17120E 100%)",
           }}
         />
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)",
-            backgroundSize: "42px 42px",
-            maskImage: "radial-gradient(circle at center, black, transparent 76%)",
-          }}
-        />
-        <div className="absolute inset-x-8 top-8 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
-        <div className="relative z-10 flex h-full w-full flex-col items-center justify-center px-4 py-8 text-center md:px-10">
+        <div className="relative z-10 flex w-full flex-col items-center justify-center px-6 py-16 text-center md:px-10 md:py-20">
           <span className="mb-5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-white/70 backdrop-blur">
             Transparent pricing, one balance
           </span>
-          <h2 className="max-w-4xl text-3xl font-bold tracking-tight text-white md:text-6xl">
+          <h2 className="max-w-4xl text-3xl font-semibold tracking-tight text-white md:text-5xl">
             Ready to Build Something Amazing?
           </h2>
-          <p className="mt-6 max-w-xl text-sm leading-6 text-white/72 md:text-xl md:leading-8">
+          <p className="mt-5 max-w-xl text-sm leading-6 text-white/72 md:text-base">
             Access image, video, and editing models with one account. Start building in minutes with developer-friendly docs and unified billing.
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row">
             <Link
               href={destination}
-              className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#C27B3B] px-7 text-sm font-semibold text-white shadow-lg shadow-[#C27B3B]/25 transition-colors hover:bg-[#A6642D]"
+              className="group inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#C27B3B] px-6 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#A6642D]"
             >
               {destinationLabel}
               <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
             </Link>
             <Link
               href="/pricing"
-              className="inline-flex h-12 items-center justify-center rounded-full border border-white/15 bg-white/10 px-7 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/15"
+              className="inline-flex h-11 items-center justify-center rounded-lg border border-white/15 bg-white/10 px-6 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/15"
             >
               View Pricing
             </Link>
@@ -674,20 +675,28 @@ function BottomPricingCta({
   );
 }
 
+function StripeLogo() {
+  return (
+    <span className="inline-flex h-9 items-center rounded-md bg-[#635BFF] px-3 text-lg font-bold tracking-tight text-white">
+      stripe
+    </span>
+  );
+}
+
 function HeroStatCard({
   label,
   value,
   highlight = false,
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   highlight?: boolean;
 }) {
   return (
-    <div className="rounded-xl border-none bg-transparent text-[#111827] transition-all duration-200">
-      <div className="p-4 md:p-6">
+    <div className="rounded-lg border border-black/[0.06] bg-white text-[#111827] shadow-sm">
+      <div className="p-4">
         <div className="flex flex-col items-center gap-1 md:gap-2">
-          <p className={`text-3xl font-bold md:text-4xl ${highlight ? "text-[#C27B3B]" : "text-[#111827]"}`}>
+          <p className={`text-2xl font-semibold md:text-3xl ${highlight ? "text-[#C27B3B]" : "text-[#111827]"}`}>
             {value}
           </p>
           <p className="text-xs text-[#6B7280] md:text-sm">{label}</p>
@@ -714,13 +723,13 @@ function CapabilityCard({
 }) {
   return (
     <Link href={href} className="h-full">
-      <div className="group/card flex h-full flex-col overflow-hidden rounded-xl border border-black/[0.08] bg-white text-[#111827] shadow-sm transition-colors duration-200 hover:border-[#C27B3B] hover:shadow-lg">
-        <div className="relative h-48 shrink-0 overflow-hidden rounded-t-xl border-b border-black/[0.06] bg-[#FCFCFA] p-2 transition-transform group-hover/card:-translate-y-1 group-hover/card:scale-[1.02]">
+      <div className={`${CARD_CLASS} group/card flex h-full flex-col overflow-hidden text-[#111827]`}>
+        <div className="relative h-44 shrink-0 overflow-hidden border-b border-black/[0.06] bg-white p-2">
           <CapabilityPreview variant={variant} />
         </div>
         <div className="flex h-full flex-col gap-2 px-6 py-4">
           <div className="flex h-full flex-col gap-2">
-            <h3 className="text-xl font-semibold transition-colors duration-200 group-hover/card:text-[#111827]">
+            <h3 className="text-lg font-semibold transition-colors duration-200 group-hover/card:text-[#111827]">
               {title}
             </h3>
             <p className="text-sm text-[#6B7280]">{description}</p>
@@ -740,8 +749,8 @@ function CapabilityPreview({ variant }: { variant: string }) {
     return (
       <div className="absolute inset-0">
         <div className="absolute inset-0 z-20 pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-t from-[#FCFCFA] via-transparent to-[#FCFCFA] opacity-30" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#FCFCFA] via-transparent to-[#FCFCFA] opacity-30" />
+          <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-white opacity-30" />
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-transparent to-white opacity-30" />
         </div>
         <div className="absolute inset-4 z-10 grid scale-105 grid-cols-5 gap-x-0 gap-y-1">
           {PROVIDER_ORBS.map((provider, index) => (
@@ -783,8 +792,8 @@ function CapabilityPreview({ variant }: { variant: string }) {
     return (
       <div className="relative flex h-full items-center justify-center">
         <div className="absolute inset-0 z-10">
-          <div className="absolute inset-0 bg-gradient-to-t from-[#FCFCFA] via-transparent to-[#FCFCFA] opacity-20" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#FCFCFA] via-transparent to-[#FCFCFA] opacity-20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-white opacity-20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-transparent to-white opacity-20" />
         </div>
         <div className="relative flex h-full w-full items-end justify-center gap-2 px-5 pb-5">
           {[28, 44, 64, 58, 82, 98, 88].map((height) => (
@@ -856,240 +865,164 @@ function ProviderOrb({ label, index }: { label: string; index: number }) {
   );
 }
 
-function FeaturedModelCard({
-  name,
-  provider,
-  byline,
-  metricLabel,
-  metricValue,
-  trendLabel,
-  trend,
-  badge,
-  icon: Icon,
-}: {
-  name: string;
-  provider: string;
-  byline: string;
-  metricLabel: string;
-  metricValue: string;
-  trendLabel: string;
-  trend: string;
-  badge?: string;
-  icon: LucideIcon;
-}) {
+function HowItWorksSection() {
   return (
-    <Link href={`/models/${provider}/${slugifyModelName(name)}`} className="block h-full">
-      <div className="group/card flex h-full flex-col overflow-hidden rounded-xl border border-black/[0.08] bg-white text-[#111827] shadow-sm transition-colors hover:border-[#C27B3B] hover:shadow-lg">
-        <div className="flex flex-1 flex-col justify-between p-6">
-          <div className="mb-4 flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="size-12 shrink-0 overflow-hidden rounded-full border border-black/[0.08] transition-transform group-hover/card:rotate-12 group-hover/card:scale-110">
-                <div className="flex size-full items-center justify-center bg-[#F9FAFB]">
-                  <Icon className="h-5 w-5 text-[#111827]" />
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold text-[#111827]">{name}</h3>
-                  {badge ? (
-                    <span className="rounded-[6px] bg-black/[0.06] px-1.5 py-0.5 text-xs font-medium text-[#111827]">
-                      {badge}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-sm text-[#6B7280]">{byline}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2 border-t border-black/[0.08] pt-5">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col items-start justify-between">
-                <span className="text-sm text-[#6B7280]">{metricLabel}</span>
-                <span className="text-sm font-medium text-[#111827]">{metricValue}</span>
-              </div>
-              <div className="flex flex-col items-end justify-between">
-                <span className="text-sm text-[#6B7280]">{trendLabel}</span>
-                <span className={`text-sm font-medium ${trend.startsWith("+") ? "text-[#15803D]" : "text-[#DC2626]"}`}>
-                  {trend}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function HowItWorksCard({
-  step,
-  title,
-  description,
-}: {
-  step: string;
-  title: string;
-  description: string;
-  icon: LucideIcon;
-}) {
-  const isSignup = step === "1";
-  const isCredits = step === "2";
-  const isApiKey = step === "3";
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2 md:gap-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#C27B3B]/10 text-sm font-medium text-[#C27B3B] md:h-8 md:w-8">
-          {step}
-        </div>
-        <h3 className="text-base font-semibold text-[#111827] md:text-lg">{title}</h3>
-      </div>
-      <div className="min-h-10 md:min-h-12">
-        <p className="text-sm text-[#6B7280]">
-          {isApiKey ? (
-            <>
-              Create an API key and start making requests.{" "}
-              <Link href="/docs" className="text-[#111827] underline decoration-black/20 underline-offset-4">
-                Fully OpenAI compatible
-              </Link>
-              .
-            </>
-          ) : (
-            description
-          )}
-        </p>
-      </div>
-      <div className="flex w-full max-w-56 flex-col gap-3 pt-4 md:px-2">
-        {isSignup ? <SignupPreview /> : null}
-        {isCredits ? <CreditsPreview /> : null}
-        {isApiKey ? <ApiKeyPreview /> : null}
-      </div>
-    </div>
-  );
-}
-
-function SignupPreview() {
-  return (
-    <>
-      <div className="flex items-center gap-2">
-        <UserRound className="h-5 w-5 text-[#C27B3B]" strokeWidth={1.5} />
-        <TinyLine width="w-6" />
-        <TinyLine width="w-12" />
-      </div>
-      <div className="flex max-w-56 flex-row justify-center gap-2">
-        <IconBox icon={<GoogleIcon />} />
-      </div>
-    </>
-  );
-}
-
-function CreditsPreview() {
-  return (
-    <>
-      <div className="flex items-center gap-2">
-        <CreditCard className="h-5 w-5 text-[#C27B3B]" strokeWidth={1.5} />
-        <TinyLine width="w-6" />
-        <TinyLine width="w-6" />
-        <TinyLine width="w-6" />
-        <TinyLine width="w-6" />
-      </div>
-      <div className="space-y-2">
-        <CreditRow date="Apr 1" amount="$99" />
-        <CreditRow date="Mar 30" amount="$10" />
-      </div>
-    </>
-  );
-}
-
-function ApiKeyPreview() {
-  return (
-    <>
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="h-5 w-5 text-[#C27B3B]" strokeWidth={1.5} />
-        <div className="flex h-6 flex-1 items-center rounded-sm bg-[#C27B3B]/5 px-2">
-          <span className="text-xs tracking-wide text-[#6B7280]">OPENROUTER_API_KEY</span>
-        </div>
-      </div>
-      <div className="flex h-6 items-center rounded-sm bg-[#C27B3B]/5 px-2">
-        <span className="text-xs tracking-wider text-[#111827]">••••••••••••••••</span>
-      </div>
-    </>
-  );
-}
-
-function TinyLine({ width }: { width: string }) {
-  return (
-    <div className={`flex h-4 flex-col justify-center ${width}`}>
-      <div className="h-1 rounded-sm bg-[#C27B3B]/20" />
-      <div className="mt-0.5 h-0.5 rounded-sm bg-[#C27B3B]/10" />
-    </div>
-  );
-}
-
-function IconBox({
-  label,
-  icon,
-  dark = false,
-  accent = false,
-}: {
-  label?: string;
-  icon?: React.ReactNode;
-  dark?: boolean;
-  accent?: boolean;
-}) {
-  return (
-    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-black/[0.04]">
-      {icon ? (
-        icon
-      ) : (
-        <span
-          className={`text-[10px] font-semibold ${
-            dark ? "text-[#111827]" : accent ? "text-[#C27B3B]" : "text-[#4285F4]"
-          }`}
-        >
-          {label}
+    <section className={`relative z-10 mx-auto -mt-2 w-full max-w-7xl ${SECTION_X_PADDING} pb-14 md:-mt-4 md:pb-16`}>
+      <div className="mb-7 flex flex-col items-start gap-4 md:mb-8">
+        <span className="rounded-full border border-[#C27B3B]/20 bg-[#C27B3B]/5 px-3 py-1 text-[11px] font-medium text-[#8A552B]">
+          Start in minutes
         </span>
-      )}
-    </div>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09Z"
-        fill="#4285F4"
-      />
-      <path
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23Z"
-        fill="#34A853"
-      />
-      <path
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62Z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53Z"
-        fill="#EA4335"
-      />
-    </svg>
-  );
-}
-
-function CreditRow({ date, amount }: { date: string; amount: string }) {
-  return (
-    <div className="flex h-6 items-center rounded-sm bg-[#C27B3B]/5 px-2">
-      <span className="text-xs text-[#6B7280]">{date}</span>
-      <div className="mx-2 flex flex-1 items-center gap-2">
-        <div className="h-2 flex-1 rounded-sm bg-[#C27B3B]/10" />
-        <div className="h-2 flex-1 rounded-sm bg-[#C27B3B]/10" />
+        <div className="max-w-3xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-[#111827] md:text-5xl">
+            From playground to production.
+          </h2>
+          <p className="mt-4 text-sm leading-6 text-[#6B7280] md:text-base">
+            Test a model visually in Playground, then move the same inputs into an OpenOctopus API request when you are ready to ship.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-8 text-sm font-semibold text-[#111827]">
+          <Link href="/models" className="group inline-flex items-center gap-1 transition-colors hover:text-[#C27B3B]">
+            Explore models
+            <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+          <Link href="/docs" className="group inline-flex items-center gap-1 transition-colors hover:text-[#C27B3B]">
+            Read API docs
+            <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        </div>
       </div>
-      <span className="text-sm font-medium text-[#111827]">{amount}</span>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <StartModeCard
+          title="Use in Playground"
+          badge="No code"
+          cta="Open models"
+          href="/models"
+          preview={<PlaygroundModePreview />}
+        />
+        <StartModeCard
+          title="Use through API"
+          badge="OpenAI compatible"
+          cta="View docs"
+          href="/docs"
+          preview={<ApiModePreview />}
+        />
+      </div>
+    </section>
+  );
+}
+
+function StartModeCard({
+  title,
+  badge,
+  cta,
+  href,
+  preview,
+}: {
+  title: string;
+  badge: string;
+  cta: string;
+  href: string;
+  preview: ReactNode;
+}) {
+  return (
+    <div className={`${CARD_CLASS} flex min-h-[440px] flex-col justify-between overflow-hidden bg-[#FAFAF9]`}>
+      <div
+        className="flex flex-1 items-center justify-center p-6"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle, rgba(17,24,39,0.13) 1.5px, transparent 1.5px)",
+          backgroundSize: "28px 28px",
+        }}
+      >
+        {preview}
+      </div>
+      <div className="flex flex-col gap-4 border-t border-black/[0.06] bg-white px-5 py-5 md:flex-row md:items-center md:justify-between md:px-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <h3 className="text-xl font-semibold text-[#111827] md:text-2xl">{title}</h3>
+          <span className="rounded-md bg-[#FFCC33] px-2 py-1 text-[11px] font-bold text-[#111827]">
+            {badge}
+          </span>
+        </div>
+        <Link
+          href={href}
+          className="group inline-flex h-10 w-fit items-center justify-center gap-1 rounded-lg bg-[#111827] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0B1220]"
+        >
+          {cta}
+          <ChevronRight className="size-4 text-white/70 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
     </div>
   );
 }
 
-function slugifyModelName(name: string) {
-  return name.toLowerCase().replace(/\./g, ".").replace(/\s+/g, "-");
+function PlaygroundModePreview() {
+  return (
+    <div className="w-full max-w-md rounded-xl border border-black/[0.08] bg-white p-4 shadow-[0_18px_45px_rgba(17,24,39,0.10)]">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-[#C27B3B]/10 text-[#C27B3B]">
+            <WandSparkles className="size-4" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-[#111827]">OpenAI Image2 Edit</p>
+            <p className="text-xs text-[#6B7280]">image-to-image</p>
+          </div>
+        </div>
+        <span className="rounded-md bg-[#24BE58]/10 px-2 py-1 text-[10px] font-semibold text-[#15803D]">
+          Ready
+        </span>
+      </div>
+      <div className="grid gap-3 md:grid-cols-[0.86fr_1.14fr]">
+        <div className="flex aspect-[4/5] items-center justify-center rounded-lg border border-dashed border-black/[0.14] bg-[#FAFAF9]">
+          <div className="text-center">
+            <Sparkles className="mx-auto size-5 text-[#C27B3B]" />
+            <p className="mt-2 text-xs font-medium text-[#6B7280]">Upload image</p>
+          </div>
+        </div>
+        <div className="space-y-3">
+          <div className="rounded-lg border border-black/[0.06] bg-[#FAFAF9] p-3">
+            <p className="text-xs font-medium text-[#6B7280]">Prompt</p>
+            <div className="mt-2 h-16 rounded-md bg-white p-3 text-xs leading-5 text-[#111827]">
+              Make the product photo cleaner and brighter.
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {["1:1", "webp"].map((item) => (
+              <div key={item} className="rounded-md bg-[#C27B3B]/10 px-3 py-2 text-center text-xs font-semibold text-[#8A552B]">
+                {item}
+              </div>
+            ))}
+          </div>
+          <div className="h-9 rounded-lg bg-[#111827]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ApiModePreview() {
+  return (
+    <div className="w-full max-w-md overflow-hidden rounded-xl border border-black/[0.08] bg-[#0B0D10] shadow-[0_18px_45px_rgba(17,24,39,0.16)]">
+      <div className="flex items-center justify-between border-b border-white/10 bg-[#111827] px-4 py-3">
+        <div className="flex gap-2 text-xs font-medium text-white/72">
+          <span className="rounded-md bg-white/10 px-2 py-1 text-white">OpenOctopus REST</span>
+          <span className="hidden rounded-md px-2 py-1 md:inline">Async task</span>
+        </div>
+        <span className="text-xs text-white/45">copy</span>
+      </div>
+      <pre className="overflow-hidden p-5 text-[12px] leading-6 text-[#E5E7EB]">
+        <code>{`curl -X POST https://api.openoctopus.com/v1/images/generations \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ooq_your_api_key" \\
+  -d '{
+    "model": "openoctopus/imagen-4",
+    "prompt": "A clean product hero image",
+    "input": {
+      "aspect_ratio": "1:1",
+      "output_format": "webp"
+    }
+  }'`}</code>
+      </pre>
+    </div>
+  );
 }

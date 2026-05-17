@@ -70,7 +70,7 @@ export function MarketingHeader({
                 href="/login"
                 className="inline-flex h-9 items-center justify-center rounded-md bg-[#111827] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0B1220]"
               >
-                Get API Key
+                Sign In
               </Link>
             )}
           </div>
