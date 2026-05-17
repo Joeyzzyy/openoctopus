@@ -1577,11 +1577,11 @@ export function ModelsBrowser({
   };
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-3 sm:space-y-4">
       <div className="space-y-2.5">
         {selectedModel ? (
-          <div className="rounded-2xl border border-[#E9DEC9] bg-[linear-gradient(135deg,#FFF7EA_0%,#FFFDFC_55%,#F6F1E7_100%)] p-3 sm:p-3.5">
-            <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
+          <div className="rounded-xl border border-[#E9DEC9] bg-[linear-gradient(135deg,#FFF7EA_0%,#FFFDFC_55%,#F6F1E7_100%)] p-3 sm:rounded-2xl sm:p-3.5">
+            <div className="grid gap-2.5 sm:gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
               <label className="block">
                 <span className="mb-1 block text-[11px] font-medium tracking-[0.2px] text-black/50">Vendor</span>
                 <select
@@ -1615,7 +1615,7 @@ export function ModelsBrowser({
                 </select>
               </label>
             </div>
-            <p className="mt-1.5 text-[13px] leading-5.5 text-black/68">
+            <p className="mt-2 text-[13px] leading-5 text-black/68 sm:mt-1.5 sm:leading-5.5">
               {selectedModel.modelDescription || "This model does not have a detailed description yet."}
             </p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -1630,8 +1630,10 @@ export function ModelsBrowser({
                   {priceTag}
                 </span>
               ) : null}
-              <span className="inline-flex rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
+              <span className="inline-flex max-w-full rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
+                <span className="truncate">
                 {selectedModel.publicModel}
+                </span>
               </span>
             </div>
           </div>
@@ -1640,18 +1642,18 @@ export function ModelsBrowser({
 
       <div className="relative">
         <div className="space-y-4">
-      <section className="rounded-2xl border border-black/[0.08] bg-white p-2.5 shadow-sm sm:p-3">
+      <section className="rounded-xl border border-black/[0.08] bg-white p-2 shadow-sm sm:rounded-2xl sm:p-3">
         <div className="mb-2 border-b border-black/[0.08] pb-1.5">
-          <div className="flex items-center gap-1">
+          <div className="grid grid-cols-2 gap-1 sm:flex sm:items-center">
             {(["playground", "api"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => handleMainTabChange(tab)}
-                className={`h-10 cursor-pointer rounded-none border-b-2 px-3 text-sm font-medium ${
+                className={`h-10 cursor-pointer rounded-md border-b-2 px-3 text-sm font-medium sm:rounded-none ${
                   tab === mainTab
                     ? "border-[#E58A35] text-[#9A4F18]"
-                    : "border-transparent text-[#6B7280] hover:text-[#111827]"
+                    : "border-transparent text-[#6B7280] hover:bg-black/[0.02] hover:text-[#111827]"
                 }`}
               >
                 {tab === "api" ? "API" : "Playground"}
@@ -1661,8 +1663,8 @@ export function ModelsBrowser({
         </div>
         <div className="relative">
         {mainTab === "playground" ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            <section className="rounded-xl border border-black/[0.08] bg-white p-4">
+          <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
+            <section className="rounded-lg border border-black/[0.08] bg-white p-3 sm:rounded-xl sm:p-4">
               <h3 className="mb-3 text-sm font-medium text-black">Input</h3>
               <div className="space-y-3">
                 {parsedFields.length === 0 ? (
@@ -1680,7 +1682,7 @@ export function ModelsBrowser({
                         {field.required ? <span className="pl-1 text-red-500">*</span> : null}
                       </span>
                       {isImageUploadField(field) ? (
-                        <div className="rounded-md border border-black/[0.1] bg-white p-3">
+                        <div className="rounded-md border border-black/[0.1] bg-white p-2.5 sm:p-3">
                           <input
                             disabled={isSubmitting || uploadingFields[field.key]}
                             type="file"
@@ -1690,7 +1692,7 @@ export function ModelsBrowser({
                               void uploadPlaygroundImages(field, event.target.files);
                               event.target.value = "";
                             }}
-                            className="block w-full text-xs text-black/60 file:mr-3 file:h-8 file:rounded-md file:border-0 file:bg-black file:px-3 file:text-xs file:font-medium file:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            className="block w-full text-xs text-black/60 file:mb-2 file:mr-3 file:h-8 file:rounded-md file:border-0 file:bg-black file:px-3 file:text-xs file:font-medium file:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:file:mb-0"
                           />
                           <p className="mt-2 text-[11px] leading-5 text-black/45">
                             Upload PNG, JPEG, or WebP images. They are converted to secure URLs before submission.
@@ -1860,23 +1862,23 @@ export function ModelsBrowser({
                   ))
                 )}
               </div>
-              <div className="mt-4 flex items-center gap-2">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <button
                   type="button"
                   disabled={isSubmitting || !selectedModel}
                   onClick={submitPlayground}
-                  className="h-10 rounded-md bg-[#1F8A4C] px-4 text-sm font-medium text-white transition-colors hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-45"
+                  className="h-11 w-full rounded-md bg-[#1F8A4C] px-4 text-sm font-medium text-white transition-colors hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-45 sm:h-10 sm:w-auto"
                 >
                   {isSubmitting ? "Generating..." : `Generate ${priceTag ? `(${priceTag})` : ""}`}
                 </button>
-                {taskId ? <span className="text-xs text-black/45">Task: {taskId}</span> : null}
+                {taskId ? <span className="min-w-0 truncate text-xs text-black/45">Task: {taskId}</span> : null}
               </div>
             </section>
 
-            <section className="flex min-h-[360px] flex-col rounded-xl border border-black/[0.08] bg-[#FAFAFA] p-4">
-              <div className="mb-3 flex items-center justify-between">
+            <section className="flex min-h-[300px] flex-col rounded-lg border border-black/[0.08] bg-[#FAFAFA] p-3 sm:min-h-[360px] sm:rounded-xl sm:p-4">
+              <div className="mb-3 grid gap-2 sm:flex sm:items-center sm:justify-between">
                 <h3 className="text-sm font-medium text-black">Output</h3>
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   {playgroundImageAssets.length > 0 ? (
                     <button
                       type="button"
@@ -1887,26 +1889,27 @@ export function ModelsBrowser({
                           playgroundImageAssets[0].mimeType
                         )
                       }
-                      className="inline-flex h-7 items-center gap-1 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
+                      className="inline-flex h-8 items-center gap-1 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03] sm:h-7"
                     >
                       <Download className="size-3.5" />
-                      Download image
+                      <span className="hidden sm:inline">Download image</span>
+                      <span className="sm:hidden">Download</span>
                     </button>
                   ) : null}
                   {playgroundOutput ? (
                     <button
                       type="button"
                       onClick={() => setResultModalOpen(true)}
-                      className="h-7 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
+                      className="h-8 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03] sm:h-7"
                     >
-                      View result JSON
+                      Result JSON
                     </button>
                   ) : null}
-                  <div className="text-xs capitalize text-black/60">Status: {taskStatusLabel(taskStatus)}</div>
+                  <div className="min-w-0 text-xs capitalize text-black/60">Status: {taskStatusLabel(taskStatus)}</div>
                 </div>
               </div>
               {playgroundError ? (
-                <div className="flex min-h-[280px] flex-1 items-center">
+                <div className="flex min-h-[220px] flex-1 items-center sm:min-h-[280px]">
                   <div className="w-full">
                     <p className="w-full whitespace-pre-wrap break-all rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                       {playgroundError}
@@ -1925,7 +1928,7 @@ export function ModelsBrowser({
                   </div>
                 </div>
               ) : isSubmitting ? (
-                <div className="flex min-h-[280px] flex-1 flex-col items-center justify-center rounded-md border border-black/[0.08] bg-white">
+                <div className="flex min-h-[220px] flex-1 flex-col items-center justify-center rounded-md border border-black/[0.08] bg-white sm:min-h-[280px]">
                   <span className="inline-flex size-7 animate-spin rounded-full border-2 border-[#E7E0D3] border-t-[#E58A35]" />
                   <p className="mt-3 text-sm font-medium text-black">Generating...</p>
                   <p className="mt-1 text-xs text-black/55">{taskStatusLabel(taskStatus)}</p>
@@ -1940,14 +1943,14 @@ export function ModelsBrowser({
                           key={`${asset.url}-${index}`}
                           src={buildDisplayImageUrl(asset.url)}
                           alt={`Generated result ${index + 1}`}
-                          className="h-auto w-full rounded-md border border-black/[0.08] bg-white object-contain"
+                          className="max-h-[70vh] w-full rounded-md border border-black/[0.08] bg-white object-contain"
                         />
                       ))}
                     </div>
                   ) : null}
                 </div>
               ) : (
-                <div className="flex min-h-[280px] flex-1 items-center justify-center rounded-md border border-black/[0.08] bg-white px-4">
+                <div className="flex min-h-[220px] flex-1 items-center justify-center rounded-md border border-black/[0.08] bg-white px-4 sm:min-h-[280px]">
                   <p className="text-center text-sm text-black/55">
                     {`Submit ${modelSlugTail} to preview result here.`}
                   </p>
@@ -1966,15 +1969,15 @@ export function ModelsBrowser({
       </section>
 
       {mainTab === "playground" && showcaseItems.length > 0 ? (
-        <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+        <section className="rounded-xl border border-black/[0.08] bg-white p-3 shadow-sm sm:rounded-2xl sm:p-4">
             <div className="mb-3">
               <h2 className="text-base font-semibold text-black">Examples</h2>
             </div>
-            <div className="flex flex-wrap items-start gap-2">
+            <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-start">
               {showcaseItems.map((item, index) => (
                 <div
                   key={`${item.url}-${index}`}
-                  className="relative h-24 w-24 overflow-hidden rounded-md border border-black/[0.08] bg-[#FAFAFA]"
+                  className="relative aspect-square w-full overflow-hidden rounded-md border border-black/[0.08] bg-[#FAFAFA] sm:h-24 sm:w-24"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -1996,7 +1999,7 @@ export function ModelsBrowser({
       ) : null}
 
       {mainTab === "playground" && relatedModels.length > 0 ? (
-        <section className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+        <section className="rounded-xl border border-black/[0.08] bg-white p-3 shadow-sm sm:rounded-2xl sm:p-4">
           <div className="mb-3">
             <h2 className="text-base font-semibold text-black">Related Models</h2>
             <p className="mt-1 text-xs text-black/55">
