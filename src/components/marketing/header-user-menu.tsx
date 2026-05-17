@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
@@ -80,7 +81,14 @@ export function HeaderUserMenu({
               <p className="text-lg font-semibold text-black">{walletBalanceLabel}</p>
             </>
           ) : null}
-          <div className="mt-3">
+          <div className="mt-3 grid gap-2">
+            <Link
+              href="/dashboard"
+              onClick={() => setOpen(false)}
+              className="inline-flex h-9 w-full items-center justify-center rounded-md bg-[#111827] px-3 text-sm font-medium text-white hover:bg-[#0B1220]"
+            >
+              Dashboard
+            </Link>
             <form action="/auth/sign-out" method="post">
               <button
                 type="submit"

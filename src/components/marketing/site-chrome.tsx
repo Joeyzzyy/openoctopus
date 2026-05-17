@@ -53,11 +53,19 @@ export function MarketingHeader({
 
           <div className="ml-auto flex items-center gap-2">
             {isLoggedIn ? (
-              <HeaderUserMenu
-                userLabel={userLabel}
-                userAvatarUrl={userAvatarUrl}
-                walletBalanceLabel={walletBalanceLabel}
-              />
+              <>
+                <Link
+                  href="/dashboard"
+                  className="hidden h-9 items-center justify-center rounded-md bg-[#111827] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0B1220] sm:inline-flex"
+                >
+                  Dashboard
+                </Link>
+                <HeaderUserMenu
+                  userLabel={userLabel}
+                  userAvatarUrl={userAvatarUrl}
+                  walletBalanceLabel={walletBalanceLabel}
+                />
+              </>
             ) : (
               <Link
                 href="/login"

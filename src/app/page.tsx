@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { HomeMobileMenu } from "@/components/marketing/home-mobile-menu";
+import { HeaderUserMenu } from "@/components/marketing/header-user-menu";
 import { buildAbsoluteUrl } from "./(marketing)/models/data";
 import { createClient } from "@/lib/supabase/server";
 
@@ -308,11 +309,6 @@ export default async function Home() {
             </nav>
 
             <div className="absolute right-0 flex items-center gap-2 lg:static lg:ml-auto">
-              {user ? (
-                <span className="hidden max-w-[260px] truncate text-[13px] text-[#6B7280] md:inline">
-                  Hi, {user.email ?? user.user_metadata?.name ?? "there"}
-                </span>
-              ) : null}
               <HomeMobileMenu items={HEADER_NAV_ITEMS.map((item) => ({ ...item }))} />
               <Link
                 href={destination}
@@ -320,6 +316,16 @@ export default async function Home() {
               >
                 {destinationLabel}
               </Link>
+              {user ? (
+                <HeaderUserMenu
+                  userLabel={user.email ?? (user.user_metadata?.name as string | undefined) ?? null}
+                  userAvatarUrl={
+                    (user.user_metadata?.avatar_url as string | undefined) ??
+                    (user.user_metadata?.picture as string | undefined) ??
+                    null
+                  }
+                />
+              ) : null}
             </div>
           </div>
         </div>
