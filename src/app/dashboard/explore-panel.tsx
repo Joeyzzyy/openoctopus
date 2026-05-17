@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AuthRequiredOverlay } from "@/components/auth/AuthRequiredOverlay";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 type ExploreModel = {
@@ -52,11 +52,13 @@ export function ExplorePanel({
   models: ExploreModel[];
   isLoggedIn?: boolean;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const providers = useMemo(() => Array.from(new Set(models.map((item) => item.providerName))), [models]);
   const categories = useMemo(() => buildCategoryList(models), [models]);
   const [activeProvider, setActiveProvider] = useState<string>("all");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
   const effectiveSelectedCategories = selectedCategories.length > 0 ? selectedCategories : categories;
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -162,7 +164,8 @@ export function ExplorePanel({
                   onClick={(event) => {
                     if (!isLoggedIn) {
                       event.preventDefault();
-                      setAuthModalOpen(true);
+                      const nextPath = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+                      router.push(`/login?next=${encodeURIComponent(nextPath)}`);
                     }
                   }}
                   className="block overflow-hidden rounded-2xl border border-[#E7E0D3] bg-white shadow-sm transition-colors hover:border-[#D7C6AE]"
@@ -199,12 +202,6 @@ export function ExplorePanel({
           )}
         </div>
       </div>
-      <AuthRequiredOverlay
-        open={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        title="Sign in to open model tools"
-        description="You can browse Explore without signing in. Opening a model tool requires a signed-in workspace."
-      />
     </section>
   );
 }

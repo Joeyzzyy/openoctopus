@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AuthRequiredOverlay } from "@/components/auth/AuthRequiredOverlay";
 
 type ProductTopTabsProps = {
   dashboardHref?: string;
@@ -89,7 +88,6 @@ export function ProductTopTabs({
   );
   const currentActiveKey = (tabItems.find((item) => item.active)?.key ?? "dashboard") as ProductTopTabKey;
   const [optimisticActiveKey, setOptimisticActiveKey] = useState(currentActiveKey);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   useEffect(() => {
     setOptimisticActiveKey(currentActiveKey);
@@ -97,7 +95,7 @@ export function ProductTopTabs({
 
   const handleTabClick = (key: ProductTopTabKey, href: string) => {
     if (!isLoggedIn && key !== "explore") {
-      setAuthModalOpen(true);
+      router.push(`/login?next=${encodeURIComponent(href)}`);
       return;
     }
     if (href === `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`) {
@@ -132,12 +130,6 @@ export function ProductTopTabs({
           })}
         </div>
       </div>
-      <AuthRequiredOverlay
-        open={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        title="Sign in to access your workspace"
-        description="Explore is public. Dashboard, API keys, request details, account settings, and model tools require a signed-in workspace."
-      />
     </>
   );
 }
