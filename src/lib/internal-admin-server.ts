@@ -473,6 +473,11 @@ const fallbackGatewayErrorDefinitions: Record<
     message: "The generation provider failed to complete the request. Please retry shortly.",
     retryable: true,
   },
+  content_policy_violation: {
+    code: "content_policy_violation",
+    message: "The prompt or image was rejected by the provider safety policy. Please adjust the content and try again.",
+    retryable: false,
+  },
   upstream_timeout: {
     code: "upstream_timeout",
     message: "The generation request timed out. Please retry shortly.",

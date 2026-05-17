@@ -1,5 +1,6 @@
 import { getJson, postJson } from "../lib/http.js";
 import { getByPath } from "../lib/object-path.js";
+import { classifyUpstreamError } from "./upstream-error.js";
 import type {
   PollRequestInput,
   PollRequestResult,
@@ -175,15 +176,15 @@ export class WaveSpeedImageAdapter implements ProviderAdapter {
     const resultUrl = getByPath(data, executionConfig.resultUrlPath);
 
     if (status === "failed" || status === "error" || status === "canceled") {
-      const upstreamError =
-        getByPath(data, "data.error") ??
-        getByPath(data, "error") ??
-        "WaveSpeed image request failed";
+      const upstreamError = classifyUpstreamError({
+        data,
+        fallbackMessage: "WaveSpeed image request failed",
+      });
       return {
         done: true,
         success: false,
-        errorCode: "upstream_failed",
-        errorMessage: String(upstreamError),
+        errorCode: upstreamError.errorCode,
+        errorMessage: upstreamError.errorMessage,
         raw: data,
       };
     }

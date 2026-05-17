@@ -216,6 +216,16 @@ const DEFAULT_GATEWAY_ERROR_DEFINITIONS: GatewayErrorDefinition[] = [
     operatorNotes: null,
   },
   {
+    code: "content_policy_violation",
+    category: "safety",
+    httpStatus: 400,
+    publicMessage: "The prompt or image was rejected by the provider safety policy. Please adjust the content and try again.",
+    retryable: false,
+    active: true,
+    sortOrder: 205,
+    operatorNotes: null,
+  },
+  {
     code: "upstream_timeout",
     category: "upstream",
     httpStatus: 504,

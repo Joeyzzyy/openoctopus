@@ -8,6 +8,7 @@ import { addUserBalance, deleteRegisteredUser } from "./actions";
 import { InternalShell } from "./internal-shell";
 import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
 import { MonitoringLineChart } from "./monitoring-line-chart";
+import { OpsHubRefreshButton } from "./refresh-button";
 import { ImageResponseContractPanel } from "./image-response-contract-panel";
 import { RegisteredUsersTable } from "./registered-users-table";
 import { ApiSmokePanel } from "./api-smoke-panel";
@@ -1306,9 +1307,12 @@ export default async function InternalPage({
                             只拉取 failed / queued，后端分页每页 10 条，用于快速定位超时和失败请求。
                           </p>
                         </div>
-                        <p className="text-xs text-black/45">
-                          共 {data.problemRequestPagination.totalCount} 条
-                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-xs text-black/45">
+                            共 {data.problemRequestPagination.totalCount} 条
+                          </p>
+                          <OpsHubRefreshButton />
+                        </div>
                       </div>
 
                       {data.problemRequests.length > 0 ? (

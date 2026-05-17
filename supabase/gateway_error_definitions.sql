@@ -56,6 +56,7 @@ values
   ('provider_submit_failed', 'upstream', 502, 'The generation provider could not accept the request. Please retry shortly.', true, true, 180, 'Submit phase failed while calling the upstream provider.'),
   ('provider_poll_failed', 'upstream', 502, 'The generation provider could not complete the request. Please retry shortly.', true, true, 190, 'Polling phase failed while checking upstream task state.'),
   ('upstream_failed', 'upstream', 502, 'The generation provider failed to complete the request. Please retry shortly.', true, true, 200, 'Upstream reported a terminal failure state.'),
+  ('content_policy_violation', 'safety', 400, 'The prompt or image was rejected by the provider safety policy. Please adjust the content and try again.', false, true, 205, 'Provider rejected the prompt or input image due to safety or sensitive-content policy, e.g. Wavespeed code 1200.'),
   ('upstream_timeout', 'upstream', 504, 'The generation request timed out. Please retry shortly.', true, true, 210, 'Upstream task exceeded the polling timeout window.'),
   ('upstream_result_missing', 'upstream', 502, 'The generation provider returned an incomplete result. Please retry shortly.', true, true, 220, 'Provider response did not contain the expected final output payload.'),
   ('video_output_missing', 'upstream', 502, 'The generation provider returned an incomplete result. Please retry shortly.', true, true, 230, 'Provider reported success but video output assets were missing.'),

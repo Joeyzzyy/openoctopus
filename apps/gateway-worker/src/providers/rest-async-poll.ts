@@ -1,5 +1,6 @@
 import { getJson, postJson } from "../lib/http.js";
 import { env } from "../config.js";
+import { classifyUpstreamError } from "./upstream-error.js";
 import type {
   Capability,
   PollRequestInput,
@@ -299,11 +300,15 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
     );
 
     if (status.isFailed && !asset) {
+      const upstreamError = classifyUpstreamError({
+        data,
+        fallbackMessage: "Upstream request failed",
+      });
       return {
         done: true,
         success: false,
-        errorCode: "upstream_failed",
-        errorMessage: String(readPath(data, "error.message") ?? "Upstream request failed"),
+        errorCode: upstreamError.errorCode,
+        errorMessage: upstreamError.errorMessage,
         raw: data,
       };
     }

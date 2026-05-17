@@ -124,3 +124,56 @@ test("poll fetches resultPath when completed status has no asset", async () => {
     }
   );
 });
+
+test("poll classifies Wavespeed sensitive-content failures", async () => {
+  const adapter = new RestAsyncPollAdapter();
+
+  await withJsonServer(
+    (_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify({
+          code: 200,
+          data: {
+            id: "bc6c2345fa9f4b76bc956a7fbf933cc5",
+            code: 1200,
+            error: "Content flagged as potentially sensitive. Please try different prompts or images.",
+            status: "failed",
+            outputs: [],
+          },
+          message: "success",
+        })
+      );
+    },
+    async (baseUrl) => {
+      const result = await adapter.poll({
+        requestId: "00000000-0000-4000-8000-000000000002",
+        upstreamTaskId: "bc6c2345fa9f4b76bc956a7fbf933cc5",
+        provider: {
+          slug: "wavespeed",
+          baseUrl,
+          secret: "ws-key",
+          config: {
+            executionConfig: {
+              mode: "async",
+              authType: "bearer",
+              authHeaderName: "Authorization",
+              authHeaderPrefix: "Bearer",
+              pollPath: "/api/v3/predictions/{taskId}/result",
+              statusPath: "data.status",
+              resultUrlPath: "data.outputs.0",
+            },
+          },
+        },
+      });
+
+      assert.equal(result.done, true);
+      assert.equal(result.success, false);
+      assert.equal(result.errorCode, "content_policy_violation");
+      assert.equal(
+        result.errorMessage,
+        "Content flagged as potentially sensitive. Please try different prompts or images."
+      );
+    }
+  );
+});

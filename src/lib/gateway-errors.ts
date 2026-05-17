@@ -23,6 +23,7 @@ const DEFAULT_GATEWAY_ERROR_DEFINITIONS: GatewayErrorDefinition[] = [
   { code: "provider_submit_failed", httpStatus: 502, publicMessage: "The generation provider could not accept the request. Please retry shortly.", retryable: true },
   { code: "provider_poll_failed", httpStatus: 502, publicMessage: "The generation provider could not complete the request. Please retry shortly.", retryable: true },
   { code: "upstream_failed", httpStatus: 502, publicMessage: "The generation provider failed to complete the request. Please retry shortly.", retryable: true },
+  { code: "content_policy_violation", httpStatus: 400, publicMessage: "The prompt or image was rejected by the provider safety policy. Please adjust the content and try again.", retryable: false },
   { code: "upstream_timeout", httpStatus: 504, publicMessage: "The generation request timed out. Please retry shortly.", retryable: true },
   { code: "upstream_result_missing", httpStatus: 502, publicMessage: "The generation provider returned an incomplete result. Please retry shortly.", retryable: true },
   { code: "service_unavailable", httpStatus: 503, publicMessage: "The service is temporarily unavailable. Please retry later.", retryable: true },

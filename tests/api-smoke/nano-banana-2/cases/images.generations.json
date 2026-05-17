@@ -1,0 +1,25 @@
+[
+  {
+    "id": "nano-banana-2-basic",
+    "model": "openoctopus/nano-banana-2",
+    "endpoint": "/v1/images/generations",
+    "payload": {
+      "model": "openoctopus/nano-banana-2",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "enable_web_search": false,
+        "enable_image_search": false,
+        "output_format": "png",
+        "enable_sync_mode": false,
+        "enable_base64_output": false
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "assetCountMin": 1
+    }
+  }
+]
