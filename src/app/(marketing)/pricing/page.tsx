@@ -1,19 +1,14 @@
 import Link from "next/link";
-import { normalizeBillingConfig, parseBillingConfig } from "@/lib/billing-config";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  buildModelCanonicalPath,
+  loadModelsPageData,
+} from "@/app/(marketing)/models/data";
+import { ModelToolLinkActions } from "./model-tool-link-actions";
 
 export const metadata = {
   title: "Pricing — OpenOctopus",
   description: "Simple pricing list for active supported models.",
 };
-
-type PriceTier = {
-  resolution: string;
-  quality: string;
-  price: number;
-};
-
-const QUALITY_ORDER = ["low", "medium", "high"];
 
 function formatMoney(value: number, currency = "USD") {
   return new Intl.NumberFormat("en-US", {
@@ -24,98 +19,43 @@ function formatMoney(value: number, currency = "USD") {
   }).format(value);
 }
 
-function splitCombinationKey(key: string) {
-  const [resolution, quality] = key.split("__");
-  return {
-    resolution: resolution || "default",
-    quality: quality || "default",
-  };
+function buildProductionToolUrl(path: string) {
+  const base = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "") || "https://openoctopus.com";
+  return new URL(path, `${base}/`).toString();
 }
 
-function formatResolutionLabel(value: string) {
-  return `${value} output resolution`;
-}
-
-function formatQualityLabel(value: string) {
-  return `${value} generation quality`;
-}
-
-function billingDisplay(value: unknown) {
-  try {
-    const normalized = normalizeBillingConfig(parseBillingConfig(value));
-    const parts: string[] = [];
-    const { charges, currency } = normalized;
-    const combinations = normalized.parameterPrices?.combinations ?? {};
-    const tiers = Object.entries(combinations)
-      .map(([key, price]) => {
-        const numericPrice = Number(price);
-        if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
-          return null;
-        }
-        const labels = splitCombinationKey(key);
-        return {
-          ...labels,
-          price: numericPrice,
-        };
-      })
-      .filter((item): item is PriceTier => Boolean(item))
-      .sort((a, b) =>
-        a.resolution.localeCompare(b.resolution, "en-US", { numeric: true }) ||
-        (QUALITY_ORDER.indexOf(a.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(a.quality)) -
-          (QUALITY_ORDER.indexOf(b.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(b.quality)) ||
-        a.quality.localeCompare(b.quality, "en-US", { numeric: true })
-      );
-
-    if (charges.perRequest) parts.push(`per request ${charges.perRequest}`);
-    if (tiers.length > 0) {
-      const prices = tiers.map((tier) => tier.price);
-      const min = Math.min(...prices);
-      const max = Math.max(...prices);
-      parts.push(
-        min === max
-          ? `${formatMoney(min, currency)} per image`
-          : `${formatMoney(min, currency)}-${formatMoney(max, currency)} per image`
-      );
-    } else if (charges.perImage) {
-      parts.push(`per image ${charges.perImage}`);
-    }
-    if (tiers.length === 0 && charges.perVideo) parts.push(`per video ${charges.perVideo}`);
-    if (charges.perSecond) parts.push(`per second ${charges.perSecond}`);
-    if (charges.inputTextTokensPerMillion) parts.push(`per 1M input tokens ${charges.inputTextTokensPerMillion}`);
-    if (charges.outputTextTokensPerMillion) parts.push(`per 1M output tokens ${charges.outputTextTokensPerMillion}`);
-
-    return {
-      summary: parts.join(" + "),
-      currency,
-      tiers,
-    };
-  } catch {
-    return {
-      summary: "Invalid pricing configuration",
-      currency: "USD",
-      tiers: [],
-    };
+function groupedPriceTiers(
+  tiers: Array<{ resolution: string; quality: string; price: number }>
+) {
+  const grouped = new Map<string, Array<{ quality: string; price: number }>>();
+  for (const tier of tiers) {
+    const items = grouped.get(tier.resolution) ?? [];
+    items.push({ quality: tier.quality, price: tier.price });
+    grouped.set(tier.resolution, items);
   }
+
+  return Array.from(grouped.entries()).map(([resolution, items]) => ({
+    resolution,
+    items,
+  }));
 }
 
 export default async function PricingPage() {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("supported_models")
-    .select("model_slug, display_name, billing_config, active")
-    .eq("active", true)
-    .order("created_at", { ascending: false });
+  const { modelDocRows } = await loadModelsPageData();
 
-  if (error) throw new Error(error.message);
-
-  const rows = (data ?? []).map((row) => ({
-    model: row.display_name || row.model_slug,
-    slug: row.model_slug,
-    price: billingDisplay(row.billing_config),
+  const rows = modelDocRows.map((row) => ({
+    model: row.displayName || row.publicModel,
+    slug: row.publicModel,
+    toolUrl: buildProductionToolUrl(buildModelCanonicalPath(row)),
+    price: {
+      summary: row.priceLabel || "Pricing unavailable",
+      currency: row.billingCurrency,
+      tiers: row.priceTiers,
+    },
   }));
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
+    <main className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8">
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-black">Pricing</h1>
@@ -126,32 +66,51 @@ export default async function PricingPage() {
         </Link>
       </div>
       <section className="overflow-hidden rounded-xl border border-black/[0.08] bg-white">
-        <div className="grid grid-cols-2 border-b border-black/[0.08] bg-[#FAFAFA] px-4 py-2 text-xs font-medium tracking-[0.3px] text-black/60">
-          <span>Model</span>
-          <span>Price</span>
-        </div>
-        <div>
-          {rows.map((row) => (
-            <div key={row.slug} className="grid grid-cols-2 border-b border-black/[0.05] px-4 py-3 text-sm text-black last:border-b-0">
-              <span className="truncate pr-3">{row.model}</span>
-              <span className="text-black/70">
-                <span className="font-medium text-black/75">{row.price.summary}</span>
-                {row.price.tiers.length > 0 ? (
-                  <span className="mt-2 grid gap-1.5 sm:grid-cols-2">
-                    {row.price.tiers.map((tier) => (
-                      <span
-                        key={`${tier.resolution}-${tier.quality}`}
-                        className="rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-2 py-1 text-xs text-black/62"
-                      >
-                        Resolution: {formatResolutionLabel(tier.resolution)} · Quality: {formatQualityLabel(tier.quality)}{" "}
-                        <span className="font-medium text-black/75">{formatMoney(tier.price, row.price.currency)}</span>
-                      </span>
-                    ))}
-                  </span>
-                ) : null}
-              </span>
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <div className="grid min-w-[980px] grid-cols-[minmax(180px,0.9fr)_minmax(280px,1.1fr)_minmax(420px,1.6fr)] gap-x-8 border-b border-black/[0.08] bg-[#FAFAFA] px-4 py-2 text-xs font-medium tracking-[0.3px] text-black/60">
+            <span>Model</span>
+            <span>Price</span>
+            <span>Tool page</span>
+          </div>
+          <div>
+            {rows.map((row) => (
+              <div
+                key={row.slug}
+                className="grid min-w-[980px] grid-cols-[minmax(180px,0.9fr)_minmax(280px,1.1fr)_minmax(420px,1.6fr)] gap-x-8 border-b border-black/[0.05] px-4 py-3 text-sm text-black last:border-b-0"
+              >
+                <span className="truncate pr-3">{row.model}</span>
+                <span className="text-black/70">
+                  <span className="font-medium text-black/75">{row.price.summary}</span>
+                  {row.price.tiers.length > 0 ? (
+                    <span className="mt-2 grid gap-1.5">
+                      {groupedPriceTiers(row.price.tiers).map((group) => (
+                        <span
+                          key={group.resolution}
+                          className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-2 rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-2 py-1.5 text-xs text-black/62"
+                        >
+                          <span className="font-mono font-medium text-black/70">{group.resolution}</span>
+                          <span className="flex flex-wrap gap-1.5">
+                            {group.items.map((tier) => (
+                              <span
+                                key={`${group.resolution}-${tier.quality}`}
+                                className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5"
+                              >
+                                <span className="capitalize text-black/45">{tier.quality}</span>
+                                <span className="font-medium text-black/75">
+                                  {formatMoney(tier.price, row.price.currency)}
+                                </span>
+                              </span>
+                            ))}
+                          </span>
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
+                </span>
+                <ModelToolLinkActions url={row.toolUrl} />
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     </main>
