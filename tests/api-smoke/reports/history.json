@@ -2,6 +2,92 @@
   {
     "api": "POST /v1/images/generations",
     "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "nano-banana",
+    "caseId": "nano-banana-basic",
+    "model": "openoctopus/nano-banana",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "https://api.openoctopus.com",
+    "requestUrl": "https://api.openoctopus.com/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/nano-banana",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "output_format": "png",
+        "enable_sync_mode": false,
+        "enable_base64_output": false
+      }
+    },
+    "keyPrefix": "ooq_B90...Mopg",
+    "startedAt": "2026-05-17T12:12:11.553Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "2371ee34-d173-43cf-ac30-07a88567e699",
+    "finalStatus": "succeeded",
+    "assetCount": 1,
+    "submitResponse": {
+      "id": "2371ee34-d173-43cf-ac30-07a88567e699",
+      "status": "queued"
+    },
+    "pollUrl": "https://api.openoctopus.com/v1/tasks/2371ee34-d173-43cf-ac30-07a88567e699",
+    "taskResponse": {
+      "id": "2371ee34-d173-43cf-ac30-07a88567e699",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "18468eb8-9b14-4302-a625-f5c602003bbd",
+      "status": "succeeded",
+      "capability": "image_generation",
+      "public_model_slug": "openoctopus/nano-banana",
+      "output_payload": {
+        "format": "openoctopus.image.output.v1",
+        "assets": [
+          {
+            "id": "0",
+            "index": 0,
+            "type": "image",
+            "url": "https://api.openoctopus.com/v1/files/2371ee34-d173-43cf-ac30-07a88567e699/assets/0",
+            "mimeType": "image/png"
+          }
+        ]
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-17T12:12:13.494611+00:00",
+      "completed_at": "2026-05-17T12:12:31.644+00:00"
+    },
+    "completedAt": "2026-05-17T12:12:33.159Z",
+    "latencyMs": 21606
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "nano-banana",
+    "caseId": "nano-banana-basic",
+    "model": "openoctopus/nano-banana",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "https://api.openoctopus.com",
+    "requestUrl": "https://api.openoctopus.com/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/nano-banana",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "output_format": "png",
+        "enable_sync_mode": false,
+        "enable_base64_output": false
+      }
+    },
+    "keyPrefix": "ooq_B90...Mopg",
+    "startedAt": "2026-05-17T12:11:49.795Z",
+    "success": false,
+    "submitResponse": null,
+    "taskResponse": null,
+    "errorMessage": "fetch failed",
+    "completedAt": "2026-05-17T12:11:49.820Z",
+    "latencyMs": 25
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
     "suite": "openai-image2-edit",
     "caseId": "openai-image2-edit-basic",
     "model": "openoctopus/gpt-image-2-image-input",

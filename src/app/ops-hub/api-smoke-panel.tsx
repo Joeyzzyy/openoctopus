@@ -320,7 +320,6 @@ export function ApiSmokePanel({ records }: { records: ApiSmokeRecord[] }) {
       <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-3">
         <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-black">客户 API smoke 记录</p>
             <ModelHealthOverview records={records} />
           </div>
           <code className="rounded-md border border-black/[0.08] bg-white px-2 py-1 text-[11px] text-black/55">

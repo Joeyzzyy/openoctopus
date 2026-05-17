@@ -24,6 +24,7 @@ const parameterMultipliersSchema = z
 const parameterPricesSchema = z
   .object({
     combinations: z.record(z.string(), z.coerce.number().positive().max(1000000)).optional(),
+    booleanSurcharges: z.record(z.string(), z.coerce.number().positive().max(1000000)).optional(),
   })
   .optional();
 
@@ -99,6 +100,7 @@ export type BillingResolution = {
     perSecond: number;
     inputTextTokens: number;
     outputTextTokens: number;
+    booleanSurcharges: number;
   };
   metrics: BillingUsageMetrics;
 };
@@ -378,6 +380,10 @@ export function resolveBillingBreakdown(input: ResolveChargeContext): BillingRes
     metrics.imageCount > 0
       ? (config.charges.perVideo ?? 0) * outputPriceMultiplier
       : combinationUnitPrice ?? (config.charges.perVideo ?? 0) * outputPriceMultiplier;
+  const booleanSurcharges = Object.entries(config.parameterPrices?.booleanSurcharges ?? {}).reduce(
+    (sum, [key, price]) => sum + (requestInput?.[key] === true ? price : 0),
+    0
+  );
   const components = {
     perRequest: config.charges.perRequest ?? 0,
     perImage: metrics.imageCount * perImageUnitPrice,
@@ -387,6 +393,7 @@ export function resolveBillingBreakdown(input: ResolveChargeContext): BillingRes
       (metrics.inputTokens / 1_000_000) * (config.charges.inputTextTokensPerMillion ?? 0),
     outputTextTokens:
       (metrics.outputTokens / 1_000_000) * (config.charges.outputTextTokensPerMillion ?? 0),
+    booleanSurcharges,
   };
 
   return {

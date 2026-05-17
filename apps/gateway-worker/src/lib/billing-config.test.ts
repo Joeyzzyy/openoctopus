@@ -116,3 +116,31 @@ test("falls back to the lowest combination price when parameters are missing", (
   assert.equal(resolution.components.perImage, 0.01);
   assert.equal(resolution.total, 0.01);
 });
+
+test("adds boolean parameter surcharges when request input enables them", () => {
+  const config = parseBillingConfig({
+    billingMode: "hybrid",
+    currency: "USD",
+    charges: {
+      perRequest: 0.03,
+    },
+    parameterPrices: {
+      booleanSurcharges: {
+        enable_web_search: 0.02,
+        enable_image_search: 0.04,
+      },
+    },
+  });
+
+  const resolution = resolveBillingBreakdown({
+    config,
+    requestInput: {
+      enable_web_search: true,
+      enable_image_search: false,
+    },
+  });
+
+  assert.equal(resolution.components.perRequest, 0.03);
+  assert.equal(resolution.components.booleanSurcharges, 0.02);
+  assert.equal(resolution.total, 0.05);
+});

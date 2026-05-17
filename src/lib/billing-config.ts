@@ -55,6 +55,7 @@ const parameterMultipliersSchema = z
 const parameterPricesSchema = z
   .object({
     combinations: z.record(z.string(), z.coerce.number().positive().max(1000000)).optional(),
+    booleanSurcharges: z.record(z.string(), z.coerce.number().positive().max(1000000)).optional(),
   })
   .optional();
 
@@ -110,6 +111,7 @@ export type BillingResolution = {
     perSecond: number;
     inputTextTokens: number;
     outputTextTokens: number;
+    booleanSurcharges: number;
   };
   metrics: BillingUsageMetrics;
 };
@@ -366,6 +368,7 @@ export function summarizeBillingConfig(config: BillingConfig) {
   const parts: string[] = [];
   const { charges } = normalized;
   const combinationPrices = Object.values(normalized.parameterPrices?.combinations ?? {});
+  const booleanSurcharges = Object.entries(normalized.parameterPrices?.booleanSurcharges ?? {});
 
   if (charges.perRequest) {
     parts.push(`每次请求 ${charges.perRequest}`);
@@ -380,6 +383,9 @@ export function summarizeBillingConfig(config: BillingConfig) {
     );
   } else if (charges.perImage) {
     parts.push(`每张图片 ${charges.perImage}`);
+  }
+  if (booleanSurcharges.length > 0) {
+    parts.push(`布尔参数附加费 ${booleanSurcharges.length} 项`);
   }
   if (combinationPrices.length === 0 && charges.perVideo) {
     parts.push(`每个视频 ${charges.perVideo}`);
@@ -468,6 +474,10 @@ export function resolveBillingBreakdown(input: {
     metrics.imageCount > 0
       ? (config.charges.perVideo ?? 0) * outputPriceMultiplier
       : combinationUnitPrice ?? (config.charges.perVideo ?? 0) * outputPriceMultiplier;
+  const booleanSurcharges = Object.entries(config.parameterPrices?.booleanSurcharges ?? {}).reduce(
+    (sum, [key, price]) => sum + (requestInput?.[key] === true ? price : 0),
+    0
+  );
 
   const components = {
     perRequest: config.charges.perRequest ?? 0,
@@ -478,6 +488,7 @@ export function resolveBillingBreakdown(input: {
       (metrics.inputTokens / 1_000_000) * (config.charges.inputTextTokensPerMillion ?? 0),
     outputTextTokens:
       (metrics.outputTokens / 1_000_000) * (config.charges.outputTextTokensPerMillion ?? 0),
+    booleanSurcharges,
   };
 
   return {

@@ -49,6 +49,7 @@ type ProviderModelOption = {
 
 type BillingFormState = {
   currency: string;
+  outputPriceMode: string;
   chargePerRequest: boolean;
   chargePerImage: boolean;
   chargePerVideo: boolean;
@@ -65,6 +66,7 @@ type BillingFormState = {
   resolutionMultipliersJson: string;
   qualityMultipliersJson: string;
   combinationPricesJson: string;
+  booleanSurchargesJson: string;
 };
 
 type ExecutionConfigFormState = {
@@ -180,11 +182,12 @@ const ASPECT_RATIO_CANDIDATES = [
   "21:9",
 ];
 
-const RESOLUTION_CANDIDATES = ["1k", "2k", "3k", "4k"];
+const RESOLUTION_CANDIDATES = ["0.5k", "1k", "2k", "3k", "4k"];
 const SIZE_CANDIDATES = ["1024*1024", "1024*1536", "1536*1024"];
 const QUALITY_CANDIDATES = ["medium", "low", "high"];
 const OUTPUT_FORMAT_CANDIDATES = ["png", "jpeg", "webp"];
 const BACKGROUND_CANDIDATES = ["auto", "transparent", "opaque"];
+const BOOLEAN_SURCHARGE_CANDIDATES = ["enable_web_search", "enable_image_search"];
 
 const README_MARKDOWN_PROMPT = `Generate a clean SEO-friendly README in RAW MARKDOWN SOURCE format.
 
@@ -230,6 +233,12 @@ function randomFieldId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function normalizeEnumValues(values: string[]) {
+  return Array.from(
+    new Set(values.map((item) => item.trim()).filter((item) => item.length > 0))
+  );
+}
+
 function isResolutionFieldName(value: string) {
   return value.trim().toLowerCase() === "resolution";
 }
@@ -252,6 +261,9 @@ function isBackgroundFieldName(value: string) {
 
 function defaultEnumValuesForKnownInputField(fieldName: string) {
   const normalized = fieldName.trim().toLowerCase();
+  if (normalized === "resolution") {
+    return RESOLUTION_CANDIDATES;
+  }
   if (normalized === "quality") {
     return ["medium", "low", "high"];
   }
@@ -284,9 +296,9 @@ function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields")
         if (!name) {
           return null;
         }
-        const parsedEnumValues = Array.isArray(row.enum)
-          ? row.enum.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-          : [];
+        const parsedEnumValues = normalizeEnumValues(
+          Array.isArray(row.enum) ? row.enum.filter((item): item is string => typeof item === "string") : []
+        );
         const fallbackEnumValues =
           key === "params" && parsedEnumValues.length === 0
             ? defaultEnumValuesForKnownInputField(name)
@@ -448,9 +460,16 @@ function SchemaFieldEditor({
       return;
     }
     if (editingId) {
-      setRows((current) => current.map((row) => (row.id === editingId ? { ...draft, name: draft.name.trim() } : row)));
+      setRows((current) =>
+        current.map((row) =>
+          row.id === editingId ? { ...draft, name: draft.name.trim(), enumValues: normalizeEnumValues(draft.enumValues) } : row
+        )
+      );
     } else {
-      setRows((current) => [...current, { ...draft, name: draft.name.trim() }]);
+      setRows((current) => [
+        ...current,
+        { ...draft, name: draft.name.trim(), enumValues: normalizeEnumValues(draft.enumValues) },
+      ]);
     }
     setEditorOpen(false);
   };
@@ -467,9 +486,7 @@ function SchemaFieldEditor({
       description: row.description.trim(),
       example: row.example.trim(),
       exposedToCustomer: row.exposedToCustomer,
-      enumValues: row.enumValues
-        .map((item) => item.trim())
-        .filter((item, index, list) => item.length > 0 && list.indexOf(item) === index),
+      enumValues: normalizeEnumValues(row.enumValues),
     }))
     .filter((row) => row.name.length > 0);
 
@@ -604,16 +621,17 @@ function SchemaFieldEditor({
                 className={`${formInputClassName} h-9 text-xs md:col-span-2`}
                 placeholder="示例值"
               />
-              {!isQualityFieldName(draft.name) && !isOutputFormatFieldName(draft.name) && !isSizeFieldName(draft.name) && !isBackgroundFieldName(draft.name) ? (
+              {!isResolutionFieldName(draft.name) &&
+              !isQualityFieldName(draft.name) &&
+              !isOutputFormatFieldName(draft.name) &&
+              !isSizeFieldName(draft.name) &&
+              !isBackgroundFieldName(draft.name) ? (
                 <input
                   value={draft.enumValues.join(", ")}
                   onChange={(event) =>
                     setDraft((current) => ({
                       ...current,
-                      enumValues: event.target.value
-                        .split(",")
-                        .map((item) => item.trim())
-                        .filter((item) => item.length > 0),
+                      enumValues: normalizeEnumValues(event.target.value.split(",")),
                     }))
                   }
                   disabled={disabled}
@@ -976,6 +994,7 @@ const panelSurfaceClassName = "rounded-2xl border border-black/[0.08] bg-[#FCFCF
 function parseBillingFormState(initialValue?: string): BillingFormState {
   const fallback: BillingFormState = {
     currency: "USD",
+    outputPriceMode: "per_image",
     chargePerRequest: false,
     chargePerImage: true,
     chargePerVideo: false,
@@ -992,9 +1011,11 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     resolutionMultipliersJson: "{}",
     qualityMultipliersJson: "{}",
     combinationPricesJson: "{}",
+    booleanSurchargesJson: "{}",
   };
   const emptyState = {
     ...fallback,
+    outputPriceMode: "none",
     chargePerRequest: false,
     chargePerImage: false,
     chargePerVideo: false,
@@ -1017,10 +1038,46 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     if (parsed.billingMode === "hybrid" && parsed.charges && typeof parsed.charges === "object") {
       const charges = parsed.charges as Record<string, unknown>;
       const combinationPrices = readParameterPricesCombinations(parsed);
+      const booleanSurcharges = readParameterPricesBooleanSurcharges(parsed);
       const hasCombinationPrices = Object.keys(combinationPrices).length > 0;
+      const parameterMultipliers =
+        parsed.parameterMultipliers &&
+        typeof parsed.parameterMultipliers === "object" &&
+        !Array.isArray(parsed.parameterMultipliers)
+          ? (parsed.parameterMultipliers as Record<string, unknown>)
+          : {};
+      const resolutionMultipliers =
+        parameterMultipliers.resolution &&
+        typeof parameterMultipliers.resolution === "object" &&
+        !Array.isArray(parameterMultipliers.resolution)
+          ? parameterMultipliers.resolution
+          : {};
+      const qualityMultipliers =
+        parameterMultipliers.quality &&
+        typeof parameterMultipliers.quality === "object" &&
+        !Array.isArray(parameterMultipliers.quality)
+          ? parameterMultipliers.quality
+          : {};
+      const hasResolutionMultipliers = Object.keys(resolutionMultipliers).length > 0;
+      const hasQualityMultipliers = Object.keys(qualityMultipliers).length > 0;
       return {
         ...fallback,
         currency: typeof parsed.currency === "string" ? parsed.currency : fallback.currency,
+        outputPriceMode: hasCombinationPrices
+          ? "combination_prices"
+          : hasResolutionMultipliers && hasPositiveCharge(charges.perImage)
+            ? "resolution_multiplier"
+            : hasQualityMultipliers && hasPositiveCharge(charges.perImage)
+              ? "quality_multiplier"
+              : hasPositiveCharge(charges.perImage)
+                ? "per_image"
+                : hasPositiveCharge(charges.perVideo)
+                  ? "per_video"
+                  : hasPositiveCharge(charges.perSecond)
+                    ? "per_second"
+                    : hasPositiveCharge(charges.outputTextTokensPerMillion)
+                      ? "output_tokens"
+                      : "none",
         chargePerRequest: hasPositiveCharge(charges.perRequest),
         chargePerImage: !hasCombinationPrices && hasPositiveCharge(charges.perImage),
         chargePerVideo: !hasCombinationPrices && hasPositiveCharge(charges.perVideo),
@@ -1038,30 +1095,8 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
         outputCostPerMillion: String(
           charges.outputTextTokensPerMillion ?? fallback.outputCostPerMillion
         ),
-        resolutionMultipliersJson: JSON.stringify(
-          (parsed.parameterMultipliers &&
-          typeof parsed.parameterMultipliers === "object" &&
-          !Array.isArray(parsed.parameterMultipliers) &&
-          (parsed.parameterMultipliers as Record<string, unknown>).resolution &&
-          typeof (parsed.parameterMultipliers as Record<string, unknown>).resolution === "object" &&
-          !Array.isArray((parsed.parameterMultipliers as Record<string, unknown>).resolution)
-            ? (parsed.parameterMultipliers as Record<string, unknown>).resolution
-            : {}),
-          null,
-          2
-        ),
-        qualityMultipliersJson: JSON.stringify(
-          (parsed.parameterMultipliers &&
-          typeof parsed.parameterMultipliers === "object" &&
-          !Array.isArray(parsed.parameterMultipliers) &&
-          (parsed.parameterMultipliers as Record<string, unknown>).quality &&
-          typeof (parsed.parameterMultipliers as Record<string, unknown>).quality === "object" &&
-          !Array.isArray((parsed.parameterMultipliers as Record<string, unknown>).quality)
-            ? (parsed.parameterMultipliers as Record<string, unknown>).quality
-            : {}),
-          null,
-          2
-        ),
+        resolutionMultipliersJson: JSON.stringify(resolutionMultipliers, null, 2),
+        qualityMultipliersJson: JSON.stringify(qualityMultipliers, null, 2),
         combinationPricesJson: JSON.stringify(
           Object.keys(combinationPrices).length > 0
             ? combinationPrices
@@ -1069,6 +1104,7 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
           null,
           2
         ),
+        booleanSurchargesJson: JSON.stringify(booleanSurcharges, null, 2),
       };
     }
 
@@ -1082,6 +1118,16 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     return {
       ...fallback,
       currency: typeof parsed.currency === "string" ? parsed.currency : fallback.currency,
+      outputPriceMode:
+        parsed.billingMode === "per_image"
+          ? "per_image"
+          : parsed.billingMode === "per_video"
+            ? "per_video"
+            : parsed.billingMode === "per_second"
+              ? "per_second"
+              : parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.outputCostPerMillion)
+                ? "output_tokens"
+                : "none",
       chargePerRequest: parsed.billingMode === "per_request" && hasPositiveCharge(parsed.costPerRequest ?? parsed.costPerUnit),
       chargePerImage: parsed.billingMode === "per_image" && hasPositiveCharge(parsed.costPerImage ?? parsed.costPerUnit),
       chargePerVideo: parsed.billingMode === "per_video" && hasPositiveCharge(parsed.costPerVideo ?? parsed.costPerUnit),
@@ -1098,6 +1144,7 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
       resolutionMultipliersJson: fallback.resolutionMultipliersJson,
       qualityMultipliersJson: fallback.qualityMultipliersJson,
       combinationPricesJson: fallback.combinationPricesJson,
+      booleanSurchargesJson: fallback.booleanSurchargesJson,
     };
   } catch {
     return fallback;
@@ -1133,11 +1180,6 @@ function safeParseNumberMap(value: string) {
   }
 }
 
-function stringifyNumberMap(value: Record<string, number>) {
-  const entries = Object.entries(value).sort((a, b) => a[0].localeCompare(b[0], "en-US"));
-  return JSON.stringify(Object.fromEntries(entries), null, 2);
-}
-
 function stringifyLooseNumberMap(value: Record<string, string>) {
   const entries = Object.entries(value).sort((a, b) => a[0].localeCompare(b[0], "en-US"));
   return JSON.stringify(Object.fromEntries(entries), null, 2);
@@ -1161,6 +1203,22 @@ function readParameterPricesCombinations(parsed: Record<string, unknown>) {
       ? (parameterPrices.combinations as Record<string, unknown>)
       : null;
   return combinations ?? {};
+}
+
+function readParameterPricesBooleanSurcharges(parsed: Record<string, unknown>) {
+  const parameterPrices =
+    parsed.parameterPrices &&
+    typeof parsed.parameterPrices === "object" &&
+    !Array.isArray(parsed.parameterPrices)
+      ? (parsed.parameterPrices as Record<string, unknown>)
+      : null;
+  const booleanSurcharges =
+    parameterPrices?.booleanSurcharges &&
+    typeof parameterPrices.booleanSurcharges === "object" &&
+    !Array.isArray(parameterPrices.booleanSurcharges)
+      ? (parameterPrices.booleanSurcharges as Record<string, unknown>)
+      : null;
+  return booleanSurcharges ?? {};
 }
 
 function buildLegacyCombinationPrices(parsed: Record<string, unknown>, fallback: BillingFormState) {
@@ -1232,6 +1290,7 @@ function buildBillingConfigValue(state: BillingFormState) {
   const combinationPrices = state.chargeCombinationPrices
     ? safeParseNumberMap(state.combinationPricesJson)
     : {};
+  const booleanSurcharges = safeParseNumberMap(state.booleanSurchargesJson);
   const parameterMultipliers: Record<string, Record<string, number>> = {};
   if (Object.keys(resolutionMultipliers).length > 0) {
     parameterMultipliers.resolution = resolutionMultipliers;
@@ -1242,6 +1301,9 @@ function buildBillingConfigValue(state: BillingFormState) {
   const parameterPrices: Record<string, Record<string, number>> = {};
   if (Object.keys(combinationPrices).length > 0) {
     parameterPrices.combinations = combinationPrices;
+  }
+  if (Object.keys(booleanSurcharges).length > 0) {
+    parameterPrices.booleanSurcharges = booleanSurcharges;
   }
 
   return JSON.stringify({
@@ -1575,6 +1637,128 @@ function BillingNumberField({
   );
 }
 
+function ParameterMultiplierTable({
+  title,
+  valueLabel,
+  candidates,
+  values,
+  onChange,
+  help,
+}: {
+  title: string;
+  valueLabel: string;
+  candidates: string[];
+  values: Record<string, string>;
+  onChange: (key: string, value?: string) => void;
+  help: string;
+}) {
+  return (
+    <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+      <p className="text-[11px] tracking-[0.35px] text-black/60">{title}</p>
+      <div className="mt-2 overflow-x-auto rounded-lg border border-black/[0.06] bg-white">
+        <table className="w-full min-w-[360px] text-left text-xs">
+          <thead className="bg-[#FAFAF9] text-black/45">
+            <tr>
+              <th className="px-2 py-2 font-medium">启用</th>
+              <th className="px-2 py-2 font-medium">{valueLabel}</th>
+              <th className="px-2 py-2 font-medium">倍率</th>
+            </tr>
+          </thead>
+          <tbody>
+            {candidates.map((candidate) => {
+              const enabled = candidate in values;
+              const inputValue = values[candidate] ?? "1";
+              return (
+                <tr key={candidate} className="border-t border-black/[0.05]">
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="checkbox"
+                      checked={enabled}
+                      onChange={(event) => onChange(candidate, event.target.checked ? inputValue : undefined)}
+                      className="size-3.5"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 text-black/70">{candidate}</td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="number"
+                      min="0.000001"
+                      step="0.000001"
+                      value={inputValue}
+                      disabled={!enabled}
+                      onChange={(event) => onChange(candidate, event.target.value)}
+                      className="h-8 w-28 rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black disabled:bg-black/[0.03] disabled:text-black/35"
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <FieldHint help={help} />
+    </div>
+  );
+}
+
+function BooleanSurchargeTable({
+  values,
+  onChange,
+}: {
+  values: Record<string, string>;
+  onChange: (key: string, value?: string) => void;
+}) {
+  const candidates = Array.from(new Set([...BOOLEAN_SURCHARGE_CANDIDATES, ...Object.keys(values)]));
+
+  return (
+    <div className="mt-3 rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+      <p className="text-[11px] tracking-[0.35px] text-black/60">布尔参数附加费</p>
+      <div className="mt-2 overflow-x-auto rounded-lg border border-black/[0.06] bg-white">
+        <table className="w-full min-w-[460px] text-left text-xs">
+          <thead className="bg-[#FAFAF9] text-black/45">
+            <tr>
+              <th className="px-2 py-2 font-medium">启用</th>
+              <th className="px-2 py-2 font-medium">boolean 参数</th>
+              <th className="px-2 py-2 font-medium">附加金额</th>
+            </tr>
+          </thead>
+          <tbody>
+            {candidates.map((candidate) => {
+              const enabled = candidate in values;
+              const inputValue = values[candidate] ?? "0.01";
+              return (
+                <tr key={candidate} className="border-t border-black/[0.05]">
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="checkbox"
+                      checked={enabled}
+                      onChange={(event) => onChange(candidate, event.target.checked ? inputValue : undefined)}
+                      className="size-3.5"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 font-mono text-black/70">{candidate}</td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="number"
+                      min="0.000001"
+                      step="0.000001"
+                      value={inputValue}
+                      disabled={!enabled}
+                      onChange={(event) => onChange(candidate, event.target.value)}
+                      className="h-8 w-28 rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black disabled:bg-black/[0.03] disabled:text-black/35"
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <FieldHint help="当请求 input 里的对应 boolean 参数为 true 时，把这里配置的金额直接加到本次请求总价上。" />
+    </div>
+  );
+}
+
 export function BillingConfigEditor({
   name = "billingConfig",
   initialValue,
@@ -1591,22 +1775,25 @@ export function BillingConfigEditor({
     setState(parseBillingFormState(initialValue));
   }, [initialValue]);
   const hiddenValue = buildBillingConfigValue(state);
+  const resolutionMultiplierMap = safeParseLooseNumberMap(state.resolutionMultipliersJson);
+  const qualityMultiplierMap = safeParseLooseNumberMap(state.qualityMultipliersJson);
   const combinationPriceMap = safeParseLooseNumberMap(state.combinationPricesJson);
+  const booleanSurchargeMap = safeParseLooseNumberMap(state.booleanSurchargesJson);
   const inputMethod = state.chargeInputTokens
     ? "input_tokens"
     : state.chargePerRequest
       ? "per_request"
       : "none";
   const outputMethod = state.chargeOutputTokens
-    ? "output_tokens"
+    ? state.outputPriceMode || "output_tokens"
     : state.chargeCombinationPrices
-      ? "combination_prices"
+      ? state.outputPriceMode || "combination_prices"
       : state.chargePerImage
-      ? "per_image"
+      ? state.outputPriceMode || "per_image"
       : state.chargePerVideo
-        ? "per_video"
+        ? state.outputPriceMode || "per_video"
         : state.chargePerSecond
-          ? "per_second"
+          ? state.outputPriceMode || "per_second"
           : "none";
 
   const applyInputMethod = (method: string) => {
@@ -1620,9 +1807,10 @@ export function BillingConfigEditor({
   const applyOutputMethod = (method: string) => {
     setState((current) => ({
       ...current,
+      outputPriceMode: method,
       chargeOutputTokens: method === "output_tokens",
       chargeCombinationPrices: method === "combination_prices",
-      chargePerImage: method === "per_image",
+      chargePerImage: method === "per_image" || method === "resolution_multiplier" || method === "quality_multiplier",
       chargePerVideo: method === "per_video",
       chargePerSecond: method === "per_second",
     }));
@@ -1637,6 +1825,39 @@ export function BillingConfigEditor({
     }
     const nextJson = stringifyLooseNumberMap(currentMap);
     setState((current) => ({ ...current, combinationPricesJson: nextJson }));
+  };
+
+  const updateResolutionMultiplier = (key: string, value?: string) => {
+    const currentMap = safeParseLooseNumberMap(state.resolutionMultipliersJson);
+    if (value === undefined) {
+      delete currentMap[key];
+    } else {
+      currentMap[key] = value;
+    }
+    const nextJson = stringifyLooseNumberMap(currentMap);
+    setState((current) => ({ ...current, resolutionMultipliersJson: nextJson }));
+  };
+
+  const updateQualityMultiplier = (key: string, value?: string) => {
+    const currentMap = safeParseLooseNumberMap(state.qualityMultipliersJson);
+    if (value === undefined) {
+      delete currentMap[key];
+    } else {
+      currentMap[key] = value;
+    }
+    const nextJson = stringifyLooseNumberMap(currentMap);
+    setState((current) => ({ ...current, qualityMultipliersJson: nextJson }));
+  };
+
+  const updateBooleanSurcharge = (key: string, value?: string) => {
+    const currentMap = safeParseLooseNumberMap(state.booleanSurchargesJson);
+    if (value === undefined) {
+      delete currentMap[key];
+    } else {
+      currentMap[key] = value;
+    }
+    const nextJson = stringifyLooseNumberMap(currentMap);
+    setState((current) => ({ ...current, booleanSurchargesJson: nextJson }));
   };
 
   return (
@@ -1682,6 +1903,8 @@ export function BillingConfigEditor({
               >
                 <option value="none">不计费</option>
                 <option value="per_image">按图片</option>
+                <option value="resolution_multiplier">按 resolution 阶梯倍率</option>
+                <option value="quality_multiplier">按 quality 阶梯倍率</option>
                 <option value="per_video">按视频</option>
                 <option value="combination_prices">按 resolution + quality 组合阶梯</option>
                 <option value="per_second">按秒</option>
@@ -1793,6 +2016,33 @@ export function BillingConfigEditor({
         <FieldHint help="选择组合阶梯计价后，基础 perImage/perVideo 不再参与输出计价；命中的 resolution + quality 组合会直接作为每张图片/每个视频的输出单价。" />
       </div>
       ) : null}
+
+      {outputMethod === "resolution_multiplier" || outputMethod === "quality_multiplier" ? (
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {outputMethod === "resolution_multiplier" ? (
+          <ParameterMultiplierTable
+            title="单独 resolution 阶梯倍率"
+            valueLabel="resolution"
+            candidates={RESOLUTION_CANDIDATES}
+            values={resolutionMultiplierMap}
+            onChange={updateResolutionMultiplier}
+            help="用于基础 perImage/perVideo 单价的 resolution 倍率，例如 0.5k=0.5、1k=1、2k=2。"
+          />
+          ) : null}
+          {outputMethod === "quality_multiplier" ? (
+          <ParameterMultiplierTable
+            title="单独 quality 阶梯倍率"
+            valueLabel="quality"
+            candidates={QUALITY_CANDIDATES}
+            values={qualityMultiplierMap}
+            onChange={updateQualityMultiplier}
+            help="用于基础 perImage/perVideo 单价的 quality 倍率，会和 resolution 倍率相乘。"
+          />
+          ) : null}
+        </div>
+      ) : null}
+
+      <BooleanSurchargeTable values={booleanSurchargeMap} onChange={updateBooleanSurcharge} />
 
       <div className="mt-3 rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
         <p className="text-[11px] tracking-[0.35px] text-black/45">{generatedLabel}</p>
