@@ -76,6 +76,30 @@ begin
   values (v_workspace_id, new.id, 'owner')
   on conflict (workspace_id, user_id) do nothing;
 
+  insert into public.wallet_transactions (
+    workspace_id,
+    entry_type,
+    amount_delta,
+    balance_after,
+    description,
+    metadata,
+    created_by
+  )
+  values (
+    v_workspace_id,
+    'adjustment',
+    1.00,
+    1.00,
+    'System signup bonus · $1.00 credit',
+    jsonb_build_object(
+      'source', 'system_signup_bonus',
+      'credit_type', 'system_gift',
+      'reason', 'new_user_registration',
+      'user_id', new.id
+    ),
+    null
+  );
+
   return new;
 end;
 $$;

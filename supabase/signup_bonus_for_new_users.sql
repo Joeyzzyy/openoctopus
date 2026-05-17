@@ -1,7 +1,6 @@
--- Fix Google/OAuth signup failure:
--- ERROR: column reference "workspace_id" is ambiguous
--- Root cause: the trigger function used a PL/pgSQL variable named workspace_id,
--- which conflicts with table columns referenced inside INSERT ... ON CONFLICT.
+-- Add a $1 system gift to every newly registered user's default workspace.
+-- Run this in Supabase SQL editor. It replaces the auth.users signup trigger
+-- function; existing users are not backfilled by this script.
 
 create or replace function public.handle_new_user()
 returns trigger

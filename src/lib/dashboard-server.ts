@@ -1064,7 +1064,9 @@ export async function getDashboardData({
       })),
       ledgerRows: (walletLedgerRows ?? []).map((row) => ({
         title:
-          row.entry_type === "topup"
+          (row as { metadata?: Record<string, unknown> }).metadata?.source === "system_signup_bonus"
+            ? "System gift"
+            : row.entry_type === "topup"
             ? "Wallet top-up"
             : row.entry_type === "refund"
               ? "Refund"
@@ -1082,6 +1084,7 @@ export async function getDashboardData({
       })),
       billingRows: (walletLedgerRows ?? []).map((row) => {
         const metadata = (row as { metadata?: Record<string, unknown> }).metadata;
+        const isSystemSignupBonus = metadata?.source === "system_signup_bonus";
         const stripeSessionId =
           metadata && typeof metadata.stripe_checkout_session_id === "string"
             ? metadata.stripe_checkout_session_id
@@ -1101,7 +1104,9 @@ export async function getDashboardData({
         const isStripeTopupDescription = /^stripe top-up\b/i.test(normalizedDescription);
         const isDebitUsage = row.entry_type === "usage" || (row.entry_type !== "topup" && amount < 0);
         const description =
-          row.entry_type === "topup"
+          isSystemSignupBonus
+            ? "System signup bonus"
+            : row.entry_type === "topup"
             ? (isStripeTopupDescription
                 ? "Stripe top-up"
                 : normalizedDescription.length > 0
@@ -1125,7 +1130,9 @@ export async function getDashboardData({
           id: row.id,
           createdAtLabel: formatTimestamp(row.created_at),
           typeLabel:
-            row.entry_type === "topup"
+            isSystemSignupBonus
+              ? "System Gift"
+              : row.entry_type === "topup"
               ? "Top-up (Credit)"
               : row.entry_type === "refund"
                 ? "Refund"
