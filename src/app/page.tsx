@@ -98,6 +98,69 @@ const PROVIDER_ORBS = [
   "Arcee",
 ];
 
+const AI_MODEL_LOGOS = [
+  {
+    name: "Kling",
+    image: "https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/kling-color.png",
+  },
+  {
+    name: "Luma",
+    image: "https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/luma-color.png",
+  },
+  {
+    name: "Runway",
+    image: "https://www.mindvideo.ai/images/ai-models/runway.webp",
+  },
+  {
+    name: "Veo",
+    image: "https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/google-color.png",
+  },
+  {
+    name: "Hailuo",
+    image: "https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/minimax-color.png",
+  },
+  {
+    name: "Jimeng",
+    image: "https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/doubao-color.png",
+  },
+  {
+    name: "Gemini",
+    image: "https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/gemini-color.png",
+  },
+  {
+    name: "Vidu",
+    image: "https://www.mindvideo.ai/images/ai-models/vidu.webp",
+  },
+  {
+    name: "Midjourney",
+    image: "https://www.mindvideo.ai/images/ai-models/mj.webp",
+  },
+  {
+    name: "Stable Diffusion",
+    image: "https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/stability-color.png",
+  },
+  {
+    name: "DALL-E 3",
+    image: "https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/dalle-color.png",
+  },
+  {
+    name: "Sora",
+    image: "https://www.mindvideo.ai/images/ai-models/sora2.webp",
+  },
+  {
+    name: "Flux",
+    image: "https://www.mindvideo.ai/images/ai-models/flux.webp",
+  },
+  {
+    name: "Tongyi Wanx",
+    image: "https://www.mindvideo.ai/images/ai-models/wanx.webp",
+  },
+  {
+    name: "Claude",
+    image: "https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/claude-color.png",
+  },
+];
+
 const FEATURED_MODELS = [
   {
     name: "Claude Opus 4.7",
@@ -263,13 +326,13 @@ export default async function Home() {
       </header>
 
       <main className="tabular-nums">
-        <section className="relative overflow-hidden">
+        <section className="relative overflow-hidden bg-[#FCFCFA]">
           <div
             aria-hidden="true"
             className="absolute inset-0"
             style={{
               background:
-                "radial-gradient(circle at top, rgba(243, 226, 201, 0.62), transparent 32%), linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(252,252,250,1) 46%)",
+                "radial-gradient(circle at 50% 0%, rgba(243, 226, 201, 0.58), transparent 34%), radial-gradient(circle at 12% 62%, rgba(194,123,59,0.10), transparent 30%), #FCFCFA",
             }}
           />
           <div
@@ -283,52 +346,74 @@ export default async function Home() {
             }}
           />
 
-          <div className="relative mx-auto flex w-full max-w-7xl flex-col items-center px-6 pb-14 pt-6 md:px-8 md:pb-20 md:pt-8">
-            <div className="flex w-full max-w-4xl flex-col justify-center gap-12 pt-8 md:gap-16">
-              <div className="flex flex-col gap-4 text-center md:gap-6">
-                <div className="flex flex-col gap-2 md:gap-4">
-                  <h1 className="my-0 w-full text-3xl font-bold text-[#111827] sm:text-4xl md:text-5xl lg:text-6xl">
-                    The Unified Interface For LLMs
-                  </h1>
-                  <p className="text-md text-[#6B7280] md:pt-2 md:text-xl">
-                    Better{" "}
-                    <Link href="/models" className="text-[#111827] underline decoration-black/20 underline-offset-4">
-                      prices
-                    </Link>
-                    , better{" "}
-                    <Link href="/docs" className="text-[#111827] underline decoration-black/20 underline-offset-4">
-                      uptime
-                    </Link>
-                    , no subscriptions.
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 justify-center gap-3 sm:mx-auto sm:w-fit sm:grid-cols-2 sm:gap-4">
-                  <Link
-                    href={destination}
-                    className="inline-flex h-11 w-full items-center justify-center rounded-md bg-[#111827] px-10 py-4 text-[14px] font-medium text-white transition-colors hover:bg-[#0B1220]"
+          <div className="relative mx-auto flex w-full max-w-7xl flex-col items-center px-6 pb-14 pt-12 md:px-8 md:pb-20 md:pt-20">
+            <div className="pointer-events-none absolute left-8 top-16 h-24 w-24 rounded-full border border-[#C27B3B]/20 bg-[#C27B3B]/10 blur-xl" />
+            <div className="pointer-events-none absolute bottom-20 right-10 h-32 w-32 rounded-full border border-[#4338CA]/10 bg-[#4338CA]/10 blur-2xl" />
+            <div className="z-10 mx-auto flex w-full max-w-7xl flex-col overflow-hidden rounded-xl border border-white/70 bg-white/55 p-6 shadow-[0_30px_100px_rgba(17,24,39,0.18)] backdrop-blur-xl md:p-10 lg:p-16">
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.72),rgba(255,255,255,0.2)_42%,rgba(194,123,59,0.10))]" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+              <div className="relative mb-8 flex flex-wrap items-center justify-center gap-2">
+                {["Image", "Video", "Edit", "Routing"].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-black/[0.08] bg-white/70 px-3 py-1 text-[11px] font-medium text-[#6B7280] shadow-sm"
                   >
-                    {destinationLabel}
-                  </Link>
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <div className="relative flex flex-col items-center justify-center gap-6 lg:flex-row lg:gap-10">
+                <h1 className="text-center text-5xl font-semibold tracking-tight text-[#111827] md:text-7xl lg:text-8xl">
+                  Any API
+                </h1>
+                <p className="max-w-md text-center text-sm leading-6 text-[#6B7280] md:text-base lg:text-left">
+                  Discover, integrate, and manage image, video, and multimodal models in one unified API marketplace.
+                  Fast integration, reliable routing, and transparent pricing.
+                </p>
+              </div>
+
+              <div className="relative mt-10 flex flex-col items-center gap-10 lg:flex-row">
+                <HeroModelIconStack />
+                <h2 className="text-center text-5xl font-semibold tracking-tight text-[#111827] md:text-7xl lg:text-8xl">
+                  Any Model
+                </h2>
+              </div>
+
+              <div className="relative mt-10 flex flex-col items-center gap-8 lg:flex-row lg:items-end lg:justify-center">
+                <h2 className="text-center text-5xl font-semibold tracking-tight text-[#111827] underline decoration-[#C27B3B]/60 decoration-4 underline-offset-8 md:text-7xl lg:text-8xl">
+                  Always On
+                </h2>
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <Link
                     href="/models"
-                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-black/[0.08] bg-transparent px-10 py-4 text-[14px] font-medium text-[#111827] shadow-sm transition-colors hover:bg-black/[0.03]"
+                    className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-full bg-[#C27B3B] px-6 text-sm font-bold tracking-wide text-white shadow-lg shadow-[#C27B3B]/25 transition-colors hover:bg-[#A6642D] md:h-14 md:px-8 md:text-[17px]"
                   >
-                    <span>Explore Models</span>
+                    <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+                    <span className="relative z-10 flex items-center gap-2">
+                      Explore Models
+                      <ArrowRight className="size-5 transition-transform duration-300 group-hover:translate-x-1" />
+                    </span>
+                  </Link>
+                  <Link
+                    href={destination}
+                    className="inline-flex h-12 items-center justify-center rounded-full border border-black/[0.1] bg-white/70 px-6 text-sm font-semibold text-[#111827] shadow-sm transition-colors hover:bg-white md:h-14 md:px-8 md:text-[17px]"
+                  >
+                    {destinationLabel}
                   </Link>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-8 md:gap-12">
-                <div className="mx-auto grid max-w-6xl grid-cols-4 gap-4 md:gap-6">
-                  <HeroStatCard label="Monthly Tokens" value="80T" />
-                  <HeroStatCard label="Global Users" value="8M+" />
-                  <HeroStatCard label="Active Providers" value="60+" />
-                  <HeroStatCard label="Models" value="400+" highlight />
-                </div>
+              <div className="relative mt-12 grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
+                <HeroStatCard label="Monthly Tokens" value="80T" />
+                <HeroStatCard label="Global Users" value="8M+" />
+                <HeroStatCard label="Active Providers" value="60+" />
+                <HeroStatCard label="Models" value="400+" highlight />
               </div>
             </div>
           </div>
         </section>
+
+        <ModelLogoMarquee />
 
         <section className="mx-auto w-full max-w-7xl space-y-4 px-6 pb-14 md:space-y-8 md:px-8 md:pb-20">
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
@@ -337,6 +422,8 @@ export default async function Home() {
             ))}
           </div>
         </section>
+
+        <ModelLogoGrid />
 
         <section className="mx-auto w-full max-w-7xl space-y-6 px-6 pb-14 md:px-8 md:pb-20">
           <div className="flex items-center justify-between gap-4">
@@ -378,6 +465,8 @@ export default async function Home() {
           </div>
         </section>
 
+        <BottomPricingCta destination={destination} destinationLabel={destinationLabel} />
+
       </main>
 
       <footer className="border-t border-black/[0.06] bg-[#FCFCFA]">
@@ -401,6 +490,170 @@ export default async function Home() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function ModelLogoMarquee() {
+  const marqueeItems = [...AI_MODEL_LOGOS, ...AI_MODEL_LOGOS];
+
+  return (
+    <section className="w-full overflow-hidden px-0 pb-14 md:pb-20">
+      <div className="group relative flex w-full overflow-hidden py-1 [--gap:6px] [gap:var(--gap)]">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-gradient-to-r from-[#FCFCFA] to-transparent"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-gradient-to-l from-[#FCFCFA] to-transparent"
+        />
+        <div className="flex shrink-0 animate-[marquee_40s_linear_infinite] justify-around [gap:var(--gap)] group-hover:[animation-play-state:paused]">
+          {marqueeItems.map((model, index) => (
+            <div key={`${model.name}-${index}`} className="h-full">
+              <div className="mx-2 flex h-full min-w-[160px] items-center gap-3 overflow-visible rounded-xl border border-black/[0.08] bg-white/70 px-5 py-4 shadow-sm backdrop-blur-md md:mx-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={model.image}
+                  alt={model.name}
+                  className="h-10 w-10 shrink-0 object-contain"
+                  loading="lazy"
+                />
+                <span className="whitespace-nowrap text-sm font-semibold text-[#111827]">
+                  {model.name}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HeroModelIconStack() {
+  return (
+    <div className="relative flex max-w-full flex-wrap justify-center -space-x-5 -space-y-3 px-5 pt-3 md:-space-x-6">
+      <div
+        aria-hidden="true"
+        className="absolute left-1/2 top-1/2 h-16 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#C27B3B]/15 blur-2xl"
+      />
+      {AI_MODEL_LOGOS.slice(0, 5).map((model, index) => (
+        <div
+          key={model.name}
+          className={`${index >= 2 ? "hidden md:flex" : "flex"} relative size-16 items-center justify-center rounded-full border border-black/[0.08] bg-white p-4 shadow-2xl transition-transform duration-300 hover:-translate-y-1 md:size-20 md:p-5`}
+          title={model.name}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={model.image}
+            alt={model.name}
+            className="h-full w-full object-contain"
+            loading="lazy"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ModelLogoGrid() {
+  return (
+    <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-4 md:px-8 md:pb-24 md:pt-8">
+      <div className="mx-auto mb-10 w-full max-w-3xl text-center">
+        <p className="mx-auto max-w-3xl text-sm leading-6 text-[#6B7280] md:text-base">
+          OpenOctopus provides access to Kling AI, Runway, Luma AI, Veo, Sora, Flux, and more, all in one place.
+          Create stunning visuals using the best AI models available.
+        </p>
+      </div>
+      <div className="grid grid-cols-4 gap-4 sm:grid-cols-5 md:grid-cols-6 md:gap-6 lg:grid-cols-8">
+        {AI_MODEL_LOGOS.map((model) => (
+          <Link
+            key={model.name}
+            href="/models"
+            className="group flex min-w-0 flex-col items-center gap-2"
+          >
+            <div className="flex size-16 items-center justify-center overflow-hidden rounded-2xl border border-black/[0.08] bg-white/70 p-3 shadow-sm transition-all group-hover:scale-105 group-hover:border-[#C27B3B]/35 group-hover:shadow-md md:size-20">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={model.image}
+                alt={model.name}
+                className="h-full w-full object-contain"
+                loading="lazy"
+              />
+            </div>
+            <span className="max-w-full text-center text-xs leading-tight text-[#6B7280] md:text-sm">
+              {model.name}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function BottomPricingCta({
+  destination,
+  destinationLabel,
+}: {
+  destination: string;
+  destinationLabel: string;
+}) {
+  return (
+    <section className="mx-auto w-full max-w-7xl px-6 pb-20 md:px-8">
+      <div className="relative h-[30rem] overflow-hidden rounded-2xl border border-white/10 bg-[#111827] shadow-2xl">
+        <div
+          aria-hidden="true"
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(circle at 24% 20%, rgba(194,123,59,0.46), transparent 28%), radial-gradient(circle at 78% 70%, rgba(67,56,202,0.28), transparent 30%), linear-gradient(135deg, #111827 0%, #17120E 58%, #2A160C 100%)",
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 opacity-30"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)",
+            backgroundSize: "42px 42px",
+            maskImage: "radial-gradient(circle at center, black, transparent 76%)",
+          }}
+        />
+        <div className="absolute inset-x-8 top-8 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+        <div className="relative z-10 flex h-full w-full flex-col items-center justify-center px-4 py-8 text-center md:px-10">
+          <span className="mb-5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-white/70 backdrop-blur">
+            Transparent pricing, one balance
+          </span>
+          <h2 className="max-w-4xl text-3xl font-bold tracking-tight text-white md:text-6xl">
+            Ready to Build Something Amazing?
+          </h2>
+          <p className="mt-6 max-w-xl text-sm leading-6 text-white/72 md:text-xl md:leading-8">
+            Access image, video, and editing models with one account. Start building in minutes with developer-friendly docs and unified billing.
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row">
+            <Link
+              href={destination}
+              className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#C27B3B] px-7 text-sm font-semibold text-white shadow-lg shadow-[#C27B3B]/25 transition-colors hover:bg-[#A6642D]"
+            >
+              {destinationLabel}
+              <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
+            </Link>
+            <Link
+              href="/pricing"
+              className="inline-flex h-12 items-center justify-center rounded-full border border-white/15 bg-white/10 px-7 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/15"
+            >
+              View Pricing
+            </Link>
+            <Link
+              href="/docs"
+              className="text-sm font-medium text-white/78 underline-offset-4 transition-colors hover:text-white hover:underline"
+            >
+              View Documentation
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
