@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
-  KeyRound,
   LineChart,
   ReceiptText,
   UserRound,
@@ -129,40 +128,6 @@ function parseRangeMs(value: RequestRange) {
   return Number(value.replace("d", "")) * 24 * 60 * 60 * 1000;
 }
 
-function getBucketMs(interval: RequestInterval) {
-  if (interval === "minute") {
-    return 60 * 1000;
-  }
-
-  if (interval === "hour") {
-    return 60 * 60 * 1000;
-  }
-
-  return 24 * 60 * 60 * 1000;
-}
-
-function formatBucketLabel(date: Date, interval: RequestInterval) {
-  if (interval === "minute") {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date);
-  }
-
-  if (interval === "hour") {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-    }).format(date);
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(date);
-}
-
 function buildDashboardHref(input: {
   view: DashboardView;
   requestsPage?: number;
@@ -208,43 +173,6 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function buildRequestTrendSeries(
-  rows: Array<{ createdAt: string; costValue: number }>,
-  interval: RequestInterval,
-  range: RequestRange
-) {
-  const bucketMs = getBucketMs(interval);
-  const rangeMs = parseRangeMs(range);
-  const now = Date.now();
-  const end = Math.floor(now / bucketMs) * bucketMs;
-  const start = end - rangeMs + bucketMs;
-  const bucketCount = Math.max(1, Math.floor(rangeMs / bucketMs));
-  const buckets = Array.from({ length: bucketCount }, (_, index) => start + index * bucketMs);
-  const requestPoints = Array.from({ length: bucketCount }, () => 0);
-  const spendPoints = Array.from({ length: bucketCount }, () => 0);
-
-  for (const row of rows) {
-    const timestamp = new Date(row.createdAt).getTime();
-    if (!Number.isFinite(timestamp) || timestamp < start || timestamp > end + bucketMs - 1) {
-      continue;
-    }
-
-    const bucketIndex = Math.floor((timestamp - start) / bucketMs);
-    if (bucketIndex < 0 || bucketIndex >= bucketCount) {
-      continue;
-    }
-
-    requestPoints[bucketIndex] += 1;
-    spendPoints[bucketIndex] += row.costValue;
-  }
-
-  return {
-    labels: buckets.map((bucket) => formatBucketLabel(new Date(bucket), interval)),
-    requestPoints,
-    spendPoints,
-  };
-}
-
 function MetricCard({
   title,
   value,
@@ -253,7 +181,7 @@ function MetricCard({
 }: {
   title: string;
   value: string | number;
-  note: string;
+  note?: string;
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
@@ -265,7 +193,7 @@ function MetricCard({
         <div className="min-w-0">
           <p className="text-[11px] tracking-[0.35px] text-black/60">{title}</p>
           <p className="mt-1 text-2xl font-medium tracking-tight text-black">{value}</p>
-          <p className="mt-2 text-xs leading-5 text-black/50">{note}</p>
+          {note ? <p className="mt-2 text-xs leading-5 text-black/50">{note}</p> : null}
         </div>
       </div>
     </div>
@@ -327,10 +255,7 @@ export default async function DashboardPage({
 
   const walletMetric = metrics.find((metric) => metric.label === "Wallet Balance");
   const topupMetric = metrics.find((metric) => metric.label === "Total Top-Ups");
-  const trendSeries = buildRequestTrendSeries(analyticsRequests, analyticsInterval, analyticsRange);
   const filteredSpend = analyticsRequests.reduce((sum, row) => sum + row.costValue, 0);
-  const filteredRequests = analyticsRequests.length;
-  const successfulRequests = analyticsRequests.filter((row) => row.status === "succeeded").length;
   const billingRowsPage = billingRows;
   const billingTotalPages = billingPagination.totalPages;
   const normalizedBillingPage = Math.min(billingPagination.page, billingTotalPages);
@@ -345,14 +270,7 @@ export default async function DashboardPage({
     {
       title: "Spend in view",
       value: formatCurrency(filteredSpend),
-      note: `All keys in ${analyticsRange}`,
       icon: LineChart,
-    },
-    {
-      title: "Requests in view",
-      value: filteredRequests,
-      note: `${successfulRequests} succeeded in the selected window`,
-      icon: KeyRound,
     },
   ];
 
@@ -421,8 +339,8 @@ export default async function DashboardPage({
             {view === "dashboard" ? (
               <>
                 <article className="mb-6 space-y-3 md:mb-8">
-                  <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
-                    <div className="xl:col-span-1">
+                  <div className="grid gap-3 lg:grid-cols-3">
+                    <div>
                       <TopUpForm balanceLabel={walletMetric?.value ?? "$0.00"} />
                     </div>
                     {overviewCards.map((card) => (

@@ -751,12 +751,27 @@ function pickImageUrl(value: unknown): string | null {
   if (
     text.startsWith("iVBORw0KGgo") ||
     text.startsWith("/9j/") ||
-    text.startsWith("R0lGOD") ||
-    text.startsWith("UklGR")
+    text.startsWith("R0lGOD")
   ) {
     return `data:image/png;base64,${text}`;
   }
+  if (text.startsWith("UklGR")) {
+    return `data:image/webp;base64,${text}`;
+  }
   return null;
+}
+
+function imageExtensionFromMimeType(mimeType: string | null | undefined) {
+  const normalized = mimeType?.split(";")[0]?.trim().toLowerCase();
+  if (normalized === "image/jpeg") return "jpg";
+  if (normalized === "image/webp") return "webp";
+  if (normalized === "image/gif") return "gif";
+  if (normalized === "image/png") return "png";
+  return "png";
+}
+
+function replaceFileExtension(filename: string, extension: string) {
+  return filename.replace(/\.[a-z0-9]+$/i, "") + `.${extension}`;
 }
 
 function buildDisplayImageUrl(src: string) {
@@ -789,39 +804,47 @@ function isRouteSyncedWithSelection(input: {
   return input.pathname === `/models/${providerSlug}/${modelSlug}`;
 }
 
-function extractImageUrls(output: unknown): string[] {
+type PlaygroundImageAsset = {
+  url: string;
+  mimeType?: string;
+};
+
+function extractImageAssets(output: unknown): PlaygroundImageAsset[] {
   if (!isRecord(output)) return [];
-  const urls: string[] = [];
+  const assets: PlaygroundImageAsset[] = [];
   const seen = new Set<string>();
-  const pushUrl = (candidate: unknown) => {
+  const pushAsset = (candidate: unknown, mimeType?: unknown) => {
     const resolved = pickImageUrl(candidate);
     if (!resolved || seen.has(resolved)) return;
     seen.add(resolved);
-    urls.push(resolved);
+    assets.push({
+      url: resolved,
+      ...(typeof mimeType === "string" && mimeType.length > 0 ? { mimeType } : {}),
+    });
   };
 
-  const assets = Array.isArray(output.assets) ? output.assets : [];
-  for (const item of assets) {
+  const outputAssets = Array.isArray(output.assets) ? output.assets : [];
+  for (const item of outputAssets) {
     if (!isRecord(item)) continue;
     if (item.type && item.type !== "image") continue;
     const primaryUrl = pickImageUrl(item.url);
     if (primaryUrl) {
-      pushUrl(primaryUrl);
+      pushAsset(primaryUrl, item.mimeType);
       continue;
     }
-    pushUrl(item.sourceUrl);
+    pushAsset(item.sourceUrl, item.mimeType);
   }
 
-  if (urls.length === 0) {
+  if (assets.length === 0) {
     const primaryUrl = pickImageUrl(output.url);
     if (primaryUrl) {
-      pushUrl(primaryUrl);
+      pushAsset(primaryUrl, output.mimeType);
     } else {
-      pushUrl(output.sourceUrl);
+      pushAsset(output.sourceUrl, output.mimeType);
     }
   }
 
-  return urls;
+  return assets;
 }
 
 export function ModelsBrowser({
@@ -957,8 +980,8 @@ export function ModelsBrowser({
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const playgroundImageUrls = useMemo(
-    () => extractImageUrls(playgroundOutput),
+  const playgroundImageAssets = useMemo(
+    () => extractImageAssets(playgroundOutput),
     [playgroundOutput]
   );
   useEffect(() => {
@@ -1366,21 +1389,26 @@ export function ModelsBrowser({
     }
   };
 
-  const downloadImage = async (src: string, filename: string) => {
+  const downloadImage = async (src: string, filename: string, mimeType?: string) => {
     try {
+      const requestedFilename = replaceFileExtension(filename, imageExtensionFromMimeType(mimeType));
       if (src.startsWith("data:image/")) {
         const link = document.createElement("a");
         link.href = src;
-        link.download = filename;
+        link.download = requestedFilename;
         link.click();
         return;
       }
       const response = await fetch(buildDisplayImageUrl(src));
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
+      const downloadFilename = replaceFileExtension(
+        requestedFilename,
+        imageExtensionFromMimeType(blob.type || mimeType)
+      );
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.download = filename;
+      link.download = downloadFilename;
       link.click();
       URL.revokeObjectURL(blobUrl);
     } catch {
@@ -1627,13 +1655,14 @@ export function ModelsBrowser({
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-medium text-black">Output</h3>
                 <div className="flex items-center gap-2">
-                  {playgroundImageUrls.length > 0 ? (
+                  {playgroundImageAssets.length > 0 ? (
                     <button
                       type="button"
                       onClick={() =>
                         downloadImage(
-                          playgroundImageUrls[0],
-                          `${slugifyPathPart(selectedModel?.publicModel || "generated-image")}-1.png`
+                          playgroundImageAssets[0].url,
+                          `${slugifyPathPart(selectedModel?.publicModel || "generated-image")}-1.png`,
+                          playgroundImageAssets[0].mimeType
                         )
                       }
                       className="inline-flex h-7 items-center gap-1 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03]"
@@ -1681,13 +1710,13 @@ export function ModelsBrowser({
                 </div>
               ) : playgroundOutput ? (
                 <div className="space-y-3">
-                  {playgroundImageUrls.length > 0 ? (
+                  {playgroundImageAssets.length > 0 ? (
                     <div className="grid gap-2">
-                      {playgroundImageUrls.map((src, index) => (
+                      {playgroundImageAssets.map((asset, index) => (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          key={`${src}-${index}`}
-                          src={buildDisplayImageUrl(src)}
+                          key={`${asset.url}-${index}`}
+                          src={buildDisplayImageUrl(asset.url)}
                           alt={`Generated result ${index + 1}`}
                           className="h-auto w-full rounded-md border border-black/[0.08] bg-white object-contain"
                         />
