@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -352,25 +352,40 @@ export default async function Home() {
             <span className="home-hero-fade" />
           </div>
           <div className={`relative z-10 mx-auto flex w-full max-w-7xl flex-col items-center ${SECTION_X_PADDING} pb-12 pt-12 md:pb-16 md:pt-20`}>
-            <div className={`${CARD_CLASS} w-full overflow-hidden bg-white/86 p-6 backdrop-blur-sm md:p-10 lg:p-14`}>
-              <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-                <div className="max-w-2xl">
-                  <div className="mb-6 flex flex-wrap gap-2">
+            <div className="relative w-full overflow-hidden rounded-[34px] border border-[#D9C8AE]/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.94)_0%,rgba(255,249,239,0.92)_46%,rgba(247,235,216,0.9)_100%)] p-6 shadow-[0_34px_110px_rgba(77,45,22,0.14)] backdrop-blur-md md:p-10 lg:p-14">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(255,255,255,0.92),transparent_26rem),radial-gradient(circle_at_82%_30%,rgba(207,133,67,0.16),transparent_24rem),linear-gradient(120deg,rgba(255,255,255,0.46),transparent_42%,rgba(122,66,28,0.06))]"
+              />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 opacity-[0.36] [background-image:linear-gradient(rgba(122,66,28,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(122,66,28,0.045)_1px,transparent_1px)] [background-size:72px_72px] [mask-image:radial-gradient(ellipse_at_center,black_0%,rgba(0,0,0,0.44)_48%,transparent_76%)]"
+              />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-[34px] shadow-[inset_0_1px_0_rgba(255,255,255,0.88),inset_0_-80px_120px_rgba(122,66,28,0.055)]"
+              />
+              <div className="relative z-10 grid items-center gap-10 lg:grid-cols-[1.08fr_0.92fr]">
+                <div className="max-w-3xl">
+                  <div className="mb-7 flex flex-wrap gap-2">
                     {["Image generation", "Image editing", "Unified billing"].map((item) => (
                       <span
                         key={item}
-                        className="rounded-full border border-[#C27B3B]/20 bg-[#C27B3B]/5 px-3 py-1 text-[11px] font-medium text-[#8A552B]"
+                        className="rounded-full border border-[#C9945B]/25 bg-[#FFF6EA] px-3.5 py-1.5 text-[11px] font-semibold text-[#7A421C]"
                       >
                         {item}
                       </span>
                     ))}
                   </div>
-                  <h1 className="text-4xl font-semibold tracking-tight text-[#111827] md:text-6xl lg:text-7xl">
-                    One API for creative AI models.
+                  <h1 className="max-w-3xl text-[40px] font-bold leading-[1.04] tracking-[-0.032em] text-[#17110B] sm:text-5xl md:text-6xl lg:text-[72px]">
+                    Your Creative AI
+                    <span className="block pb-2 bg-[linear-gradient(92deg,#AF642B_0%,#E0A15D_38%,#7E3F18_100%)] bg-clip-text font-serif italic leading-[1.14] tracking-[-0.045em] text-transparent">
+                      Model Layer.
+                    </span>
                   </h1>
-                  <p className="mt-6 max-w-xl text-sm leading-6 text-[#6B7280] md:text-base">
-                    Generate and edit images through the models OpenOctopus supports today, with clear pricing,
-                    API keys, playground testing, and account balance in one place.
+                  <p className="mt-5 max-w-2xl text-sm leading-6 text-[#5F564C] md:text-base md:leading-7">
+                    OpenOctopus helps teams turn image generation and editing models into production-ready API
+                    infrastructure, with playground testing, unified billing, and one key for every supported model.
                   </p>
                   <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                     <PrimaryLink href="/models">
@@ -380,15 +395,7 @@ export default async function Home() {
                     <SecondaryLink href={destination}>{destinationLabel}</SecondaryLink>
                   </div>
                 </div>
-                <div className="flex flex-col gap-6 rounded-xl border border-black/[0.06] bg-[#FAFAF9] p-5">
-                  <HeroModelIconStack />
-                  <div className="grid grid-cols-2 gap-3">
-                    <HeroStatCard label="Active models" value="6" />
-                    <HeroStatCard label="Capabilities" value="2" highlight />
-                    <HeroStatCard label="API format" value="REST" />
-                    <HeroStatCard label="Secure payments" value={<StripeLogo />} />
-                  </div>
-                </div>
+                <HeroOctopusOrbit />
               </div>
             </div>
           </div>
@@ -594,17 +601,60 @@ function ProviderEcosystemSection() {
   );
 }
 
-function HeroModelIconStack() {
+const HERO_ORBIT_POSITIONS = [
+  { x: "7%", y: "11%", delay: "0s" },
+  { x: "31%", y: "4%", delay: "0.04s" },
+  { x: "70%", y: "8%", delay: "0.08s" },
+  { x: "86%", y: "28%", delay: "0.12s" },
+  { x: "78%", y: "68%", delay: "0.16s" },
+  { x: "58%", y: "84%", delay: "0.2s" },
+  { x: "26%", y: "80%", delay: "0.24s" },
+  { x: "6%", y: "66%", delay: "0.28s" },
+  { x: "16%", y: "38%", delay: "0.32s" },
+  { x: "65%", y: "31%", delay: "0.36s" },
+  { x: "43%", y: "17%", delay: "0.4s" },
+  { x: "41%", y: "67%", delay: "0.44s" },
+  { x: "47%", y: "88%", delay: "0.48s" },
+  { x: "89%", y: "50%", delay: "0.52s" },
+  { x: "1%", y: "53%", delay: "0.56s" },
+];
+
+function HeroOctopusOrbit() {
   return (
-    <div className="relative flex max-w-full flex-wrap justify-center -space-x-5 -space-y-3 px-5 pt-3 md:-space-x-6">
+    <div className="relative min-h-[430px] overflow-visible p-5 md:min-h-[500px]">
       <div
         aria-hidden="true"
-        className="absolute left-1/2 top-1/2 h-16 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#C27B3B]/15 blur-2xl"
+        className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#D18A45]/20 blur-3xl"
       />
-      {AI_MODEL_LOGOS.slice(0, 5).map((model, index) => (
+      <div
+        aria-hidden="true"
+        className="hero-orbit-ring absolute left-1/2 top-1/2 h-[260px] w-[260px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#C9945B]/18 md:h-[330px] md:w-[330px]"
+      />
+      <div
+        aria-hidden="true"
+        className="hero-orbit-ring hero-orbit-ring-slow absolute left-1/2 top-1/2 h-[330px] w-[330px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-[#8A552B]/14 md:h-[420px] md:w-[420px]"
+      />
+      <div className="absolute left-1/2 top-1/2 z-10 flex h-44 w-44 -translate-x-1/2 -translate-y-1/2 items-center justify-center md:h-56 md:w-56">
+        <div className="hero-octopus-logo h-full w-full">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.png"
+            alt="OpenOctopus"
+            className="h-full w-full object-contain"
+          />
+        </div>
+      </div>
+      {AI_MODEL_LOGOS.map((model, index) => (
         <div
           key={model.name}
-          className={`${index >= 2 ? "hidden md:flex" : "flex"} relative size-16 items-center justify-center rounded-full border border-black/[0.08] bg-white p-4 shadow-sm transition-transform duration-300 hover:-translate-y-1 md:size-20 md:p-5`}
+          className="hero-orbit-logo absolute z-20 flex size-12 items-center justify-center rounded-2xl border border-black/[0.08] bg-white/92 p-2.5 shadow-[0_14px_34px_rgba(28,25,23,0.10)] backdrop-blur transition-transform duration-300 hover:scale-110 md:size-14 md:p-3"
+          style={
+            {
+              "--orbit-x": HERO_ORBIT_POSITIONS[index % HERO_ORBIT_POSITIONS.length].x,
+              "--orbit-y": HERO_ORBIT_POSITIONS[index % HERO_ORBIT_POSITIONS.length].y,
+              "--orbit-delay": HERO_ORBIT_POSITIONS[index % HERO_ORBIT_POSITIONS.length].delay,
+            } as CSSProperties
+          }
           title={model.name}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -672,37 +722,6 @@ function BottomPricingCta({
         </div>
       </div>
     </section>
-  );
-}
-
-function StripeLogo() {
-  return (
-    <span className="inline-flex h-9 items-center rounded-md bg-[#635BFF] px-3 text-lg font-bold tracking-tight text-white">
-      stripe
-    </span>
-  );
-}
-
-function HeroStatCard({
-  label,
-  value,
-  highlight = false,
-}: {
-  label: string;
-  value: ReactNode;
-  highlight?: boolean;
-}) {
-  return (
-    <div className="rounded-lg border border-black/[0.06] bg-white text-[#111827] shadow-sm">
-      <div className="p-4">
-        <div className="flex flex-col items-center gap-1 md:gap-2">
-          <p className={`text-2xl font-semibold md:text-3xl ${highlight ? "text-[#C27B3B]" : "text-[#111827]"}`}>
-            {value}
-          </p>
-          <p className="text-xs text-[#6B7280] md:text-sm">{label}</p>
-        </div>
-      </div>
-    </div>
   );
 }
 
