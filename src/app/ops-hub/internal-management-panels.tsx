@@ -1015,10 +1015,6 @@ function SupportedModelDetailsForm({
   const [activeTab, setActiveTab] = useState<"basic" | "pricing">("basic");
   const [pricingSeed, setPricingSeed] = useState(model.billingConfigText);
 
-  useEffect(() => {
-    setPricingSeed(model.billingConfigText);
-  }, [model.billingConfigText]);
-
   return (
     <ManagedDialogForm action={updateSupportedModelDetails} close={close} className="grid gap-4">
       <input type="hidden" name="supportedModelId" value={model.id} />
@@ -1332,7 +1328,7 @@ export function PublicModelsPanel({
     if ((input.page ?? 1) > 1) params.set("modelPage", String(input.page));
     if (input.modelType && input.modelType !== "all") params.set("modelType", input.modelType);
     if (input.status && input.status !== "all") params.set("modelStatus", input.status);
-    return `/internal?${params.toString()}`;
+    return `/ops-hub?${params.toString()}`;
   };
 
   return (
@@ -1474,6 +1470,7 @@ export function PublicModelsPanel({
                     >
                       {({ close }) => (
                         <SupportedModelDetailsForm
+                          key={model.id}
                           model={model}
                           vendorOptions={vendorOptions}
                           capabilityOptions={capabilityOptions}
@@ -3232,7 +3229,7 @@ export function InternalModelAiUsageLogsPanel({
         <div className="flex items-center gap-2">
           <a
             aria-disabled={page <= 1}
-            href={`/internal?tab=internal-model-ai-usage-logs&aiUsagePage=${Math.max(1, page - 1)}`}
+            href={`/ops-hub?tab=internal-model-ai-usage-logs&aiUsagePage=${Math.max(1, page - 1)}`}
             className={`h-8 rounded-md border border-black/[0.08] bg-white px-3 py-2 text-xs text-black/65 ${
               page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-black/[0.03]"
             }`}
@@ -3241,7 +3238,7 @@ export function InternalModelAiUsageLogsPanel({
           </a>
           <a
             aria-disabled={page >= totalPages}
-            href={`/internal?tab=internal-model-ai-usage-logs&aiUsagePage=${Math.min(totalPages, page + 1)}`}
+            href={`/ops-hub?tab=internal-model-ai-usage-logs&aiUsagePage=${Math.min(totalPages, page + 1)}`}
             className={`h-8 rounded-md border border-black/[0.08] bg-white px-3 py-2 text-xs text-black/65 ${
               page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-black/[0.03]"
             }`}

@@ -1,15 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod/v4";
 import { deriveLegacyBillingFields, parseBillingConfig } from "@/lib/billing-config";
-import {
-  INTERNAL_ACCESS_COOKIE,
-  INTERNAL_ACCESS_COOKIE_VALUE,
-  INTERNAL_ACCESS_PASSWORD,
-} from "@/lib/internal-access";
+import { assertInternalAdminUser } from "@/lib/internal-access";
 import { encryptProviderSecret } from "@/lib/provider-secret-crypto";
 import {
   getProviderModelRuntimeDiagnostics,
@@ -20,7 +15,6 @@ import {
   type RuntimeSupportedModel,
 } from "@/lib/provider-runtime-guard";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 const providerStatusSchema = z.enum(["healthy", "degraded", "offline"]);
 const capabilitySchema = z.enum([
@@ -397,7 +391,7 @@ function buildInternalAlertHref(input: {
   message: string;
   level: "success" | "warning" | "error" | "info";
 }) {
-  return `/internal?tab=${input.tab}&alert=${encodeURIComponent(input.message)}&alertLevel=${input.level}`;
+  return `/ops-hub?tab=${input.tab}&alert=${encodeURIComponent(input.message)}&alertLevel=${input.level}`;
 }
 
 function normalizeUsageWorkspaceId(workspaceId: string) {
@@ -410,7 +404,7 @@ function normalizeUsageWorkspaceId(workspaceId: string) {
 }
 
 async function loadProviderRuntimeContext(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createAdminClient>,
   input: {
     providerId?: string;
     providerModelIds?: string[];
@@ -529,75 +523,17 @@ async function loadProviderRuntimeContext(
 }
 
 async function getInternalAdminContext() {
-  const cookieStore = await cookies();
-  const hasPasswordAccess =
-    cookieStore.get(INTERNAL_ACCESS_COOKIE)?.value === INTERNAL_ACCESS_COOKIE_VALUE;
-
-  if (hasPasswordAccess) {
-    return {
-      supabase: createAdminClient(),
-      userId: "internal-password-access",
-      workspaceId: "00000000-0000-0000-0000-000000000000",
-      isPasswordAccess: true,
-    };
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("Unauthorized");
-  }
-
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id, role")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership?.workspace_id) {
-    throw new Error("Missing workspace membership");
-  }
-
-  if (!["owner", "admin"].includes(membership.role)) {
-    throw new Error("Insufficient permissions");
-  }
-
+  const user = await assertInternalAdminUser();
   return {
-    supabase,
+    supabase: createAdminClient(),
     userId: user.id,
-    workspaceId: membership.workspace_id,
-    isPasswordAccess: false,
+    workspaceId: "00000000-0000-0000-0000-000000000000",
+    isPasswordAccess: true,
   };
 }
 
-export async function unlockInternalAccess(formData: FormData) {
-  const raw = formData.get("password");
-  const password = typeof raw === "string" ? raw : "";
-
-  if (password !== INTERNAL_ACCESS_PASSWORD) {
-    throw new Error("密码错误");
-  }
-
-  const cookieStore = await cookies();
-  cookieStore.set(INTERNAL_ACCESS_COOKIE, INTERNAL_ACCESS_COOKIE_VALUE, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-
-  revalidatePath("/internal");
-  redirect("/internal");
-}
-
 async function logAdminAudit(input: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
+  supabase: ReturnType<typeof createAdminClient>;
   userId: string;
   workspaceId: string | null;
   action: string;
@@ -655,7 +591,7 @@ async function logAdminAudit(input: {
 }
 
 async function ensureWorkerTemplateExists(input: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
+  supabase: ReturnType<typeof createAdminClient>;
   slug: string;
   displayName?: string;
   config: Record<string, unknown>;
@@ -736,7 +672,7 @@ export async function createProvider(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const updateProviderStatusSchema = z.object({
@@ -771,7 +707,7 @@ export async function updateProviderStatus(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const updateProviderSchema = z.object({
@@ -840,7 +776,7 @@ export async function clearApiKeyRequestRecords(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
   revalidatePath("/dashboard");
 }
 
@@ -886,7 +822,7 @@ export async function updateProvider(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const addUserBalanceSchema = z.object({
@@ -973,7 +909,7 @@ export async function addUserBalance(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const deleteRegisteredUserSchema = z.object({
@@ -1068,7 +1004,7 @@ export async function deleteRegisteredUser(formData: FormData) {
     throw new Error(toReadableSupabaseError(deleteError, "删除用户失败"));
   }
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
   redirect(
     buildInternalAlertHref({
       tab: "monitoring-requests",
@@ -1120,7 +1056,7 @@ export async function deleteProvider(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const createProviderCredentialSchema = z.object({
@@ -1200,7 +1136,7 @@ export async function createProviderCredential(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const updateProviderCredentialSchema = z.object({
@@ -1270,7 +1206,7 @@ export async function updateProviderCredentialState(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const rotateProviderCredentialSecretSchema = z.object({
@@ -1322,7 +1258,7 @@ export async function rotateProviderCredentialSecret(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const deleteProviderCredentialSchema = z.object({
@@ -1377,7 +1313,7 @@ export async function deleteProviderCredential(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const updateProviderCredentialDetailsSchema = z.object({
@@ -1464,7 +1400,7 @@ export async function updateProviderCredentialDetails(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const createModelVendorSchema = z.object({
@@ -1515,7 +1451,7 @@ export async function createModelVendor(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const deleteModelVendorSchema = z.object({
@@ -1574,7 +1510,7 @@ export async function deleteModelVendor(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const createWorkerTemplateSchema = z.object({
@@ -1648,7 +1584,7 @@ export async function createWorkerTemplate(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 export async function updateWorkerTemplate(formData: FormData) {
@@ -1684,7 +1620,7 @@ export async function updateWorkerTemplate(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 export async function deleteWorkerTemplate(formData: FormData) {
@@ -1738,7 +1674,7 @@ export async function deleteWorkerTemplate(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 export async function upsertGatewayErrorDefinition(formData: FormData) {
@@ -1797,7 +1733,7 @@ export async function upsertGatewayErrorDefinition(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const createProviderAdapterAliasSchema = z.object({
@@ -1841,7 +1777,7 @@ export async function createProviderAdapterAlias(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 export async function createProviderAdapterCatalog(formData: FormData) {
@@ -1874,7 +1810,7 @@ export async function createProviderAdapterCatalog(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const deleteProviderAdapterAliasSchema = z.object({
@@ -1925,7 +1861,7 @@ export async function deleteProviderAdapterAlias(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 export async function deleteProviderAdapterCatalog(formData: FormData) {
@@ -1967,7 +1903,7 @@ export async function deleteProviderAdapterCatalog(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const createSupportedModelSchema = z.object({
@@ -2056,7 +1992,7 @@ export async function createSupportedModel(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const updateSupportedModelSchema = z.object({
@@ -2109,7 +2045,7 @@ export async function updateSupportedModelState(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const updateSupportedModelPricingSchema = z.object({
@@ -2153,7 +2089,7 @@ export async function updateSupportedModelPricing(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const updateSupportedModelDetailsSchema = z.object({
@@ -2281,7 +2217,7 @@ export async function updateSupportedModelDetails(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const deleteSupportedModelSchema = z.object({
@@ -2370,7 +2306,7 @@ export async function deleteSupportedModel(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const createProviderModelSchema = z.object({
@@ -2545,7 +2481,7 @@ export async function createProviderModel(formData: FormData) {
       },
     });
 
-    revalidatePath("/internal");
+    revalidatePath("/ops-hub");
   } catch (error) {
     const message = error instanceof Error ? error.message : "保存失败，请稍后重试。";
     redirect(
@@ -2638,7 +2574,7 @@ export async function updateProviderModelState(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const updateProviderModelDetailsSchema = z.object({
@@ -2811,7 +2747,7 @@ export async function updateProviderModelDetails(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const deleteProviderModelSchema = z.object({
@@ -2884,7 +2820,7 @@ export async function deleteProviderModel(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const createRoutingRuleSchema = z.object({
@@ -3020,7 +2956,7 @@ export async function createRoutingRule(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const updateRoutingRuleSchema = z.object({
@@ -3136,7 +3072,7 @@ export async function updateRoutingRule(formData: FormData) {
     details: parsed,
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const deleteRoutingRuleSchema = z.object({
@@ -3187,7 +3123,7 @@ export async function deleteRoutingRule(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const updateModelEconomicsBundleSchema = z.object({
@@ -3250,7 +3186,7 @@ export async function updateModelEconomicsBundle(formData: FormData) {
   if (rpcError) {
     if (rpcError.message.includes("admin_update_model_economics_bundle")) {
       throw new Error(
-        "Missing RPC admin_update_model_economics_bundle. Run supabase/internal_model_economics_bundle.sql first."
+        "Missing RPC admin_update_model_economics_bundle. Run supabase/ops-hub_model_economics_bundle.sql first."
       );
     }
     throw new Error(rpcError.message);
@@ -3282,7 +3218,7 @@ export async function updateModelEconomicsBundle(formData: FormData) {
     },
   });
 
-  revalidatePath("/internal");
+  revalidatePath("/ops-hub");
 }
 
 const providerModelAutofillSchema = z.object({
@@ -3737,7 +3673,7 @@ export async function generateProviderModelDraftFromSource(input: {
       },
     });
 
-    revalidatePath("/internal");
+    revalidatePath("/ops-hub");
     return {
       ok: true as const,
       data: {

@@ -2,7 +2,24 @@ import Link from "next/link";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { EmailPasswordSignInForm } from "@/components/auth/EmailPasswordSignInForm";
 
-export default function LoginPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function getSafeNextPath(value: string | string[] | undefined) {
+  const next = Array.isArray(value) ? value[0] : value;
+  if (!next || !next.startsWith("/") || next.startsWith("//")) {
+    return "/dashboard";
+  }
+  return next;
+}
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const resolvedSearchParams = await searchParams;
+  const nextPath = getSafeNextPath(resolvedSearchParams.next);
+
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#FCFCFA] px-4">
       <div
@@ -36,13 +53,13 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-5">
-              <EmailPasswordSignInForm />
+              <EmailPasswordSignInForm nextPath={nextPath} />
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-black/[0.08]" />
                 <span className="text-[11px] uppercase tracking-[0.8px] text-black/40">or</span>
                 <div className="h-px flex-1 bg-black/[0.08]" />
               </div>
-              <GoogleSignInButton />
+              <GoogleSignInButton nextPath={nextPath} />
             </div>
 
             <p className="mt-8 text-center text-xs leading-5 text-[#6B7280]">

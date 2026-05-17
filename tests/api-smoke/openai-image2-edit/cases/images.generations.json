@@ -1,0 +1,27 @@
+[
+  {
+    "id": "openai-image2-edit-basic",
+    "model": "openoctopus/gpt-image-2-image-input",
+    "endpoint": "/v1/images/generations",
+    "payload": {
+      "model": "openoctopus/gpt-image-2-image-input",
+      "prompt": "turn the subject into a premium orange and black octopus mascot while preserving the clean composition",
+      "input": {
+        "images": [
+          "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/06882d5f-d093-44c5-a277-63c34c9cfe70/playground-input-1779003530279-1776786640458643012-6ubpclu4.png"
+        ],
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "quality": "medium",
+        "output_format": "png",
+        "enable_sync_mode": false,
+        "enable_base64_output": false
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "assetCountMin": 1
+    }
+  }
+]

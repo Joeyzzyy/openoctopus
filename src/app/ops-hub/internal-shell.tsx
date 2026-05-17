@@ -31,7 +31,7 @@ function buildHref(tab: InternalTabKey, selectedTemplateKey?: string) {
   if (selectedTemplateKey) {
     params.set("template", selectedTemplateKey);
   }
-  return `/internal?${params.toString()}`;
+  return `/ops-hub?${params.toString()}`;
 }
 
 export function InternalShell({

@@ -28,7 +28,11 @@ function GoogleIcon() {
   );
 }
 
-export function GoogleSignInButton() {
+export function GoogleSignInButton({
+  nextPath = "/dashboard",
+}: {
+  nextPath?: string;
+}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +42,7 @@ export function GoogleSignInButton() {
 
     try {
       const supabase = createClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=/dashboard`;
+      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {

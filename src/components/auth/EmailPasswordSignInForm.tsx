@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Eye, EyeOff } from "lucide-react";
 
-export function EmailPasswordSignInForm() {
+export function EmailPasswordSignInForm({
+  nextPath = "/dashboard",
+}: {
+  nextPath?: string;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +35,7 @@ export function EmailPasswordSignInForm() {
         throw authError;
       }
 
-      router.replace("/dashboard");
+      router.replace(nextPath);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Email sign-in failed");

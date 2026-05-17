@@ -183,7 +183,7 @@ export function RegisteredUsersTable({
 
     try {
       const response = await fetch(
-        `/api/internal/user-requests?userId=${encodeURIComponent(userId)}&page=${page}`,
+        `/api/ops-hub/user-requests?userId=${encodeURIComponent(userId)}&page=${page}`,
         { cache: "no-store" }
       );
       const payload = (await response.json()) as {

@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { Logo } from "@/components/layout/Logo";
 import { getInternalAdminData } from "@/lib/internal-admin-server";
 import { getApiSmokeRecords } from "@/lib/api-smoke-records";
-import { addUserBalance, deleteRegisteredUser, unlockInternalAccess } from "./actions";
-import { INTERNAL_ACCESS_COOKIE, INTERNAL_ACCESS_COOKIE_VALUE } from "@/lib/internal-access";
+import { getInternalAdminUser } from "@/lib/internal-access";
+import { addUserBalance, deleteRegisteredUser } from "./actions";
 import { InternalShell } from "./internal-shell";
 import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
 import { MonitoringLineChart } from "./monitoring-line-chart";
@@ -164,7 +163,7 @@ function buildRequestsFilterHref(input: {
   if ((input.page ?? 1) > 1) {
     params.set("requestPage", String(input.page));
   }
-  return `/internal?${params.toString()}`;
+  return `/ops-hub?${params.toString()}`;
 }
 
 const monitoringIntervalOptions = [
@@ -300,7 +299,7 @@ function buildMonitoringHref(input: {
   if (input.problemRequestPage && input.problemRequestPage > 1) {
     params.set("problemRequestPage", String(input.problemRequestPage));
   }
-  return `/internal?${params.toString()}`;
+  return `/ops-hub?${params.toString()}`;
 }
 
 function readMonitoringCount(request: { count?: number }) {
@@ -747,34 +746,10 @@ export default async function InternalPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const cookieStore = await cookies();
-  const hasPasswordAccess =
-    cookieStore.get(INTERNAL_ACCESS_COOKIE)?.value === INTERNAL_ACCESS_COOKIE_VALUE;
+  const internalAdminUser = await getInternalAdminUser();
 
-  if (!hasPasswordAccess) {
-    return (
-      <main className="relative min-h-screen overflow-x-hidden bg-[#FCFCFA] text-[#111111]">
-        <div className="relative mx-auto flex min-h-screen w-full max-w-[520px] items-center px-4 py-10">
-          <section className="w-full rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm">
-            <form action={unlockInternalAccess} className="grid gap-3">
-              <input
-                type="password"
-                name="password"
-                required
-                className="h-10 rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none focus:border-black/20"
-                placeholder="访问密码"
-              />
-              <button
-                type="submit"
-                className="inline-flex h-10 items-center justify-center rounded-md bg-[#111827] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0B1220]"
-              >
-                进入后台
-              </button>
-            </form>
-          </section>
-        </div>
-      </main>
-    );
+  if (!internalAdminUser) {
+    redirect("/login?next=/ops-hub");
   }
 
   const resolvedSearchParams = await searchParams;
@@ -851,10 +826,9 @@ export default async function InternalPage({
     internalAiUsagePage: selectedInternalAiUsagePage,
     internalAiUsagePageSize: 10,
     activeTab,
-    bypassAuth: true,
   });
-  if (!data) redirect("/login");
-  if (!data.authorized) redirect("/login");
+  if (!data) redirect("/login?next=/ops-hub");
+  if (!data.authorized) redirect("/login?next=/ops-hub");
   const apiSmokeRecords = activeTab === "api-smoke" ? await getApiSmokeRecords(100) : [];
 
   const selectedTemplateKey = getSearchValue(resolvedSearchParams, "template");
@@ -1212,7 +1186,7 @@ export default async function InternalPage({
 
                         <div>
                           <p className="text-[11px] tracking-[0.35px] text-black/45">模型</p>
-                          <form action="/internal" className="mt-2 flex gap-1.5">
+                          <form action="/ops-hub" className="mt-2 flex gap-1.5">
                             <input type="hidden" name="tab" value={activeTab} />
                             <input type="hidden" name="monitoringView" value={effectiveMonitoringView} />
                             <input type="hidden" name="monitoringInterval" value={selectedMonitoringInterval} />

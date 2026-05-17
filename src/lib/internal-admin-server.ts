@@ -6,6 +6,7 @@ import {
   getProviderRuntimeDiagnostics,
   getRoutingRuleRuntimeDiagnostics,
 } from "@/lib/provider-runtime-guard";
+import { getInternalAdminUser } from "@/lib/internal-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -327,7 +328,6 @@ type InternalAdminDataOptions = {
   internalAiUsagePage?: number;
   internalAiUsagePageSize?: number;
   activeTab?: string;
-  bypassAuth?: boolean;
 };
 
 function formatJson(value: Record<string, unknown> | null | undefined) {
@@ -960,47 +960,22 @@ async function fetchGlobalMonitoringData(
 }
 
 export async function getInternalAdminData(options: InternalAdminDataOptions = {}) {
-  const bypassAuth = options.bypassAuth === true;
-  const supabase = bypassAuth ? createAdminClient() : await createClient();
-  const user: {
-    id: string;
-    email?: string | null;
-    user_metadata?: Record<string, unknown>;
-  } | null = bypassAuth
-    ? {
-        id: "internal-password-access",
-        email: "internal@openoctopus.local",
-        user_metadata: { name: "Internal Access" },
-      }
-    : ((await supabase.auth.getUser()).data.user as {
-        id: string;
-        email?: string | null;
-        user_metadata?: Record<string, unknown>;
-      } | null);
+  const user = await getInternalAdminUser();
 
   if (!user) {
     return null;
   }
 
-  const membership = bypassAuth
-    ? ({
-        workspace_id: "00000000-0000-0000-0000-000000000000",
-        role: "owner",
-        workspaces: {
-          id: "00000000-0000-0000-0000-000000000000",
-          name: "Internal Workspace",
-          slug: "internal-workspace",
-        },
-      } as const)
-    : (
-        await supabase
-          .from("workspace_members")
-          .select("workspace_id, role, workspaces(id, name, slug)")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: true })
-          .limit(1)
-          .maybeSingle()
-      ).data;
+  const supabase = createAdminClient();
+  const membership = {
+    workspace_id: "00000000-0000-0000-0000-000000000000",
+    role: "owner",
+    workspaces: {
+      id: "00000000-0000-0000-0000-000000000000",
+      name: "Internal Workspace",
+      slug: "internal-workspace",
+    },
+  } as const;
 
   const role = membership?.role as string | undefined;
   const canManage = role === "owner" || role === "admin";
@@ -1170,20 +1145,12 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
                 .order("created_at", { ascending: true }))
         : Promise.resolve({ data: [], error: null }),
       shouldLoadManagementData
-        ? (bypassAuth
-            ? supabase
-                .from("routing_rules")
-                .select(
-                  "id, workspace_id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy, active, created_at"
-                )
-                .order("created_at", { ascending: true })
-            : supabase
-                .from("routing_rules")
-                .select(
-                  "id, workspace_id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy, active, created_at"
-                )
-                .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
-                .order("created_at", { ascending: true }))
+        ? supabase
+            .from("routing_rules")
+            .select(
+              "id, workspace_id, capability, public_model_slug, primary_provider_model_id, fallback_provider_model_id, route_strategy, active, created_at"
+            )
+            .order("created_at", { ascending: true })
         : Promise.resolve({ data: [], error: null }),
       shouldLoadRequestRecords
         ? Promise.resolve({ data: [], error: null })
@@ -1196,35 +1163,23 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
         : Promise.resolve({ data: [], error: null }),
       Promise.resolve({ data: [], error: null }),
       shouldLoadManagementData
-        ? (bypassAuth
-            ? supabase
-                .from("admin_audit_logs")
-                .select(
-                  "id, actor_user_id, workspace_id, action, target_type, target_id, summary, details, created_at"
-                )
-                .order("created_at", { ascending: false })
-                .limit(40)
-            : supabase
-                .from("admin_audit_logs")
-                .select(
-                  "id, actor_user_id, workspace_id, action, target_type, target_id, summary, details, created_at"
-                )
-                .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`)
-                .order("created_at", { ascending: false })
-                .limit(40))
+        ? supabase
+            .from("admin_audit_logs")
+            .select(
+              "id, actor_user_id, workspace_id, action, target_type, target_id, summary, details, created_at"
+            )
+            .order("created_at", { ascending: false })
+            .limit(40)
         : Promise.resolve({ data: [], error: null }),
       shouldLoadManagementData
         ? (() => {
-            let query = supabase
+            const query = supabase
               .from("internal_model_ai_usage_logs")
               .select(
                 "id, workspace_id, actor_user_id, source_url, model, status, input_tokens, output_tokens, total_tokens, estimated_cost_usd, latency_ms, error_message, created_at",
                 shouldPaginateInternalAiUsageLogs ? { count: "exact" } : undefined
               )
               .order("created_at", { ascending: false });
-            if (!bypassAuth) {
-              query = query.or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`);
-            }
             return shouldPaginateInternalAiUsageLogs
               ? query.range(
                   (internalAiUsagePage - 1) * internalAiUsagePageSize,
