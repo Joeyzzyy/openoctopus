@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { AuthRequiredOverlay } from "@/components/auth/AuthRequiredOverlay";
 import { cn } from "@/lib/utils";
 
 type ExploreModel = {
@@ -44,16 +45,19 @@ function buildCategoryList(models: ExploreModel[]) {
   return categories;
 }
 
-export function ExplorePanel({ models }: { models: ExploreModel[] }) {
+export function ExplorePanel({
+  models,
+  isLoggedIn = true,
+}: {
+  models: ExploreModel[];
+  isLoggedIn?: boolean;
+}) {
   const providers = useMemo(() => Array.from(new Set(models.map((item) => item.providerName))), [models]);
   const categories = useMemo(() => buildCategoryList(models), [models]);
   const [activeProvider, setActiveProvider] = useState<string>("all");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(categories);
-  useEffect(() => {
-    if (categories.length > 0 && selectedCategories.length === 0) {
-      setSelectedCategories(categories);
-    }
-  }, [categories, selectedCategories.length]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const effectiveSelectedCategories = selectedCategories.length > 0 ? selectedCategories : categories;
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const model of models) {
@@ -68,17 +72,18 @@ export function ExplorePanel({ models }: { models: ExploreModel[] }) {
     return models.filter((model) => {
       const category = capabilityToCategory(model.capability);
       const providerMatched = activeProvider === "all" || model.providerName === activeProvider;
-      const categoryMatched = selectedCategories.includes(category);
+      const categoryMatched = effectiveSelectedCategories.includes(category);
       return providerMatched && categoryMatched;
     });
-  }, [activeProvider, models, selectedCategories]);
+  }, [activeProvider, effectiveSelectedCategories, models]);
 
   const toggleCategory = (category: string) => {
     setSelectedCategories((prev) => {
-      const next = prev.includes(category)
-        ? prev.filter((item) => item !== category)
-        : [...prev, category];
-      return next.length === 0 ? categories : next;
+      const current = prev.length > 0 ? prev : categories;
+      const next = current.includes(category)
+        ? current.filter((item) => item !== category)
+        : [...current, category];
+      return next.length === categories.length ? [] : next;
     });
   };
 
@@ -129,7 +134,7 @@ export function ExplorePanel({ models }: { models: ExploreModel[] }) {
               <label key={category} className="flex cursor-pointer items-center gap-2 text-sm text-black/80">
                 <input
                   type="checkbox"
-                  checked={selectedCategories.includes(category)}
+                  checked={effectiveSelectedCategories.includes(category)}
                   onChange={() => toggleCategory(category)}
                   className="size-4 rounded border-[#CFC6B6] text-[#B7661F] focus:ring-[#E58A35]"
                 />
@@ -154,6 +159,12 @@ export function ExplorePanel({ models }: { models: ExploreModel[] }) {
                   href={model.modelHref}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={(event) => {
+                    if (!isLoggedIn) {
+                      event.preventDefault();
+                      setAuthModalOpen(true);
+                    }
+                  }}
                   className="block overflow-hidden rounded-2xl border border-[#E7E0D3] bg-white shadow-sm transition-colors hover:border-[#D7C6AE]"
                 >
                   <div className="flex h-full min-h-[120px] items-center">
@@ -188,6 +199,12 @@ export function ExplorePanel({ models }: { models: ExploreModel[] }) {
           )}
         </div>
       </div>
+      <AuthRequiredOverlay
+        open={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        title="Sign in to open model tools"
+        description="You can browse Explore without signing in. Opening a model tool requires a signed-in workspace."
+      />
     </section>
   );
 }

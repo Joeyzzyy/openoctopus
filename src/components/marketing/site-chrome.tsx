@@ -3,6 +3,7 @@ import { Logo } from "@/components/layout/Logo";
 import { HeaderUserMenu } from "@/components/marketing/header-user-menu";
 
 const HEADER_NAV_ITEMS = [
+  { label: "Explore", href: "/dashboard?view=explore" },
   { label: "Pricing", href: "/pricing" },
   { label: "Learn More", href: "/resource" },
 ];
@@ -42,8 +43,6 @@ export function MarketingHeader({
               <Link
                 key={item.label}
                 href={item.href}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="rounded-md px-3 py-2 text-[14px] font-medium text-[#6B7280] transition-colors hover:bg-black/[0.03] hover:text-[#111827]"
               >
                 {item.label}

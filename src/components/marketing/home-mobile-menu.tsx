@@ -42,8 +42,6 @@ export function HomeMobileMenu({
             <Link
               key={item.label}
               href={item.href}
-              target="_blank"
-              rel="noopener noreferrer"
               onClick={() => setOpen(false)}
               className="block rounded-md px-3 py-2 text-[13px] font-medium text-[#4B5563] transition-colors hover:bg-black/[0.03] hover:text-[#111827]"
             >

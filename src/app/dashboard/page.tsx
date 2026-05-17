@@ -242,12 +242,28 @@ export default async function DashboardPage({
     analyticsLookbackMs: parseRangeMs(analyticsRange),
   });
 
-  if (!data) {
-    redirect("/login");
+  if (!data && view !== "explore") {
+    redirect(`/login?next=${encodeURIComponent(`/dashboard?view=${view}`)}`);
   }
 
   const { apiKeys, metrics, requestPagination, billingPagination, requestQueueRows, analyticsRequests, billingRows, user } =
-    data;
+    data ?? {
+      apiKeys: [],
+      metrics: [],
+      requestPagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 },
+      billingPagination: { page: 1, pageSize: 10, total: 0, totalPages: 1 },
+      requestQueueRows: [],
+      analyticsRequests: [],
+      billingRows: [],
+      user: {
+        id: "",
+        email: null,
+        name: "OpenOctopus User",
+        avatarUrl: null,
+        authProviders: [],
+        hasPasswordSignIn: false,
+      },
+    };
   const exploreData = await loadModelsPageData().catch(() => ({
     modelDocRows: [],
     vendorOptions: [],
@@ -279,7 +295,7 @@ export default async function DashboardPage({
       <AutoRefreshOnReturn />
       <TopUpCelebration />
       <MarketingHeader
-        isLoggedIn
+        isLoggedIn={!!data}
         userLabel={user.email ?? user.name}
         userAvatarUrl={user.avatarUrl ?? null}
         walletBalanceLabel={walletMetric?.value ?? "$0.00"}
@@ -287,6 +303,7 @@ export default async function DashboardPage({
 
       <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-4 sm:px-5 xl:px-0">
         <ProductTopTabs
+          isLoggedIn={!!data}
           dashboardHref={buildDashboardHref({
             view: "dashboard",
             requestsPage: 1,
@@ -607,6 +624,7 @@ export default async function DashboardPage({
 
             {view === "explore" ? (
               <ExplorePanel
+                isLoggedIn={!!data}
                 models={exploreData.modelDocRows.map((model) => ({
                   id: model.id,
                   displayName: model.displayName,
