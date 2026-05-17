@@ -1100,6 +1100,16 @@ export function ModelsBrowser({
   );
   const capabilityTag = selectedModel?.modelTypeLabel || "uncategorized";
   const modelSlugTail = selectedModel?.upstreamModelSlug || selectedModel?.publicModel || "model";
+  const isModelDetailRoute = Boolean(initialProvider && initialModelSlug);
+  const pageHeading =
+    isModelDetailRoute && selectedModel
+      ? `${selectedModel.displayName}${selectedModel.modelTypeLabel ? ` ${selectedModel.modelTypeLabel} model` : " AI model"}`
+      : "Explore AI models on OpenOctopus";
+  const pageIntro =
+    isModelDetailRoute && selectedModel
+      ? selectedModel.modelDescription ||
+        `${selectedModel.displayName} by ${selectedModel.providerName} with playground access, API examples, and pricing details.`
+      : "Browse public AI model tools with playground access, API examples, pricing details, and provider-backed documentation.";
   const parsedFields = useMemo(
     () =>
       parseInputSchemaText(selectedModel?.inputSchemaText ?? "").filter(
@@ -1615,6 +1625,17 @@ export function ModelsBrowser({
 
   return (
     <section className="space-y-3 sm:space-y-4">
+      <header className="rounded-xl border border-[#E9DEC9] bg-white px-4 py-4 shadow-sm sm:rounded-2xl sm:px-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9A4F18]">
+          {isModelDetailRoute && selectedModel ? `${selectedModel.providerName} model tool` : "Model catalog"}
+        </p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-black sm:text-4xl">
+          {pageHeading}
+        </h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-black/62">
+          {pageIntro}
+        </p>
+      </header>
       <div className="space-y-2.5">
         {selectedModel ? (
           <div className="rounded-xl border border-[#E9DEC9] bg-[linear-gradient(135deg,#FFF7EA_0%,#FFFDFC_55%,#F6F1E7_100%)] p-3 sm:rounded-2xl sm:p-3.5">
