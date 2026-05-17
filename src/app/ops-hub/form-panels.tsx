@@ -1040,6 +1040,8 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
       const combinationPrices = readParameterPricesCombinations(parsed);
       const booleanSurcharges = readParameterPricesBooleanSurcharges(parsed);
       const hasCombinationPrices = Object.keys(combinationPrices).length > 0;
+      const resolutionPrices = splitSingleDimensionPrices(combinationPrices, "resolution");
+      const qualityPrices = splitSingleDimensionPrices(combinationPrices, "quality");
       const parameterMultipliers =
         parsed.parameterMultipliers &&
         typeof parsed.parameterMultipliers === "object" &&
@@ -1064,7 +1066,11 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
         ...fallback,
         currency: typeof parsed.currency === "string" ? parsed.currency : fallback.currency,
         outputPriceMode: hasCombinationPrices
-          ? "combination_prices"
+          ? resolutionPrices
+            ? "resolution_multiplier"
+            : qualityPrices
+              ? "quality_multiplier"
+              : "combination_prices"
           : hasResolutionMultipliers && hasPositiveCharge(charges.perImage)
             ? "resolution_multiplier"
             : hasQualityMultipliers && hasPositiveCharge(charges.perImage)
@@ -1079,10 +1085,14 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
                       ? "output_tokens"
                       : "none",
         chargePerRequest: hasPositiveCharge(charges.perRequest),
-        chargePerImage: !hasCombinationPrices && hasPositiveCharge(charges.perImage),
+        chargePerImage:
+          !hasCombinationPrices &&
+          !hasResolutionMultipliers &&
+          !hasQualityMultipliers &&
+          hasPositiveCharge(charges.perImage),
         chargePerVideo: !hasCombinationPrices && hasPositiveCharge(charges.perVideo),
         chargePerSecond: !hasCombinationPrices && hasPositiveCharge(charges.perSecond),
-        chargeCombinationPrices: hasCombinationPrices,
+        chargeCombinationPrices: hasCombinationPrices || hasResolutionMultipliers || hasQualityMultipliers,
         chargeInputTokens: hasPositiveCharge(charges.inputTextTokensPerMillion),
         chargeOutputTokens: !hasCombinationPrices && hasPositiveCharge(charges.outputTextTokensPerMillion),
         costPerRequest: String(charges.perRequest ?? fallback.costPerRequest),
@@ -1095,8 +1105,8 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
         outputCostPerMillion: String(
           charges.outputTextTokensPerMillion ?? fallback.outputCostPerMillion
         ),
-        resolutionMultipliersJson: JSON.stringify(resolutionMultipliers, null, 2),
-        qualityMultipliersJson: JSON.stringify(qualityMultipliers, null, 2),
+        resolutionMultipliersJson: JSON.stringify(resolutionPrices ?? resolutionMultipliers, null, 2),
+        qualityMultipliersJson: JSON.stringify(qualityPrices ?? qualityMultipliers, null, 2),
         combinationPricesJson: JSON.stringify(
           Object.keys(combinationPrices).length > 0
             ? combinationPrices
@@ -1189,6 +1199,14 @@ function buildCombinationKey(resolution: string, quality: string) {
   return `${resolution}__${quality}`;
 }
 
+function buildResolutionPriceKey(resolution: string) {
+  return buildCombinationKey(resolution, "default");
+}
+
+function buildQualityPriceKey(quality: string) {
+  return buildCombinationKey("default", quality);
+}
+
 function readParameterPricesCombinations(parsed: Record<string, unknown>) {
   const parameterPrices =
     parsed.parameterPrices &&
@@ -1203,6 +1221,27 @@ function readParameterPricesCombinations(parsed: Record<string, unknown>) {
       ? (parameterPrices.combinations as Record<string, unknown>)
       : null;
   return combinations ?? {};
+}
+
+function splitSingleDimensionPrices(
+  combinations: Record<string, unknown>,
+  dimension: "resolution" | "quality"
+) {
+  const entries = Object.entries(combinations);
+  const matches = entries.filter(([key]) =>
+    dimension === "resolution"
+      ? key.endsWith("__default")
+      : key.startsWith("default__")
+  );
+  if (matches.length === 0 || matches.length !== entries.length) {
+    return null;
+  }
+  return Object.fromEntries(
+    matches.map(([key, value]) => [
+      dimension === "resolution" ? key.replace(/__default$/, "") : key.replace(/^default__/, ""),
+      value,
+    ])
+  );
 }
 
 function readParameterPricesBooleanSurcharges(parsed: Record<string, unknown>) {
@@ -1285,19 +1324,28 @@ function buildBillingConfigValue(state: BillingFormState) {
     charges.outputTextTokensPerMillion = Number(state.outputCostPerMillion);
   }
 
-  const resolutionMultipliers = safeParseNumberMap(state.resolutionMultipliersJson);
-  const qualityMultipliers = safeParseNumberMap(state.qualityMultipliersJson);
-  const combinationPrices = state.chargeCombinationPrices
-    ? safeParseNumberMap(state.combinationPricesJson)
-    : {};
+  const resolutionPrices = safeParseNumberMap(state.resolutionMultipliersJson);
+  const qualityPrices = safeParseNumberMap(state.qualityMultipliersJson);
+  const explicitCombinationPrices = safeParseNumberMap(state.combinationPricesJson);
+  const combinationPrices =
+    state.outputPriceMode === "resolution_multiplier"
+      ? Object.fromEntries(
+          Object.entries(resolutionPrices).map(([resolution, price]) => [
+            buildResolutionPriceKey(resolution),
+            price,
+          ])
+        )
+      : state.outputPriceMode === "quality_multiplier"
+        ? Object.fromEntries(
+            Object.entries(qualityPrices).map(([quality, price]) => [
+              buildQualityPriceKey(quality),
+              price,
+            ])
+          )
+        : state.chargeCombinationPrices
+          ? explicitCombinationPrices
+          : {};
   const booleanSurcharges = safeParseNumberMap(state.booleanSurchargesJson);
-  const parameterMultipliers: Record<string, Record<string, number>> = {};
-  if (Object.keys(resolutionMultipliers).length > 0) {
-    parameterMultipliers.resolution = resolutionMultipliers;
-  }
-  if (Object.keys(qualityMultipliers).length > 0) {
-    parameterMultipliers.quality = qualityMultipliers;
-  }
   const parameterPrices: Record<string, Record<string, number>> = {};
   if (Object.keys(combinationPrices).length > 0) {
     parameterPrices.combinations = combinationPrices;
@@ -1310,7 +1358,6 @@ function buildBillingConfigValue(state: BillingFormState) {
     billingMode: "hybrid",
     currency: state.currency.trim() || "USD",
     charges,
-    ...(Object.keys(parameterMultipliers).length > 0 ? { parameterMultipliers } : {}),
     ...(Object.keys(parameterPrices).length > 0 ? { parameterPrices } : {}),
   });
 }
@@ -1661,13 +1708,13 @@ function ParameterMultiplierTable({
             <tr>
               <th className="px-2 py-2 font-medium">启用</th>
               <th className="px-2 py-2 font-medium">{valueLabel}</th>
-              <th className="px-2 py-2 font-medium">倍率</th>
+              <th className="px-2 py-2 font-medium">单价</th>
             </tr>
           </thead>
           <tbody>
             {candidates.map((candidate) => {
               const enabled = candidate in values;
-              const inputValue = values[candidate] ?? "1";
+              const inputValue = values[candidate] ?? "0.01";
               return (
                 <tr key={candidate} className="border-t border-black/[0.05]">
                   <td className="px-2 py-1.5">
@@ -1809,8 +1856,8 @@ export function BillingConfigEditor({
       ...current,
       outputPriceMode: method,
       chargeOutputTokens: method === "output_tokens",
-      chargeCombinationPrices: method === "combination_prices",
-      chargePerImage: method === "per_image" || method === "resolution_multiplier" || method === "quality_multiplier",
+      chargeCombinationPrices: method === "combination_prices" || method === "resolution_multiplier" || method === "quality_multiplier",
+      chargePerImage: method === "per_image",
       chargePerVideo: method === "per_video",
       chargePerSecond: method === "per_second",
     }));
@@ -1903,8 +1950,8 @@ export function BillingConfigEditor({
               >
                 <option value="none">不计费</option>
                 <option value="per_image">按图片</option>
-                <option value="resolution_multiplier">按 resolution 阶梯倍率</option>
-                <option value="quality_multiplier">按 quality 阶梯倍率</option>
+                <option value="resolution_multiplier">按 resolution 阶梯单价</option>
+                <option value="quality_multiplier">按 quality 阶梯单价</option>
                 <option value="per_video">按视频</option>
                 <option value="combination_prices">按 resolution + quality 组合阶梯</option>
                 <option value="per_second">按秒</option>
@@ -2021,22 +2068,22 @@ export function BillingConfigEditor({
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           {outputMethod === "resolution_multiplier" ? (
           <ParameterMultiplierTable
-            title="单独 resolution 阶梯倍率"
+            title="单独 resolution 阶梯单价"
             valueLabel="resolution"
             candidates={RESOLUTION_CANDIDATES}
             values={resolutionMultiplierMap}
             onChange={updateResolutionMultiplier}
-            help="用于基础 perImage/perVideo 单价的 resolution 倍率，例如 0.5k=0.5、1k=1、2k=2。"
+            help="直接填写该 resolution 的单张输出价格，例如 1k=0.07、2k=0.14、4k=0.24。"
           />
           ) : null}
           {outputMethod === "quality_multiplier" ? (
           <ParameterMultiplierTable
-            title="单独 quality 阶梯倍率"
+            title="单独 quality 阶梯单价"
             valueLabel="quality"
             candidates={QUALITY_CANDIDATES}
             values={qualityMultiplierMap}
             onChange={updateQualityMultiplier}
-            help="用于基础 perImage/perVideo 单价的 quality 倍率，会和 resolution 倍率相乘。"
+            help="直接填写该 quality 的单张输出价格，例如 low=0.03、medium=0.07、high=0.14。"
           />
           ) : null}
         </div>

@@ -319,11 +319,26 @@ export function deriveLegacyBillingFields(config: BillingConfig) {
   const normalized = normalizeBillingConfig(config);
   const charges = normalized.charges;
   const combinationPrices = Object.values(normalized.parameterPrices?.combinations ?? {});
+  const resolutionPrices = Object.values(normalized.parameterMultipliers?.resolution ?? {});
+  const qualityPrices = Object.values(normalized.parameterMultipliers?.quality ?? {});
+  const singleDimensionPrices =
+    resolutionPrices.length > 0 && qualityPrices.length === 0
+      ? resolutionPrices
+      : qualityPrices.length > 0 && resolutionPrices.length === 0
+        ? qualityPrices
+        : [];
 
   if (combinationPrices.length > 0) {
     return {
       unitLabel: "combination",
       defaultUnitCost: Math.min(...combinationPrices),
+    };
+  }
+
+  if (singleDimensionPrices.length > 0) {
+    return {
+      unitLabel: "tier",
+      defaultUnitCost: Math.min(...singleDimensionPrices),
     };
   }
 
@@ -369,6 +384,14 @@ export function summarizeBillingConfig(config: BillingConfig) {
   const { charges } = normalized;
   const combinationPrices = Object.values(normalized.parameterPrices?.combinations ?? {});
   const booleanSurcharges = Object.entries(normalized.parameterPrices?.booleanSurcharges ?? {});
+  const resolutionPrices = Object.values(normalized.parameterMultipliers?.resolution ?? {});
+  const qualityPrices = Object.values(normalized.parameterMultipliers?.quality ?? {});
+  const singleDimensionPrices =
+    resolutionPrices.length > 0 && qualityPrices.length === 0
+      ? resolutionPrices
+      : qualityPrices.length > 0 && resolutionPrices.length === 0
+        ? qualityPrices
+        : [];
 
   if (charges.perRequest) {
     parts.push(`每次请求 ${charges.perRequest}`);
@@ -380,6 +403,14 @@ export function summarizeBillingConfig(config: BillingConfig) {
       min === max
         ? `组合阶梯 ${combinationPrices.length} 档 · ${min}`
         : `组合阶梯 ${combinationPrices.length} 档 · ${min}-${max}`
+    );
+  } else if (singleDimensionPrices.length > 0) {
+    const min = Math.min(...singleDimensionPrices);
+    const max = Math.max(...singleDimensionPrices);
+    parts.push(
+      min === max
+        ? `阶梯单价 ${singleDimensionPrices.length} 档 · ${min}`
+        : `阶梯单价 ${singleDimensionPrices.length} 档 · ${min}-${max}`
     );
   } else if (charges.perImage) {
     parts.push(`每张图片 ${charges.perImage}`);
@@ -429,6 +460,56 @@ export function resolveBillingMetrics(input: {
   };
 }
 
+function resolveParameterUnitPrice(
+  combinations: Record<string, number> | undefined,
+  resolution: string,
+  quality: string
+) {
+  const prices = combinations ?? {};
+  const entries = Object.entries(prices);
+  if (entries.length === 0) return null;
+
+  const candidates = [
+    resolution && quality ? `${resolution}__${quality}` : "",
+    resolution ? `${resolution}__default` : "",
+    quality ? `default__${quality}` : "",
+    resolution,
+    quality,
+  ].filter(Boolean);
+
+  for (const key of candidates) {
+    const price = prices[key];
+    if (typeof price === "number" && Number.isFinite(price) && price > 0) {
+      return price;
+    }
+  }
+
+  const matchingResolutionPrices = resolution
+    ? entries
+        .filter(([key]) => key === resolution || key.startsWith(`${resolution}__`))
+        .map(([, price]) => price)
+        .filter((price) => Number.isFinite(price) && price > 0)
+    : [];
+  if (matchingResolutionPrices.length > 0) {
+    return Math.min(...matchingResolutionPrices);
+  }
+
+  const matchingQualityPrices = quality
+    ? entries
+        .filter(([key]) => key === quality || key.endsWith(`__${quality}`))
+        .map(([, price]) => price)
+        .filter((price) => Number.isFinite(price) && price > 0)
+    : [];
+  if (matchingQualityPrices.length > 0) {
+    return Math.min(...matchingQualityPrices);
+  }
+
+  const validPrices = entries
+    .map(([, price]) => price)
+    .filter((price) => Number.isFinite(price) && price > 0);
+  return validPrices.length > 0 ? Math.min(...validPrices) : null;
+}
+
 export function resolveBillingBreakdown(input: {
   config: BillingConfig;
   requestInput?: Record<string, unknown> | null;
@@ -454,26 +535,34 @@ export function resolveBillingBreakdown(input: {
     typeof config.parameterMultipliers.quality[normalizedQuality] === "number"
       ? config.parameterMultipliers.quality[normalizedQuality]
       : 1;
+  const hasOnlyResolutionLegacyPrices =
+    Object.keys(config.parameterMultipliers?.resolution ?? {}).length > 0 &&
+    Object.keys(config.parameterMultipliers?.quality ?? {}).length === 0;
+  const hasOnlyQualityLegacyPrices =
+    Object.keys(config.parameterMultipliers?.quality ?? {}).length > 0 &&
+    Object.keys(config.parameterMultipliers?.resolution ?? {}).length === 0;
+  const legacySingleDimensionUnitPrice =
+    hasOnlyResolutionLegacyPrices && normalizedResolution
+      ? config.parameterMultipliers?.resolution?.[normalizedResolution] ?? null
+      : hasOnlyQualityLegacyPrices && normalizedQuality
+        ? config.parameterMultipliers?.quality?.[normalizedQuality] ?? null
+        : null;
   const outputPriceMultiplier = resolutionMultiplier * qualityMultiplier;
-  const combinationKey =
-    normalizedResolution && normalizedQuality
-      ? `${normalizedResolution}__${normalizedQuality}`
-      : "";
-  const combinationUnitPrice =
-    combinationKey &&
-    config.parameterPrices?.combinations &&
-    typeof config.parameterPrices.combinations[combinationKey] === "number"
-      ? config.parameterPrices.combinations[combinationKey]
-      : config.parameterPrices?.combinations &&
-          Object.keys(config.parameterPrices.combinations).length > 0
-        ? Math.min(...Object.values(config.parameterPrices.combinations))
-      : null;
+  const combinationUnitPrice = resolveParameterUnitPrice(
+    config.parameterPrices?.combinations,
+    normalizedResolution,
+    normalizedQuality
+  );
   const perImageUnitPrice =
-    combinationUnitPrice ?? (config.charges.perImage ?? 0) * outputPriceMultiplier;
+    combinationUnitPrice ??
+    legacySingleDimensionUnitPrice ??
+    (config.charges.perImage ?? 0) * outputPriceMultiplier;
   const perVideoUnitPrice =
     metrics.imageCount > 0
       ? (config.charges.perVideo ?? 0) * outputPriceMultiplier
-      : combinationUnitPrice ?? (config.charges.perVideo ?? 0) * outputPriceMultiplier;
+      : combinationUnitPrice ??
+        legacySingleDimensionUnitPrice ??
+        (config.charges.perVideo ?? 0) * outputPriceMultiplier;
   const booleanSurcharges = Object.entries(config.parameterPrices?.booleanSurcharges ?? {}).reduce(
     (sum, [key, price]) => sum + (requestInput?.[key] === true ? price : 0),
     0

@@ -53,6 +53,10 @@ function formatQualityLabel(value: string) {
   return `${value} generation quality`;
 }
 
+function tierDimensionLabel(name: string, value: string, formatter: (input: string) => string) {
+  return value === "default" ? "" : `${name}: ${formatter(value)}`;
+}
+
 function extractCombinationPrices(config: ProviderModelPricing | SupportedModelBillingConfig) {
   if (!config) {
     return [];
@@ -73,6 +77,75 @@ function extractCombinationPrices(config: ProviderModelPricing | SupportedModelB
         };
       })
       .filter((item): item is { resolution: string; quality: string; price: number } => Boolean(item))
+      .sort((a, b) =>
+        a.resolution.localeCompare(b.resolution, "en-US", { numeric: true }) ||
+        (QUALITY_ORDER.indexOf(a.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(a.quality)) -
+          (QUALITY_ORDER.indexOf(b.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(b.quality)) ||
+        a.quality.localeCompare(b.quality, "en-US", { numeric: true })
+      );
+  } catch {
+    return [];
+  }
+}
+
+function extractImagePriceTiers(config: ProviderModelPricing | SupportedModelBillingConfig) {
+  if (!config) {
+    return [];
+  }
+
+  try {
+    const normalized = normalizeBillingConfig(parseBillingConfig(config));
+    const combinationTiers = extractCombinationPrices(config);
+    if (combinationTiers.length > 0) {
+      return combinationTiers;
+    }
+    const perImage = readNumeric(normalized.charges.perImage);
+    if (perImage === null || perImage <= 0) {
+      return [];
+    }
+    const resolutionEntries = Object.entries(normalized.parameterMultipliers?.resolution ?? {});
+    const qualityEntries = Object.entries(normalized.parameterMultipliers?.quality ?? {});
+    if (resolutionEntries.length > 0 && qualityEntries.length === 0) {
+      return resolutionEntries
+        .map(([resolution, value]) => ({
+          resolution,
+          quality: "default",
+          price: Number(value),
+        }))
+        .filter((item): item is { resolution: string; quality: string; price: number } =>
+          Number.isFinite(item.price) && item.price > 0
+        )
+        .sort((a, b) => a.resolution.localeCompare(b.resolution, "en-US", { numeric: true }));
+    }
+    if (qualityEntries.length > 0 && resolutionEntries.length === 0) {
+      return qualityEntries
+        .map(([quality, value]) => ({
+          resolution: "default",
+          quality,
+          price: Number(value),
+        }))
+        .filter((item): item is { resolution: string; quality: string; price: number } =>
+          Number.isFinite(item.price) && item.price > 0
+        )
+        .sort((a, b) =>
+          (QUALITY_ORDER.indexOf(a.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(a.quality)) -
+            (QUALITY_ORDER.indexOf(b.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(b.quality)) ||
+          a.quality.localeCompare(b.quality, "en-US", { numeric: true })
+        );
+    }
+    const resolutions = resolutionEntries.length > 0 ? resolutionEntries : [["default", 1] as const];
+    const qualities = qualityEntries.length > 0 ? qualityEntries : [["default", 1] as const];
+    return resolutions
+      .flatMap(([resolution, resolutionMultiplier]) =>
+        qualities.map(([quality, qualityMultiplier]) => ({
+          resolution,
+          quality,
+          price: perImage * Number(resolutionMultiplier) * Number(qualityMultiplier),
+        }))
+      )
+      .filter((item): item is { resolution: string; quality: string; price: number } =>
+        Number.isFinite(item.price) && item.price > 0
+      )
       .sort((a, b) =>
         a.resolution.localeCompare(b.resolution, "en-US", { numeric: true }) ||
         (QUALITY_ORDER.indexOf(a.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(a.quality)) -
@@ -231,7 +304,7 @@ export async function getMarketingImagePricing(): Promise<MarketingImagePricing>
     (supportedModel?.billing_config as SupportedModelBillingConfig) ?? null,
     supportedModel?.default_unit_cost
   );
-  const sellTiers = extractCombinationPrices(
+  const sellTiers = extractImagePriceTiers(
     (supportedModel?.billing_config as SupportedModelBillingConfig) ?? null
   );
   const sellUsd = supportedModelCost ?? 0;
@@ -246,7 +319,11 @@ export async function getMarketingImagePricing(): Promise<MarketingImagePricing>
       resolution: tier.resolution,
       quality: tier.quality,
       priceUsd: tier.price,
-      label: `Resolution: ${formatResolutionLabel(tier.resolution)} · Quality: ${formatQualityLabel(tier.quality)} · ${formatUsd(tier.price)} / image`,
+      label: [
+        tierDimensionLabel("Resolution", tier.resolution, formatResolutionLabel),
+        tierDimensionLabel("Quality", tier.quality, formatQualityLabel),
+        `${formatUsd(tier.price)} / image`,
+      ].filter(Boolean).join(" · "),
     })),
     publicModelSlug: route?.public_model_slug ?? supportedModel?.model_slug ?? null,
   };

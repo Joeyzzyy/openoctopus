@@ -56,6 +56,11 @@ export type ModelDocRow = {
     price: number;
     label: string;
   }>;
+  booleanSurcharges: Array<{
+    name: string;
+    price: number;
+    label: string;
+  }>;
 };
 
 export type GatewayErrorDocRow = {
@@ -130,21 +135,97 @@ function splitCombinationKey(key: string) {
   };
 }
 
+function tierDimensionLabel(name: string, value: string) {
+  return value === "default" ? "" : `${name}: ${value}`;
+}
+
 function readPriceTiers(value: unknown) {
   try {
     const normalized = normalizeBillingConfig(parseBillingConfig(value));
-    return Object.entries(normalized.parameterPrices?.combinations ?? {})
+    const combinationTiers = Object.entries(normalized.parameterPrices?.combinations ?? {})
       .map(([key, price]) => {
         const numericPrice = Number(price);
         if (!Number.isFinite(numericPrice) || numericPrice <= 0) return null;
         const labels = splitCombinationKey(key);
+        const labelParts = [
+          tierDimensionLabel("Resolution", labels.resolution),
+          tierDimensionLabel("Quality", labels.quality),
+          `${formatUsd(numericPrice)} / image`,
+        ].filter(Boolean);
         return {
           ...labels,
           price: numericPrice,
-          label: `Resolution: ${labels.resolution} output resolution · Quality: ${labels.quality} generation quality · ${formatUsd(numericPrice)} / image`,
+          label: labelParts.join(" · "),
         };
       })
       .filter((item): item is { resolution: string; quality: string; price: number; label: string } => Boolean(item))
+      .sort((a, b) =>
+        a.resolution.localeCompare(b.resolution, "en-US", { numeric: true }) ||
+        (QUALITY_ORDER.indexOf(a.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(a.quality)) -
+          (QUALITY_ORDER.indexOf(b.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(b.quality)) ||
+        a.quality.localeCompare(b.quality, "en-US", { numeric: true })
+      );
+    if (combinationTiers.length > 0) {
+      return combinationTiers;
+    }
+
+    const perImage = Number(normalized.charges.perImage ?? 0);
+    if (!Number.isFinite(perImage) || perImage <= 0) {
+      return [];
+    }
+    const resolutionEntries = Object.entries(normalized.parameterMultipliers?.resolution ?? {});
+    const qualityEntries = Object.entries(normalized.parameterMultipliers?.quality ?? {});
+    if (resolutionEntries.length > 0 && qualityEntries.length === 0) {
+      return resolutionEntries
+        .map(([resolution, price]) => ({
+          resolution,
+          quality: "default",
+          price: Number(price),
+          label: [
+            tierDimensionLabel("Resolution", resolution),
+            `${formatUsd(Number(price))} / image`,
+          ].filter(Boolean).join(" · "),
+        }))
+        .filter((item) => Number.isFinite(item.price) && item.price > 0)
+        .sort((a, b) => a.resolution.localeCompare(b.resolution, "en-US", { numeric: true }));
+    }
+    if (qualityEntries.length > 0 && resolutionEntries.length === 0) {
+      return qualityEntries
+        .map(([quality, price]) => ({
+          resolution: "default",
+          quality,
+          price: Number(price),
+          label: [
+            tierDimensionLabel("Quality", quality),
+            `${formatUsd(Number(price))} / image`,
+          ].filter(Boolean).join(" · "),
+        }))
+        .filter((item) => Number.isFinite(item.price) && item.price > 0)
+        .sort((a, b) =>
+          (QUALITY_ORDER.indexOf(a.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(a.quality)) -
+            (QUALITY_ORDER.indexOf(b.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(b.quality)) ||
+          a.quality.localeCompare(b.quality, "en-US", { numeric: true })
+        );
+    }
+    const resolutions = resolutionEntries.length > 0 ? resolutionEntries : [["default", 1] as const];
+    const qualities = qualityEntries.length > 0 ? qualityEntries : [["default", 1] as const];
+    return resolutions
+      .flatMap(([resolution, resolutionMultiplier]) =>
+        qualities.map(([quality, qualityMultiplier]) => {
+          const price = Number((perImage * Number(resolutionMultiplier) * Number(qualityMultiplier)).toFixed(8));
+          return {
+            resolution,
+            quality,
+            price,
+            label: [
+              tierDimensionLabel("Resolution", resolution),
+              tierDimensionLabel("Quality", quality),
+              `${formatUsd(price)} / image`,
+            ].filter(Boolean).join(" · "),
+          };
+        })
+      )
+      .filter((item) => Number.isFinite(item.price) && item.price > 0)
       .sort((a, b) =>
         a.resolution.localeCompare(b.resolution, "en-US", { numeric: true }) ||
         (QUALITY_ORDER.indexOf(a.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(a.quality)) -
@@ -156,12 +237,32 @@ function readPriceTiers(value: unknown) {
   }
 }
 
+function readBooleanSurcharges(value: unknown) {
+  try {
+    const normalized = normalizeBillingConfig(parseBillingConfig(value));
+    return Object.entries(normalized.parameterPrices?.booleanSurcharges ?? {})
+      .map(([name, price]) => {
+        const numericPrice = Number(price);
+        if (!Number.isFinite(numericPrice) || numericPrice <= 0) return null;
+        return {
+          name,
+          price: numericPrice,
+          label: `${name} + ${formatUsd(numericPrice)}`,
+        };
+      })
+      .filter((item): item is { name: string; price: number; label: string } => Boolean(item));
+  } catch {
+    return [];
+  }
+}
+
 function billingSummary(value: unknown) {
   try {
     const normalized = normalizeBillingConfig(parseBillingConfig(value));
     const parts: string[] = [];
     const { charges, currency } = normalized;
     const tiers = readPriceTiers(value);
+    const booleanSurcharges = readBooleanSurcharges(value);
     if (charges.perRequest) parts.push(`per request ${charges.perRequest}`);
     if (tiers.length > 0) {
       const prices = tiers.map((tier) => tier.price);
@@ -175,6 +276,7 @@ function billingSummary(value: unknown) {
     if (charges.perSecond) parts.push(`per second ${charges.perSecond}`);
     if (charges.inputTextTokensPerMillion) parts.push(`per 1M input tokens ${charges.inputTextTokensPerMillion}`);
     if (charges.outputTextTokensPerMillion) parts.push(`per 1M output tokens ${charges.outputTextTokensPerMillion}`);
+    if (booleanSurcharges.length > 0) parts.push(`${booleanSurcharges.length} optional add-ons`);
     return parts.some((part) => part.includes("$")) ? parts.join(" + ") : `${currency} ${parts.join(" + ")}`;
   } catch {
     return "Invalid pricing configuration";
@@ -441,6 +543,7 @@ export const loadModelsPageData = cache(async () => {
         : [];
     const primaryPrice = readPrimaryPrice(model.billing_config);
     const priceTiers = readPriceTiers(model.billing_config);
+    const booleanSurcharges = readBooleanSurcharges(model.billing_config);
 
     return {
       id: model.id,
@@ -490,6 +593,7 @@ export const loadModelsPageData = cache(async () => {
       primaryPriceValue: primaryPrice.primaryPriceValue,
       primaryPriceLabel: primaryPrice.primaryPriceLabel,
       priceTiers,
+      booleanSurcharges,
     };
   });
 

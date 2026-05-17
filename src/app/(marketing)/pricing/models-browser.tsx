@@ -1,9 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CircleHelp, Copy, Download, X } from "lucide-react";
+import { CircleHelp, Download, X } from "lucide-react";
 import type { GatewayErrorDocRow, ModelDocRow } from "../models/data";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
@@ -746,6 +746,41 @@ function readPositiveNumber(value: unknown) {
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
+function isBooleanEnabled(value: unknown) {
+  return value === true || value === "true";
+}
+
+function isValidEnumValue(value: string | undefined, enumValues?: string[]) {
+  if (!enumValues || enumValues.length === 0) return true;
+  return typeof value === "string" && enumValues.includes(value);
+}
+
+function findMatchingPriceTier(
+  tiers: ModelDocRow["priceTiers"],
+  resolution: string,
+  quality: string
+) {
+  const normalizedResolution = resolution || "default";
+  const normalizedQuality = quality || "default";
+  const candidates = [
+    (tier: ModelDocRow["priceTiers"][number]) =>
+      tier.resolution === normalizedResolution && tier.quality === normalizedQuality,
+    (tier: ModelDocRow["priceTiers"][number]) =>
+      tier.resolution === normalizedResolution && tier.quality === "default",
+    (tier: ModelDocRow["priceTiers"][number]) =>
+      tier.resolution === "default" && tier.quality === normalizedQuality,
+    (tier: ModelDocRow["priceTiers"][number]) => tier.resolution === normalizedResolution,
+    (tier: ModelDocRow["priceTiers"][number]) => tier.quality === normalizedQuality,
+  ];
+
+  for (const predicate of candidates) {
+    const tier = tiers.find(predicate);
+    if (tier) return tier;
+  }
+
+  return tiers[0] ?? null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -812,18 +847,6 @@ function buildDisplayImageUrl(src: string) {
     return src;
   }
   return src;
-}
-
-function isRouteSyncedWithSelection(input: {
-  pathname: string;
-  selectedProvider: string;
-  selectedModelPublicSlug: string;
-}) {
-  const providerSlug =
-    slugifyPathPart(input.selectedProvider) || encodeURIComponent(input.selectedProvider);
-  const modelSlug =
-    slugifyPathPart(input.selectedModelPublicSlug) || encodeURIComponent(input.selectedModelPublicSlug);
-  return input.pathname === `/models/${providerSlug}/${modelSlug}`;
 }
 
 type PlaygroundImageAsset = {
@@ -1088,29 +1111,36 @@ export function ModelsBrowser({
   const priceTag = useMemo(() => {
     if (!selectedModel) return "";
     const tiers = selectedModel.priceTiers ?? [];
-    if (tiers.length === 0) return selectedModel.priceLabel || "";
+    const booleanSurchargeTotal = (selectedModel.booleanSurcharges ?? []).reduce(
+      (sum, surcharge) => sum + (isBooleanEnabled(playgroundForm[surcharge.name]) ? surcharge.price : 0),
+      0
+    );
+    if (tiers.length === 0) {
+      return booleanSurchargeTotal > 0
+        ? `${selectedModel.priceLabel || "Pricing unavailable"} + ${formatUsd(booleanSurchargeTotal)} add-ons`
+        : selectedModel.priceLabel || "";
+    }
     const resolutionField = parsedFields.find((field) => isResolutionField(field.key));
     const qualityField = parsedFields.find((field) => field.key.trim().toLowerCase() === "quality");
     const resolution =
       (resolutionField ? playgroundForm[resolutionField.key] : "") ||
       resolutionField?.enumValues?.[0] ||
-      RESOLUTION_OPTIONS[0];
+      "default";
     const quality =
       (qualityField ? playgroundForm[qualityField.key] : "") ||
       qualityField?.enumValues?.[0] ||
-      "medium";
-    const tier =
-      tiers.find((item) => item.resolution === resolution && item.quality === quality) ??
-      tiers.find((item) => item.resolution === resolution) ??
-      tiers[0];
+      "default";
+    const tier = findMatchingPriceTier(tiers, resolution, quality);
+    if (!tier) return selectedModel.priceLabel || "";
     const imageCount =
       readPositiveNumber(playgroundForm.num_images) ??
       readPositiveNumber(playgroundForm.n) ??
       1;
-    const total = tier.price * imageCount;
+    const total = tier.price * imageCount + booleanSurchargeTotal;
+    const addOnLabel = booleanSurchargeTotal > 0 ? ` + ${formatUsd(booleanSurchargeTotal)} add-ons` : "";
     return imageCount > 1
-      ? `${formatUsd(total)} total · ${formatUsd(tier.price)} / image`
-      : `${formatUsd(tier.price)} / image`;
+      ? `${formatUsd(total)} total · ${formatUsd(tier.price)} / image${addOnLabel}`
+      : `${formatUsd(total)} total · ${formatUsd(tier.price)} / image${addOnLabel}`;
   }, [parsedFields, playgroundForm, selectedModel]);
 
   useEffect(() => {
@@ -1120,15 +1150,16 @@ export function ModelsBrowser({
 
       for (const field of parsedFields) {
         const existing = next[field.key];
-        if (typeof existing === "string" && existing.trim().length > 0) continue;
 
         if (field.key === "aspect_ratio") {
           const defaultRatio =
             field.enumValues && field.enumValues.length > 0
               ? field.enumValues[0]
               : ASPECT_RATIO_OPTIONS[0];
-          next[field.key] = defaultRatio;
-          changed = true;
+          if (!existing || !isValidEnumValue(existing, field.enumValues)) {
+            next[field.key] = defaultRatio;
+            changed = true;
+          }
           continue;
         }
 
@@ -1137,20 +1168,26 @@ export function ModelsBrowser({
             field.enumValues && field.enumValues.length > 0
               ? field.enumValues[0]
               : RESOLUTION_OPTIONS[0];
-          next[field.key] = defaultResolution;
-          changed = true;
+          if (!existing || !isValidEnumValue(existing, field.enumValues)) {
+            next[field.key] = defaultResolution;
+            changed = true;
+          }
           continue;
         }
 
         if (field.enumValues && field.enumValues.length > 0) {
-          next[field.key] = field.enumValues[0];
-          changed = true;
+          if (!existing || !isValidEnumValue(existing, field.enumValues)) {
+            next[field.key] = field.enumValues[0];
+            changed = true;
+          }
           continue;
         }
 
         if (field.type === "boolean") {
-          next[field.key] = "true";
-          changed = true;
+          if (existing !== "true" && existing !== "false") {
+            next[field.key] = "false";
+            changed = true;
+          }
         }
       }
 
@@ -1625,11 +1662,6 @@ export function ModelsBrowser({
               <span className="inline-flex rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
                 {capabilityTag}
               </span>
-              {priceTag ? (
-                <span className="inline-flex rounded-full border border-[#CFE5D5] bg-[#EAF7ED] px-3 py-1 text-xs font-medium text-[#245C31]">
-                  {priceTag}
-                </span>
-              ) : null}
               <span className="inline-flex max-w-full rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
                 <span className="truncate">
                 {selectedModel.publicModel}
@@ -1808,7 +1840,7 @@ export function ModelsBrowser({
                       ) : field.type === "boolean" ? (
                         <select
                           disabled={isSubmitting}
-                          value={playgroundForm[field.key] ?? "true"}
+                          value={playgroundForm[field.key] ?? "false"}
                           onChange={(event) =>
                             setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
                           }
@@ -2031,11 +2063,6 @@ export function ModelsBrowser({
                     <span className="rounded-sm bg-white px-1.5 py-0.5 text-[10px] text-black/60">
                       {model.modelTypeLabel || "model"}
                     </span>
-                    {model.priceLabel ? (
-                      <span className="rounded-sm bg-[#EAF7ED] px-1.5 py-0.5 text-[10px] font-medium text-[#245C31]">
-                        {model.priceLabel}
-                      </span>
-                    ) : null}
                   </div>
                 </button>
               );
