@@ -225,6 +225,16 @@ function buildPayload(model: string, capability: string) {
 }`;
   }
 
+  if (capability === "image_edit") {
+    return `{
+  "model": "${model}",
+  "prompt": "change the background to a clean studio scene",
+  "input": {
+    "images": ["https://example.com/input.png"]
+  }
+}`;
+  }
+
   return `{
   "model": "${model}",
   "prompt": "a premium octopus mascot, orange and black, clean background"
@@ -246,6 +256,7 @@ function sanitizeProviderInputSchemaForDocs(schema: Record<string, unknown>) {
 }
 
 function buildEndpoint(capability: string) {
+  if (capability === "image_edit") return "/v1/images/edits";
   return capability.includes("video") ? "/v1/videos/generations" : "/v1/images/generations";
 }
 

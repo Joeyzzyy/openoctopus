@@ -102,7 +102,7 @@ type ProviderModelRow = {
 type ProviderModelShowcaseAssetRow = {
   id: string;
   provider_model_id: string;
-  asset_kind: "cover" | "gallery";
+  asset_kind: "cover" | "gallery" | "playground_input";
   storage_bucket: string;
   storage_path: string;
   public_url: string;
@@ -1269,17 +1269,21 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       : providerModelShowcaseAssetsResponse.data ?? []) as ProviderModelShowcaseAssetRow[];
   if (shouldPaginatePublicModels && supportedModels.length > 0) {
     const supportedModelIdsForPage = supportedModels.map((model) => model.id);
-    const pageProviderModelsResponse = await supabase
+    const allProviderModelsResponse = await supabase
       .from("provider_models")
       .select(
         "id, provider_id, supported_model_id, public_model_slug, upstream_model_slug, capability, active, pricing, input_schema, output_schema, execution_template, execution_config, created_at"
       )
-      .in("supported_model_id", supportedModelIdsForPage)
       .order("created_at", { ascending: true });
-    providerModels = (pageProviderModelsResponse.error
+    providerModels = (allProviderModelsResponse.error
       ? []
-      : pageProviderModelsResponse.data ?? []) as ProviderModelRow[];
-    const providerModelIdsForPage = providerModels.map((model) => model.id);
+      : allProviderModelsResponse.data ?? []) as ProviderModelRow[];
+    const providerModelIdsForPage = providerModels
+      .filter((model) =>
+        typeof model.supported_model_id === "string" &&
+        supportedModelIdsForPage.includes(model.supported_model_id)
+      )
+      .map((model) => model.id);
     if (providerModelIdsForPage.length > 0) {
       const pageShowcaseAssetsResponse = await supabase
         .from("provider_model_showcase_assets")

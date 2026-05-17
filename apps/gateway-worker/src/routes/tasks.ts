@@ -61,6 +61,29 @@ const imageRequestSchema = z.object({
   input: z.record(z.string(), z.unknown()).default({}),
 });
 
+const imageEditRequestSchema = imageRequestSchema.superRefine((value, context) => {
+  if (!value.prompt?.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["prompt"],
+      message: "prompt is required",
+    });
+  }
+
+  const images = value.input.images;
+  if (
+    !Array.isArray(images) ||
+    images.length === 0 ||
+    images.some((item) => typeof item !== "string" || item.trim().length === 0)
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["input", "images"],
+      message: "input.images must be a non-empty array of image URLs",
+    });
+  }
+});
+
 const videoRequestSchema = z.object({
   model: z.string().min(1),
   prompt: z.string().min(1).optional(),
@@ -173,6 +196,53 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         providerBaseUrl: queued.providerBaseUrl,
         providerConfig: queued.providerConfig,
         capability: "image_generation",
+        publicModelSlug: parsed.model,
+        upstreamModelSlug: queued.upstreamModelSlug,
+        endpoint: queued.endpoint,
+        prompt: parsed.prompt,
+        input: parsed.input,
+      });
+
+      return reply.code(202).send({
+        id: queued.requestId,
+        status: "queued",
+      });
+    } catch (error) {
+      return sendRequestError(reply, error);
+    }
+  });
+
+  app.post("/v1/images/edits", async (request, reply) => {
+    const parsed = imageEditRequestSchema.parse(request.body);
+    const authHeader = request.headers.authorization;
+    const apiKey = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
+    const sourceHeader =
+      typeof request.headers["x-openoctopus-request-source"] === "string"
+        ? request.headers["x-openoctopus-request-source"]
+        : "";
+    const requestSource = sourceHeader === "playground" ? "playground" : "api";
+
+    try {
+      const queued = await createQueuedRequest({
+        apiKey,
+        endpoint: "/v1/images/edits",
+        capability: "image_edit",
+        requestSource,
+        model: parsed.model,
+        prompt: parsed.prompt,
+        input: parsed.input,
+      });
+
+      await enqueueInferenceJob({
+        requestId: queued.requestId,
+        workspaceId: queued.workspaceId,
+        apiKeyId: queued.apiKeyId,
+        providerModelId: queued.providerModelId,
+        credentialId: queued.credentialId,
+        providerSlug: queued.providerSlug,
+        providerBaseUrl: queued.providerBaseUrl,
+        providerConfig: queued.providerConfig,
+        capability: "image_edit",
         publicModelSlug: parsed.model,
         upstreamModelSlug: queued.upstreamModelSlug,
         endpoint: queued.endpoint,

@@ -1818,10 +1818,13 @@ export function CreateProviderModelForm({
   defaultExecutionConfig = '{"submitPath":"/v1/models/{upstreamModel}:generate","pollPath":"/v1/operations/{taskId}","taskIdPath":"name","statusPath":"done","resultUrlPath":"response.outputUrl"}',
   defaultActive = true,
   defaultShowcaseCoverUrl = null,
+  defaultPlaygroundInputUrl = null,
   defaultShowcaseGalleryUrls = [],
   defaultShowcaseCoverPrompt = "",
+  defaultPlaygroundInputPrompt = "",
   defaultShowcaseGalleryPrompts = [],
   defaultShowcaseCoverAssetId,
+  defaultPlaygroundInputAssetId,
   defaultShowcaseGalleryAssetIds = [],
   providerModelId,
   disabled,
@@ -1846,10 +1849,13 @@ export function CreateProviderModelForm({
   defaultExecutionConfig?: string;
   defaultActive?: boolean;
   defaultShowcaseCoverUrl?: string | null;
+  defaultPlaygroundInputUrl?: string | null;
   defaultShowcaseGalleryUrls?: string[];
   defaultShowcaseCoverPrompt?: string;
+  defaultPlaygroundInputPrompt?: string;
   defaultShowcaseGalleryPrompts?: string[];
   defaultShowcaseCoverAssetId?: string;
+  defaultPlaygroundInputAssetId?: string;
   defaultShowcaseGalleryAssetIds?: string[];
   providerModelId?: string;
   disabled: boolean;
@@ -1927,6 +1933,7 @@ export function CreateProviderModelForm({
   const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("ai-autofill");
   void defaultActive;
   const [selectedCoverFileName, setSelectedCoverFileName] = useState("");
+  const [selectedPlaygroundInputFileName, setSelectedPlaygroundInputFileName] = useState("");
   const [selectedGalleryFileNames, setSelectedGalleryFileNames] = useState<string[]>([]);
   const galleryPromptPlaceholder = defaultShowcaseGalleryPrompts
     .map((prompt, index) => `${index + 1}. ${prompt}`)
@@ -2464,50 +2471,39 @@ export function CreateProviderModelForm({
           }}
           className={activeTab === "protocol" ? "grid gap-3 md:grid-cols-2" : "hidden"}
         >
-        <label className="block md:col-span-2">
-          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上游模型 slug / 标识</span>
-          <input
-            value={upstreamModelSlug}
-            onChange={(event) => setUpstreamModelSlug(event.target.value)}
-            placeholder="google/imagen4-fast"
-            disabled={disabled}
-            className={formInputClassName}
-          />
-          <FieldHint
-            help="这个值来自模型映射，会替换 submitPath 里的 {upstreamModel}。例如 submitPath=/api/v3/{upstreamModel} 时，这里填 google/imagen4-fast。"
-            example="google/imagen4-fast"
-          />
-        </label>
         <div className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">调用协议配置</span>
           <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
             <div className="mb-3 grid gap-3 md:grid-cols-2">
-              {executionConfigPresets.length > 0 ? (
-                <label className="block">
-                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">快速填充（复制已有模型）</span>
-                  <select
-                    value={selectedPresetId}
-                    onChange={(event) => {
-                      const nextPresetId = event.target.value;
-                      setSelectedPresetId(nextPresetId);
-                      if (!nextPresetId) return;
-                      const preset = executionConfigPresets.find((item) => item.id === nextPresetId);
-                      if (!preset) return;
-                      setExecutionTemplate(preset.executionTemplate);
-                      setExecutionConfigState(parseExecutionConfigState(preset.executionConfigText));
-                    }}
-                    disabled={disabled}
-                    className={formSelectClassName}
-                  >
-                    <option value="">选择一个已配置模型并复制其调用协议</option>
-                    {executionConfigPresets.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">快速填充（复制已有模型）</span>
+                <select
+                  value={selectedPresetId}
+                  onChange={(event) => {
+                    const nextPresetId = event.target.value;
+                    setSelectedPresetId(nextPresetId);
+                    if (!nextPresetId) return;
+                    const preset = executionConfigPresets.find((item) => item.id === nextPresetId);
+                    if (!preset) return;
+                    setExecutionTemplate(preset.executionTemplate);
+                    setExecutionConfigState(parseExecutionConfigState(preset.executionConfigText));
+                  }}
+                  disabled={disabled || executionConfigPresets.length === 0}
+                  className={formSelectClassName}
+                >
+                  <option value="">
+                    {executionConfigPresets.length > 0
+                      ? "选择一个已配置模型并复制其调用协议"
+                      : "暂无可复制的其他模型映射"}
+                  </option>
+                  {executionConfigPresets.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                <FieldHint help="只复制调用协议模板和路径映射，不会覆盖当前上游模型 slug、输入参数、输出参数或成本配置。" />
+              </label>
               <label className="block">
                 <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">API 调用格式配置</span>
                 <select
@@ -3062,6 +3058,74 @@ export function CreateProviderModelForm({
 
             <section className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-black/80">Playground 示例输入图</p>
+                <span className="text-[11px] text-black/45">图片编辑模型 demo 用</span>
+              </div>
+              {defaultPlaygroundInputUrl ? (
+                <div className="rounded-lg border border-black/[0.08] bg-white p-3">
+                  <p className="mb-2 text-[11px] text-black/55">已上传示例输入图</p>
+                  {defaultPlaygroundInputAssetId ? (
+                    <input type="hidden" name="existingPlaygroundInputAssetId" value={defaultPlaygroundInputAssetId} />
+                  ) : null}
+                  <div className="grid gap-3 md:grid-cols-[132px_1fr]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={defaultPlaygroundInputUrl}
+                      alt="Current playground input"
+                      className="h-28 w-28 rounded-lg border border-black/[0.08] object-cover"
+                    />
+                    <div>
+                      <label className="block">
+                        <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">示例说明</span>
+                        <textarea
+                          name="existingPlaygroundInputPrompt"
+                          defaultValue={defaultPlaygroundInputPrompt}
+                          disabled={disabled}
+                          className={formTextAreaClassName}
+                          rows={4}
+                          placeholder="说明这张输入图适合怎么编辑"
+                        />
+                      </label>
+                      <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#B54432]">
+                        <input type="checkbox" name="removePlaygroundInput" className="size-3.5" />
+                        删除当前示例输入图
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-black/[0.12] bg-white p-3 text-xs text-black/50">
+                  暂无 Playground 示例输入图
+                </div>
+              )}
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上传示例输入图（单张）</span>
+                  <input
+                    type="file"
+                    name="playgroundInputFile"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    onChange={(event) => setSelectedPlaygroundInputFileName(event.target.files?.[0]?.name ?? "")}
+                    className="block w-full text-xs text-black/65 file:mr-3 file:rounded-md file:border-0 file:bg-black file:px-3 file:py-2 file:text-xs file:font-medium file:text-white hover:file:bg-black/90"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">新示例说明</span>
+                  <textarea
+                    name="playgroundInputPrompt"
+                    defaultValue=""
+                    disabled={disabled}
+                    className={formTextAreaClassName}
+                    rows={5}
+                    placeholder="例如：点击使用这张图片，再输入“把背景换成纯白摄影棚”。"
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
                 <p className="text-xs font-medium text-black/80">作品素材区域</p>
                 <span className="text-[11px] text-black/45">{defaultShowcaseGalleryUrls.length} 张已上传</span>
               </div>
@@ -3157,6 +3221,7 @@ export function CreateProviderModelForm({
               <p className="mb-2 text-[11px] text-black/55">本次待上传</p>
               <ShowcaseUploadStatus
                 coverFileName={selectedCoverFileName}
+                playgroundInputFileName={selectedPlaygroundInputFileName}
                 galleryFileNames={selectedGalleryFileNames}
               />
             </div>
@@ -3170,7 +3235,7 @@ export function CreateProviderModelForm({
           <SubmitButton
             label={submitLabel}
             pendingLabel={
-              selectedCoverFileName || selectedGalleryFileNames.length > 0
+              selectedCoverFileName || selectedPlaygroundInputFileName || selectedGalleryFileNames.length > 0
                 ? "上传并保存中..."
                 : "保存中..."
             }
@@ -3416,13 +3481,15 @@ function FormAutoClose({
 
 function ShowcaseUploadStatus({
   coverFileName,
+  playgroundInputFileName,
   galleryFileNames,
 }: {
   coverFileName: string;
+  playgroundInputFileName: string;
   galleryFileNames: string[];
 }) {
   const { pending } = useFormStatus();
-  const hasSelectedFiles = Boolean(coverFileName) || galleryFileNames.length > 0;
+  const hasSelectedFiles = Boolean(coverFileName) || Boolean(playgroundInputFileName) || galleryFileNames.length > 0;
 
   if (pending && hasSelectedFiles) {
     return (
@@ -3444,6 +3511,7 @@ function ShowcaseUploadStatus({
     <div className="rounded-xl border border-[#D8E8D9] bg-[#F3FBF4] px-3 py-2.5 text-xs leading-5 text-[#245C31]">
       已选择待上传素材：
       {coverFileName ? ` 封面 1 张（${coverFileName}）` : ""}
+      {playgroundInputFileName ? ` Playground 示例 1 张（${playgroundInputFileName}）` : ""}
       {galleryFileNames.length > 0
         ? ` 作品图 ${galleryFileNames.length} 张（${galleryFileNames.join("、")}）`
         : ""}

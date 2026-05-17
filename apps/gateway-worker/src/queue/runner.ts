@@ -17,7 +17,7 @@ type QueueMessage = {
   providerSlug: string;
   providerBaseUrl: string | null;
   providerConfig: Record<string, unknown> | null;
-  capability: "image_generation" | "video_generation";
+  capability: "image_generation" | "image_edit" | "video_generation";
   publicModelSlug: string;
   upstreamModelSlug: string;
   endpoint: string;
@@ -34,7 +34,7 @@ type PollingMessage = {
   providerSlug: string;
   providerBaseUrl: string | null;
   providerConfig: Record<string, unknown> | null;
-  capability: "image_generation" | "video_generation";
+  capability: "image_generation" | "image_edit" | "video_generation";
   publicModelSlug: string;
   upstreamModelSlug: string;
   endpoint: string;
@@ -434,7 +434,7 @@ function resolveVideoDurationSeconds(input: {
 }
 
 function withNormalizedVideoDuration(input: {
-  capability: "image_generation" | "video_generation";
+  capability: "image_generation" | "image_edit" | "video_generation";
   requestInput?: Record<string, unknown> | null;
   output?: Record<string, unknown> | null;
   providerRaw?: Record<string, unknown> | null;
@@ -474,13 +474,13 @@ function withNormalizedVideoDuration(input: {
 }
 
 function withNormalizedOutput(input: {
-  capability: "image_generation" | "video_generation";
+  capability: "image_generation" | "image_edit" | "video_generation";
   requestInput?: Record<string, unknown> | null;
   output?: Record<string, unknown> | null;
   providerRaw?: Record<string, unknown> | null;
 }) {
   const withDuration = withNormalizedVideoDuration(input);
-  if (input.capability !== "image_generation") {
+  if (input.capability !== "image_generation" && input.capability !== "image_edit") {
     return withDuration;
   }
 
@@ -1535,7 +1535,7 @@ type RecoveryAttemptRow = {
   inference_requests: {
     id: string;
     status: string;
-    capability: "image_generation" | "video_generation";
+    capability: "image_generation" | "image_edit" | "video_generation";
     public_model_slug: string;
     provider_id: string;
     provider_model_id: string;

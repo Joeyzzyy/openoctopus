@@ -15,7 +15,7 @@ type SupportedModelRow = {
 
 type ProviderModelShowcaseAssetRow = {
   provider_model_id: string;
-  asset_kind: "cover" | "gallery";
+  asset_kind: "cover" | "gallery" | "playground_input";
   public_url: string;
   alt_text: string | null;
   sort_order: number;
@@ -39,6 +39,8 @@ export type ModelDocRow = {
   coverImagePrompt: string | null;
   showcaseImageUrls: string[];
   showcaseImagePrompts: Array<string | null>;
+  playgroundInputImageUrl: string | null;
+  playgroundInputPrompt: string | null;
   modelTypeLabel: string;
   priceLabel: string;
   modelDescription: string;
@@ -474,6 +476,10 @@ export const loadModelsPageData = cache(async () => {
       showcaseImagePrompts: showcaseAssets
         .filter((asset) => asset.asset_kind === "gallery")
         .map((asset) => asset.alt_text ?? null),
+      playgroundInputImageUrl:
+        showcaseAssets.find((asset) => asset.asset_kind === "playground_input")?.public_url ?? null,
+      playgroundInputPrompt:
+        showcaseAssets.find((asset) => asset.asset_kind === "playground_input")?.alt_text ?? null,
       modelTypeLabel: readMetaField(model.billing_config, "modelType"),
       priceLabel: billingSummary(model.billing_config),
       modelDescription: readMetaField(model.billing_config, "modelDescription"),

@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CircleHelp, Copy, Download } from "lucide-react";
+import { CircleHelp, Copy, Download, X } from "lucide-react";
 import type { GatewayErrorDocRow, ModelDocRow } from "../models/data";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
@@ -11,11 +11,18 @@ import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
 type JsonSchemaField = {
   key: string;
   label: string;
-  type: "string" | "number" | "boolean";
+  type: "string" | "number" | "boolean" | "array";
   required: boolean;
   description?: string;
   exposedToCustomer: boolean;
   enumValues?: string[];
+};
+
+type PlaygroundUpload = {
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
 };
 
 type TaskStatus =
@@ -611,7 +618,9 @@ function parseInputSchemaText(schemaText: string): JsonSchemaField[] {
           ? row.enum.filter((v): v is string => typeof v === "string")
           : undefined;
         const normalizedType: JsonSchemaField["type"] =
-          rawType === "number" || rawType === "integer"
+          rawType === "array" || rawType.toLowerCase().includes("array")
+            ? "array"
+            : rawType === "number" || rawType === "integer"
             ? "number"
             : rawType === "boolean"
               ? "boolean"
@@ -658,7 +667,9 @@ function parseInputSchemaText(schemaText: string): JsonSchemaField[] {
         ? propertySchema.enum.filter((v): v is string => typeof v === "string")
         : undefined;
       const normalizedType: JsonSchemaField["type"] =
-        rawType === "number" || rawType === "integer"
+        rawType === "array" || (typeof rawType === "string" && rawType.toLowerCase().includes("array"))
+          ? "array"
+          : rawType === "number" || rawType === "integer"
           ? "number"
           : rawType === "boolean"
             ? "boolean"
@@ -708,6 +719,17 @@ function isAspectRatioEnum(values?: string[]) {
 
 function isResolutionField(key: string) {
   return key.trim().toLowerCase() === "resolution";
+}
+
+function isImageUploadField(field: JsonSchemaField) {
+  return field.key.trim().toLowerCase() === "images";
+}
+
+function formatUploadSize(size: number) {
+  if (size >= 1024 * 1024) {
+    return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  }
+  return `${Math.max(1, Math.round(size / 1024))} KB`;
 }
 
 function formatUsd(value: number) {
@@ -979,6 +1001,8 @@ export function ModelsBrowser({
   const [resultCopied, setResultCopied] = useState(false);
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
+  const [playgroundUploads, setPlaygroundUploads] = useState<Record<string, PlaygroundUpload[]>>({});
+  const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const playgroundImageAssets = useMemo(
     () => extractImageAssets(playgroundOutput),
@@ -986,6 +1010,8 @@ export function ModelsBrowser({
   );
   useEffect(() => {
     setPlaygroundForm({});
+    setPlaygroundUploads({});
+    setUploadingFields({});
   }, [effectiveModelSlug]);
   const handleProviderChange = (nextProvider: string) => {
     setSelectedProvider(nextProvider);
@@ -1080,7 +1106,6 @@ export function ModelsBrowser({
     const imageCount =
       readPositiveNumber(playgroundForm.num_images) ??
       readPositiveNumber(playgroundForm.n) ??
-      readPositiveNumber(playgroundForm.images) ??
       1;
     const total = tier.price * imageCount;
     return imageCount > 1
@@ -1134,6 +1159,32 @@ export function ModelsBrowser({
   }, [parsedFields]);
 
   useEffect(() => {
+    const exampleUrl = selectedModel?.playgroundInputImageUrl;
+    if (!exampleUrl) return;
+    const imageFields = parsedFields.filter(isImageUploadField);
+    if (imageFields.length === 0) return;
+
+    setPlaygroundUploads((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const field of imageFields) {
+        const currentUploads = next[field.key] ?? [];
+        if (currentUploads.length > 0) continue;
+        next[field.key] = [
+          {
+            url: exampleUrl,
+            name: "Example image",
+            mimeType: "image/*",
+            size: 0,
+          },
+        ];
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [parsedFields, selectedModel?.playgroundInputImageUrl]);
+
+  useEffect(() => {
     const prefillPrompt = searchParams.get("prompt")?.trim();
     if (!prefillPrompt) return;
     const hasPromptField = parsedFields.some((field) => field.key === "prompt");
@@ -1142,7 +1193,71 @@ export function ModelsBrowser({
   }, [parsedFields, searchParams]);
 
   const inferEndpoint = (capability: string | null | undefined) =>
-    capability?.includes("video") ? "/v1/videos/generations" : "/v1/images/generations";
+    capability === "image_edit"
+      ? "/v1/images/edits"
+      : capability?.includes("video")
+        ? "/v1/videos/generations"
+        : "/v1/images/generations";
+
+  const uploadPlaygroundImages = async (field: JsonSchemaField, files: FileList | null) => {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) return;
+
+    setUploadingFields((current) => ({ ...current, [field.key]: true }));
+    setValidationErrors((current) => {
+      const next = { ...current };
+      delete next[field.key];
+      return next;
+    });
+
+    try {
+      const uploaded: PlaygroundUpload[] = [];
+      for (const file of selectedFiles) {
+        const formData = new FormData();
+        formData.set("field", field.key);
+        formData.set("file", file);
+        const response = await fetch("/api/playground/uploads", {
+          method: "POST",
+          body: formData,
+        });
+        const payload = (await response.json().catch(() => ({}))) as {
+          url?: string;
+          mimeType?: string;
+          name?: string;
+          size?: number;
+          error?: { message?: string };
+        };
+        if (!response.ok || !payload.url) {
+          throw new Error(payload.error?.message ?? "Upload failed");
+        }
+        uploaded.push({
+          url: payload.url,
+          name: payload.name || file.name,
+          mimeType: payload.mimeType || file.type,
+          size: typeof payload.size === "number" ? payload.size : file.size,
+        });
+      }
+
+      setPlaygroundUploads((current) => ({
+        ...current,
+        [field.key]: [...(current[field.key] ?? []), ...uploaded],
+      }));
+    } catch (error) {
+      setValidationErrors((current) => ({
+        ...current,
+        [field.key]: error instanceof Error ? error.message : "Upload failed",
+      }));
+    } finally {
+      setUploadingFields((current) => ({ ...current, [field.key]: false }));
+    }
+  };
+
+  const removePlaygroundUpload = (fieldKey: string, index: number) => {
+    setPlaygroundUploads((current) => ({
+      ...current,
+      [fieldKey]: (current[fieldKey] ?? []).filter((_, itemIndex) => itemIndex !== index),
+    }));
+  };
 
   const submitPlayground = async () => {
     if (!selectedModel) return;
@@ -1157,6 +1272,12 @@ export function ModelsBrowser({
 
     const nextValidationErrors: Record<string, string> = {};
     for (const field of parsedFields) {
+      if (isImageUploadField(field)) {
+        if (field.required && (playgroundUploads[field.key] ?? []).length === 0) {
+          nextValidationErrors[field.key] = `${field.label} is required.`;
+        }
+        continue;
+      }
       const value = playgroundForm[field.key]?.trim() ?? "";
       if (field.required && value.length === 0) {
         nextValidationErrors[field.key] = `${field.label} is required.`;
@@ -1179,6 +1300,13 @@ export function ModelsBrowser({
       let promptValue: string | undefined;
 
       for (const field of parsedFields) {
+        if (isImageUploadField(field)) {
+          const uploads = playgroundUploads[field.key] ?? [];
+          if (uploads.length > 0) {
+            inputPayload[field.key] = uploads.map((item) => item.url);
+          }
+          continue;
+        }
         const raw = playgroundForm[field.key];
         if ((raw ?? "").trim().length === 0) continue;
         if (field.key === "prompt") {
@@ -1192,6 +1320,25 @@ export function ModelsBrowser({
         }
         if (field.type === "boolean") {
           inputPayload[field.key] = raw === "true";
+          continue;
+        }
+        if (field.type === "array") {
+          const trimmed = raw.trim();
+          if (trimmed.startsWith("[")) {
+            try {
+              const parsedArray = JSON.parse(trimmed);
+              if (Array.isArray(parsedArray)) {
+                inputPayload[field.key] = parsedArray;
+                continue;
+              }
+            } catch {
+              // Fall through to simple splitting below.
+            }
+          }
+          inputPayload[field.key] = trimmed
+            .split(/[\n,]/)
+            .map((item) => item.trim())
+            .filter(Boolean);
           continue;
         }
         inputPayload[field.key] = raw;
@@ -1532,7 +1679,70 @@ export function ModelsBrowser({
                         </span>
                         {field.required ? <span className="pl-1 text-red-500">*</span> : null}
                       </span>
-                      {field.key === "aspect_ratio" || isAspectRatioEnum(field.enumValues) ? (
+                      {isImageUploadField(field) ? (
+                        <div className="rounded-md border border-black/[0.1] bg-white p-3">
+                          <input
+                            disabled={isSubmitting || uploadingFields[field.key]}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            multiple
+                            onChange={(event) => {
+                              void uploadPlaygroundImages(field, event.target.files);
+                              event.target.value = "";
+                            }}
+                            className="block w-full text-xs text-black/60 file:mr-3 file:h-8 file:rounded-md file:border-0 file:bg-black file:px-3 file:text-xs file:font-medium file:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                          />
+                          <p className="mt-2 text-[11px] leading-5 text-black/45">
+                            Upload PNG, JPEG, or WebP images. They are converted to secure URLs before submission.
+                          </p>
+                          {uploadingFields[field.key] ? (
+                            <p className="mt-2 text-[11px] text-black/55">Uploading...</p>
+                          ) : null}
+                          {(playgroundUploads[field.key] ?? []).length > 0 ? (
+                            <div className="mt-3 grid gap-3">
+                              {(playgroundUploads[field.key] ?? []).map((upload, index) => (
+                                <div
+                                  key={`${upload.url}-${index}`}
+                                  className="relative rounded-md border border-black/[0.06] bg-[#FCFCFA] p-2"
+                                >
+                                  <button
+                                    type="button"
+                                    disabled={isSubmitting}
+                                    onClick={() => removePlaygroundUpload(field.key, index)}
+                                    className="absolute right-2 top-2 z-10 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-black/[0.08] bg-white/95 text-black/50 shadow-sm hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label={`Remove ${upload.name}`}
+                                    title="Remove image"
+                                  >
+                                    <X className="size-3.5" />
+                                  </button>
+                                  <div className="overflow-hidden rounded bg-white">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={upload.url}
+                                      alt={upload.name}
+                                      className="max-h-32 w-full object-contain"
+                                    />
+                                  </div>
+                                  <div className="mt-2 min-w-0 pr-8">
+                                    <p className="truncate text-xs font-medium text-black/75">
+                                      {upload.name}
+                                    </p>
+                                    {selectedModel?.playgroundInputPrompt && upload.url === selectedModel.playgroundInputImageUrl ? (
+                                      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-black/45">
+                                        {selectedModel.playgroundInputPrompt}
+                                      </p>
+                                    ) : null}
+                                    <p className="mt-1 text-[11px] text-black/45">
+                                      {upload.mimeType}
+                                      {upload.size > 0 ? ` · ${formatUploadSize(upload.size)}` : ""}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : field.key === "aspect_ratio" || isAspectRatioEnum(field.enumValues) ? (
                         <select
                           disabled={isSubmitting}
                           value={
@@ -1616,6 +1826,18 @@ export function ModelsBrowser({
                             validationErrors[field.key] ? "border-[#D94A38]" : "border-black/[0.1]"
                           }`}
                           placeholder="Describe what to generate..."
+                        />
+                      ) : field.type === "array" ? (
+                        <textarea
+                          disabled={isSubmitting}
+                          value={playgroundForm[field.key] ?? ""}
+                          onChange={(event) =>
+                            setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
+                          }
+                          className={`min-h-[88px] w-full rounded-md border bg-white px-3 py-2 font-mono text-xs text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03] ${
+                            validationErrors[field.key] ? "border-[#D94A38]" : "border-black/[0.1]"
+                          }`}
+                          placeholder="One value per line, comma-separated, or a JSON array"
                         />
                       ) : (
                         <input

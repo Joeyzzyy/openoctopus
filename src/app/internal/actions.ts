@@ -100,7 +100,7 @@ async function uploadShowcaseImage(input: {
   supabase: ReturnType<typeof createAdminClient>;
   providerModelId: string;
   file: File;
-  kind: "cover" | "gallery";
+  kind: "cover" | "gallery" | "playground_input";
   index?: number;
 }) {
   const extension = inferImageExtension(input.file);
@@ -108,7 +108,9 @@ async function uploadShowcaseImage(input: {
   const path =
     input.kind === "cover"
       ? `provider-model-showcase/${input.providerModelId}/cover-${Date.now()}-${baseName}.${extension}`
-      : `provider-model-showcase/${input.providerModelId}/gallery-${Date.now()}-${input.index ?? 0}-${baseName}.${extension}`;
+      : input.kind === "playground_input"
+        ? `provider-model-showcase/${input.providerModelId}/playground-input-${Date.now()}-${baseName}.${extension}`
+        : `provider-model-showcase/${input.providerModelId}/gallery-${Date.now()}-${input.index ?? 0}-${baseName}.${extension}`;
   const buffer = Buffer.from(await input.file.arrayBuffer());
   const { error: uploadError } = await input.supabase.storage
     .from(MODEL_SHOWCASE_BUCKET)
@@ -140,6 +142,11 @@ async function syncProviderModelShowcaseAssets(input: {
   existingCoverAssetId: string | null;
   existingCoverPrompt: string | null;
   removeCover: boolean;
+  playgroundInputFile: File | null;
+  playgroundInputPrompt: string | null;
+  existingPlaygroundInputAssetId: string | null;
+  existingPlaygroundInputPrompt: string | null;
+  removePlaygroundInput: boolean;
   galleryFiles: File[];
   galleryPrompts: string[];
   existingGalleryPromptUpdates: Array<{ id: string; prompt: string | null }>;
@@ -159,6 +166,7 @@ async function syncProviderModelShowcaseAssets(input: {
 
   const existing = existingRows ?? [];
   const existingCover = existing.filter((row) => row.asset_kind === "cover");
+  const existingPlaygroundInput = existing.filter((row) => row.asset_kind === "playground_input");
   const existingGallery = existing.filter((row) => row.asset_kind === "gallery");
   const existingGalleryById = new Map(existingGallery.map((row) => [row.id, row]));
 
@@ -195,6 +203,10 @@ async function syncProviderModelShowcaseAssets(input: {
     await deleteRows(existingCover);
   }
 
+  if (input.removePlaygroundInput || input.playgroundInputFile) {
+    await deleteRows(existingPlaygroundInput);
+  }
+
   if (!input.removeCover && !input.coverFile && input.existingCoverAssetId) {
     const coverPrompt = input.existingCoverPrompt?.trim() || null;
     const existingCoverRow = existingCover.find((row) => row.id === input.existingCoverAssetId);
@@ -203,6 +215,29 @@ async function syncProviderModelShowcaseAssets(input: {
         .from("provider_model_showcase_assets")
         .update({ alt_text: coverPrompt })
         .eq("id", existingCoverRow.id);
+      if (error) {
+        throw new Error(error.message);
+      }
+    }
+  }
+
+  if (
+    !input.removePlaygroundInput &&
+    !input.playgroundInputFile &&
+    input.existingPlaygroundInputAssetId
+  ) {
+    const playgroundInputPrompt = input.existingPlaygroundInputPrompt?.trim() || null;
+    const existingPlaygroundInputRow = existingPlaygroundInput.find(
+      (row) => row.id === input.existingPlaygroundInputAssetId
+    );
+    if (
+      existingPlaygroundInputRow &&
+      (existingPlaygroundInputRow.alt_text ?? null) !== playgroundInputPrompt
+    ) {
+      const { error } = await input.supabase
+        .from("provider_model_showcase_assets")
+        .update({ alt_text: playgroundInputPrompt })
+        .eq("id", existingPlaygroundInputRow.id);
       if (error) {
         throw new Error(error.message);
       }
@@ -247,6 +282,25 @@ async function syncProviderModelShowcaseAssets(input: {
       asset_kind: "cover",
       ...uploaded,
       alt_text: input.coverPrompt,
+      sort_order: 0,
+    });
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  if (input.playgroundInputFile) {
+    const uploaded = await uploadShowcaseImage({
+      supabase: input.supabase,
+      providerModelId: input.providerModelId,
+      file: input.playgroundInputFile,
+      kind: "playground_input",
+    });
+    const { error } = await input.supabase.from("provider_model_showcase_assets").insert({
+      provider_model_id: input.providerModelId,
+      asset_kind: "playground_input",
+      ...uploaded,
+      alt_text: input.playgroundInputPrompt,
       sort_order: 0,
     });
     if (error) {
@@ -2338,6 +2392,9 @@ export async function createProviderModel(formData: FormData) {
     const showcaseCoverFile = isNonEmptyFile(formData.get("showcaseCoverFile"))
       ? (formData.get("showcaseCoverFile") as File)
       : null;
+    const playgroundInputFile = isNonEmptyFile(formData.get("playgroundInputFile"))
+      ? (formData.get("playgroundInputFile") as File)
+      : null;
     const showcaseGalleryFiles = formData
       .getAll("showcaseGalleryFiles")
       .filter((value): value is File => isNonEmptyFile(value));
@@ -2348,6 +2405,7 @@ export async function createProviderModel(formData: FormData) {
       .getAll("existingShowcaseGalleryPrompts")
       .filter((value): value is string => typeof value === "string");
     const removeShowcaseCover = parseBooleanField(formData.get("removeShowcaseCover"));
+    const removePlaygroundInput = parseBooleanField(formData.get("removePlaygroundInput"));
     const replaceShowcaseGallery = parseBooleanField(formData.get("replaceShowcaseGallery"));
     const parsed = createProviderModelSchema.parse({
       providerId: formData.get("providerId"),
@@ -2451,6 +2509,11 @@ export async function createProviderModel(formData: FormData) {
         existingCoverAssetId: normalizeOptionalText(formData.get("existingShowcaseCoverAssetId")),
         existingCoverPrompt: normalizeOptionalText(formData.get("existingShowcaseCoverPrompt")),
         removeCover: removeShowcaseCover,
+        playgroundInputFile,
+        playgroundInputPrompt: normalizeOptionalText(formData.get("playgroundInputPrompt")),
+        existingPlaygroundInputAssetId: normalizeOptionalText(formData.get("existingPlaygroundInputAssetId")),
+        existingPlaygroundInputPrompt: normalizeOptionalText(formData.get("existingPlaygroundInputPrompt")),
+        removePlaygroundInput,
         galleryFiles: showcaseGalleryFiles,
         galleryPrompts:
           normalizeOptionalText(formData.get("showcaseGalleryPromptsText"))
@@ -2597,6 +2660,9 @@ export async function updateProviderModelDetails(formData: FormData) {
   const showcaseCoverFile = isNonEmptyFile(formData.get("showcaseCoverFile"))
     ? (formData.get("showcaseCoverFile") as File)
     : null;
+  const playgroundInputFile = isNonEmptyFile(formData.get("playgroundInputFile"))
+    ? (formData.get("playgroundInputFile") as File)
+    : null;
   const showcaseGalleryFiles = formData
     .getAll("showcaseGalleryFiles")
     .filter((value): value is File => isNonEmptyFile(value));
@@ -2607,6 +2673,7 @@ export async function updateProviderModelDetails(formData: FormData) {
     .getAll("existingShowcaseGalleryPrompts")
     .filter((value): value is string => typeof value === "string");
   const removeShowcaseCover = parseBooleanField(formData.get("removeShowcaseCover"));
+  const removePlaygroundInput = parseBooleanField(formData.get("removePlaygroundInput"));
   const replaceShowcaseGallery = parseBooleanField(formData.get("replaceShowcaseGallery"));
   const parsed = updateProviderModelDetailsSchema.parse({
     providerModelId: formData.get("providerModelId"),
@@ -2709,6 +2776,11 @@ export async function updateProviderModelDetails(formData: FormData) {
     existingCoverAssetId: normalizeOptionalText(formData.get("existingShowcaseCoverAssetId")),
     existingCoverPrompt: normalizeOptionalText(formData.get("existingShowcaseCoverPrompt")),
     removeCover: removeShowcaseCover,
+    playgroundInputFile,
+    playgroundInputPrompt: normalizeOptionalText(formData.get("playgroundInputPrompt")),
+    existingPlaygroundInputAssetId: normalizeOptionalText(formData.get("existingPlaygroundInputAssetId")),
+    existingPlaygroundInputPrompt: normalizeOptionalText(formData.get("existingPlaygroundInputPrompt")),
+    removePlaygroundInput,
     galleryFiles: showcaseGalleryFiles,
     galleryPrompts:
       normalizeOptionalText(formData.get("showcaseGalleryPromptsText"))

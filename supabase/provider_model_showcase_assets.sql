@@ -1,7 +1,7 @@
 create table if not exists public.provider_model_showcase_assets (
   id uuid primary key default gen_random_uuid(),
   provider_model_id uuid not null references public.provider_models(id) on delete cascade,
-  asset_kind text not null check (asset_kind in ('cover', 'gallery')),
+  asset_kind text not null check (asset_kind in ('cover', 'gallery', 'playground_input')),
   storage_bucket text not null default 'model-showcase-assets',
   storage_path text not null,
   public_url text not null,
@@ -14,6 +14,10 @@ create table if not exists public.provider_model_showcase_assets (
 create unique index if not exists uniq_provider_model_showcase_cover
   on public.provider_model_showcase_assets(provider_model_id)
   where asset_kind = 'cover';
+
+create unique index if not exists uniq_provider_model_showcase_playground_input
+  on public.provider_model_showcase_assets(provider_model_id)
+  where asset_kind = 'playground_input';
 
 create index if not exists idx_provider_model_showcase_assets_order
   on public.provider_model_showcase_assets(provider_model_id, asset_kind, sort_order, created_at);

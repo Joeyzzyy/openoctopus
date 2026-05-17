@@ -158,7 +158,7 @@ type ProviderModelSummary = {
   outputSchemaText: string;
   showcaseAssets: Array<{
     id: string;
-    kind: "cover" | "gallery";
+    kind: "cover" | "gallery" | "playground_input";
     publicUrl: string;
     storageBucket: string;
     storagePath: string;
@@ -311,12 +311,14 @@ function readSeoCoverage(configText: string) {
 function readProviderModelContentCoverage(model: ProviderModelSummary) {
   const coverCount = model.showcaseAssets.filter((asset) => asset.kind === "cover").length;
   const galleryCount = model.showcaseAssets.filter((asset) => asset.kind === "gallery").length;
+  const playgroundInputCount = model.showcaseAssets.filter((asset) => asset.kind === "playground_input").length;
   const readmeMarkdown = readReadmeMarkdownFromExecutionConfig(model.executionConfigText);
 
   return {
     hasCover: coverCount > 0,
     hasGallery: galleryCount > 0,
     galleryCount,
+    hasPlaygroundInput: playgroundInputCount > 0,
     hasReadme: readmeMarkdown.length > 0,
   };
 }
@@ -1603,6 +1605,7 @@ export function PublicModelsPanel({
                                     label={contentCoverage.hasGallery ? `素材图 ${contentCoverage.galleryCount}` : "素材图"}
                                     ok={contentCoverage.hasGallery}
                                   />
+                                  <StatusPill label="Playground 示例" ok={contentCoverage.hasPlaygroundInput} />
                                   <StatusPill label="README" ok={contentCoverage.hasReadme} />
                                 </div>
                               </td>
@@ -1644,11 +1647,20 @@ export function PublicModelsPanel({
                                         defaultShowcaseCoverUrl={
                                           mapping.showcaseAssets.find((asset) => asset.kind === "cover")?.publicUrl ?? null
                                         }
+                                        defaultPlaygroundInputUrl={
+                                          mapping.showcaseAssets.find((asset) => asset.kind === "playground_input")?.publicUrl ?? null
+                                        }
                                         defaultShowcaseCoverAssetId={
                                           mapping.showcaseAssets.find((asset) => asset.kind === "cover")?.id
                                         }
+                                        defaultPlaygroundInputAssetId={
+                                          mapping.showcaseAssets.find((asset) => asset.kind === "playground_input")?.id
+                                        }
                                         defaultShowcaseCoverPrompt={
                                           mapping.showcaseAssets.find((asset) => asset.kind === "cover")?.altText ?? ""
+                                        }
+                                        defaultPlaygroundInputPrompt={
+                                          mapping.showcaseAssets.find((asset) => asset.kind === "playground_input")?.altText ?? ""
                                         }
                                         defaultShowcaseGalleryUrls={
                                           mapping.showcaseAssets
@@ -2269,11 +2281,20 @@ export function EconomicsPanel({
                                     defaultShowcaseCoverUrl={
                                       row.providerModel.showcaseAssets.find((asset) => asset.kind === "cover")?.publicUrl ?? null
                                     }
+                                    defaultPlaygroundInputUrl={
+                                      row.providerModel.showcaseAssets.find((asset) => asset.kind === "playground_input")?.publicUrl ?? null
+                                    }
                                     defaultShowcaseCoverAssetId={
                                       row.providerModel.showcaseAssets.find((asset) => asset.kind === "cover")?.id
                                     }
+                                    defaultPlaygroundInputAssetId={
+                                      row.providerModel.showcaseAssets.find((asset) => asset.kind === "playground_input")?.id
+                                    }
                                     defaultShowcaseCoverPrompt={
                                       row.providerModel.showcaseAssets.find((asset) => asset.kind === "cover")?.altText ?? ""
+                                    }
+                                    defaultPlaygroundInputPrompt={
+                                      row.providerModel.showcaseAssets.find((asset) => asset.kind === "playground_input")?.altText ?? ""
                                     }
                                     defaultShowcaseGalleryUrls={
                                       row.providerModel.showcaseAssets
