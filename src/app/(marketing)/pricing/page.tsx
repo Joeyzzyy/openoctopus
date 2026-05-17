@@ -51,6 +51,21 @@ function groupedPriceTiers(
   }));
 }
 
+function shouldShowPriceTiers(row: PricingRow) {
+  if (row.price.tiers.length !== 1) {
+    return row.price.tiers.length > 0;
+  }
+
+  const [tier] = row.price.tiers;
+  const formattedTierPrice = formatMoney(tier.price, row.price.currency);
+  const summary = row.price.summary.trim();
+  const hasDimensionLabel =
+    Boolean(formatTierDimension(tier.resolution)) ||
+    Boolean(formatTierDimension(tier.quality));
+
+  return hasDimensionLabel && !summary.includes(formattedTierPrice);
+}
+
 type PricingRow = {
   model: string;
   slug: string;
@@ -93,57 +108,61 @@ function PricingTable({ rows }: { rows: PricingRow[] }) {
         <span>Tool page</span>
       </div>
       <div>
-        {rows.map((row) => (
-          <div
-            key={row.slug}
-            className="grid min-w-[980px] grid-cols-[minmax(180px,0.9fr)_minmax(280px,1.1fr)_minmax(420px,1.6fr)] gap-x-8 border-b border-black/[0.05] px-4 py-3 text-sm text-black last:border-b-0"
-          >
-            <span className="truncate pr-3">{row.model}</span>
-            <span className="text-black/70">
-              <span className="font-medium text-black/75">{row.price.summary}</span>
-              {row.price.tiers.length > 0 ? (
-                <span className="mt-2 grid gap-1.5">
-                  {groupedPriceTiers(row.price.tiers).map((group) => (
-                    <span
-                      key={group.resolution}
-                      className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-2 rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-2 py-1.5 text-xs text-black/62"
-                    >
-                      <span className="font-mono font-medium text-black/70">{formatTierDimension(group.resolution)}</span>
-                      <span className="flex flex-wrap gap-1.5">
-                        {group.items.map((tier) => (
-                          <span
-                            key={`${group.resolution}-${tier.quality}`}
-                            className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5"
-                          >
-                            {formatTierDimension(tier.quality) ? (
-                              <span className="capitalize text-black/45">{formatTierDimension(tier.quality)}</span>
-                            ) : null}
-                            <span className="font-medium text-black/75">
-                              {formatMoney(tier.price, row.price.currency)}
+        {rows.map((row) => {
+          const showPriceTiers = shouldShowPriceTiers(row);
+
+          return (
+            <div
+              key={row.slug}
+              className="grid min-w-[980px] grid-cols-[minmax(180px,0.9fr)_minmax(280px,1.1fr)_minmax(420px,1.6fr)] gap-x-8 border-b border-black/[0.05] px-4 py-3 text-sm text-black last:border-b-0"
+            >
+              <span className="truncate pr-3">{row.model}</span>
+              <span className="text-black/70">
+                <span className="font-medium text-black/75">{row.price.summary}</span>
+                {showPriceTiers ? (
+                  <span className="mt-2 grid gap-1.5">
+                    {groupedPriceTiers(row.price.tiers).map((group) => (
+                      <span
+                        key={group.resolution}
+                        className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-2 rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-2 py-1.5 text-xs text-black/62"
+                      >
+                        <span className="font-mono font-medium text-black/70">{formatTierDimension(group.resolution)}</span>
+                        <span className="flex flex-wrap gap-1.5">
+                          {group.items.map((tier) => (
+                            <span
+                              key={`${group.resolution}-${tier.quality}`}
+                              className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5"
+                            >
+                              {formatTierDimension(tier.quality) ? (
+                                <span className="capitalize text-black/45">{formatTierDimension(tier.quality)}</span>
+                              ) : null}
+                              <span className="font-medium text-black/75">
+                                {formatMoney(tier.price, row.price.currency)}
+                              </span>
                             </span>
-                          </span>
-                        ))}
+                          ))}
+                        </span>
                       </span>
-                    </span>
-                  ))}
-                </span>
-              ) : null}
-              {row.price.booleanSurcharges.length > 0 ? (
-                <span className="mt-2 flex flex-wrap gap-1.5">
-                  {row.price.booleanSurcharges.map((surcharge) => (
-                    <span
-                      key={surcharge.name}
-                      className="inline-flex items-center rounded-md border border-black/[0.06] bg-[#FFF7EA] px-2 py-1 text-xs font-medium text-[#9A4F18]"
-                    >
-                      {surcharge.label}
-                    </span>
-                  ))}
-                </span>
-              ) : null}
-            </span>
-            <ModelToolLinkActions url={row.toolUrl} />
-          </div>
-        ))}
+                    ))}
+                  </span>
+                ) : null}
+                {row.price.booleanSurcharges.length > 0 ? (
+                  <span className="mt-2 flex flex-wrap gap-1.5">
+                    {row.price.booleanSurcharges.map((surcharge) => (
+                      <span
+                        key={surcharge.name}
+                        className="inline-flex items-center rounded-md border border-black/[0.06] bg-[#FFF7EA] px-2 py-1 text-xs font-medium text-[#9A4F18]"
+                      >
+                        {surcharge.label}
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+              </span>
+              <ModelToolLinkActions url={row.toolUrl} />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
