@@ -1640,9 +1640,9 @@ export function ModelsBrowser({
         ) : null}
       </div>
 
-      <div className="relative">
-        <div className="space-y-4">
-      <section className="rounded-xl border border-black/[0.08] bg-white p-2 shadow-sm sm:rounded-2xl sm:p-3">
+      <div className="relative min-w-0 max-w-full">
+        <div className="min-w-0 space-y-4">
+      <section className="min-w-0 max-w-full rounded-xl border border-black/[0.08] bg-white p-2 shadow-sm sm:rounded-2xl sm:p-3">
         <div className="mb-2 border-b border-black/[0.08] pb-1.5">
           <div className="grid grid-cols-2 gap-1 sm:flex sm:items-center">
             {(["playground", "api"] as const).map((tab) => (
@@ -1661,7 +1661,7 @@ export function ModelsBrowser({
             ))}
           </div>
         </div>
-        <div className="relative">
+        <div className="relative min-w-0">
         {mainTab === "playground" ? (
           <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
             <section className="rounded-lg border border-black/[0.08] bg-white p-3 sm:rounded-xl sm:p-4">

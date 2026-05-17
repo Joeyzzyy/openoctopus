@@ -145,8 +145,8 @@ function FieldDocTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-black/[0.08] bg-white">
-      <table className="min-w-full text-xs text-black/75">
+    <div className="max-w-full overflow-x-auto rounded-xl border border-black/[0.08] bg-white">
+      <table className="min-w-[680px] text-xs text-black/75">
         <thead>
           <tr className="border-b border-black/[0.08] bg-[#FCFCFA] text-[10px] uppercase tracking-[0.8px] text-black/45">
             <th className="px-3 py-2 text-left">Field</th>
@@ -196,7 +196,7 @@ function CodeBlock({
   onCopy: (value: string, block: string) => void;
 }) {
   return (
-    <div className="relative">
+    <div className="relative min-w-0 max-w-full">
       <button
         type="button"
         onClick={() => onCopy(code, copyId)}
@@ -206,7 +206,7 @@ function CodeBlock({
       >
         {copiedBlock === copyId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
       </button>
-      <pre className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-[#F6F8FB] p-4 pr-12 font-mono text-[11px] leading-6 text-[#1F2937]">
+      <pre className="max-w-full overflow-x-auto rounded-2xl border border-black/[0.08] bg-[#F6F8FB] p-4 pr-12 font-mono text-[11px] leading-6 text-[#1F2937]">
         <code>{code}</code>
       </pre>
     </div>
@@ -630,7 +630,7 @@ export function ApiQuickstartCard({
         ];
 
   return (
-    <section className="rounded-[28px] border border-black/[0.08] bg-white p-4 shadow-[0_24px_70px_rgba(17,24,39,0.08)] sm:p-6">
+    <section className="min-w-0 max-w-full rounded-[28px] border border-black/[0.08] bg-white p-4 shadow-[0_24px_70px_rgba(17,24,39,0.08)] sm:p-6">
       {headerControls ? (
         <div className="-mx-4 mb-4 border-b border-black/[0.06] bg-white px-4 pb-3 pt-1 sm:-mx-6 sm:px-6">
           {headerControls}
@@ -646,7 +646,7 @@ export function ApiQuickstartCard({
           {copiedAll ? "Copied all" : "Copy full API doc"}
         </button>
       </div>
-      <div className="grid items-start gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
+      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
         <aside className="h-fit rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-2 md:sticky md:top-24 md:self-start max-md:static">
           <nav className="space-y-1">
             <button
@@ -679,7 +679,7 @@ export function ApiQuickstartCard({
             </button>
           </nav>
         </aside>
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           <div ref={quickstartRef} className="space-y-3">
             <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
               <p className="text-[10px] uppercase tracking-[1px] text-black/45">Integration Steps</p>
@@ -844,8 +844,8 @@ export function ApiQuickstartCard({
               <p className="mt-1 text-xs leading-5 text-black/55">
                 Error codes below are loaded from internal gateway error definitions and should be treated as source of truth.
               </p>
-              <div className="mt-2 overflow-x-auto rounded-xl border border-black/[0.08] bg-white">
-                <table className="min-w-full text-xs text-black/75">
+              <div className="mt-2 max-w-full overflow-x-auto rounded-xl border border-black/[0.08] bg-white">
+                <table className="min-w-[680px] text-xs text-black/75">
                   <thead>
                     <tr className="border-b border-black/[0.08] bg-[#FCFCFA] text-[10px] uppercase tracking-[0.8px] text-black/45">
                       <th className="px-3 py-2 text-left">Code</th>
