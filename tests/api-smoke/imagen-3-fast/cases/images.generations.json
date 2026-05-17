@@ -1,0 +1,21 @@
+[
+  {
+    "id": "imagen-3-fast-basic",
+    "model": "openoctopus/imagen-3-fast",
+    "endpoint": "/v1/images/generations",
+    "payload": {
+      "model": "openoctopus/imagen-3-fast",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "num_images": 1,
+        "enable_base64_output": false
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "assetCountMin": 1
+    }
+  }
+]
