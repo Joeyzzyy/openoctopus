@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Check, Copy } from "lucide-react";
 import type { ApiSmokeRecord } from "@/lib/api-smoke-records";
 
 type SmokeAsset = {
@@ -80,12 +81,39 @@ function getSmokeImageAssets(record: ApiSmokeRecord) {
     .filter((asset): asset is SmokeAsset => Boolean(asset));
 }
 
-function SmokeDetailBlock({ title, value }: { title: string; value: unknown }) {
+function SmokeDetailBlock({
+  title,
+  value,
+  copyId,
+  copied,
+  onCopy,
+}: {
+  title: string;
+  value: unknown;
+  copyId: string;
+  copied: boolean;
+  onCopy: (value: string, copyId: string) => void;
+}) {
+  const formattedValue = formatSmokeJson(value);
+
   return (
     <div className="min-w-0 rounded-lg border border-black/[0.08] bg-white px-3 py-2">
-      <p className="text-[11px] font-medium uppercase tracking-[0.35px] text-black/45">{title}</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.35px] text-black/45">
+          {title}
+        </p>
+        <button
+          type="button"
+          onClick={() => onCopy(formattedValue, copyId)}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-black/[0.08] bg-white text-black/55 transition-colors hover:bg-black/[0.03] hover:text-black/75"
+          aria-label={`复制 ${title}`}
+          title={`复制 ${title}`}
+        >
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        </button>
+      </div>
       <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-5 text-black/72">
-        {formatSmokeJson(value)}
+        {formattedValue}
       </pre>
     </div>
   );
@@ -128,9 +156,16 @@ function SmokeModal({
   modal: ModalState;
   onClose: () => void;
 }) {
+  const [copiedBlock, setCopiedBlock] = useState<string | null>(null);
+
   if (!modal) return null;
 
   const record = modal.record;
+  const handleCopy = async (value: string, copyId: string) => {
+    await navigator.clipboard.writeText(value);
+    setCopiedBlock(copyId);
+    window.setTimeout(() => setCopiedBlock(null), 1500);
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 px-4 py-6 backdrop-blur-sm">
@@ -173,12 +208,42 @@ function SmokeModal({
         ) : (
           <div className="max-h-[calc(90vh-68px)] overflow-auto bg-[#FCFCFA] p-4">
             <div className="grid gap-3 lg:grid-cols-2">
-              <SmokeDetailBlock title="Request URL" value={record.requestUrl ?? `${record.baseUrl}${record.endpoint}`} />
-              <SmokeDetailBlock title="Poll URL" value={record.pollUrl ?? (record.taskId ? `${record.baseUrl}/v1/tasks/${record.taskId}` : null)} />
-              <SmokeDetailBlock title="Request Payload" value={record.requestPayload ?? null} />
-              <SmokeDetailBlock title="Submit Response" value={record.submitResponse ?? null} />
+              <SmokeDetailBlock
+                title="Request URL"
+                value={record.requestUrl ?? `${record.baseUrl}${record.endpoint}`}
+                copyId="request-url"
+                copied={copiedBlock === "request-url"}
+                onCopy={handleCopy}
+              />
+              <SmokeDetailBlock
+                title="Poll URL"
+                value={record.pollUrl ?? (record.taskId ? `${record.baseUrl}/v1/tasks/${record.taskId}` : null)}
+                copyId="poll-url"
+                copied={copiedBlock === "poll-url"}
+                onCopy={handleCopy}
+              />
+              <SmokeDetailBlock
+                title="Request Payload"
+                value={record.requestPayload ?? null}
+                copyId="request-payload"
+                copied={copiedBlock === "request-payload"}
+                onCopy={handleCopy}
+              />
+              <SmokeDetailBlock
+                title="Submit Response"
+                value={record.submitResponse ?? null}
+                copyId="submit-response"
+                copied={copiedBlock === "submit-response"}
+                onCopy={handleCopy}
+              />
               <div className="lg:col-span-2">
-                <SmokeDetailBlock title="Task Response" value={record.taskResponse ?? null} />
+                <SmokeDetailBlock
+                  title="Task Response"
+                  value={record.taskResponse ?? null}
+                  copyId="task-response"
+                  copied={copiedBlock === "task-response"}
+                  onCopy={handleCopy}
+                />
               </div>
             </div>
           </div>

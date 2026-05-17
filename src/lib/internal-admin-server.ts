@@ -424,6 +424,135 @@ function sanitizeOutputPayloadForCustomer(value: unknown) {
   return { ...rest, assets };
 }
 
+const fallbackGatewayErrorDefinitions: Record<
+  string,
+  { code: string; message: string; retryable: boolean }
+> = {
+  invalid_request: {
+    code: "invalid_request",
+    message: "The request payload is invalid. Check the required fields and try again.",
+    retryable: false,
+  },
+  unauthorized: {
+    code: "unauthorized",
+    message: "Authentication is required for this request.",
+    retryable: false,
+  },
+  invalid_api_key: {
+    code: "invalid_api_key",
+    message: "The API key is invalid or inactive.",
+    retryable: false,
+  },
+  insufficient_balance: {
+    code: "insufficient_balance",
+    message: "Your wallet balance is insufficient. Please top up and try again.",
+    retryable: false,
+  },
+  model_not_available: {
+    code: "model_not_available",
+    message: "The requested model is currently unavailable.",
+    retryable: false,
+  },
+  task_not_found: {
+    code: "task_not_found",
+    message: "The requested task could not be found.",
+    retryable: false,
+  },
+  provider_submit_failed: {
+    code: "provider_submit_failed",
+    message: "The generation provider could not accept the request. Please retry shortly.",
+    retryable: true,
+  },
+  provider_poll_failed: {
+    code: "provider_poll_failed",
+    message: "The generation provider could not complete the request. Please retry shortly.",
+    retryable: true,
+  },
+  upstream_failed: {
+    code: "upstream_failed",
+    message: "The generation provider failed to complete the request. Please retry shortly.",
+    retryable: true,
+  },
+  upstream_timeout: {
+    code: "upstream_timeout",
+    message: "The generation request timed out. Please retry shortly.",
+    retryable: true,
+  },
+  upstream_result_missing: {
+    code: "upstream_result_missing",
+    message: "The generation provider returned an incomplete result. Please retry shortly.",
+    retryable: true,
+  },
+  service_unavailable: {
+    code: "service_unavailable",
+    message: "The service is temporarily unavailable. Please retry later.",
+    retryable: true,
+  },
+  internal_error: {
+    code: "internal_error",
+    message: "The service encountered an unexpected error. Please retry later.",
+    retryable: true,
+  },
+};
+
+function resolveInternalGatewayErrorDefinition(
+  code: string | null | undefined,
+  definitions?: GatewayErrorDefinitionRow[]
+) {
+  const normalizedCode =
+    typeof code === "string" && /^[a-z0-9_]+$/.test(code.trim().toLowerCase())
+      ? code.trim().toLowerCase()
+      : "internal_error";
+  const configured = definitions?.find(
+    (definition) => definition.active && definition.code === normalizedCode
+  );
+  if (configured) {
+    return {
+      code: configured.code,
+      message: configured.public_message,
+      retryable: configured.retryable,
+    };
+  }
+  return fallbackGatewayErrorDefinitions[normalizedCode] ?? fallbackGatewayErrorDefinitions.internal_error;
+}
+
+function buildCustomerTaskResponse(input: {
+  request: RequestRow;
+  outputPayload: Record<string, unknown> | null;
+  gatewayErrorDefinitions?: GatewayErrorDefinitionRow[];
+}) {
+  const { request, outputPayload, gatewayErrorDefinitions } = input;
+  const response: Record<string, unknown> = {
+    id: request.id,
+    workspace_id: request.workspace_id,
+    api_key_id: request.api_key_id,
+    status: request.status,
+    capability: request.capability,
+    public_model_slug: request.public_model_slug,
+    output_payload: outputPayload,
+    error_code: request.error_code,
+    error_message: request.error_message,
+    created_at: request.created_at,
+    completed_at: request.completed_at,
+  };
+
+  if (request.status === "failed") {
+    const publicError = resolveInternalGatewayErrorDefinition(
+      request.error_code,
+      gatewayErrorDefinitions
+    );
+    response.error_code = publicError.code;
+    response.error_message = publicError.message;
+    response.error = {
+      code: publicError.code,
+      message: publicError.message,
+      retryable: publicError.retryable,
+    };
+  }
+
+  return response;
+}
+
 function extractOutputPayloadFromUsageMetadata(metadata: unknown) {
   const record = asRecord(metadata);
   if (!record) return null;
@@ -587,6 +716,10 @@ function summarizeInternalRequest(input: {
   const packagedOutputPayload =
     sanitizeOutputPayloadForCustomer(outputPayloadFromRequest) ??
     sanitizeOutputPayloadForCustomer(outputPayloadFromUsage);
+  const customerTaskResponse = buildCustomerTaskResponse({
+    request,
+    outputPayload: packagedOutputPayload,
+  });
   const upstreamRawPayload =
     outputPayloadFromRequest?.raw ??
     extractUpstreamPayloadFromUsageMetadata(usageEvent?.metadata) ??
@@ -611,7 +744,7 @@ function summarizeInternalRequest(input: {
     customerComponentBreakdown,
     providerComponentBreakdown,
     upstreamRawText: formatUnknownJson(upstreamRawPayload) ?? "null",
-    packagedOutputText: formatUnknownJson(packagedOutputPayload) ?? "null",
+    packagedOutputText: formatUnknownJson(customerTaskResponse) ?? "null",
     createdLabel: formatRelativeTimestamp(request.created_at),
     startedLabel: formatRelativeTimestamp(request.started_at),
     completedLabel: formatRelativeTimestamp(request.completed_at),
@@ -1103,7 +1236,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     ]);
 
   const providers = (providersResponse.error ? [] : providersResponse.data ?? []) as ProviderRow[];
-  let supportedModels = (supportedModelsResponse.error
+  const supportedModels = (supportedModelsResponse.error
     ? []
     : supportedModelsResponse.data ?? []) as SupportedModelRow[];
   const supportedModelTotalCount = supportedModelsResponse.error
@@ -1828,13 +1961,18 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     const packagedOutputPayload =
       sanitizeOutputPayloadForCustomer(outputPayloadFromRequest) ??
       sanitizeOutputPayloadForCustomer(outputPayloadFromUsage);
+    const customerTaskResponse = buildCustomerTaskResponse({
+      request,
+      outputPayload: packagedOutputPayload,
+      gatewayErrorDefinitions,
+    });
     const upstreamRawPayload =
       outputPayloadFromRequest?.raw ??
       extractUpstreamPayloadFromUsageMetadata(usageEvent?.metadata) ??
       relatedAttempts.find((attempt) => attempt.response_payload)?.response_payload ??
       null;
     const upstreamRawText = formatUnknownJson(upstreamRawPayload) ?? "null";
-    const packagedOutputText = formatUnknownJson(packagedOutputPayload) ?? "null";
+    const packagedOutputText = formatUnknownJson(customerTaskResponse) ?? "null";
 
     return {
       ...request,

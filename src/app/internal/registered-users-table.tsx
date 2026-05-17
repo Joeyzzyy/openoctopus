@@ -6,6 +6,8 @@ import { RegisteredUserDeleteButton } from "./registered-user-delete-button";
 
 type UserRequestRow = {
   id: string;
+  workspace_id?: string | null;
+  api_key_id?: string | null;
   status: string;
   capability: string;
   public_model_slug: string;
@@ -18,6 +20,8 @@ type UserRequestRow = {
   profitLabel: string;
   createdLabel: string;
   completedLabel: string;
+  created_at?: string;
+  completed_at?: string | null;
   error_code: string | null;
   error_message: string | null;
   upstreamRawText: string;
@@ -74,6 +78,40 @@ function requestStatusClassName(status: string) {
     return "bg-[#FFF0EC] text-[#B54432] border-[#F0C7BD]";
   }
   return "bg-black/[0.06] text-black/60 border-transparent";
+}
+
+function formatCustomerResponseText(request: UserRequestRow) {
+  try {
+    const parsed = JSON.parse(request.packagedOutputText) as unknown;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed) &&
+      "output_payload" in parsed
+    ) {
+      return request.packagedOutputText;
+    }
+
+    return JSON.stringify(
+      {
+        id: request.id,
+        workspace_id: request.workspace_id ?? null,
+        api_key_id: request.api_key_id ?? null,
+        status: request.status,
+        capability: request.capability,
+        public_model_slug: request.public_model_slug,
+        output_payload: parsed,
+        error_code: request.error_code,
+        error_message: request.error_message,
+        created_at: request.created_at,
+        completed_at: request.completed_at ?? null,
+      },
+      null,
+      2
+    );
+  } catch {
+    return request.packagedOutputText;
+  }
 }
 
 export function RegisteredUsersTable({
@@ -494,7 +532,7 @@ export function RegisteredUsersTable({
                                               对客返回 JSON
                                             </summary>
                                             <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all border-t border-black/[0.06] p-3 text-[11px] text-black/70">
-                                              {request.packagedOutputText}
+                                              {formatCustomerResponseText(request)}
                                             </pre>
                                           </details>
                                   </div>

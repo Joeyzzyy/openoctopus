@@ -730,7 +730,7 @@ function UnifiedTaskCard({
             </details>
             <details className="rounded-lg border border-black/[0.06] bg-white px-3 py-2">
               <summary className="cursor-pointer list-none text-[11px] font-medium uppercase tracking-[0.5px] text-black/55">
-                对客返回（封装后）
+                对客返回 JSON
               </summary>
               <pre className="mt-1 max-h-52 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-black/75">
                 {request.packagedOutputText ?? "null"}

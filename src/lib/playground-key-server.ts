@@ -81,9 +81,11 @@ async function createWorkspacePlaygroundKey(
   if (replacedApiKeyId) {
     await supabaseAdmin
       .from("api_keys")
-      .update({ status: "revoked" })
+      .delete()
       .eq("id", replacedApiKeyId)
-      .eq("workspace_id", workspaceId);
+      .eq("workspace_id", workspaceId)
+      .eq("name", "System Playground Key")
+      .eq("environment", "System");
   }
 
   return { secret, apiKeyId: apiKeyRow.id as string };
