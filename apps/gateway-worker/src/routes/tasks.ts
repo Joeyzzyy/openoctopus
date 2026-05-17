@@ -16,10 +16,9 @@ function redactOutputPayloadRaw(outputPayload: unknown) {
   if (!("raw" in record)) {
     return outputPayload;
   }
-  return {
-    ...record,
-    raw: null,
-  };
+  const redacted = { ...record };
+  delete redacted.raw;
+  return redacted;
 }
 
 function redactOutputAssetSourceUrl(outputPayload: unknown) {

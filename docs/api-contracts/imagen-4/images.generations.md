@@ -63,20 +63,13 @@ Poll until `status` becomes `succeeded`, `failed`, or `cancelled`.
     "format": "openoctopus.image.output.v1",
     "assets": [
       {
+        "id": "0",
+        "index": 0,
         "type": "image",
-        "url": "https://example.com/result.png",
+        "url": "https://api.openoctopus.com/v1/files/00000000-0000-0000-0000-000000000000/assets/0",
         "mimeType": "image/png"
       }
-    ],
-    "raw": {
-      "id": "example",
-      "model": "example",
-      "outputs": "example",
-      "status": "example",
-      "urls": "example",
-      "created_at": "example",
-      "has_nsfw_contents": "example"
-    }
+    ]
   }
 }
 ```
@@ -138,7 +131,7 @@ Provider extension params:
     "type": "boolean",
     "required": false,
     "example": "false",
-    "description": "If enabled, the output will be encoded into a BASE64 string instead of a URL."
+    "description": "Provider-specific passthrough option. OpenOctopus public task output is standardized as downloadable asset URLs in output_payload.assets."
   }
 ]
 ```
@@ -147,4 +140,4 @@ Provider extension params:
 
 When `task.status=failed`, use `error.code` and only retry when `retryable=true`.
 
-`output_payload.raw` is optional debug data sanitized by OpenOctopus, not an upstream passthrough contract.
+OpenOctopus public responses expose stable generated assets through `output_payload.assets[]`. Upstream raw payloads and source URLs are internal debug data and are not part of the public API contract.
