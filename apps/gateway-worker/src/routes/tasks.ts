@@ -186,22 +186,30 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         input: parsed.input,
       });
 
-      await enqueueInferenceJob({
-        requestId: queued.requestId,
-        workspaceId: queued.workspaceId,
-        apiKeyId: queued.apiKeyId,
-        providerModelId: queued.providerModelId,
-        credentialId: queued.credentialId,
-        providerSlug: queued.providerSlug,
-        providerBaseUrl: queued.providerBaseUrl,
-        providerConfig: queued.providerConfig,
-        capability: "image_generation",
-        publicModelSlug: parsed.model,
-        upstreamModelSlug: queued.upstreamModelSlug,
-        endpoint: queued.endpoint,
-        prompt: parsed.prompt,
-        input: parsed.input,
-      });
+      try {
+        await enqueueInferenceJob({
+          requestId: queued.requestId,
+          workspaceId: queued.workspaceId,
+          apiKeyId: queued.apiKeyId,
+          providerModelId: queued.providerModelId,
+          credentialId: queued.credentialId,
+          providerSlug: queued.providerSlug,
+          providerBaseUrl: queued.providerBaseUrl,
+          providerConfig: queued.providerConfig,
+          capability: "image_generation",
+          publicModelSlug: parsed.model,
+          upstreamModelSlug: queued.upstreamModelSlug,
+          endpoint: queued.endpoint,
+          prompt: parsed.prompt,
+          input: parsed.input,
+        });
+      } catch {
+        throw new RequestValidationError(
+          "Failed to enqueue image generation job",
+          503,
+          "queue_unavailable"
+        );
+      }
 
       return reply.code(202).send({
         id: queued.requestId,
@@ -233,22 +241,30 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         input: parsed.input,
       });
 
-      await enqueueInferenceJob({
-        requestId: queued.requestId,
-        workspaceId: queued.workspaceId,
-        apiKeyId: queued.apiKeyId,
-        providerModelId: queued.providerModelId,
-        credentialId: queued.credentialId,
-        providerSlug: queued.providerSlug,
-        providerBaseUrl: queued.providerBaseUrl,
-        providerConfig: queued.providerConfig,
-        capability: "image_edit",
-        publicModelSlug: parsed.model,
-        upstreamModelSlug: queued.upstreamModelSlug,
-        endpoint: queued.endpoint,
-        prompt: parsed.prompt,
-        input: parsed.input,
-      });
+      try {
+        await enqueueInferenceJob({
+          requestId: queued.requestId,
+          workspaceId: queued.workspaceId,
+          apiKeyId: queued.apiKeyId,
+          providerModelId: queued.providerModelId,
+          credentialId: queued.credentialId,
+          providerSlug: queued.providerSlug,
+          providerBaseUrl: queued.providerBaseUrl,
+          providerConfig: queued.providerConfig,
+          capability: "image_edit",
+          publicModelSlug: parsed.model,
+          upstreamModelSlug: queued.upstreamModelSlug,
+          endpoint: queued.endpoint,
+          prompt: parsed.prompt,
+          input: parsed.input,
+        });
+      } catch {
+        throw new RequestValidationError(
+          "Failed to enqueue image edit job",
+          503,
+          "queue_unavailable"
+        );
+      }
 
       return reply.code(202).send({
         id: queued.requestId,
@@ -351,22 +367,30 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         input: normalizedInput,
       });
 
-      await enqueueInferenceJob({
-        requestId: queued.requestId,
-        workspaceId: queued.workspaceId,
-        apiKeyId: queued.apiKeyId,
-        providerModelId: queued.providerModelId,
-        credentialId: queued.credentialId,
-        providerSlug: queued.providerSlug,
-        providerBaseUrl: queued.providerBaseUrl,
-        providerConfig: queued.providerConfig,
-        capability: "video_generation",
-        publicModelSlug: parsed.model,
-        upstreamModelSlug: queued.upstreamModelSlug,
-        endpoint: queued.endpoint,
-        prompt: parsed.prompt,
-        input: normalizedInput,
-      });
+      try {
+        await enqueueInferenceJob({
+          requestId: queued.requestId,
+          workspaceId: queued.workspaceId,
+          apiKeyId: queued.apiKeyId,
+          providerModelId: queued.providerModelId,
+          credentialId: queued.credentialId,
+          providerSlug: queued.providerSlug,
+          providerBaseUrl: queued.providerBaseUrl,
+          providerConfig: queued.providerConfig,
+          capability: "video_generation",
+          publicModelSlug: parsed.model,
+          upstreamModelSlug: queued.upstreamModelSlug,
+          endpoint: queued.endpoint,
+          prompt: parsed.prompt,
+          input: normalizedInput,
+        });
+      } catch {
+        throw new RequestValidationError(
+          "Failed to enqueue video generation job",
+          503,
+          "queue_unavailable"
+        );
+      }
 
       return reply.code(202).send({
         id: queued.requestId,

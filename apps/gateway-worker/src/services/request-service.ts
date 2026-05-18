@@ -55,7 +55,11 @@ export async function authenticateApiKey(apiKey: string) {
     .maybeSingle();
 
   if (apiKeyError) {
-    throw new Error(apiKeyError.message);
+    throw new RequestValidationError(
+      "Failed to read API key record",
+      503,
+      "database_operation_failed"
+    );
   }
 
   if (!apiKeyRow || apiKeyRow.status !== "active") {
@@ -139,7 +143,11 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     .eq("workspace_id", apiKeyRow.workspace_id);
 
   if (walletError) {
-    throw new Error(walletError.message);
+    throw new RequestValidationError(
+      "Failed to read wallet balance",
+      503,
+      "database_operation_failed"
+    );
   }
 
   const walletBalance = (walletRows ?? []).reduce(
@@ -165,7 +173,11 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     .maybeSingle();
 
   if (routeError) {
-    throw new Error(routeError.message);
+    throw new RequestValidationError(
+      "Failed to resolve routing rule",
+      503,
+      "database_operation_failed"
+    );
   }
 
   if (!routeRow) {
@@ -183,7 +195,11 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     .maybeSingle();
 
   if (supportedModelError) {
-    throw new Error(supportedModelError.message);
+    throw new RequestValidationError(
+      "Failed to read supported model",
+      503,
+      "database_operation_failed"
+    );
   }
 
   if (!supportedModelRow?.active) {
@@ -205,10 +221,19 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     );
   }
 
-  const estimatedCustomerCharge = resolveBillingBreakdown({
-    config: customerBillingConfig,
-    requestInput: input.input,
-  }).total;
+  let estimatedCustomerCharge: number;
+  try {
+    estimatedCustomerCharge = resolveBillingBreakdown({
+      config: customerBillingConfig,
+      requestInput: input.input,
+    }).total;
+  } catch {
+    throw new RequestValidationError(
+      `Failed to evaluate billing for ${input.model}`,
+      503,
+      "billing_resolution_failed"
+    );
+  }
 
   if (estimatedCustomerCharge > walletBalance) {
     throw new RequestValidationError(
@@ -225,7 +250,11 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     .maybeSingle();
 
   if (providerModelError) {
-    throw new Error(providerModelError.message);
+    throw new RequestValidationError(
+      "Failed to read provider model",
+      503,
+      "database_operation_failed"
+    );
   }
 
   if (!providerModelRow) {
@@ -257,7 +286,11 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     .maybeSingle();
 
   if (providerError) {
-    throw new Error(providerError.message);
+    throw new RequestValidationError(
+      "Failed to read provider",
+      503,
+      "database_operation_failed"
+    );
   }
 
   if (!providerRow) {
@@ -292,7 +325,11 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     .order("updated_at", { ascending: false });
 
   if (credentialError) {
-    throw new Error(credentialError.message);
+    throw new RequestValidationError(
+      "Failed to read provider credentials",
+      503,
+      "database_operation_failed"
+    );
   }
 
   const credential = resolveRuntimeCredential((credentialRows ?? []) as ProviderCredentialRow[]);
@@ -318,7 +355,11 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
   });
 
   if (insertError) {
-    throw new Error(insertError.message);
+    throw new RequestValidationError(
+      "Failed to record queued request",
+      503,
+      "request_record_write_failed"
+    );
   }
 
   const { error: lastUsedError } = await supabaseAdmin
@@ -327,7 +368,11 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     .eq("id", apiKeyRow.id);
 
   if (lastUsedError) {
-    throw new Error(lastUsedError.message);
+    throw new RequestValidationError(
+      "Failed to update API key last_used_at",
+      503,
+      "api_key_touch_failed"
+    );
   }
 
   return {
