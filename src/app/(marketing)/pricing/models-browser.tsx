@@ -775,7 +775,7 @@ const ASPECT_RATIO_OPTIONS = [
 ];
 
 const RESOLUTION_OPTIONS = ["480p", "720p", "1080p", "1440p", "2160p", "1k", "2k", "3k", "4k"];
-const PLAYGROUND_POLL_TIMEOUT_MS = 10 * 60 * 1000;
+const PLAYGROUND_POLL_TIMEOUT_MS = 30 * 60 * 1000;
 const PLAYGROUND_POLL_INTERVAL_MS = 1800;
 
 function isAspectRatioEnum(values?: string[]) {

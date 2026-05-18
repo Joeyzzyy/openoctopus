@@ -474,7 +474,10 @@ export default async function DashboardPage({
                           {row.promptText ? (
                             <div className="mt-3 rounded-xl border border-black/[0.08] bg-white px-3 py-2">
                               <p className="text-[11px] tracking-[0.35px] text-black/45">{dashboardCopy.requests.prompt}</p>
-                              <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-black/80">
+                              <p
+                                className="mt-1 h-5 overflow-hidden text-sm leading-5 text-black/80"
+                                title={row.promptText}
+                              >
                                 {row.promptText}
                               </p>
                             </div>
