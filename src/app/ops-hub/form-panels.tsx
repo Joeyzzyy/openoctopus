@@ -104,6 +104,7 @@ type SchemaFieldState = {
   minimum: string;
   maximum: string;
   step: string;
+  maxItems: string;
 };
 
 function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormState> {
@@ -361,6 +362,12 @@ function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields")
               ? String(row.max)
               : "";
         const step = row.step !== undefined && row.step !== null ? String(row.step) : "";
+        const maxItems =
+          row.maxItems !== undefined && row.maxItems !== null
+            ? String(row.maxItems)
+            : row.max_items !== undefined && row.max_items !== null
+              ? String(row.max_items)
+              : "";
         const normalizedName = name.trim().toLowerCase();
         return {
           id: randomFieldId(),
@@ -379,6 +386,7 @@ function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields")
           minimum: minimum || (key === "params" && normalizedName === "duration" ? "1" : ""),
           maximum: maximum || (key === "params" && normalizedName === "duration" ? "60" : ""),
           step: step || (key === "params" && normalizedName === "duration" ? "1" : ""),
+          maxItems,
         } satisfies SchemaFieldState;
       })
       .filter((row): row is SchemaFieldState => Boolean(row));
@@ -403,6 +411,25 @@ function parseOptionalNumber(value: string) {
   if (!trimmed) return undefined;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseOptionalInteger(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function isReferenceAssetFieldName(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return [
+    "reference_image",
+    "reference_images",
+    "reference_video",
+    "reference_videos",
+    "reference_audio",
+    "reference_audios",
+  ].includes(normalized);
 }
 
 function hasPositivePricingCharge(pricingText: string) {
@@ -492,6 +519,7 @@ function SchemaFieldEditor({
     minimum: "",
     maximum: "",
     step: "",
+    maxItems: "",
   });
 
   useEffect(() => {
@@ -519,6 +547,7 @@ function SchemaFieldEditor({
       minimum: "",
       maximum: "",
       step: "",
+      maxItems: "",
     });
     setEditorOpen(true);
   };
@@ -543,6 +572,14 @@ function SchemaFieldEditor({
       toast.error("最小值、最大值和阶梯值必须是数字");
       return;
     }
+    if (draft.maxItems.trim().length > 0 && parseOptionalInteger(draft.maxItems) === undefined) {
+      toast.error("最大数量必须是大于 0 的整数");
+      return;
+    }
+    if (isReferenceAssetFieldName(draft.name) && parseOptionalInteger(draft.maxItems ?? "") === undefined) {
+      toast.error("reference 图、视频、音频字段必须设置最大数量上限");
+      return;
+    }
     const nextEnumValues =
       keyName === "params" &&
       (isDetailLevelFieldName(draft.name) || isDurationFieldName(draft.name)) &&
@@ -557,6 +594,7 @@ function SchemaFieldEditor({
       isDurationFieldName(draft.name) && draft.maximum.trim().length === 0 ? "60" : draft.maximum.trim();
     const nextStep =
       isDurationFieldName(draft.name) && draft.step.trim().length === 0 ? "1" : draft.step.trim();
+    const nextMaxItems = draft.maxItems.trim();
     if (editingId) {
       setRows((current) =>
         current.map((row) =>
@@ -568,6 +606,7 @@ function SchemaFieldEditor({
                 minimum: nextMinimum,
                 maximum: nextMaximum,
                 step: nextStep,
+                maxItems: nextMaxItems,
               }
             : row
         )
@@ -582,6 +621,7 @@ function SchemaFieldEditor({
           minimum: nextMinimum,
           maximum: nextMaximum,
           step: nextStep,
+          maxItems: nextMaxItems,
         },
       ]);
     }
@@ -604,6 +644,7 @@ function SchemaFieldEditor({
       minimum: row.minimum.trim(),
       maximum: row.maximum.trim(),
       step: row.step.trim(),
+      maxItems: row.maxItems.trim(),
     }))
     .filter((row) => row.name.length > 0);
 
@@ -620,6 +661,7 @@ function SchemaFieldEditor({
         minimum: parseOptionalNumber(row.minimum),
         maximum: parseOptionalNumber(row.maximum),
         step: parseOptionalNumber(row.step),
+        maxItems: parseOptionalInteger(row.maxItems),
       })),
     },
     null,
@@ -690,6 +732,11 @@ function SchemaFieldEditor({
               {row.minimum || row.maximum || row.step ? (
                 <span className="rounded border border-[#BAE6FD] bg-white px-2 py-0.5">
                   范围：{row.minimum || "-"} - {row.maximum || "-"} · 阶梯：{row.step || "-"}
+                </span>
+              ) : null}
+              {row.maxItems ? (
+                <span className="rounded border border-[#BAE6FD] bg-white px-2 py-0.5">
+                  最大数量：{row.maxItems}
                 </span>
               ) : null}
               {includeRequired ? (
@@ -779,6 +826,22 @@ function SchemaFieldEditor({
                     inputMode="decimal"
                   />
                 </div>
+              ) : null}
+              {keyName === "params" && (draft.type === "array" || isReferenceAssetFieldName(draft.name)) ? (
+                <input
+                  value={draft.maxItems}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, maxItems: event.target.value }))
+                  }
+                  disabled={disabled}
+                  className={`${formInputClassName} h-9 text-xs md:col-span-2`}
+                  placeholder={
+                    isReferenceAssetFieldName(draft.name)
+                      ? "最大数量，reference 字段必填，如 1 或 4"
+                      : "最大数组数量，如 4"
+                  }
+                  inputMode="numeric"
+                />
               ) : null}
               {!isResolutionFieldName(draft.name) &&
               !isQualityFieldName(draft.name) &&

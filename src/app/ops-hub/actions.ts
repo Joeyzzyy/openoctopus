@@ -37,6 +37,38 @@ function normalizeOptionalText(value: FormDataEntryValue | null) {
   return normalized.length > 0 ? normalized : null;
 }
 
+const REFERENCE_ASSET_FIELD_NAMES = new Set([
+  "reference_image",
+  "reference_images",
+  "reference_video",
+  "reference_videos",
+  "reference_audio",
+  "reference_audios",
+]);
+
+function validateReferenceAssetSchemaLimits(inputSchema: Record<string, unknown>) {
+  const params = Array.isArray(inputSchema.params) ? inputSchema.params : [];
+  const errors: string[] = [];
+
+  for (const item of params) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+    const row = item as Record<string, unknown>;
+    const name = typeof row.name === "string" ? row.name.trim() : "";
+    if (!REFERENCE_ASSET_FIELD_NAMES.has(name.toLowerCase())) {
+      continue;
+    }
+    const rawMaxItems = row.maxItems ?? row.max_items;
+    const maxItems = typeof rawMaxItems === "number" ? rawMaxItems : Number(rawMaxItems);
+    if (!Number.isInteger(maxItems) || maxItems <= 0) {
+      errors.push(`${name} 必须设置正整数 maxItems 上限`);
+    }
+  }
+
+  return errors;
+}
+
 function toReadableSupabaseError(error: unknown, fallback: string) {
   const message =
     error instanceof Error
@@ -2442,6 +2474,10 @@ export async function createProviderModel(formData: FormData) {
       executionTemplate: (formData.get("executionTemplate") as string) || "rest-async-poll-v1",
       executionConfig: parseJsonField(formData.get("executionConfig")),
     });
+    const inputSchemaErrors = validateReferenceAssetSchemaLimits(parsed.inputSchema);
+    if (inputSchemaErrors.length > 0) {
+      throw new Error(inputSchemaErrors.join("；"));
+    }
     await ensureWorkerTemplateExists({
       supabase,
       slug: parsed.executionTemplate,
@@ -2722,6 +2758,10 @@ export async function updateProviderModelDetails(formData: FormData) {
     executionTemplate: (formData.get("executionTemplate") as string) || "rest-async-poll-v1",
     executionConfig: parseJsonField(formData.get("executionConfig")),
   });
+  const inputSchemaErrors = validateReferenceAssetSchemaLimits(parsed.inputSchema);
+  if (inputSchemaErrors.length > 0) {
+    throw new Error(inputSchemaErrors.join("；"));
+  }
   await ensureWorkerTemplateExists({
     supabase,
     slug: parsed.executionTemplate,
@@ -3559,10 +3599,11 @@ export async function generateProviderModelDraftFromSource(input: {
     "2) billingMode should be \"hybrid\" whenever possible.",
     "3) charges can include: perRequest, perImage, perVideo, perSecond, inputTextTokensPerMillion, outputTextTokensPerMillion; use number values ONLY when an explicit upstream provider cost is present in the source document.",
     "3a) Never invent pricing. Never use 0 as a placeholder. If the source does not include an explicit provider price, return charges as an empty object: {}.",
-    "4) inputSchema format: { officialDocUrl, params: [{ name, type, required, description, example, exposedToCustomer }] }.",
+    "4) inputSchema format: { officialDocUrl, params: [{ name, type, required, description, example, exposedToCustomer, maxItems }] }.",
     "5) outputSchema format: { officialDocUrl, fields: [{ name, type, description, example, exposedToCustomer }] }.",
     "6) summary: short chinese text describing what was recognized and what needs manual check.",
-    "7) If unknown, return empty string or empty array/object. Never omit required top-level keys.",
+    "7) For reference_images/reference_videos/reference_audios style array params, include a positive integer maxItems whenever the upstream documentation provides a limit.",
+    "8) If unknown, return empty string or empty array/object. Never omit required top-level keys.",
     "JSON OUTPUT EXAMPLE:",
     "{",
     '  "pricing": {"billingMode":"hybrid","currency":"USD","charges":{}},',

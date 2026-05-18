@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { parseBillingConfig, resolveBillingBreakdown } from "../lib/billing-config.js";
+import { validateReferenceAssetLimits } from "../lib/reference-asset-limits.js";
 import {
   pickRuntimeCredential,
   type RuntimeProviderCredential,
@@ -245,7 +246,7 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
 
   const { data: providerModelRow, error: providerModelError } = await supabaseAdmin
     .from("provider_models")
-    .select("id, provider_id, upstream_model_slug, pricing, active, execution_template, execution_config")
+    .select("id, provider_id, upstream_model_slug, pricing, input_schema, active, execution_template, execution_config")
     .eq("id", routeRow.primary_provider_model_id)
     .maybeSingle();
 
@@ -266,6 +267,18 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
       `Primary provider model for ${input.model} is not active.`,
       409,
       "provider_model_inactive"
+    );
+  }
+
+  const referenceAssetLimitErrors = validateReferenceAssetLimits(
+    providerModelRow.input_schema,
+    input.input
+  );
+  if (referenceAssetLimitErrors.length > 0) {
+    throw new RequestValidationError(
+      referenceAssetLimitErrors[0],
+      400,
+      "invalid_request"
     );
   }
 

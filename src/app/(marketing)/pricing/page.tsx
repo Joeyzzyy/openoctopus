@@ -28,6 +28,12 @@ function formatTierDimension(value: string) {
   return value === "default" ? "" : value;
 }
 
+function formatBooleanTierDimension(value: string) {
+  if (value === "true") return "yes";
+  if (value === "false") return "no";
+  return formatTierDimension(value);
+}
+
 function providerAnchor(provider: string) {
   return `provider-${provider
     .toLowerCase()
@@ -36,12 +42,34 @@ function providerAnchor(provider: string) {
 }
 
 function groupedPriceTiers(
-  tiers: Array<{ resolution: string; quality: string; price: number }>
+  tiers: Array<{
+    resolution: string;
+    quality: string;
+    duration?: string;
+    hasReferenceVideos?: string;
+    hasAudio?: string;
+    price: number;
+  }>
 ) {
-  const grouped = new Map<string, Array<{ quality: string; price: number }>>();
+  const grouped = new Map<
+    string,
+    Array<{
+      quality: string;
+      duration?: string;
+      hasReferenceVideos?: string;
+      hasAudio?: string;
+      price: number;
+    }>
+  >();
   for (const tier of tiers) {
     const items = grouped.get(tier.resolution) ?? [];
-    items.push({ quality: tier.quality, price: tier.price });
+    items.push({
+      quality: tier.quality,
+      duration: tier.duration,
+      hasReferenceVideos: tier.hasReferenceVideos,
+      hasAudio: tier.hasAudio,
+      price: tier.price,
+    });
     grouped.set(tier.resolution, items);
   }
 
@@ -61,7 +89,10 @@ function shouldShowPriceTiers(row: PricingRow) {
   const summary = row.price.summary.trim();
   const hasDimensionLabel =
     Boolean(formatTierDimension(tier.resolution)) ||
-    Boolean(formatTierDimension(tier.quality));
+    Boolean(formatTierDimension(tier.quality)) ||
+    Boolean(formatTierDimension(tier.duration ?? "default")) ||
+    Boolean(formatBooleanTierDimension(tier.hasReferenceVideos ?? "default")) ||
+    Boolean(formatBooleanTierDimension(tier.hasAudio ?? "default"));
 
   return hasDimensionLabel && !summary.includes(formattedTierPrice);
 }
@@ -74,7 +105,14 @@ type PricingRow = {
   price: {
     summary: string;
     currency: string;
-    tiers: Array<{ resolution: string; quality: string; price: number }>;
+    tiers: Array<{
+      resolution: string;
+      quality: string;
+      duration?: string;
+      hasReferenceVideos?: string;
+      hasAudio?: string;
+      price: number;
+    }>;
     booleanSurcharges: Array<{ name: string; price: number; label: string }>;
   };
 };
@@ -130,11 +168,30 @@ function PricingTable({ rows }: { rows: PricingRow[] }) {
                         <span className="flex flex-wrap gap-1.5">
                           {group.items.map((tier) => (
                             <span
-                              key={`${group.resolution}-${tier.quality}`}
+                              key={[
+                                group.resolution,
+                                tier.quality,
+                                tier.duration ?? "default",
+                                tier.hasReferenceVideos ?? "default",
+                                tier.hasAudio ?? "default",
+                              ].join("-")}
                               className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5"
                             >
                               {formatTierDimension(tier.quality) ? (
                                 <span className="capitalize text-black/45">{formatTierDimension(tier.quality)}</span>
+                              ) : null}
+                              {formatTierDimension(tier.duration ?? "default") ? (
+                                <span className="text-black/45">{formatTierDimension(tier.duration ?? "default")}s</span>
+                              ) : null}
+                              {formatBooleanTierDimension(tier.hasReferenceVideos ?? "default") ? (
+                                <span className="text-black/45">
+                                  ref video {formatBooleanTierDimension(tier.hasReferenceVideos ?? "default")}
+                                </span>
+                              ) : null}
+                              {formatBooleanTierDimension(tier.hasAudio ?? "default") ? (
+                                <span className="text-black/45">
+                                  audio {formatBooleanTierDimension(tier.hasAudio ?? "default")}
+                                </span>
                               ) : null}
                               <span className="font-medium text-black/75">
                                 {formatMoney(tier.price, row.price.currency)}

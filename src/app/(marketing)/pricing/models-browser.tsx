@@ -19,6 +19,7 @@ type JsonSchemaField = {
   minimum?: number;
   maximum?: number;
   step?: number;
+  maxItems?: number;
 };
 
 type PlaygroundUpload = {
@@ -698,6 +699,7 @@ function parseInputSchemaText(schemaText: string): JsonSchemaField[] {
           minimum: readOptionalNumber(row.minimum ?? row.min),
           maximum: readOptionalNumber(row.maximum ?? row.max),
           step: readOptionalNumber(row.step),
+          maxItems: readOptionalNumber(row.maxItems ?? row.max_items),
         });
       }
       return fields;
@@ -751,6 +753,7 @@ function parseInputSchemaText(schemaText: string): JsonSchemaField[] {
         minimum: readOptionalNumber(propertySchema.minimum ?? propertySchema.min),
         maximum: readOptionalNumber(propertySchema.maximum ?? propertySchema.max),
         step: readOptionalNumber(propertySchema.step),
+        maxItems: readOptionalNumber(propertySchema.maxItems ?? propertySchema.max_items),
       });
     }
     return fields;
@@ -879,6 +882,17 @@ function isMultipleUploadField(field: JsonSchemaField) {
   );
 }
 
+function getUploadLimit(field: JsonSchemaField) {
+  const configuredMaxItems =
+    typeof field.maxItems === "number" && Number.isFinite(field.maxItems)
+      ? Math.max(1, Math.floor(field.maxItems))
+      : null;
+  if (configuredMaxItems !== null) {
+    return configuredMaxItems;
+  }
+  return isMultipleUploadField(field) ? null : 1;
+}
+
 function getUploadAccept(kind: UploadFieldKind) {
   if (kind === "video") return "video/mp4,video/webm,video/quicktime";
   if (kind === "audio") return "audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,audio/ogg,audio/webm";
@@ -893,6 +907,14 @@ function getUploadHelpText(kind: UploadFieldKind) {
     return "Upload MP3, WAV, M4A, AAC, OGG, or WebM audio. They are converted to secure URLs before submission.";
   }
   return "Upload PNG, JPEG, WebP, or GIF images. They are converted to secure URLs before submission.";
+}
+
+function appendUploadLimitText(baseText: string, field: JsonSchemaField) {
+  const limit = getUploadLimit(field);
+  if (limit === null) {
+    return baseText;
+  }
+  return `${baseText} Max ${limit} file${limit === 1 ? "" : "s"}.`;
 }
 
 function getUploadTitle(kind: UploadFieldKind) {
@@ -1595,6 +1617,26 @@ export function ModelsBrowser({
   const uploadPlaygroundAssets = async (field: JsonSchemaField, files: FileList | null) => {
     const selectedFiles = Array.from(files ?? []);
     if (selectedFiles.length === 0) return;
+    const uploadLimit = getUploadLimit(field);
+
+    if (uploadLimit !== null) {
+      const existingCount = playgroundUploads[field.key]?.length ?? 0;
+      const allowedRemaining = Math.max(0, uploadLimit - existingCount);
+      if (allowedRemaining <= 0) {
+        setValidationErrors((current) => ({
+          ...current,
+          [field.key]: `${field.label} allows at most ${uploadLimit} file${uploadLimit === 1 ? "" : "s"}.`,
+        }));
+        return;
+      }
+      if (selectedFiles.length > allowedRemaining) {
+        setValidationErrors((current) => ({
+          ...current,
+          [field.key]: `${field.label} allows at most ${uploadLimit} file${uploadLimit === 1 ? "" : "s"}.`,
+        }));
+        return;
+      }
+    }
 
     setUploadingFields((current) => ({ ...current, [field.key]: true }));
     setValidationErrors((current) => {
@@ -1668,8 +1710,13 @@ export function ModelsBrowser({
     const nextValidationErrors: Record<string, string> = {};
     for (const field of parsedFields) {
       if (isUploadField(field)) {
-        if (field.required && (playgroundUploads[field.key] ?? []).length === 0) {
+        const uploadCount = (playgroundUploads[field.key] ?? []).length;
+        if (field.required && uploadCount === 0) {
           nextValidationErrors[field.key] = `${field.label} is required.`;
+        }
+        const uploadLimit = getUploadLimit(field);
+        if (uploadLimit !== null && uploadCount > uploadLimit) {
+          nextValidationErrors[field.key] = `${field.label} allows at most ${uploadLimit} file${uploadLimit === 1 ? "" : "s"}.`;
         }
         continue;
       }
@@ -2102,7 +2149,7 @@ export function ModelsBrowser({
                             disabled={isSubmitting || uploadingFields[field.key]}
                             type="file"
                             accept={getUploadAccept(uploadKind)}
-                            multiple={isMultipleUploadField(field)}
+                            multiple={isMultipleUploadField(field) && (getUploadLimit(field) ?? 2) > 1}
                             onChange={(event) => {
                               void uploadPlaygroundAssets(field, event.target.files);
                               event.target.value = "";
@@ -2110,7 +2157,7 @@ export function ModelsBrowser({
                             className="block w-full text-xs text-black/60 file:mb-2 file:mr-3 file:h-8 file:rounded-md file:border-0 file:bg-black file:px-3 file:text-xs file:font-medium file:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:file:mb-0"
                           />
                           <p className="mt-2 text-[11px] leading-5 text-black/45">
-                            {getUploadHelpText(uploadKind)}
+                            {appendUploadLimitText(getUploadHelpText(uploadKind), field)}
                           </p>
                           {uploadingFields[field.key] ? (
                             <p className="mt-2 text-[11px] text-black/55">Uploading...</p>

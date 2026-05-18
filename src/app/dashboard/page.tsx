@@ -217,6 +217,51 @@ function EmptyState({
   );
 }
 
+function isVideoOutputAsset(asset: { type: string; mimeType: string | null }) {
+  return asset.type === "video" || asset.mimeType?.startsWith("video/") === true;
+}
+
+function RequestOutputPreview({
+  asset,
+  alt,
+  sizeClassName,
+}: {
+  asset: {
+    type: string;
+    url: string;
+    mimeType: string | null;
+  };
+  alt: string;
+  sizeClassName: string;
+}) {
+  if (isVideoOutputAsset(asset)) {
+    return (
+      <video
+        src={asset.url}
+        muted
+        playsInline
+        preload="metadata"
+        className={`${sizeClassName} bg-black object-cover transition-opacity group-hover:opacity-85`}
+      />
+    );
+  }
+
+  if (asset.type === "image" || asset.mimeType?.startsWith("image/") === true) {
+    return (
+      <>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={asset.url}
+          alt={alt}
+          className={`${sizeClassName} object-cover transition-opacity group-hover:opacity-85`}
+        />
+      </>
+    );
+  }
+
+  return <div className={`flex items-center justify-center text-[11px] text-black/50 ${sizeClassName}`}>File</div>;
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -389,10 +434,7 @@ export default async function DashboardPage({
 
             {view === "request-details" ? (
               <section className="p-0">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="min-w-0">
-                      <h3 className="text-lg font-semibold text-black">{dashboardCopy.requests.title}</h3>
-                    </div>
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="inline-flex h-8 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/80">
                         <span>{formatI18n(dashboardCopy.requests.total, { count: requestPagination.total })}</span>
@@ -425,12 +467,20 @@ export default async function DashboardPage({
                               {row.status}
                             </span>
                           </div>
-                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-black/70">
+                          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-black/70">
                             <div>{dashboardCopy.requests.time}: {row.createdAtLabel}</div>
                             <div>{dashboardCopy.requests.vendor}: {row.vendor}</div>
                             <div>{dashboardCopy.requests.latency}: {row.latency}</div>
                             <div>{dashboardCopy.requests.cost}: {row.cost}</div>
                           </div>
+                          {row.promptText ? (
+                            <div className="mt-3 rounded-xl border border-black/[0.08] bg-white px-3 py-2">
+                              <p className="text-[11px] tracking-[0.35px] text-black/45">{dashboardCopy.requests.prompt}</p>
+                              <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-black/80">
+                                {row.promptText}
+                              </p>
+                            </div>
+                          ) : null}
                           {row.outputAssets.length > 0 ? (
                             <div className="mt-3 flex flex-wrap gap-2">
                               {row.outputAssets.slice(0, 3).map((asset, index) => (
@@ -442,20 +492,11 @@ export default async function DashboardPage({
                                   rel="noreferrer"
                                   className="group block overflow-hidden rounded-md border border-black/[0.08] bg-white"
                                 >
-                                  {asset.type === "image" ? (
-                                    <>
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={asset.url}
-                                      alt={`Generated output ${index + 1}`}
-                                      className="size-20 object-cover transition-opacity group-hover:opacity-85"
-                                    />
-                                    </>
-                                  ) : (
-                                    <div className="flex size-20 items-center justify-center text-[11px] text-black/50">
-                                      {dashboardCopy.requests.download}
-                                    </div>
-                                  )}
+                                  <RequestOutputPreview
+                                    asset={asset}
+                                    alt={`Generated output ${index + 1}`}
+                                    sizeClassName="size-20"
+                                  />
                                 </a>
                               ))}
                             </div>
@@ -518,20 +559,11 @@ export default async function DashboardPage({
                                             className="group block overflow-hidden rounded-md border border-black/[0.08] bg-white"
                                             title={dashboardCopy.requests.openAsset}
                                           >
-                                            {asset.type === "image" ? (
-                                              <>
-                                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                                              <img
-                                                src={asset.url}
-                                                alt={`Generated output ${index + 1}`}
-                                                className="size-12 object-cover transition-opacity group-hover:opacity-85"
-                                              />
-                                              </>
-                                            ) : (
-                                              <div className="flex size-12 items-center justify-center text-[10px] text-black/45">
-                                                {dashboardCopy.requests.file}
-                                              </div>
-                                            )}
+                                            <RequestOutputPreview
+                                              asset={asset}
+                                              alt={`Generated output ${index + 1}`}
+                                              sizeClassName="size-12"
+                                            />
                                           </a>
                                         ))}
                                       </div>
@@ -539,6 +571,11 @@ export default async function DashboardPage({
                                   <div className="min-w-0">
                                     <p className="text-sm text-black">{row.model}</p>
                                     <p className="text-xs text-black/45">{row.capability}</p>
+                                    {row.promptText ? (
+                                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-black/55">
+                                        {row.promptText}
+                                      </p>
+                                    ) : null}
                                   </div>
                                   </div>
                                 </td>

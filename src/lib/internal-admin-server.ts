@@ -145,6 +145,8 @@ type RequestRow = {
   actual_profit: number | null;
   error_code: string | null;
   error_message: string | null;
+  input_payload: Record<string, unknown> | null;
+  normalized_params: Record<string, unknown> | null;
   output_payload: Record<string, unknown> | null;
   created_at: string;
   started_at: string | null;
@@ -396,6 +398,23 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function extractPromptText(
+  normalizedParams: Record<string, unknown> | null,
+  inputPayload: Record<string, unknown> | null
+) {
+  const normalizedPrompt = typeof normalizedParams?.prompt === "string"
+    ? normalizedParams.prompt.trim()
+    : "";
+  if (normalizedPrompt) {
+    return normalizedPrompt;
+  }
+
+  const inputPrompt = typeof inputPayload?.prompt === "string"
+    ? inputPayload.prompt.trim()
+    : "";
+  return inputPrompt || null;
 }
 
 function formatUnknownJson(value: unknown) {
@@ -1385,7 +1404,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     let requestQuery = supabase
       .from("inference_requests")
       .select(
-        "id, workspace_id, user_id, api_key_id, request_source, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)",
+        "id, workspace_id, user_id, api_key_id, request_source, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, input_payload, normalized_params, output_payload, created_at, started_at, completed_at, workspaces(name, slug)",
         { count: "exact" }
       )
       .gte("created_at", monitoringSinceIso)
@@ -1448,7 +1467,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     const problemRequestsResponse = await supabase
       .from("inference_requests")
       .select(
-        "id, workspace_id, user_id, api_key_id, request_source, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at, workspaces(name, slug)",
+        "id, workspace_id, user_id, api_key_id, request_source, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, input_payload, normalized_params, output_payload, created_at, started_at, completed_at, workspaces(name, slug)",
         { count: "exact" }
       )
       .in("status", ["failed", "queued"])
@@ -1921,6 +1940,8 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       })
       .filter((item) => item !== null);
     const outputPayloadFromRequest = asRecord(request.output_payload);
+    const inputPayloadFromRequest = asRecord(request.input_payload);
+    const normalizedParamsFromRequest = asRecord(request.normalized_params);
     const outputPayloadFromUsage = extractOutputPayloadFromUsageMetadata(usageEvent?.metadata);
     const packagedOutputPayload =
       sanitizeOutputPayloadForCustomer(outputPayloadFromRequest) ??
@@ -1955,6 +1976,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       apiKeyPrefix: apiKey?.key_prefix ?? "unknown",
       apiKeyEnvironment: apiKey?.environment ?? "unknown",
       attemptCount: relatedAttempts.length,
+      promptText: extractPromptText(normalizedParamsFromRequest, inputPayloadFromRequest),
       lastAttempt: summarizeAttempt(relatedAttempts[0]),
       customerCharge,
       providerCost,

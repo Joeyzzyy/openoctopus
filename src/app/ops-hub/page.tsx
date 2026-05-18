@@ -12,6 +12,7 @@ import { InternalShell } from "./internal-shell";
 import { MonitoringAutoRefresh } from "./monitoring-auto-refresh";
 import { MonitoringLineChart } from "./monitoring-line-chart";
 import { OpsHubRefreshButton } from "./refresh-button";
+import { CopyTextButton } from "./copy-text-button";
 import { ImageResponseContractPanel } from "./image-response-contract-panel";
 import { RegisteredUsersTable } from "./registered-users-table";
 import { ApiSmokePanel } from "./api-smoke-panel";
@@ -613,6 +614,7 @@ function UnifiedTaskCard({
     workspaceSlug?: string;
     providerLabel?: string;
     callerLabel?: string;
+    promptText?: string | null;
     errorMessage?: string | null;
     lastAttempt?: {
       attemptNo: number;
@@ -707,6 +709,20 @@ function UnifiedTaskCard({
           <span className="text-black/60">
             利润 <span className="font-semibold text-black">{request.profitLabel}</span>
           </span>
+        </div>
+      ) : null}
+
+      {request.promptText ? (
+        <div className="mt-3 rounded-lg border border-[#DDF4FF] bg-white px-3 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-medium uppercase tracking-[0.5px] text-black/55">
+              Prompt
+            </p>
+            <CopyTextButton value={request.promptText} label="提示词" />
+          </div>
+          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-black/75">
+            {request.promptText}
+          </pre>
         </div>
       ) : null}
 
@@ -1396,6 +1412,7 @@ export default async function InternalPage({
                                 completedLabel: request.completedLabel,
                                 providerLabel: `${internalCopy.monitoring.upstream}: ${request.providerName} / ${request.upstreamModelSlug}`,
                                 callerLabel: `${internalCopy.monitoring.caller}: ${request.actorName} · ${request.apiKeyName} · ${request.apiKeyPrefix} · ${request.sourceLabel}`,
+                                promptText: request.promptText,
                                 errorMessage: request.error_message,
                                 lastAttempt: request.lastAttempt,
                                 upstreamRawText: request.upstreamRawText,

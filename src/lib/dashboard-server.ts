@@ -34,6 +34,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function extractDashboardPromptText(
+  normalizedParams: Record<string, unknown> | null,
+  inputPayload: Record<string, unknown> | null
+) {
+  const normalizedPrompt = normalizedParams?.prompt;
+  if (typeof normalizedPrompt === "string" && normalizedPrompt.trim().length > 0) {
+    return normalizedPrompt.trim();
+  }
+  const inputPrompt = inputPayload?.prompt;
+  if (typeof inputPrompt === "string" && inputPrompt.trim().length > 0) {
+    return inputPrompt.trim();
+  }
+  return null;
+}
+
 function normalizeDashboardAssetUrl(value: string, mimeType: string | null) {
   const text = value.trim();
   if (text.startsWith("http://") || text.startsWith("https://")) {
@@ -232,6 +247,7 @@ export type DashboardData = {
     status: RequestState;
     latency: string;
     cost: string;
+    promptText: string | null;
     outputAssets: Array<{
       type: string;
       url: string;
@@ -654,7 +670,7 @@ export async function getDashboardData({
         let query = supabaseAdmin
           .from("inference_requests")
           .select(
-            "id, api_key_id, request_source, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, output_payload, created_at, queued_at, started_at, completed_at",
+            "id, api_key_id, request_source, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, input_payload, normalized_params, output_payload, created_at, queued_at, started_at, completed_at",
             { count: "exact" }
           )
           .eq("workspace_id", workspace.id)
@@ -906,6 +922,12 @@ export async function getDashboardData({
       }
 
       const costValue = Number(row.actual_cost ?? row.estimated_cost ?? 0);
+      const inputPayload = isRecord((row as { input_payload?: unknown }).input_payload)
+        ? ((row as { input_payload?: unknown }).input_payload as Record<string, unknown>)
+        : null;
+      const normalizedParams = isRecord((row as { normalized_params?: unknown }).normalized_params)
+        ? ((row as { normalized_params?: unknown }).normalized_params as Record<string, unknown>)
+        : null;
       const outputPayload = isRecord((row as { output_payload?: unknown }).output_payload)
         ? ((row as { output_payload?: unknown }).output_payload as Record<string, unknown>)
         : {};
@@ -948,6 +970,7 @@ export async function getDashboardData({
               : "failed",
         latency,
         cost: costValue > 0 ? formatCurrency(costValue) : "pending",
+        promptText: extractDashboardPromptText(normalizedParams, inputPayload),
         outputAssets,
       };
     });

@@ -48,6 +48,7 @@ function normalizeInputSchema(inputSchema: unknown) {
           ...(typeof item.minimum === "number" ? { minimum: item.minimum } : {}),
           ...(typeof item.maximum === "number" ? { maximum: item.maximum } : {}),
           ...(typeof item.step === "number" ? { step: item.step } : {}),
+          ...(typeof item.maxItems === "number" ? { maxItems: item.maxItems } : {}),
           ...(isFileLike ? { format: "file_url_or_file" } : {}),
         };
       })
