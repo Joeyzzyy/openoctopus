@@ -173,3 +173,113 @@ test("treats generate_audio as alias for hasAudio boolean surcharge", () => {
   assert.equal(resolution.components.booleanSurcharges, 0.4);
   assert.equal(resolution.total, 1.6);
 });
+
+test("treats reference_videos as optional and does not add surcharge when omitted", () => {
+  const config = parseBillingConfig({
+    billingMode: "hybrid",
+    currency: "USD",
+    charges: {
+      perVideo: 1.2,
+    },
+    parameterPrices: {
+      booleanSurcharges: {
+        hasReferenceVideos: 0.5,
+      },
+    },
+  });
+
+  const resolution = resolveBillingBreakdown({
+    config,
+    requestInput: {},
+    output: {
+      assets: [{ type: "video", url: "https://example.com/video.mp4" }],
+    },
+  });
+
+  assert.equal(resolution.components.perVideo, 1.2);
+  assert.equal(resolution.components.booleanSurcharges, 0);
+  assert.equal(resolution.total, 1.2);
+});
+
+test("treats reference_videos array as alias for hasReferenceVideos surcharge", () => {
+  const config = parseBillingConfig({
+    billingMode: "hybrid",
+    currency: "USD",
+    charges: {
+      perVideo: 1.2,
+    },
+    parameterPrices: {
+      booleanSurcharges: {
+        hasReferenceVideos: 0.5,
+      },
+    },
+  });
+
+  const resolution = resolveBillingBreakdown({
+    config,
+    requestInput: {
+      reference_videos: ["https://example.com/reference.mp4"],
+    },
+    output: {
+      assets: [{ type: "video", url: "https://example.com/video.mp4" }],
+    },
+  });
+
+  assert.equal(resolution.components.perVideo, 1.2);
+  assert.equal(resolution.components.booleanSurcharges, 0.5);
+  assert.equal(resolution.total, 1.7);
+});
+
+test("supports named combination pricing with reference videos and audio dimensions", () => {
+  const config = parseBillingConfig({
+    billingMode: "hybrid",
+    currency: "USD",
+    charges: {},
+    parameterPrices: {
+      combinations: {
+        "resolution=720p__duration=5__hasReferenceVideos=false__hasAudio=false": 0.6,
+        "resolution=720p__duration=5__hasReferenceVideos=true__hasAudio=false": 0.9,
+        "resolution=720p__duration=5__hasReferenceVideos=true__hasAudio=true": 1.1,
+      },
+    },
+  });
+
+  const withoutReferences = resolveBillingBreakdown({
+    config,
+    requestInput: {
+      resolution: "720p",
+      duration: 5,
+    },
+    output: {
+      assets: [{ type: "video", url: "https://example.com/video.mp4" }],
+    },
+  });
+  assert.equal(withoutReferences.components.perVideo, 0.6);
+
+  const withReferenceVideos = resolveBillingBreakdown({
+    config,
+    requestInput: {
+      resolution: "720p",
+      duration: 5,
+      reference_videos: ["https://example.com/reference.mp4"],
+    },
+    output: {
+      assets: [{ type: "video", url: "https://example.com/video.mp4" }],
+    },
+  });
+  assert.equal(withReferenceVideos.components.perVideo, 0.9);
+
+  const withReferenceVideosAndAudio = resolveBillingBreakdown({
+    config,
+    requestInput: {
+      resolution: "720p",
+      duration: 5,
+      reference_videos: ["https://example.com/reference.mp4"],
+      generate_audio: true,
+    },
+    output: {
+      assets: [{ type: "video", url: "https://example.com/video.mp4" }],
+    },
+  });
+  assert.equal(withReferenceVideosAndAudio.components.perVideo, 1.1);
+});

@@ -58,6 +58,9 @@ export type ModelDocRow = {
   priceTiers: Array<{
     resolution: string;
     quality: string;
+    duration?: string;
+    hasReferenceVideos?: string;
+    hasAudio?: string;
     price: number;
     label: string;
   }>;
@@ -134,10 +137,32 @@ function formatUsd(value: number) {
 }
 
 function splitCombinationKey(key: string) {
+  if (key.includes("=")) {
+    const result: Record<string, string> = {};
+    for (const part of key.split("__")) {
+      const separatorIndex = part.indexOf("=");
+      if (separatorIndex <= 0 || separatorIndex === part.length - 1) continue;
+      const name = part.slice(0, separatorIndex).trim();
+      const value = part.slice(separatorIndex + 1).trim();
+      if (!name || !value) continue;
+      result[name] = value;
+    }
+    return {
+      resolution: result.resolution || "default",
+      quality: result.quality || "default",
+      duration: result.duration || "default",
+      hasReferenceVideos: result.hasReferenceVideos || "default",
+      hasAudio: result.hasAudio || "default",
+    };
+  }
+
   const [resolution, quality] = key.split("__");
   return {
     resolution: resolution || "default",
     quality: quality || "default",
+    duration: "default",
+    hasReferenceVideos: "default",
+    hasAudio: "default",
   };
 }
 
@@ -164,7 +189,10 @@ function readPriceTiers(value: unknown) {
         const labels = splitCombinationKey(key);
         const labelParts = [
           tierDimensionLabel("Resolution", labels.resolution),
+          tierDimensionLabel("Duration", labels.duration),
           tierDimensionLabel("Quality", labels.quality),
+          tierDimensionLabel("Reference Videos", labels.hasReferenceVideos),
+          tierDimensionLabel("Audio", labels.hasAudio),
           `${formatUsd(numericPrice)} / image`,
         ].filter(Boolean);
         return {
@@ -173,11 +201,22 @@ function readPriceTiers(value: unknown) {
           label: labelParts.join(" · "),
         };
       })
-      .filter((item): item is { resolution: string; quality: string; price: number; label: string } => Boolean(item))
+      .filter((item): item is {
+        resolution: string;
+        quality: string;
+        duration: string;
+        hasReferenceVideos: string;
+        hasAudio: string;
+        price: number;
+        label: string;
+      } => Boolean(item))
       .sort((a, b) =>
         a.resolution.localeCompare(b.resolution, "en-US", { numeric: true }) ||
+        a.duration.localeCompare(b.duration ?? "default", "en-US", { numeric: true }) ||
         (QUALITY_ORDER.indexOf(a.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(a.quality)) -
           (QUALITY_ORDER.indexOf(b.quality) === -1 ? 99 : QUALITY_ORDER.indexOf(b.quality)) ||
+        a.hasReferenceVideos.localeCompare(b.hasReferenceVideos ?? "default", "en-US", { numeric: true }) ||
+        a.hasAudio.localeCompare(b.hasAudio ?? "default", "en-US", { numeric: true }) ||
         a.quality.localeCompare(b.quality, "en-US", { numeric: true })
       );
     if (combinationTiers.length > 0) {

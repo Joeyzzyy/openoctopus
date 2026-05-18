@@ -2818,6 +2818,7 @@ export function ProvidersPanel({
                             <ManagedDialogForm action={updateProvider} close={close}>
                               <input type="hidden" name="providerId" value={provider.id} />
                               <FormField label="名称" name="name" defaultValue={provider.name} required />
+                              <FormField label="Slug" name="slug" defaultValue={provider.slug} required />
                               <FormField label="基础 URL" name="baseUrl" defaultValue={provider.base_url ?? ""} />
                               <FormSelect label="状态" name="status" defaultValue={provider.status} options={[...providerStatusOptions]} />
                               <FormField label="区域" name="regions" defaultValue={(provider.regions ?? []).join(", ")} />
@@ -3038,21 +3039,19 @@ export function CredentialsPanel({
 
                 <ManagementDialog
                   trigger={<ModalButton tone="secondary">删除</ModalButton>}
-                  disabled={credential.is_active}
                   title={`删除 ${credential.label}`}
-                  description="确认是否删除这个未启用的供应商密钥。"
+                  description="确认是否删除这个供应商密钥。"
                 >
                   {({ close }) => (
                   <ManagedDialogForm action={deleteProviderCredential} close={close}>
                     <input type="hidden" name="credentialId" value={credential.id} />
                     <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
-                      这个操作会永久删除供应商密钥记录。必须先停用后才能删除。
+                      这个操作会永久删除供应商密钥记录，删除后无法恢复。
                     </div>
                     <div className="flex justify-end">
                       <SubmitButton
                         label="删除供应商密钥"
                         pendingLabel="删除中..."
-                        disabled={credential.is_active}
                         tone="danger"
                       />
                     </div>

@@ -1063,7 +1063,7 @@ export default async function InternalPage({
             <>
               <SectionShell
                 id="providers-panel"
-                title={internalCopy.sections.providers}
+                title=""
                 description=" "
                 headerRight={<CreateProviderButton providerStatusOptions={displayProviderStatusOptions} />}
               >

@@ -740,8 +740,8 @@ export function resolveBillingBreakdown(input: {
       requestInput?.duration_seconds ??
       requestInput?.duration
   );
-  const normalizedHasReferenceVideos = resolveHasReferenceVideos(requestInput);
-  const normalizedHasAudio = resolveHasAudio(requestInput);
+  const normalizedHasReferenceVideos = resolveHasReferenceVideos(requestInput) || "false";
+  const normalizedHasAudio = resolveHasAudio(requestInput) || "false";
   const resolutionMultiplier =
     normalizedResolution &&
     config.parameterMultipliers?.resolution &&

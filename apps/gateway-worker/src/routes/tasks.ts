@@ -39,7 +39,8 @@ function redactOutputAssetSourceUrl(outputPayload: unknown) {
     if (!("sourceUrl" in assetRecord)) {
       return asset;
     }
-    const { sourceUrl: _sourceUrl, ...rest } = assetRecord;
+    const rest = { ...assetRecord };
+    delete rest.sourceUrl;
     return rest;
   });
 
@@ -55,13 +56,64 @@ import {
   RequestValidationError,
 } from "../services/request-service.js";
 
-const imageRequestSchema = z.object({
+function isHttpUrl(candidate: string) {
+  try {
+    const url = new URL(candidate);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function validateReferenceUrlFields(
+  input: Record<string, unknown>,
+  context: z.RefinementCtx
+) {
+  const validateReferenceUrlField = (fieldName: string) => {
+    const raw = input[fieldName];
+    if (raw === undefined || raw === null || raw === "") return;
+
+    const items = Array.isArray(raw) ? raw : [raw];
+    if (items.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["input", fieldName],
+        message: `${fieldName} must contain at least one accessible HTTP(S) asset URL`,
+      });
+      return;
+    }
+
+    const invalid = items.some((item) => typeof item !== "string" || !isHttpUrl(item.trim()));
+    if (invalid) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["input", fieldName],
+        message: `${fieldName} must be a usable HTTP(S) asset URL or an array of usable HTTP(S) asset URLs`,
+      });
+    }
+  };
+
+  for (const fieldName of [
+    "reference_image",
+    "reference_images",
+    "reference_video",
+    "reference_videos",
+    "reference_audio",
+    "reference_audios",
+  ]) {
+    validateReferenceUrlField(fieldName);
+  }
+}
+
+export const imageRequestSchema = z.object({
   model: z.string().min(1),
   prompt: z.string().min(1).optional(),
   input: z.record(z.string(), z.unknown()).default({}),
+}).superRefine((value, context) => {
+  validateReferenceUrlFields(value.input, context);
 });
 
-const imageEditRequestSchema = imageRequestSchema.superRefine((value, context) => {
+export const imageEditRequestSchema = imageRequestSchema.superRefine((value, context) => {
   if (!value.prompt?.trim()) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
@@ -84,7 +136,7 @@ const imageEditRequestSchema = imageRequestSchema.superRefine((value, context) =
   }
 });
 
-const videoRequestSchema = z.object({
+export const videoRequestSchema = z.object({
   model: z.string().min(1),
   prompt: z.string().min(1).optional(),
   input: z.record(z.string(), z.unknown()).default({}),
@@ -93,6 +145,8 @@ const videoRequestSchema = z.object({
   durationSeconds: z.union([z.number(), z.string()]).optional(),
   aspect_ratio: z.string().optional(),
   resolution: z.string().optional(),
+}).superRefine((value, context) => {
+  validateReferenceUrlFields(value.input, context);
 });
 
 export async function registerTaskRoutes(app: FastifyInstance) {

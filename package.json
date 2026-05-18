@@ -18,6 +18,7 @@
     "lint": "eslint",
     "lint:web": "eslint",
     "smoke:images": "node tests/api-smoke/scripts/images.generations.mjs",
+    "smoke:videos": "node tests/api-smoke/scripts/videos.generations.mjs",
     "smoke:api": "npm run smoke:images"
   },
   "dependencies": {

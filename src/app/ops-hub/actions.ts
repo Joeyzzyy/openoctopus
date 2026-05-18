@@ -795,6 +795,7 @@ export async function updateProviderStatus(formData: FormData) {
 const updateProviderSchema = z.object({
   providerId: z.string().uuid(),
   name: z.string().min(2).max(80),
+  slug: z.string().min(2).max(80),
   baseUrl: z.string().url().optional().or(z.literal("")),
   status: providerStatusSchema,
   regions: z.array(z.string()).default([]),
@@ -868,6 +869,7 @@ export async function updateProvider(formData: FormData) {
   const parsed = updateProviderSchema.parse({
     providerId: formData.get("providerId"),
     name: formData.get("name"),
+    slug: formData.get("slug"),
     baseUrl: normalizeOptionalText(formData.get("baseUrl")) ?? "",
     status: formData.get("status"),
     regions: parseStringArray(formData.get("regions")),
@@ -879,6 +881,7 @@ export async function updateProvider(formData: FormData) {
     .from("providers")
     .update({
       name: parsed.name,
+      slug: parsed.slug,
       base_url: parsed.baseUrl || null,
       status: parsed.status,
       regions,
@@ -1365,10 +1368,6 @@ export async function deleteProviderCredential(formData: FormData) {
 
   if (!credentialRow) {
     throw new Error("Provider credential is missing");
-  }
-
-  if (credentialRow.is_active) {
-    throw new Error("Deactivate this credential before deleting it");
   }
 
   const { error } = await supabase

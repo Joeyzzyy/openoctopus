@@ -1,0 +1,51 @@
+[
+  {
+    "id": "seedance-2.0-text-to-video-with-reference-assets",
+    "model": "openoctopus/bytedance/seedance-2.0/text-to-video",
+    "endpoint": "/v1/videos/generations",
+    "payload": {
+      "model": "openoctopus/bytedance/seedance-2.0/text-to-video",
+      "prompt": "a cinematic octopus swimming through a neon underwater city",
+      "input": {
+        "reference_images": [
+          "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/06882d5f-d093-44c5-a277-63c34c9cfe70/playground-input-1779003530279-1776786640458643012-6ubpclu4.png"
+        ],
+        "duration": 5,
+        "reference_videos": [
+          "https://samplelib.com/preview/mp4/sample-5s.mp4"
+        ],
+        "reference_audios": [
+          "https://samplelib.com/mp3/sample-3s.mp3"
+        ],
+        "resolution": "720p",
+        "generate_audio": true
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "assetCountMin": 1,
+      "timeoutMs": 300000
+    }
+  },
+  {
+    "id": "seedance-2.0-text-to-video-omit-reference-assets",
+    "model": "openoctopus/bytedance/seedance-2.0/text-to-video",
+    "endpoint": "/v1/videos/generations",
+    "payload": {
+      "model": "openoctopus/bytedance/seedance-2.0/text-to-video",
+      "prompt": "a cinematic octopus swimming through a neon underwater city",
+      "input": {
+        "duration": 5,
+        "resolution": "720p",
+        "generate_audio": true
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "assetCountMin": 1,
+      "timeoutMs": 300000
+    }
+  }
+]

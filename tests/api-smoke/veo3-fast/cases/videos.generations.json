@@ -1,0 +1,38 @@
+[
+  {
+    "id": "veo3-fast-basic",
+    "model": "openoctopus/google/veo3-fast",
+    "endpoint": "/v1/videos/generations",
+    "payload": {
+      "model": "openoctopus/google/veo3-fast",
+      "prompt": "a cinematic octopus swimming through a neon underwater city",
+      "input": {
+        "duration": 4,
+        "resolution": "720p"
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "assetCountMin": 1
+    }
+  },
+  {
+    "id": "veo3-fast-omit-reference-assets",
+    "model": "openoctopus/google/veo3-fast",
+    "endpoint": "/v1/videos/generations",
+    "payload": {
+      "model": "openoctopus/google/veo3-fast",
+      "prompt": "a cinematic octopus swimming through a neon underwater city",
+      "input": {
+        "duration": 4,
+        "resolution": "720p"
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "assetCountMin": 1
+    }
+  }
+]

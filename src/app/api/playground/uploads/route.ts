@@ -6,7 +6,7 @@ import { buildGatewayErrorResponse, isGatewayValidationError } from "@/lib/gatew
 import { getAuthedWorkspaceForPlayground } from "@/lib/playground-key-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const UPLOAD_BUCKET = process.env.GENERATED_ASSETS_BUCKET || "generated-assets";
 
@@ -14,6 +14,17 @@ const allowedMimeTypes = new Map([
   ["image/png", "png"],
   ["image/jpeg", "jpg"],
   ["image/webp", "webp"],
+  ["image/gif", "gif"],
+  ["video/mp4", "mp4"],
+  ["video/webm", "webm"],
+  ["video/quicktime", "mov"],
+  ["audio/mpeg", "mp3"],
+  ["audio/wav", "wav"],
+  ["audio/x-wav", "wav"],
+  ["audio/mp4", "m4a"],
+  ["audio/aac", "aac"],
+  ["audio/ogg", "ogg"],
+  ["audio/webm", "webm"],
 ]);
 
 const uploadSchema = z.object({
@@ -48,7 +59,7 @@ export async function POST(request: Request) {
           error: {
             ...response.payload.error,
             message:
-              "Upload must be a PNG, JPEG, or WebP image no larger than 20MB.",
+              "Upload must be a supported image, video, or audio file no larger than 100MB.",
           },
         },
         { status: response.statusCode }

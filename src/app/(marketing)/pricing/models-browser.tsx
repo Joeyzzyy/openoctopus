@@ -28,6 +28,8 @@ type PlaygroundUpload = {
   size: number;
 };
 
+type UploadFieldKind = "image" | "video" | "audio";
+
 type TaskStatus =
   | "idle"
   | "submitting"
@@ -784,6 +786,7 @@ function isResolutionField(key: string) {
 
 function isImageUploadField(field: JsonSchemaField) {
   const key = field.key.trim().toLowerCase();
+  if (field.type === "boolean") return false;
   if (["num_images", "number_of_images", "image_count", "n_images"].includes(key)) return false;
   return (
     key === "images" ||
@@ -798,6 +801,49 @@ function isImageUploadField(field: JsonSchemaField) {
     key.endsWith("_image") ||
     key.endsWith("_images")
   );
+}
+
+function isVideoUploadField(field: JsonSchemaField) {
+  const key = field.key.trim().toLowerCase();
+  if (field.type === "boolean") return false;
+  return (
+    key === "video" ||
+    key === "videos" ||
+    key === "reference_video" ||
+    key === "reference_videos" ||
+    key === "source_video" ||
+    key === "input_video" ||
+    key === "target_video" ||
+    key.endsWith("_video") ||
+    key.endsWith("_videos")
+  );
+}
+
+function isAudioUploadField(field: JsonSchemaField) {
+  const key = field.key.trim().toLowerCase();
+  if (field.type === "boolean") return false;
+  return (
+    key === "audio" ||
+    key === "audios" ||
+    key === "reference_audio" ||
+    key === "reference_audios" ||
+    key === "source_audio" ||
+    key === "input_audio" ||
+    key === "target_audio" ||
+    key.endsWith("_audio") ||
+    key.endsWith("_audios")
+  );
+}
+
+function getUploadFieldKind(field: JsonSchemaField): UploadFieldKind | null {
+  if (isImageUploadField(field)) return "image";
+  if (isVideoUploadField(field)) return "video";
+  if (isAudioUploadField(field)) return "audio";
+  return null;
+}
+
+function isUploadField(field: JsonSchemaField) {
+  return getUploadFieldKind(field) !== null;
 }
 
 function normalizeImageFieldKey(value: string | null | undefined) {
@@ -820,9 +866,39 @@ function pickPlaygroundExampleForField(
   return examples.find((item) => item.fieldKey === null) ?? null;
 }
 
-function isMultipleImageUploadField(field: JsonSchemaField) {
+function isMultipleUploadField(field: JsonSchemaField) {
   const key = field.key.trim().toLowerCase();
-  return field.type === "array" || key === "images" || key.endsWith("_images");
+  return (
+    field.type === "array" ||
+    key === "images" ||
+    key === "videos" ||
+    key === "audios" ||
+    key.endsWith("_images") ||
+    key.endsWith("_videos") ||
+    key.endsWith("_audios")
+  );
+}
+
+function getUploadAccept(kind: UploadFieldKind) {
+  if (kind === "video") return "video/mp4,video/webm,video/quicktime";
+  if (kind === "audio") return "audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,audio/ogg,audio/webm";
+  return "image/png,image/jpeg,image/webp,image/gif";
+}
+
+function getUploadHelpText(kind: UploadFieldKind) {
+  if (kind === "video") {
+    return "Upload MP4, WebM, or MOV videos. They are converted to secure URLs before submission.";
+  }
+  if (kind === "audio") {
+    return "Upload MP3, WAV, M4A, AAC, OGG, or WebM audio. They are converted to secure URLs before submission.";
+  }
+  return "Upload PNG, JPEG, WebP, or GIF images. They are converted to secure URLs before submission.";
+}
+
+function getUploadTitle(kind: UploadFieldKind) {
+  if (kind === "video") return "video";
+  if (kind === "audio") return "audio";
+  return "image";
 }
 
 function isSliderNumberField(field: JsonSchemaField) {
@@ -869,6 +945,7 @@ function isBooleanEnabled(value: unknown) {
 
 function isBooleanSurchargeEnabled(
   form: Record<string, string>,
+  uploads: Record<string, PlaygroundUpload[]>,
   surchargeName: string
 ) {
   if (isBooleanEnabled(form[surchargeName])) {
@@ -896,7 +973,20 @@ function isBooleanSurchargeEnabled(
           ]
         : [surchargeName];
 
-  return aliases.some((key) => isBooleanEnabled(form[key]));
+  if (aliases.some((key) => isBooleanEnabled(form[key]))) {
+    return true;
+  }
+
+  if (surchargeName === "hasReferenceVideos") {
+    return [
+      "referenceVideos",
+      "reference_videos",
+      "referenceVideoUrls",
+      "reference_video_urls",
+    ].some((key) => (uploads[key] ?? []).length > 0);
+  }
+
+  return false;
 }
 
 function isValidEnumValue(value: string | undefined, enumValues?: string[]) {
@@ -907,13 +997,32 @@ function isValidEnumValue(value: string | undefined, enumValues?: string[]) {
 function findMatchingPriceTier(
   tiers: ModelDocRow["priceTiers"],
   resolution: string,
-  quality: string
+  quality: string,
+  duration: string,
+  hasReferenceVideos: string,
+  hasAudio: string
 ) {
   const normalizedResolution = resolution || "default";
   const normalizedQuality = quality || "default";
+  const normalizedDuration = duration || "default";
+  const normalizedHasReferenceVideos = hasReferenceVideos || "default";
+  const normalizedHasAudio = hasAudio || "default";
   const candidates = [
     (tier: ModelDocRow["priceTiers"][number]) =>
-      tier.resolution === normalizedResolution && tier.quality === normalizedQuality,
+      tier.resolution === normalizedResolution &&
+      tier.quality === normalizedQuality &&
+      (tier.duration ?? "default") === normalizedDuration &&
+      (tier.hasReferenceVideos ?? "default") === normalizedHasReferenceVideos &&
+      (tier.hasAudio ?? "default") === normalizedHasAudio,
+    (tier: ModelDocRow["priceTiers"][number]) =>
+      tier.resolution === normalizedResolution &&
+      tier.quality === normalizedQuality &&
+      (tier.duration ?? "default") === normalizedDuration &&
+      (tier.hasReferenceVideos ?? "default") === normalizedHasReferenceVideos,
+    (tier: ModelDocRow["priceTiers"][number]) =>
+      tier.resolution === normalizedResolution &&
+      tier.quality === normalizedQuality &&
+      (tier.duration ?? "default") === normalizedDuration,
     (tier: ModelDocRow["priceTiers"][number]) =>
       tier.resolution === normalizedResolution && tier.quality === "default",
     (tier: ModelDocRow["priceTiers"][number]) =>
@@ -1003,6 +1112,11 @@ type PlaygroundImageAsset = {
   mimeType?: string;
 };
 
+type PlaygroundVideoAsset = {
+  url: string;
+  mimeType?: string;
+};
+
 function extractImageAssets(output: unknown): PlaygroundImageAsset[] {
   if (!isRecord(output)) return [];
   const assets: PlaygroundImageAsset[] = [];
@@ -1036,6 +1150,35 @@ function extractImageAssets(output: unknown): PlaygroundImageAsset[] {
     } else {
       pushAsset(output.sourceUrl, output.mimeType);
     }
+  }
+
+  return assets;
+}
+
+function extractVideoAssets(output: unknown): PlaygroundVideoAsset[] {
+  if (!isRecord(output)) return [];
+  const assets: PlaygroundVideoAsset[] = [];
+  const seen = new Set<string>();
+  const pushAsset = (candidate: unknown, mimeType?: unknown) => {
+    if (typeof candidate !== "string") return;
+    const resolved = candidate.trim();
+    if (!resolved || seen.has(resolved)) return;
+    seen.add(resolved);
+    assets.push({
+      url: resolved,
+      ...(typeof mimeType === "string" && mimeType.length > 0 ? { mimeType } : {}),
+    });
+  };
+
+  const outputAssets = Array.isArray(output.assets) ? output.assets : [];
+  for (const item of outputAssets) {
+    if (!isRecord(item)) continue;
+    if (item.type && item.type !== "video") continue;
+    pushAsset(item.url, item.mimeType);
+  }
+
+  if (assets.length === 0) {
+    pushAsset(output.url, output.mimeType);
   }
 
   return assets;
@@ -1192,6 +1335,10 @@ export function ModelsBrowser({
     () => extractImageAssets(playgroundOutput),
     [playgroundOutput]
   );
+  const playgroundVideoAssets = useMemo(
+    () => extractVideoAssets(playgroundOutput),
+    [playgroundOutput]
+  );
   const playgroundTextOutput = useMemo(
     () => extractTextOutput(playgroundOutput),
     [playgroundOutput]
@@ -1293,7 +1440,7 @@ export function ModelsBrowser({
     const tiers = selectedModel.priceTiers ?? [];
     const booleanSurchargeTotal = (selectedModel.booleanSurcharges ?? []).reduce(
       (sum, surcharge) =>
-        sum + (isBooleanSurchargeEnabled(playgroundForm, surcharge.name) ? surcharge.price : 0),
+        sum + (isBooleanSurchargeEnabled(playgroundForm, playgroundUploads, surcharge.name) ? surcharge.price : 0),
       0
     );
     if (tiers.length === 0) {
@@ -1303,6 +1450,10 @@ export function ModelsBrowser({
     }
     const resolutionField = parsedFields.find((field) => isResolutionField(field.key));
     const qualityField = parsedFields.find((field) => field.key.trim().toLowerCase() === "quality");
+    const durationField = parsedFields.find((field) => {
+      const key = field.key.trim().toLowerCase();
+      return key === "duration" || key === "duration_seconds" || key === "durationseconds";
+    });
     const resolution =
       (resolutionField ? playgroundForm[resolutionField.key] : "") ||
       resolutionField?.enumValues?.[0] ||
@@ -1311,7 +1462,16 @@ export function ModelsBrowser({
       (qualityField ? playgroundForm[qualityField.key] : "") ||
       qualityField?.enumValues?.[0] ||
       "default";
-    const tier = findMatchingPriceTier(tiers, resolution, quality);
+    const duration =
+      (durationField ? playgroundForm[durationField.key] : "") ||
+      durationField?.enumValues?.[0] ||
+      "default";
+    const hasReferenceVideos = ["referenceVideos", "reference_videos", "referenceVideoUrls", "reference_video_urls"]
+      .some((key) => (playgroundUploads[key] ?? []).length > 0)
+      ? "true"
+      : "false";
+    const hasAudio = isBooleanSurchargeEnabled(playgroundForm, playgroundUploads, "hasAudio") ? "true" : "false";
+    const tier = findMatchingPriceTier(tiers, resolution, quality, duration, hasReferenceVideos, hasAudio);
     if (!tier) return selectedModel.priceLabel || "";
     const imageCount =
       readPositiveNumber(playgroundForm.num_images) ??
@@ -1322,7 +1482,7 @@ export function ModelsBrowser({
     return imageCount > 1
       ? `${formatUsd(total)} total · ${formatUsd(tier.price)} / image${addOnLabel}`
       : `${formatUsd(total)} total · ${formatUsd(tier.price)} / image${addOnLabel}`;
-  }, [parsedFields, playgroundForm, selectedModel]);
+  }, [parsedFields, playgroundForm, playgroundUploads, selectedModel]);
 
   useEffect(() => {
     setPlaygroundForm((current) => {
@@ -1432,7 +1592,7 @@ export function ModelsBrowser({
         ? "/v1/videos/generations"
         : "/v1/images/generations";
 
-  const uploadPlaygroundImages = async (field: JsonSchemaField, files: FileList | null) => {
+  const uploadPlaygroundAssets = async (field: JsonSchemaField, files: FileList | null) => {
     const selectedFiles = Array.from(files ?? []);
     if (selectedFiles.length === 0) return;
 
@@ -1473,7 +1633,7 @@ export function ModelsBrowser({
 
       setPlaygroundUploads((current) => ({
         ...current,
-        [field.key]: isMultipleImageUploadField(field)
+        [field.key]: isMultipleUploadField(field)
           ? [...(current[field.key] ?? []), ...uploaded]
           : uploaded.slice(0, 1),
       }));
@@ -1507,7 +1667,7 @@ export function ModelsBrowser({
 
     const nextValidationErrors: Record<string, string> = {};
     for (const field of parsedFields) {
-      if (isImageUploadField(field)) {
+      if (isUploadField(field)) {
         if (field.required && (playgroundUploads[field.key] ?? []).length === 0) {
           nextValidationErrors[field.key] = `${field.label} is required.`;
         }
@@ -1535,10 +1695,10 @@ export function ModelsBrowser({
       let promptValue: string | undefined;
 
       for (const field of parsedFields) {
-        if (isImageUploadField(field)) {
+        if (isUploadField(field)) {
           const uploads = playgroundUploads[field.key] ?? [];
           if (uploads.length > 0) {
-            inputPayload[field.key] = isMultipleImageUploadField(field)
+            inputPayload[field.key] = isMultipleUploadField(field)
               ? uploads.map((item) => item.url)
               : uploads[0]?.url;
           }
@@ -1931,21 +2091,26 @@ export function ModelsBrowser({
                         </span>
                         {field.required ? <span className="pl-1 text-red-500">*</span> : null}
                       </span>
-                      {isImageUploadField(field) ? (
+                      {isUploadField(field) ? (
                         <div className="rounded-md border border-black/[0.1] bg-white p-2.5 sm:p-3">
+                          {(() => {
+                            const uploadKind = getUploadFieldKind(field) ?? "image";
+                            const uploadTitle = getUploadTitle(uploadKind);
+                            return (
+                              <>
                           <input
                             disabled={isSubmitting || uploadingFields[field.key]}
                             type="file"
-                            accept="image/png,image/jpeg,image/webp"
-                            multiple={isMultipleImageUploadField(field)}
+                            accept={getUploadAccept(uploadKind)}
+                            multiple={isMultipleUploadField(field)}
                             onChange={(event) => {
-                              void uploadPlaygroundImages(field, event.target.files);
+                              void uploadPlaygroundAssets(field, event.target.files);
                               event.target.value = "";
                             }}
                             className="block w-full text-xs text-black/60 file:mb-2 file:mr-3 file:h-8 file:rounded-md file:border-0 file:bg-black file:px-3 file:text-xs file:font-medium file:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:file:mb-0"
                           />
                           <p className="mt-2 text-[11px] leading-5 text-black/45">
-                            Upload PNG, JPEG, or WebP images. They are converted to secure URLs before submission.
+                            {getUploadHelpText(uploadKind)}
                           </p>
                           {uploadingFields[field.key] ? (
                             <p className="mt-2 text-[11px] text-black/55">Uploading...</p>
@@ -1963,17 +2128,31 @@ export function ModelsBrowser({
                                     onClick={() => removePlaygroundUpload(field.key, index)}
                                     className="absolute right-2 top-2 z-10 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-black/[0.08] bg-white/95 text-black/50 shadow-sm hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
                                     aria-label={`Remove ${upload.name}`}
-                                    title="Remove image"
+                                    title={`Remove ${uploadTitle}`}
                                   >
                                     <X className="size-3.5" />
                                   </button>
                                   <div className="overflow-hidden rounded bg-white">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={upload.url}
-                                      alt={upload.name}
-                                      className="max-h-32 w-full object-contain"
-                                    />
+                                    {upload.mimeType.startsWith("video/") ? (
+                                      <video
+                                        src={upload.url}
+                                        controls
+                                        className="max-h-48 w-full rounded bg-black object-contain"
+                                      />
+                                    ) : upload.mimeType.startsWith("audio/") ? (
+                                      <div className="p-3">
+                                        <audio src={upload.url} controls className="w-full" />
+                                      </div>
+                                    ) : (
+                                      <>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                          src={upload.url}
+                                          alt={upload.name}
+                                          className="max-h-32 w-full object-contain"
+                                        />
+                                      </>
+                                    )}
                                   </div>
                                   <div className="mt-2 min-w-0 pr-8">
                                     <p className="truncate text-xs font-medium text-black/75">
@@ -1998,6 +2177,9 @@ export function ModelsBrowser({
                               ))}
                             </div>
                           ) : null}
+                              </>
+                            );
+                          })()}
                         </div>
                       ) : field.key === "aspect_ratio" || isAspectRatioEnum(field.enumValues) ? (
                         <select
@@ -2182,6 +2364,15 @@ export function ModelsBrowser({
                         <Download className="size-3.5" />
                         <span>Download image</span>
                       </button>
+                    ) : playgroundVideoAssets.length > 0 ? (
+                      <a
+                        href={playgroundVideoAssets[0].url}
+                        download={`${slugifyPathPart(selectedModel?.publicModel || "generated-video")}-1.mp4`}
+                        className="inline-flex h-8 items-center gap-1 rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                      >
+                        <Download className="size-3.5" />
+                        <span>Download video</span>
+                      </a>
                     ) : null}
                     {playgroundOutput ? (
                       <button
@@ -2249,6 +2440,19 @@ export function ModelsBrowser({
                           src={buildDisplayImageUrl(asset.url)}
                           alt={`Generated result ${index + 1}`}
                           className="max-h-[70vh] w-full rounded-md border border-black/[0.08] bg-white object-contain"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  {playgroundVideoAssets.length > 0 ? (
+                    <div className="grid gap-2">
+                      {playgroundVideoAssets.map((asset, index) => (
+                        <video
+                          key={`${asset.url}-${index}`}
+                          src={asset.url}
+                          controls
+                          playsInline
+                          className="max-h-[70vh] w-full rounded-md border border-black/[0.08] bg-white"
                         />
                       ))}
                     </div>

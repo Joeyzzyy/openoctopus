@@ -213,14 +213,35 @@ function CodeBlock({
   );
 }
 
-function buildPayload(model: string, capability: string) {
+function schemaHasField(schema: Record<string, unknown>, fieldName: string) {
+  const params = Array.isArray(schema.params) ? schema.params : [];
+  return params.some((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+    return typeof (item as Record<string, unknown>).name === "string"
+      && ((item as Record<string, unknown>).name as string).trim() === fieldName;
+  });
+}
+
+function buildPayload(model: string, capability: string, inputSchema: Record<string, unknown>) {
   if (capability.includes("video")) {
+    const inputLines = [
+      '    "duration": 5,',
+      '    "resolution": "720p"',
+    ];
+    if (schemaHasField(inputSchema, "reference_images") || schemaHasField(inputSchema, "reference_image")) {
+      inputLines.splice(0, 0, '    "reference_images": ["https://example.com/reference-image.png"],');
+    }
+    if (schemaHasField(inputSchema, "reference_videos") || schemaHasField(inputSchema, "reference_video")) {
+      inputLines.splice(inputLines.length - 1, 0, '    "reference_videos": ["https://example.com/reference-video.mp4"],');
+    }
+    if (schemaHasField(inputSchema, "reference_audios") || schemaHasField(inputSchema, "reference_audio")) {
+      inputLines.splice(inputLines.length - 1, 0, '    "reference_audios": ["https://example.com/reference-audio.mp3"],');
+    }
     return `{
   "model": "${model}",
   "prompt": "a cinematic octopus swimming through a neon underwater city",
   "input": {
-    "duration": 5,
-    "resolution": "720p"
+${inputLines.join("\n")}
   }
 }`;
   }
@@ -261,9 +282,9 @@ function buildEndpoint(capability: string) {
   return capability.includes("video") ? "/v1/videos/generations" : "/v1/images/generations";
 }
 
-function buildCreateExamples(model: string, capability: string) {
+function buildCreateExamples(model: string, capability: string, inputSchema: Record<string, unknown>) {
   const endpoint = buildEndpoint(capability);
-  const payload = buildPayload(model, capability);
+  const payload = buildPayload(model, capability, inputSchema);
   const compactPayload = payload.replace(/\n\s*/g, " ").replace(/\s+/g, " ").trim();
 
   const curl = [
@@ -404,23 +425,26 @@ export function ApiQuickstartCard({
   headerControls?: React.ReactNode;
   gatewayErrorDocs?: GatewayErrorDocItem[];
 }) {
-  const safeModels =
-    models && models.length > 0
-      ? models
-      : [
-          {
-            publicModel: "openoctopus/seedream-4.5",
-            displayName: "Seedream 4.5",
-            capability: "image generation",
-            inputSchemaText: "{}",
-            outputSchemaText: "{}",
-            officialDocUrl: null,
-            executionConfigText: "{}",
-            requestExampleJson: null,
-            submitResponseExampleJson: null,
-            normalizedOutputExampleJson: null,
-          },
-        ];
+  const safeModels = useMemo(
+    () =>
+      models && models.length > 0
+        ? models
+        : [
+            {
+              publicModel: "openoctopus/seedream-4.5",
+              displayName: "Seedream 4.5",
+              capability: "image generation",
+              inputSchemaText: "{}",
+              outputSchemaText: "{}",
+              officialDocUrl: null,
+              executionConfigText: "{}",
+              requestExampleJson: null,
+              submitResponseExampleJson: null,
+              normalizedOutputExampleJson: null,
+            },
+          ],
+    [models]
+  );
 
   const fallbackModel = safeModels[0]?.publicModel ?? "openoctopus/seedream-4.5";
   const resolvedModel = useMemo(
@@ -453,7 +477,11 @@ export function ApiQuickstartCard({
   const providerOutputSchema = safeParseJsonObject(selectedModel?.outputSchemaText);
   const inputFieldDocs = extractFieldDocs(providerInputSchema, "params");
   const outputFieldDocs = extractFieldDocs(providerOutputSchema, "fields");
-  const createExamples = buildCreateExamples(selectedModel?.publicModel ?? fallbackModel, capability);
+  const createExamples = buildCreateExamples(
+    selectedModel?.publicModel ?? fallbackModel,
+    capability,
+    providerInputSchema
+  );
   const pollingExamples = buildPollingExamples();
   const taskExample = buildTaskStatusCurl();
   const executionConfig = safeParseJsonObject(selectedModel?.executionConfigText);

@@ -6,7 +6,7 @@ import { sendGatewayError } from "../lib/gateway-errors.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { authenticateApiKey, RequestValidationError } from "../services/request-service.js";
 
-const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 
 const allowedMimeTypes = new Map([
@@ -14,6 +14,16 @@ const allowedMimeTypes = new Map([
   ["image/jpeg", "jpg"],
   ["image/webp", "webp"],
   ["image/gif", "gif"],
+  ["video/mp4", "mp4"],
+  ["video/webm", "webm"],
+  ["video/quicktime", "mov"],
+  ["audio/mpeg", "mp3"],
+  ["audio/wav", "wav"],
+  ["audio/x-wav", "wav"],
+  ["audio/mp4", "m4a"],
+  ["audio/aac", "aac"],
+  ["audio/ogg", "ogg"],
+  ["audio/webm", "webm"],
 ]);
 
 const querySchema = z.object({
@@ -31,7 +41,7 @@ function sanitizePathPart(value: string) {
 }
 
 function stripKnownExtension(filename: string) {
-  return filename.replace(/\.(png|jpe?g|webp|gif)$/i, "");
+  return filename.replace(/\.(png|jpe?g|webp|gif|mp4|webm|mov|mp3|wav|m4a|aac|ogg)$/i, "");
 }
 
 export async function registerUploadRoutes(app: FastifyInstance) {
