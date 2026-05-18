@@ -10,7 +10,9 @@ import {
 } from "./queue/runner.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerFileRoutes } from "./routes/files.js";
+import { registerManifestRoutes } from "./routes/manifest.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
+import { registerUploadRoutes } from "./routes/uploads.js";
 
 const app = Fastify({
   logger: {
@@ -42,6 +44,8 @@ app.setErrorHandler(async (error, request, reply) => {
 
 await registerHealthRoute(app);
 await registerFileRoutes(app);
+await registerManifestRoutes(app);
+await registerUploadRoutes(app);
 await registerTaskRoutes(app);
 
 const queueEnabled = await queueRpcAvailable();
