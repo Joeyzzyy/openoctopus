@@ -19,6 +19,7 @@ import { TopUpCelebration } from "./top-up-celebration";
 import { AccountPasswordForm } from "./account-password-form";
 import { ExplorePanel } from "./explore-panel";
 import { buildModelCanonicalPath, loadModelsPageData } from "@/app/(marketing)/models/data";
+import { CopyTextButton } from "@/app/ops-hub/copy-text-button";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -262,6 +263,14 @@ function RequestOutputPreview({
   return <div className={`flex items-center justify-center text-[11px] text-black/50 ${sizeClassName}`}>File</div>;
 }
 
+function summarizePromptWords(prompt: string, wordLimit = 10) {
+  const words = prompt.trim().split(/\s+/).filter((word) => word.length > 0);
+  if (words.length <= wordLimit) {
+    return prompt.trim();
+  }
+  return `${words.slice(0, wordLimit).join(" ")} ...`;
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -434,18 +443,7 @@ export default async function DashboardPage({
 
             {view === "request-details" ? (
               <section className="p-0">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="inline-flex h-8 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/80">
-                        <span>{formatI18n(dashboardCopy.requests.total, { count: requestPagination.total })}</span>
-                      </div>
-                      <div className="inline-flex h-8 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/80">
-                        <span>{formatI18n(dashboardCopy.requests.perPage, { count: requestPagination.pageSize })}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-2 md:hidden">
+                  <div className="space-y-2 md:hidden">
                     {requestQueueRows.length > 0 ? (
                       requestQueueRows.map((row) => (
                         <article
@@ -572,9 +570,15 @@ export default async function DashboardPage({
                                     <p className="text-sm text-black">{row.model}</p>
                                     <p className="text-xs text-black/45">{row.capability}</p>
                                     {row.promptText ? (
-                                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-black/55">
-                                        {row.promptText}
-                                      </p>
+                                      <div className="mt-1 flex items-start gap-2">
+                                        <p
+                                          className="min-w-0 flex-1 truncate text-xs leading-5 text-black/55"
+                                          title={row.promptText}
+                                        >
+                                          {summarizePromptWords(row.promptText)}
+                                        </p>
+                                        <CopyTextButton value={row.promptText} label={dashboardCopy.requests.prompt} />
+                                      </div>
                                     ) : null}
                                   </div>
                                   </div>
