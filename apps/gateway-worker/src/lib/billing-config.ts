@@ -105,6 +105,14 @@ export type BillingResolution = {
   metrics: BillingUsageMetrics;
 };
 
+const COMBINATION_KEY_DIMENSION_ORDER = [
+  "resolution",
+  "duration",
+  "quality",
+  "hasReferenceVideos",
+  "hasAudio",
+] as const;
+
 type ResolveChargeContext = {
   config: BillingConfig;
   requestInput?: Record<string, unknown> | null;
@@ -129,6 +137,164 @@ function readNumericCandidate(value: unknown): number | null {
   }
 
   return null;
+}
+
+function normalizeParameterValue(value: unknown) {
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value.trim();
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+
+  return "";
+}
+
+function sortCombinationDimensionEntries(entries: Array<[string, string]>) {
+  return entries.sort(([leftKey], [rightKey]) => {
+    const leftIndex = COMBINATION_KEY_DIMENSION_ORDER.indexOf(
+      leftKey as (typeof COMBINATION_KEY_DIMENSION_ORDER)[number]
+    );
+    const rightIndex = COMBINATION_KEY_DIMENSION_ORDER.indexOf(
+      rightKey as (typeof COMBINATION_KEY_DIMENSION_ORDER)[number]
+    );
+
+    if (leftIndex !== -1 || rightIndex !== -1) {
+      if (leftIndex === -1) return 1;
+      if (rightIndex === -1) return -1;
+      return leftIndex - rightIndex;
+    }
+
+    return leftKey.localeCompare(rightKey, "en-US");
+  });
+}
+
+function buildNamedCombinationKey(values: Record<string, string>) {
+  const entries = sortCombinationDimensionEntries(
+    Object.entries(values).filter(([, value]) => value.length > 0)
+  );
+
+  return entries.map(([key, value]) => `${key}=${value}`).join("__");
+}
+
+function parseNamedCombinationKey(key: string) {
+  if (!key.includes("=")) {
+    return null;
+  }
+
+  const parts = key.split("__");
+  const result: Record<string, string> = {};
+
+  for (const part of parts) {
+    const separatorIndex = part.indexOf("=");
+    if (separatorIndex <= 0 || separatorIndex === part.length - 1) {
+      return null;
+    }
+
+    const name = part.slice(0, separatorIndex).trim();
+    const value = part.slice(separatorIndex + 1).trim();
+    if (!name || !value) {
+      return null;
+    }
+    result[name] = value;
+  }
+
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+function resolveHasReferenceVideos(input: Record<string, unknown> | null) {
+  if (!input) {
+    return "";
+  }
+
+  const directBooleanKeys = [
+    "hasReferenceVideos",
+    "has_reference_videos",
+    "useReferenceVideos",
+    "use_reference_videos",
+  ] as const;
+  for (const key of directBooleanKeys) {
+    if (typeof input[key] === "boolean") {
+      return input[key] ? "true" : "false";
+    }
+  }
+
+  const collectionKeys = [
+    "referenceVideos",
+    "reference_videos",
+    "referenceVideoUrls",
+    "reference_video_urls",
+  ] as const;
+  for (const key of collectionKeys) {
+    const value = input[key];
+    if (Array.isArray(value)) {
+      return value.length > 0 ? "true" : "false";
+    }
+  }
+
+  return "";
+}
+
+function resolveHasAudio(input: Record<string, unknown> | null) {
+  if (!input) {
+    return "";
+  }
+
+  const directBooleanKeys = [
+    "hasAudio",
+    "has_audio",
+    "withAudio",
+    "with_audio",
+    "generateAudio",
+    "generate_audio",
+    "includeAudio",
+    "include_audio",
+  ] as const;
+  for (const key of directBooleanKeys) {
+    if (typeof input[key] === "boolean") {
+      return input[key] ? "true" : "false";
+    }
+  }
+
+  return "";
+}
+
+function isRequestBooleanEnabled(
+  requestInput: Record<string, unknown> | null,
+  key: string
+) {
+  if (!requestInput) {
+    return false;
+  }
+
+  if (requestInput[key] === true) {
+    return true;
+  }
+
+  if (key === "hasAudio") {
+    return resolveHasAudio(requestInput) === "true";
+  }
+
+  if (key === "hasReferenceVideos") {
+    return resolveHasReferenceVideos(requestInput) === "true";
+  }
+
+  return false;
+}
+
+function normalizeDurationValue(value: unknown) {
+  const normalized = normalizeParameterValue(value).toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+
+  const matched = normalized.match(/^(\d+(?:\.\d+)?)\s*s?$/);
+  return matched?.[1] ?? normalized;
 }
 
 function getNestedNumber(source: Record<string, unknown> | null, path: string[]) {
@@ -312,10 +478,6 @@ export function normalizeBillingConfig(config: BillingConfig): HybridBillingConf
   }
 }
 
-function normalizeParameterValue(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : "";
-}
-
 export function resolveBillingMetrics(input: {
   requestInput?: Record<string, unknown> | null;
   output?: Record<string, unknown> | null;
@@ -342,12 +504,86 @@ export function resolveBillingMetrics(input: {
   };
 }
 
+function resolveParameterUnitPrice(
+  combinations: Record<string, number> | undefined,
+  dimensions: Record<string, string>
+) {
+  const prices = combinations ?? {};
+  const entries = Object.entries(prices);
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const exactNamedKey = buildNamedCombinationKey(dimensions);
+  if (exactNamedKey) {
+    const exactNamedPrice = prices[exactNamedKey];
+    if (typeof exactNamedPrice === "number" && Number.isFinite(exactNamedPrice) && exactNamedPrice > 0) {
+      return exactNamedPrice;
+    }
+  }
+
+  const matchingNamedPrices = entries
+    .map(([key, price]) => {
+      const parsed = parseNamedCombinationKey(key);
+      if (!parsed) {
+        return null;
+      }
+
+      const matches = Object.entries(parsed).every(
+        ([name, value]) => dimensions[name] && dimensions[name] === value
+      );
+      if (!matches || !Number.isFinite(price) || price <= 0) {
+        return null;
+      }
+
+      return {
+        specificity: Object.keys(parsed).length,
+        price,
+      };
+    })
+    .filter((item): item is { specificity: number; price: number } => Boolean(item))
+    .sort((a, b) => b.specificity - a.specificity || a.price - b.price);
+
+  if (matchingNamedPrices.length > 0) {
+    return matchingNamedPrices[0].price;
+  }
+
+  const resolution = dimensions.resolution ?? "";
+  const quality = dimensions.quality ?? "";
+  const legacyCandidates = [
+    resolution && quality ? `${resolution}__${quality}` : "",
+    resolution ? `${resolution}__default` : "",
+    quality ? `default__${quality}` : "",
+    resolution,
+    quality,
+  ].filter(Boolean);
+
+  for (const key of legacyCandidates) {
+    const price = prices[key];
+    if (typeof price === "number" && Number.isFinite(price) && price > 0) {
+      return price;
+    }
+  }
+
+  const validPrices = entries
+    .map(([, price]) => price)
+    .filter((price) => Number.isFinite(price) && price > 0);
+  return validPrices.length > 0 ? Math.min(...validPrices) : null;
+}
+
 export function resolveBillingBreakdown(input: ResolveChargeContext): BillingResolution {
   const config = normalizeBillingConfig(input.config);
   const metrics = resolveBillingMetrics(input);
   const requestInput = input.requestInput ?? null;
   const normalizedResolution = normalizeParameterValue(requestInput?.resolution);
-  const normalizedQuality = normalizeParameterValue(requestInput?.quality);
+  const normalizedQuality = normalizeParameterValue(requestInput?.quality).toLowerCase();
+  const normalizedDuration = normalizeDurationValue(
+    requestInput?.durationSeconds ??
+      requestInput?.duration_seconds ??
+      requestInput?.duration
+  );
+  const normalizedHasReferenceVideos = resolveHasReferenceVideos(requestInput);
+  const normalizedHasAudio = resolveHasAudio(requestInput);
   const resolutionMultiplier =
     normalizedResolution &&
     config.parameterMultipliers?.resolution &&
@@ -361,19 +597,13 @@ export function resolveBillingBreakdown(input: ResolveChargeContext): BillingRes
       ? config.parameterMultipliers.quality[normalizedQuality]
       : 1;
   const outputPriceMultiplier = resolutionMultiplier * qualityMultiplier;
-  const combinationKey =
-    normalizedResolution && normalizedQuality
-      ? `${normalizedResolution}__${normalizedQuality}`
-      : "";
-  const combinationUnitPrice =
-    combinationKey &&
-    config.parameterPrices?.combinations &&
-    typeof config.parameterPrices.combinations[combinationKey] === "number"
-      ? config.parameterPrices.combinations[combinationKey]
-      : config.parameterPrices?.combinations &&
-          Object.keys(config.parameterPrices.combinations).length > 0
-        ? Math.min(...Object.values(config.parameterPrices.combinations))
-      : null;
+  const combinationUnitPrice = resolveParameterUnitPrice(config.parameterPrices?.combinations, {
+    resolution: normalizedResolution,
+    quality: normalizedQuality,
+    duration: normalizedDuration,
+    hasReferenceVideos: normalizedHasReferenceVideos,
+    hasAudio: normalizedHasAudio,
+  });
   const perImageUnitPrice =
     combinationUnitPrice ?? (config.charges.perImage ?? 0) * outputPriceMultiplier;
   const perVideoUnitPrice =
@@ -381,7 +611,7 @@ export function resolveBillingBreakdown(input: ResolveChargeContext): BillingRes
       ? (config.charges.perVideo ?? 0) * outputPriceMultiplier
       : combinationUnitPrice ?? (config.charges.perVideo ?? 0) * outputPriceMultiplier;
   const booleanSurcharges = Object.entries(config.parameterPrices?.booleanSurcharges ?? {}).reduce(
-    (sum, [key, price]) => sum + (requestInput?.[key] === true ? price : 0),
+    (sum, [key, price]) => sum + (isRequestBooleanEnabled(requestInput, key) ? price : 0),
     0
   );
   const components = {

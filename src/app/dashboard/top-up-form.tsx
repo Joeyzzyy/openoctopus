@@ -6,7 +6,23 @@ import { createTopUpCheckoutSession } from "./actions";
 
 const PRESET_AMOUNTS = [5, 10, 20, 50, 100] as const;
 
-export function TopUpForm({ balanceLabel }: { balanceLabel?: string | null }) {
+export function TopUpForm({
+  balanceLabel,
+  labels = {
+    title: "Wallet balance",
+    description: "Top up with Stripe Checkout.",
+    amount: "Amount",
+    submit: "Top up",
+  },
+}: {
+  balanceLabel?: string | null;
+  labels?: {
+    title: string;
+    description: string;
+    amount: string;
+    submit: string;
+  };
+}) {
   const [amount, setAmount] = useState(5);
 
   return (
@@ -17,11 +33,11 @@ export function TopUpForm({ balanceLabel }: { balanceLabel?: string | null }) {
             <WalletCards className="size-4" />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] tracking-[0.35px] text-black/60">Wallet balance</p>
+            <p className="text-[11px] tracking-[0.35px] text-black/60">{labels.title}</p>
             <p className="mt-1 text-2xl font-medium tracking-tight text-black">
               {balanceLabel ?? "$0.00"}
             </p>
-            <p className="mt-2 text-xs leading-5 text-black/50">Top up with Stripe Checkout.</p>
+            <p className="mt-2 text-xs leading-5 text-black/50">{labels.description}</p>
           </div>
         </div>
 
@@ -44,7 +60,7 @@ export function TopUpForm({ balanceLabel }: { balanceLabel?: string | null }) {
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-black/70">
-            <span className="sr-only">Amount</span>
+            <span className="sr-only">{labels.amount}</span>
             <input
               type="number"
               min={1}
@@ -61,7 +77,7 @@ export function TopUpForm({ balanceLabel }: { balanceLabel?: string | null }) {
             type="submit"
             className="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-[#1F8A4C] px-4 text-xs font-medium text-white transition-colors hover:bg-[#176D3D]"
           >
-            Top up
+            {labels.submit}
           </button>
         </div>
       </div>

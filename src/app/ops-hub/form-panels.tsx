@@ -186,13 +186,39 @@ const ASPECT_RATIO_CANDIDATES = [
   "21:9",
 ];
 
-const RESOLUTION_CANDIDATES = ["0.5k", "1k", "2k", "3k", "4k"];
+const RESOLUTION_CANDIDATES = [
+  "480p",
+  "720p",
+  "1080p",
+  "1440p",
+  "2160p",
+  "0.5k",
+  "1k",
+  "2k",
+  "3k",
+  "4k",
+];
 const SIZE_CANDIDATES = ["1024*1024", "1024*1536", "1536*1024"];
 const QUALITY_CANDIDATES = ["medium", "low", "high"];
+const DURATION_CANDIDATES = Array.from({ length: 60 }, (_, index) => String(index + 1));
+const VIDEO_RESOLUTION_CANDIDATES = ["480p", "720p", "1080p"];
+const VIDEO_DURATION_CANDIDATES = ["5", "10", "15"];
+const VIDEO_REFERENCE_VIDEO_CANDIDATES = [
+  { value: "false", label: "无参考视频" },
+  { value: "true", label: "有参考视频" },
+];
+const VIDEO_AUDIO_CANDIDATES = [
+  { value: "false", label: "无音频" },
+  { value: "true", label: "有音频" },
+];
 const DETAIL_LEVEL_CANDIDATES = ["low", "medium", "high"];
 const OUTPUT_FORMAT_CANDIDATES = ["png", "jpeg", "webp"];
 const BACKGROUND_CANDIDATES = ["auto", "transparent", "opaque"];
-const BOOLEAN_SURCHARGE_CANDIDATES = ["enable_web_search", "enable_image_search"];
+const BOOLEAN_SURCHARGE_CANDIDATES = [
+  "enable_web_search",
+  "enable_image_search",
+  "hasAudio",
+];
 
 const README_MARKDOWN_PROMPT = `Generate a clean SEO-friendly README in RAW MARKDOWN SOURCE format.
 
@@ -256,6 +282,10 @@ function isQualityFieldName(value: string) {
   return value.trim().toLowerCase() === "quality";
 }
 
+function isDurationFieldName(value: string) {
+  return value.trim().toLowerCase() === "duration";
+}
+
 function isDetailLevelFieldName(value: string) {
   return value.trim().toLowerCase() === "detail_level";
 }
@@ -275,6 +305,9 @@ function defaultEnumValuesForKnownInputField(fieldName: string) {
   }
   if (normalized === "quality") {
     return ["medium", "low", "high"];
+  }
+  if (normalized === "duration") {
+    return DURATION_CANDIDATES;
   }
   if (normalized === "detail_level") {
     return DETAIL_LEVEL_CANDIDATES;
@@ -328,6 +361,7 @@ function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields")
               ? String(row.max)
               : "";
         const step = row.step !== undefined && row.step !== null ? String(row.step) : "";
+        const normalizedName = name.trim().toLowerCase();
         return {
           id: randomFieldId(),
           name,
@@ -342,9 +376,9 @@ function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields")
                 ? row.customerVisible
                 : true,
           enumValues: parsedEnumValues.length > 0 ? parsedEnumValues : fallbackEnumValues,
-          minimum,
-          maximum,
-          step,
+          minimum: minimum || (key === "params" && normalizedName === "duration" ? "1" : ""),
+          maximum: maximum || (key === "params" && normalizedName === "duration" ? "60" : ""),
+          step: step || (key === "params" && normalizedName === "duration" ? "1" : ""),
         } satisfies SchemaFieldState;
       })
       .filter((row): row is SchemaFieldState => Boolean(row));
@@ -511,10 +545,18 @@ function SchemaFieldEditor({
     }
     const nextEnumValues =
       keyName === "params" &&
-      isDetailLevelFieldName(draft.name) &&
+      (isDetailLevelFieldName(draft.name) || isDurationFieldName(draft.name)) &&
       normalizeEnumValues(draft.enumValues).length === 0
-        ? DETAIL_LEVEL_CANDIDATES
+        ? isDurationFieldName(draft.name)
+          ? DURATION_CANDIDATES
+          : DETAIL_LEVEL_CANDIDATES
         : normalizeEnumValues(draft.enumValues);
+    const nextMinimum =
+      isDurationFieldName(draft.name) && draft.minimum.trim().length === 0 ? "1" : draft.minimum.trim();
+    const nextMaximum =
+      isDurationFieldName(draft.name) && draft.maximum.trim().length === 0 ? "60" : draft.maximum.trim();
+    const nextStep =
+      isDurationFieldName(draft.name) && draft.step.trim().length === 0 ? "1" : draft.step.trim();
     if (editingId) {
       setRows((current) =>
         current.map((row) =>
@@ -523,9 +565,9 @@ function SchemaFieldEditor({
                 ...draft,
                 name: draft.name.trim(),
                 enumValues: nextEnumValues,
-                minimum: draft.minimum.trim(),
-                maximum: draft.maximum.trim(),
-                step: draft.step.trim(),
+                minimum: nextMinimum,
+                maximum: nextMaximum,
+                step: nextStep,
               }
             : row
         )
@@ -537,9 +579,9 @@ function SchemaFieldEditor({
           ...draft,
           name: draft.name.trim(),
           enumValues: nextEnumValues,
-          minimum: draft.minimum.trim(),
-          maximum: draft.maximum.trim(),
-          step: draft.step.trim(),
+          minimum: nextMinimum,
+          maximum: nextMaximum,
+          step: nextStep,
         },
       ]);
     }
@@ -740,6 +782,7 @@ function SchemaFieldEditor({
               ) : null}
               {!isResolutionFieldName(draft.name) &&
               !isQualityFieldName(draft.name) &&
+              !isDurationFieldName(draft.name) &&
               !isDetailLevelFieldName(draft.name) &&
               !isOutputFormatFieldName(draft.name) &&
               !isSizeFieldName(draft.name) &&
@@ -857,6 +900,75 @@ function SchemaFieldEditor({
                       );
                     })}
                   </div>
+                </div>
+              ) : null}
+              {isDurationFieldName(draft.name) ? (
+                <div className="rounded-md border border-[#BAE6FD] bg-[#F8FCFF] p-2.5 md:col-span-2">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] text-black/60">duration 可选值（秒，可多选）</p>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDraft((current) => ({
+                            ...current,
+                            enumValues: DURATION_CANDIDATES,
+                            minimum: current.minimum || "1",
+                            maximum: current.maximum || "60",
+                            step: current.step || "1",
+                          }))
+                        }
+                        className="h-7 rounded border border-black/[0.1] bg-white px-2 text-[11px] text-black/60 hover:bg-[#E0F2FE]"
+                      >
+                        全选 1-60
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDraft((current) => ({
+                            ...current,
+                            enumValues: [],
+                          }))
+                        }
+                        className="h-7 rounded border border-black/[0.1] bg-white px-2 text-[11px] text-black/60 hover:bg-[#E0F2FE]"
+                      >
+                        清空
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid max-h-52 grid-cols-4 gap-2 overflow-y-auto rounded-md border border-[#DDF4FF] bg-white p-2 sm:grid-cols-6 md:grid-cols-8">
+                    {DURATION_CANDIDATES.map((value) => {
+                      const checked = draft.enumValues.includes(value);
+                      return (
+                        <label key={value} className="inline-flex items-center gap-1.5 text-xs text-black/75">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) =>
+                              setDraft((current) => {
+                                const set = new Set(current.enumValues);
+                                if (event.target.checked) {
+                                  set.add(value);
+                                } else {
+                                  set.delete(value);
+                                }
+                                return {
+                                  ...current,
+                                  enumValues: DURATION_CANDIDATES.filter((item) => set.has(item)),
+                                  minimum: current.minimum || "1",
+                                  maximum: current.maximum || "60",
+                                  step: current.step || "1",
+                                };
+                              })
+                            }
+                            className="size-3.5"
+                          />
+                          {value}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <FieldHint help="duration 默认建议做成非必填，并提供 1 到 60 秒可选项；前台 Playground 会按这里的枚举渲染下拉选择。" />
                 </div>
               ) : null}
               {isDetailLevelFieldName(draft.name) ? (
@@ -1349,6 +1461,64 @@ function stringifyLooseNumberMap(value: Record<string, string>) {
   return JSON.stringify(Object.fromEntries(entries), null, 2);
 }
 
+const COMBINATION_KEY_DIMENSION_ORDER = [
+  "resolution",
+  "duration",
+  "quality",
+  "hasReferenceVideos",
+  "hasAudio",
+] as const;
+
+function sortCombinationDimensionEntries(entries: Array<[string, string]>) {
+  return entries.sort(([leftKey], [rightKey]) => {
+    const leftIndex = COMBINATION_KEY_DIMENSION_ORDER.indexOf(
+      leftKey as (typeof COMBINATION_KEY_DIMENSION_ORDER)[number]
+    );
+    const rightIndex = COMBINATION_KEY_DIMENSION_ORDER.indexOf(
+      rightKey as (typeof COMBINATION_KEY_DIMENSION_ORDER)[number]
+    );
+
+    if (leftIndex !== -1 || rightIndex !== -1) {
+      if (leftIndex === -1) return 1;
+      if (rightIndex === -1) return -1;
+      return leftIndex - rightIndex;
+    }
+
+    return leftKey.localeCompare(rightKey, "en-US");
+  });
+}
+
+function buildNamedCombinationKey(values: Record<string, string>) {
+  const entries = sortCombinationDimensionEntries(
+    Object.entries(values).filter(([, value]) => value.trim().length > 0)
+  );
+
+  return entries.map(([key, value]) => `${key}=${value.trim()}`).join("__");
+}
+
+function parseNamedCombinationKey(key: string) {
+  if (!key.includes("=")) {
+    return null;
+  }
+
+  const result: Record<string, string> = {};
+  for (const part of key.split("__")) {
+    const separatorIndex = part.indexOf("=");
+    if (separatorIndex <= 0 || separatorIndex === part.length - 1) {
+      return null;
+    }
+
+    const name = part.slice(0, separatorIndex).trim();
+    const value = part.slice(separatorIndex + 1).trim();
+    if (!name || !value) {
+      return null;
+    }
+    result[name] = value;
+  }
+
+  return Object.keys(result).length > 0 ? result : null;
+}
+
 function buildCombinationKey(resolution: string, quality: string) {
   return `${resolution}__${quality}`;
 }
@@ -1359,6 +1529,20 @@ function buildResolutionPriceKey(resolution: string) {
 
 function buildQualityPriceKey(quality: string) {
   return buildCombinationKey("default", quality);
+}
+
+function buildVideoCombinationKey(
+  resolution: string,
+  duration: string,
+  hasReferenceVideos: "true" | "false",
+  hasAudio: "true" | "false"
+) {
+  return buildNamedCombinationKey({
+    resolution,
+    duration,
+    hasReferenceVideos,
+    hasAudio,
+  });
 }
 
 function readParameterPricesCombinations(parsed: Record<string, unknown>) {
@@ -1396,6 +1580,26 @@ function splitSingleDimensionPrices(
       value,
     ])
   );
+}
+
+function detectCombinationPricingVariant(combinations: Record<string, unknown>) {
+  const values = Object.keys(combinations)
+    .map((key) => parseNamedCombinationKey(key))
+    .filter((item): item is Record<string, string> => Boolean(item));
+
+  if (
+    values.length > 0 &&
+    values.every(
+      (item) =>
+        item.duration &&
+        item.hasReferenceVideos &&
+        item.resolution
+    )
+  ) {
+    return "video";
+  }
+
+  return "image";
 }
 
 function readParameterPricesBooleanSurcharges(parsed: Record<string, unknown>) {
@@ -1915,11 +2119,20 @@ function ParameterMultiplierTable({
 function BooleanSurchargeTable({
   values,
   onChange,
+  capability,
 }: {
   values: Record<string, string>;
   onChange: (key: string, value?: string) => void;
+  capability?: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
 }) {
   const candidates = Array.from(new Set([...BOOLEAN_SURCHARGE_CANDIDATES, ...Object.keys(values)]));
+  const labelForCandidate = (candidate: string) => {
+    if (candidate === "hasAudio" && capability === "video_generation") {
+      return "是否带音频";
+    }
+
+    return candidate;
+  };
 
   return (
     <div className="mt-3 rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
@@ -1947,7 +2160,13 @@ function BooleanSurchargeTable({
                       className="size-3.5"
                     />
                   </td>
-                  <td className="px-2 py-1.5 font-mono text-black/70">{candidate}</td>
+                  <td className="px-2 py-1.5 text-black/70">
+                    {candidate === "hasAudio" && capability === "video_generation" ? (
+                      <span>{labelForCandidate(candidate)} <span className="font-mono text-black/45">({candidate})</span></span>
+                    ) : (
+                      <span className="font-mono">{candidate}</span>
+                    )}
+                  </td>
                   <td className="px-2 py-1.5">
                     <input
                       type="number"
@@ -1965,7 +2184,13 @@ function BooleanSurchargeTable({
           </tbody>
         </table>
       </div>
-      <FieldHint help="当请求 input 里的对应 boolean 参数为 true 时，把这里配置的金额直接加到本次请求总价上。" />
+      <FieldHint
+        help={
+          capability === "video_generation"
+            ? "当请求 input 里的对应 boolean 参数为 true 时，把这里配置的金额直接加到本次请求总价上。视频模型可用 hasAudio 作为带音频附加费。"
+            : "当请求 input 里的对应 boolean 参数为 true 时，把这里配置的金额直接加到本次请求总价上。"
+        }
+      />
     </div>
   );
 }
@@ -1973,11 +2198,13 @@ function BooleanSurchargeTable({
 export function BillingConfigEditor({
   name = "billingConfig",
   initialValue,
+  capability,
   componentHint = "启用一个或多个计费维度。Gemini 2.5 Flash Image 通常按输入 token 和输出图片共同计费。",
   generatedLabel = "生成的计费配置",
 }: {
   name?: string;
   initialValue?: string;
+  capability?: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
   componentHint?: string;
   generatedLabel?: string;
 }) {
@@ -1990,6 +2217,9 @@ export function BillingConfigEditor({
   const qualityMultiplierMap = safeParseLooseNumberMap(state.qualityMultipliersJson);
   const combinationPriceMap = safeParseLooseNumberMap(state.combinationPricesJson);
   const booleanSurchargeMap = safeParseLooseNumberMap(state.booleanSurchargesJson);
+  const combinationPricingVariant = detectCombinationPricingVariant(combinationPriceMap);
+  const isVideoPricingEditor =
+    capability === "video_generation" || combinationPricingVariant === "video";
   const inputMethod = state.chargeInputTokens
     ? "input_tokens"
     : "none";
@@ -2117,7 +2347,11 @@ export function BillingConfigEditor({
                 <option value="resolution_multiplier">按 resolution 阶梯单价</option>
                 <option value="quality_multiplier">按 quality 阶梯单价</option>
                 <option value="per_video">按视频</option>
-                <option value="combination_prices">按 resolution + quality 组合阶梯</option>
+                <option value="combination_prices">
+                  {isVideoPricingEditor
+                    ? "按 resolution + duration + reference + audio 组合阶梯"
+                    : "按 resolution + quality 组合阶梯"}
+                </option>
                 <option value="per_second">按秒</option>
                 <option value="output_tokens">按输出 Token（每百万）</option>
               </select>
@@ -2175,56 +2409,131 @@ export function BillingConfigEditor({
 
       {outputMethod === "combination_prices" ? (
       <div className="mt-3 rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
-        <p className="text-[11px] tracking-[0.35px] text-black/60">resolution + quality 组合阶梯单价</p>
+          <p className="text-[11px] tracking-[0.35px] text-black/60">
+          {isVideoPricingEditor
+            ? "resolution + duration + reference videos + audio 组合阶梯单价"
+            : "resolution + quality 组合阶梯单价"}
+        </p>
         <div className="mt-2 overflow-x-auto rounded-lg border border-[#DDF4FF] bg-white">
           <table className="min-w-[560px] w-full text-left text-xs">
             <thead className="bg-[#F8FCFF] text-black/45">
               <tr>
                 <th className="px-2 py-2 font-medium">启用</th>
                 <th className="px-2 py-2 font-medium">resolution</th>
-                <th className="px-2 py-2 font-medium">quality</th>
+                <th className="px-2 py-2 font-medium">
+                  {isVideoPricingEditor ? "duration" : "quality"}
+                </th>
+                {isVideoPricingEditor ? (
+                  <>
+                    <th className="px-2 py-2 font-medium">reference videos</th>
+                    <th className="px-2 py-2 font-medium">audio</th>
+                  </>
+                ) : null}
                 <th className="px-2 py-2 font-medium">输出单价</th>
               </tr>
             </thead>
             <tbody>
-              {RESOLUTION_CANDIDATES.flatMap((resolution) =>
-                QUALITY_CANDIDATES.map((quality) => {
-                  const key = buildCombinationKey(resolution, quality);
-                  const enabled = key in combinationPriceMap;
-                  const inputValue = combinationPriceMap[key] ?? String(Number(state.costPerImage || state.costPerVideo || 1));
-                  return (
-                    <tr key={key} className="border-t border-black/[0.05]">
-                      <td className="px-2 py-1.5">
-                        <input
-                          type="checkbox"
-                          checked={enabled}
-                          onChange={(event) =>
-                            updateCombinationPrice(key, event.target.checked ? inputValue : undefined)
-                          }
-                          className="size-3.5"
-                        />
-                      </td>
-                      <td className="px-2 py-1.5 text-black/70">{resolution}</td>
-                      <td className="px-2 py-1.5 text-black/70">{quality}</td>
-                      <td className="px-2 py-1.5">
-                        <input
-                          type="number"
-                          min="0.000001"
-                          step="0.000001"
-                          value={inputValue}
-                          disabled={!enabled}
-                          onChange={(event) => updateCombinationPrice(key, event.target.value)}
-                          className="h-8 w-28 rounded-md border border-[#BAE6FD] bg-white px-2 text-xs text-black disabled:bg-black/[0.03] disabled:text-black/35"
-                        />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+              {isVideoPricingEditor
+                ? VIDEO_RESOLUTION_CANDIDATES.flatMap((resolution) =>
+                    VIDEO_DURATION_CANDIDATES.flatMap((duration) =>
+                      VIDEO_REFERENCE_VIDEO_CANDIDATES.flatMap(
+                        ({ value: referenceValue, label: referenceLabel }) =>
+                          VIDEO_AUDIO_CANDIDATES.map(({ value: audioValue, label: audioLabel }) => {
+                            const key = buildVideoCombinationKey(
+                              resolution,
+                              duration,
+                              referenceValue as "true" | "false",
+                              audioValue as "true" | "false"
+                            );
+                            const enabled = key in combinationPriceMap;
+                            const inputValue =
+                              combinationPriceMap[key] ??
+                              String(Number(state.costPerVideo || state.costPerImage || 1));
+                            return (
+                              <tr key={key} className="border-t border-black/[0.05]">
+                                <td className="px-2 py-1.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={enabled}
+                                    onChange={(event) =>
+                                      updateCombinationPrice(
+                                        key,
+                                        event.target.checked ? inputValue : undefined
+                                      )
+                                    }
+                                    className="size-3.5"
+                                  />
+                                </td>
+                                <td className="px-2 py-1.5 text-black/70">{resolution}</td>
+                                <td className="px-2 py-1.5 text-black/70">{duration}s</td>
+                                <td className="px-2 py-1.5 text-black/70">{referenceLabel}</td>
+                                <td className="px-2 py-1.5 text-black/70">{audioLabel}</td>
+                                <td className="px-2 py-1.5">
+                                  <input
+                                    type="number"
+                                    min="0.000001"
+                                    step="0.000001"
+                                    value={inputValue}
+                                    disabled={!enabled}
+                                    onChange={(event) => updateCombinationPrice(key, event.target.value)}
+                                    className="h-8 w-28 rounded-md border border-[#BAE6FD] bg-white px-2 text-xs text-black disabled:bg-black/[0.03] disabled:text-black/35"
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })
+                      )
+                    )
+                  )
+                : RESOLUTION_CANDIDATES.flatMap((resolution) =>
+                    QUALITY_CANDIDATES.map((quality) => {
+                      const key = buildCombinationKey(resolution, quality);
+                      const enabled = key in combinationPriceMap;
+                      const inputValue =
+                        combinationPriceMap[key] ??
+                        String(Number(state.costPerImage || state.costPerVideo || 1));
+                      return (
+                        <tr key={key} className="border-t border-black/[0.05]">
+                          <td className="px-2 py-1.5">
+                            <input
+                              type="checkbox"
+                              checked={enabled}
+                              onChange={(event) =>
+                                updateCombinationPrice(
+                                  key,
+                                  event.target.checked ? inputValue : undefined
+                                )
+                              }
+                              className="size-3.5"
+                            />
+                          </td>
+                          <td className="px-2 py-1.5 text-black/70">{resolution}</td>
+                          <td className="px-2 py-1.5 text-black/70">{quality}</td>
+                          <td className="px-2 py-1.5">
+                            <input
+                              type="number"
+                              min="0.000001"
+                              step="0.000001"
+                              value={inputValue}
+                              disabled={!enabled}
+                              onChange={(event) => updateCombinationPrice(key, event.target.value)}
+                              className="h-8 w-28 rounded-md border border-[#BAE6FD] bg-white px-2 text-xs text-black disabled:bg-black/[0.03] disabled:text-black/35"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
             </tbody>
           </table>
         </div>
-        <FieldHint help="选择组合阶梯计价后，基础 perImage/perVideo 不再参与输出计价；命中的 resolution + quality 组合会直接作为每张图片/每个视频的输出单价。" />
+        <FieldHint
+          help={
+            isVideoPricingEditor
+              ? "选择组合阶梯计价后，基础 perVideo 不再参与输出计价；命中的 resolution + duration + hasReferenceVideos + hasAudio 组合会直接作为每个视频的输出单价。"
+              : "选择组合阶梯计价后，基础 perImage/perVideo 不再参与输出计价；命中的 resolution + quality 组合会直接作为每张图片/每个视频的输出单价。"
+          }
+        />
       </div>
       ) : null}
 
@@ -2253,7 +2562,11 @@ export function BillingConfigEditor({
         </div>
       ) : null}
 
-      <BooleanSurchargeTable values={booleanSurchargeMap} onChange={updateBooleanSurcharge} />
+      <BooleanSurchargeTable
+        values={booleanSurchargeMap}
+        onChange={updateBooleanSurcharge}
+        capability={capability}
+      />
 
       <div className="mt-3 rounded-xl border border-[#DDF4FF] bg-[#F8FCFF] px-3 py-2.5">
         <p className="text-[11px] tracking-[0.35px] text-black/45">{generatedLabel}</p>
@@ -3292,6 +3605,7 @@ export function CreateProviderModelForm({
           <BillingConfigEditor
             name="pricing"
             initialValue={seedPricingText || defaultPricing}
+            capability={selectedSupportedModel?.capability ?? null}
             componentHint="按供应商真实结算方式填写内部进货成本。这里决定 provider cost，不影响用户售价。"
             generatedLabel="生成的供应商计费配置"
           />

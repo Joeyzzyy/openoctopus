@@ -8,8 +8,44 @@ import { Eye, EyeOff } from "lucide-react";
 
 export function AccountPasswordForm({
   hasPassword,
+  labels = {
+    password: "Password",
+    confirmPassword: "Confirm password",
+    hidePassword: "Hide password",
+    showPassword: "Show password",
+    hideConfirmPassword: "Hide confirm password",
+    showConfirmPassword: "Show confirm password",
+    required: "Both password fields are required.",
+    minLength: "Password must be at least 8 characters.",
+    mismatch: "Passwords do not match.",
+    updatedToast: "Password updated",
+    setToast: "Password set",
+    updatedSuccess: "Your password has been updated.",
+    setSuccess: "Password sign-in is now available for this Gmail address.",
+    saving: "Saving...",
+    updatePassword: "Update password",
+    setPassword: "Set password",
+  },
 }: {
   hasPassword: boolean;
+  labels?: {
+    password: string;
+    confirmPassword: string;
+    hidePassword: string;
+    showPassword: string;
+    hideConfirmPassword: string;
+    showConfirmPassword: string;
+    required: string;
+    minLength: string;
+    mismatch: string;
+    updatedToast: string;
+    setToast: string;
+    updatedSuccess: string;
+    setSuccess: string;
+    saving: string;
+    updatePassword: string;
+    setPassword: string;
+  };
 }) {
   const [state, formAction, isPending] = useActionState(updateAccountPassword, {
     success: false,
@@ -22,16 +58,16 @@ export function AccountPasswordForm({
   const formRef = useRef<HTMLFormElement>(null);
   const validationMessage = useMemo(() => {
     if (!password && !confirmPassword) return null;
-    if (!password || !confirmPassword) return "Both password fields are required.";
-    if (password.length < 8) return "Password must be at least 8 characters.";
-    if (password !== confirmPassword) return "Passwords do not match.";
+    if (!password || !confirmPassword) return labels.required;
+    if (password.length < 8) return labels.minLength;
+    if (password !== confirmPassword) return labels.mismatch;
     return null;
-  }, [confirmPassword, password]);
+  }, [confirmPassword, labels, password]);
   const canSubmit = Boolean(password && confirmPassword && !validationMessage);
 
   useEffect(() => {
     if (state.success) {
-      toast.success(hasPassword ? "Password updated" : "Password set");
+      toast.success(hasPassword ? labels.updatedToast : labels.setToast);
       formRef.current?.reset();
       window.setTimeout(() => {
         setPassword("");
@@ -41,13 +77,13 @@ export function AccountPasswordForm({
     } else if (state.error) {
       toast.error(state.error);
     }
-  }, [hasPassword, router, state]);
+  }, [hasPassword, labels, router, state]);
 
   return (
     <form ref={formRef} action={formAction} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="space-y-2">
-          <span className="text-xs font-medium text-black/60">Password</span>
+          <span className="text-xs font-medium text-black/60">{labels.password}</span>
           <span className="relative block">
             <input
               name="password"
@@ -61,7 +97,7 @@ export function AccountPasswordForm({
             />
             <button
               type="button"
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-label={showPassword ? labels.hidePassword : labels.showPassword}
               onClick={() => setShowPassword((value) => !value)}
               className="absolute right-2 top-1/2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded text-black/45 hover:bg-black/[0.04] hover:text-black"
             >
@@ -70,7 +106,7 @@ export function AccountPasswordForm({
           </span>
         </label>
         <label className="space-y-2">
-          <span className="text-xs font-medium text-black/60">Confirm password</span>
+          <span className="text-xs font-medium text-black/60">{labels.confirmPassword}</span>
           <span className="relative block">
             <input
               name="confirmPassword"
@@ -84,7 +120,7 @@ export function AccountPasswordForm({
             />
             <button
               type="button"
-              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+              aria-label={showConfirmPassword ? labels.hideConfirmPassword : labels.showConfirmPassword}
               onClick={() => setShowConfirmPassword((value) => !value)}
               className="absolute right-2 top-1/2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded text-black/45 hover:bg-black/[0.04] hover:text-black"
             >
@@ -107,8 +143,8 @@ export function AccountPasswordForm({
       {state.success ? (
         <p className="rounded-md border border-[#CFE8D5] bg-[#EFF9F1] px-3 py-2 text-sm text-[#226236]">
           {hasPassword
-            ? "Your password has been updated."
-            : "Password sign-in is now available for this Gmail address."}
+            ? labels.updatedSuccess
+            : labels.setSuccess}
         </p>
       ) : null}
 
@@ -117,7 +153,7 @@ export function AccountPasswordForm({
         disabled={isPending || !canSubmit}
         className="inline-flex h-10 items-center rounded-md border border-[#38BDF8] bg-[#38BDF8] px-4 text-sm font-medium text-white transition-colors hover:bg-[#cf7626] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isPending ? "Saving..." : hasPassword ? "Update password" : "Set password"}
+        {isPending ? labels.saving : hasPassword ? labels.updatePassword : labels.setPassword}
       </button>
     </form>
   );

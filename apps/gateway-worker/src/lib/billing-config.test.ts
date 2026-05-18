@@ -144,3 +144,32 @@ test("adds boolean parameter surcharges when request input enables them", () => 
   assert.equal(resolution.components.booleanSurcharges, 0.02);
   assert.equal(resolution.total, 0.05);
 });
+
+test("treats generate_audio as alias for hasAudio boolean surcharge", () => {
+  const config = parseBillingConfig({
+    billingMode: "hybrid",
+    currency: "USD",
+    charges: {
+      perVideo: 1.2,
+    },
+    parameterPrices: {
+      booleanSurcharges: {
+        hasAudio: 0.4,
+      },
+    },
+  });
+
+  const resolution = resolveBillingBreakdown({
+    config,
+    requestInput: {
+      generate_audio: true,
+    },
+    output: {
+      assets: [{ type: "video", url: "https://example.com/video.mp4" }],
+    },
+  });
+
+  assert.equal(resolution.components.perVideo, 1.2);
+  assert.equal(resolution.components.booleanSurcharges, 0.4);
+  assert.equal(resolution.total, 1.6);
+});

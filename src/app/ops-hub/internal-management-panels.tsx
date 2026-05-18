@@ -1,6 +1,7 @@
 "use client";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, useTransition } from "react";
 import { BadgeCheck, CircleAlert, X } from "lucide-react";
+import { toast } from "sonner";
 import { deriveLegacyBillingFields, parseBillingConfig } from "@/lib/billing-config";
 import {
   createModelVendor,
@@ -39,7 +40,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useFormStatus } from "react-dom";
 
 type CapabilityOption = { value: string; label: string };
 type ProviderStatusOption = { value: string; label: string };
@@ -95,6 +95,44 @@ type GatewayErrorDefinitionSummary = {
   createdLabel: string;
   updatedLabel: string;
 };
+
+function normalizeCapabilityForModality(
+  modality: SupportedModelSummary["modality"],
+  capability: NonNullable<SupportedModelSummary["capability"]>
+) {
+  if (modality === "video") {
+    return "video_generation";
+  }
+
+  if (modality === "text") {
+    return "image_recognition";
+  }
+
+  if (modality === "image") {
+    return capability === "video_generation" ? "image_generation" : capability;
+  }
+
+  return capability;
+}
+
+function normalizeModalityForCapability(
+  capability: NonNullable<SupportedModelSummary["capability"]>,
+  modality: SupportedModelSummary["modality"]
+) {
+  if (capability === "video_generation") {
+    return "video";
+  }
+
+  if (capability === "image_recognition" && modality === "text") {
+    return "text";
+  }
+
+  if (modality === "video") {
+    return "image";
+  }
+
+  return modality;
+}
 
 type ProviderSummary = {
   id: string;
@@ -905,24 +943,6 @@ function ManagementDialog({
   );
 }
 
-function AutoCloseWatcher({
-  submitted,
-  close,
-}: {
-  submitted: boolean;
-  close: () => void;
-}) {
-  const { pending } = useFormStatus();
-
-  useEffect(() => {
-    if (submitted && !pending) {
-      close();
-    }
-  }, [close, pending, submitted]);
-
-  return null;
-}
-
 function ManagedDialogForm({
   action,
   className = "grid gap-4",
@@ -934,17 +954,23 @@ function ManagedDialogForm({
   close: () => void;
   children: React.ReactNode;
 }) {
-  const [submitted, setSubmitted] = useState(false);
+  const [, startTransition] = useTransition();
 
   return (
     <form
-      action={action}
-      className={className}
-      onSubmit={() => {
-        setSubmitted(true);
+      action={(formData) => {
+        startTransition(async () => {
+          try {
+            await action(formData);
+            close();
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "操作失败，请重试。";
+            toast.error(message);
+          }
+        });
       }}
+      className={className}
     >
-      <AutoCloseWatcher submitted={submitted} close={close} />
       {children}
     </form>
   );
@@ -1036,6 +1062,8 @@ function SupportedModelDetailsForm({
 }) {
   const [activeTab, setActiveTab] = useState<"basic" | "pricing">("basic");
   const [pricingSeed, setPricingSeed] = useState(model.billingConfigText);
+  const [modality, setModality] = useState<SupportedModelSummary["modality"]>(model.modality);
+  const [capability, setCapability] = useState(model.capability ?? "image_generation");
 
   return (
     <ManagedDialogForm action={updateSupportedModelDetails} close={close} className="grid gap-4">
@@ -1102,7 +1130,14 @@ function SupportedModelDetailsForm({
             <FormSelect
               label="模态"
               name="modality"
-              defaultValue={model.modality}
+              value={modality}
+              onChange={(value) => {
+                const nextModality = value as SupportedModelSummary["modality"];
+                setModality(nextModality);
+                setCapability((current) =>
+                  normalizeCapabilityForModality(nextModality, current)
+                );
+              }}
               options={[
                 { value: "image", label: "图片" },
                 { value: "video", label: "视频" },
@@ -1110,7 +1145,20 @@ function SupportedModelDetailsForm({
                 { value: "text", label: "文本" },
               ]}
             />
-            <FormSelect label="能力类型" name="capability" defaultValue={model.capability ?? "image_generation"} options={[...capabilityOptions]} />
+            <FormSelect
+              label="能力类型"
+              name="capability"
+              value={capability}
+              onChange={(value) => {
+                const nextCapability =
+                  value as NonNullable<SupportedModelSummary["capability"]>;
+                setCapability(nextCapability);
+                setModality((current) =>
+                  normalizeModalityForCapability(nextCapability, current)
+                );
+              }}
+              options={[...capabilityOptions]}
+            />
           </div>
           <div className={activeTab === "pricing" ? "" : "hidden"}>
             <div className="mb-3 rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
@@ -1140,7 +1188,7 @@ function SupportedModelDetailsForm({
                 <p className="mt-2 text-xs text-black/45">当前可售模型还没有供应商映射成本配置。</p>
               )}
             </div>
-            <BillingConfigEditor initialValue={pricingSeed} />
+            <BillingConfigEditor initialValue={pricingSeed} capability={capability} />
           </div>
         </div>
       </div>
@@ -1156,6 +1204,8 @@ function FormSelect({
   name,
   options,
   defaultValue,
+  value,
+  onChange,
   disabled = false,
   help,
   className,
@@ -1164,6 +1214,8 @@ function FormSelect({
   name: string;
   options: Array<{ value: string; label: string }>;
   defaultValue?: string;
+  value?: string;
+  onChange?: (value: string) => void;
   disabled?: boolean;
   help?: string;
   className?: string;
@@ -1174,6 +1226,8 @@ function FormSelect({
       <select
         name={name}
         defaultValue={defaultValue}
+        value={value}
+        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
         disabled={disabled}
         className={formSelectClassName}
       >
@@ -2056,24 +2110,48 @@ export function CreateSupportedModelButton({
         <FormSelect
           label="模态"
           name="modality"
+          value={draftValues.modality}
+          onChange={(value) =>
+            setDraftValues((current) => {
+              const nextModality = value as SupportedModelSummary["modality"];
+              return {
+                ...current,
+                modality: nextModality,
+                capability: normalizeCapabilityForModality(
+                  nextModality,
+                  current.capability as NonNullable<SupportedModelSummary["capability"]>
+                ),
+              };
+            })
+          }
           options={[
             { value: "image", label: "图片" },
             { value: "video", label: "视频" },
             { value: "audio", label: "音频" },
             { value: "text", label: "文本" },
           ]}
-          defaultValue={draftValues.modality}
         />
         <FormSelect
           label="能力类型"
           name="capability"
           options={[...capabilityOptions]}
-          defaultValue={draftValues.capability}
+          value={draftValues.capability}
+          onChange={(value) =>
+            setDraftValues((current) => ({
+              ...current,
+              capability: value,
+              modality: normalizeModalityForCapability(
+                value as NonNullable<SupportedModelSummary["capability"]>,
+                current.modality as SupportedModelSummary["modality"]
+              ),
+            }))
+          }
         />
         <div className="md:col-span-2">
           <BillingConfigEditor
             key={`create-supported-model-billing-${formSeed}`}
             initialValue={draftValues.billingConfigText}
+            capability={draftValues.capability as SupportedModelSummary["capability"]}
           />
         </div>
         <input type="hidden" name="active" value="true" />

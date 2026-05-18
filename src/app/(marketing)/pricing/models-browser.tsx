@@ -769,7 +769,7 @@ const ASPECT_RATIO_OPTIONS = [
   "21:9",
 ];
 
-const RESOLUTION_OPTIONS = ["1k", "2k", "3k", "4k"];
+const RESOLUTION_OPTIONS = ["480p", "720p", "1080p", "1440p", "2160p", "1k", "2k", "3k", "4k"];
 const PLAYGROUND_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 const PLAYGROUND_POLL_INTERVAL_MS = 1800;
 
@@ -865,6 +865,38 @@ function readPositiveNumber(value: unknown) {
 
 function isBooleanEnabled(value: unknown) {
   return value === true || value === "true";
+}
+
+function isBooleanSurchargeEnabled(
+  form: Record<string, string>,
+  surchargeName: string
+) {
+  if (isBooleanEnabled(form[surchargeName])) {
+    return true;
+  }
+
+  const aliases =
+    surchargeName === "hasAudio"
+      ? [
+          "hasAudio",
+          "has_audio",
+          "withAudio",
+          "with_audio",
+          "generateAudio",
+          "generate_audio",
+          "includeAudio",
+          "include_audio",
+        ]
+      : surchargeName === "hasReferenceVideos"
+        ? [
+            "hasReferenceVideos",
+            "has_reference_videos",
+            "useReferenceVideos",
+            "use_reference_videos",
+          ]
+        : [surchargeName];
+
+  return aliases.some((key) => isBooleanEnabled(form[key]));
 }
 
 function isValidEnumValue(value: string | undefined, enumValues?: string[]) {
@@ -1260,7 +1292,8 @@ export function ModelsBrowser({
     if (!selectedModel) return "";
     const tiers = selectedModel.priceTiers ?? [];
     const booleanSurchargeTotal = (selectedModel.booleanSurcharges ?? []).reduce(
-      (sum, surcharge) => sum + (isBooleanEnabled(playgroundForm[surcharge.name]) ? surcharge.price : 0),
+      (sum, surcharge) =>
+        sum + (isBooleanSurchargeEnabled(playgroundForm, surcharge.name) ? surcharge.price : 0),
       0
     );
     if (tiers.length === 0) {

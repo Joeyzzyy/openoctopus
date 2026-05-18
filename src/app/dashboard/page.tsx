@@ -8,7 +8,7 @@ import {
 import { MarketingHeader } from "@/components/marketing/site-chrome";
 import { ProductTopTabs } from "@/components/marketing/product-top-tabs";
 import { getDashboardData } from "@/lib/dashboard-server";
-import { getI18n } from "@/lib/i18n";
+import { formatI18n, getI18n } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n-server";
 import { cn } from "@/lib/utils";
 import { CreateKeyButton } from "./dashboard-actions";
@@ -224,6 +224,7 @@ export default async function DashboardPage({
 }) {
   const locale = await getLocale();
   const copy = getI18n(locale);
+  const dashboardCopy = copy.dashboard;
   const resolvedSearchParams = await searchParams;
   const view = parseDashboardView(getSearchValue(resolvedSearchParams, "view"));
   const analyticsInterval = parseRequestInterval(
@@ -282,13 +283,13 @@ export default async function DashboardPage({
 
   const overviewCards = [
     {
-      title: "Total top-ups",
+      title: dashboardCopy.overview.totalTopups,
       value: topupMetric?.value ?? "$0.00",
-      note: topupMetric?.change ?? "No recharge recorded",
+      note: topupMetric?.change ?? dashboardCopy.overview.noRecharge,
       icon: ReceiptText,
     },
     {
-      title: "Spend in view",
+      title: dashboardCopy.overview.spendInView,
       value: formatCurrency(filteredSpend),
       icon: LineChart,
     },
@@ -297,7 +298,7 @@ export default async function DashboardPage({
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#F8FCFF] text-[#111111]">
       <AutoRefreshOnReturn />
-      <TopUpCelebration />
+      <TopUpCelebration labels={dashboardCopy.topUpCelebration} />
       <MarketingHeader
         isLoggedIn={!!data}
         userLabel={user.email ?? user.name}
@@ -358,9 +359,9 @@ export default async function DashboardPage({
             dashboard: copy.nav.dashboard,
             explore: copy.nav.explore,
             models: copy.nav.models,
-            apiKeys: locale === "zh" ? "API 密钥" : "API Keys",
-            requestDetails: locale === "zh" ? "请求详情" : "Request Details",
-            account: locale === "zh" ? "账户" : "Account",
+            apiKeys: dashboardCopy.tabs.apiKeys,
+            requestDetails: dashboardCopy.tabs.requestDetails,
+            account: dashboardCopy.tabs.account,
           }}
         />
         <div className="mt-2 xl:mt-4">
@@ -370,7 +371,7 @@ export default async function DashboardPage({
                 <article className="mb-6 space-y-3 md:mb-8">
                   <div className="grid gap-3 lg:grid-cols-3">
                     <div>
-                      <TopUpForm balanceLabel={walletMetric?.value ?? "$0.00"} />
+                      <TopUpForm balanceLabel={walletMetric?.value ?? "$0.00"} labels={dashboardCopy.wallet} />
                     </div>
                     {overviewCards.map((card) => (
                       <MetricCard
@@ -390,14 +391,14 @@ export default async function DashboardPage({
               <section className="p-0">
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="min-w-0">
-                      <h3 className="text-lg font-semibold text-black">Request list</h3>
+                      <h3 className="text-lg font-semibold text-black">{dashboardCopy.requests.title}</h3>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="inline-flex h-8 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/80">
-                        <span>{requestPagination.total} total</span>
+                        <span>{formatI18n(dashboardCopy.requests.total, { count: requestPagination.total })}</span>
                       </div>
                       <div className="inline-flex h-8 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-2.5 text-xs text-black/80">
-                        <span>{requestPagination.pageSize} per page</span>
+                        <span>{formatI18n(dashboardCopy.requests.perPage, { count: requestPagination.pageSize })}</span>
                       </div>
                     </div>
                   </div>
@@ -425,10 +426,10 @@ export default async function DashboardPage({
                             </span>
                           </div>
                             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-black/70">
-                            <div>Time: {row.createdAtLabel}</div>
-                            <div>Vendor: {row.vendor}</div>
-                            <div>Latency: {row.latency}</div>
-                            <div>Cost: {row.cost}</div>
+                            <div>{dashboardCopy.requests.time}: {row.createdAtLabel}</div>
+                            <div>{dashboardCopy.requests.vendor}: {row.vendor}</div>
+                            <div>{dashboardCopy.requests.latency}: {row.latency}</div>
+                            <div>{dashboardCopy.requests.cost}: {row.cost}</div>
                           </div>
                           {row.outputAssets.length > 0 ? (
                             <div className="mt-3 flex flex-wrap gap-2">
@@ -452,7 +453,7 @@ export default async function DashboardPage({
                                     </>
                                   ) : (
                                     <div className="flex size-20 items-center justify-center text-[11px] text-black/50">
-                                      Download
+                                      {dashboardCopy.requests.download}
                                     </div>
                                   )}
                                 </a>
@@ -463,8 +464,8 @@ export default async function DashboardPage({
                       ))
                     ) : (
                       <EmptyState
-                        title="No requests found"
-                        detail="No request records found in this workspace."
+                        title={dashboardCopy.requests.emptyTitle}
+                        detail={dashboardCopy.requests.emptyDetail}
                       />
                     )}
                   </div>
@@ -474,7 +475,16 @@ export default async function DashboardPage({
                       <table className="w-full min-w-[860px] text-sm">
                         <thead>
                           <tr className="border-b border-black/10 text-left">
-                            {["Time", "Output", "Source", "ID", "Vendor", "Status", "Latency", "Cost"].map(
+                            {[
+                              dashboardCopy.requests.time,
+                              dashboardCopy.requests.output,
+                              dashboardCopy.requests.source,
+                              dashboardCopy.requests.id,
+                              dashboardCopy.requests.vendor,
+                              dashboardCopy.requests.status,
+                              dashboardCopy.requests.latency,
+                              dashboardCopy.requests.cost,
+                            ].map(
                               (heading) => (
                                 <th
                                   key={heading}
@@ -506,7 +516,7 @@ export default async function DashboardPage({
                                             target="_blank"
                                             rel="noreferrer"
                                             className="group block overflow-hidden rounded-md border border-black/[0.08] bg-white"
-                                            title="Open or download generated asset"
+                                            title={dashboardCopy.requests.openAsset}
                                           >
                                             {asset.type === "image" ? (
                                               <>
@@ -519,7 +529,7 @@ export default async function DashboardPage({
                                               </>
                                             ) : (
                                               <div className="flex size-12 items-center justify-center text-[10px] text-black/45">
-                                                File
+                                                {dashboardCopy.requests.file}
                                               </div>
                                             )}
                                           </a>
@@ -552,7 +562,7 @@ export default async function DashboardPage({
                           ) : (
                             <tr>
                               <td className="px-2 py-20 text-center text-sm text-black/50" colSpan={8}>
-                                No requests found
+                                {dashboardCopy.requests.emptyTitle}
                               </td>
                             </tr>
                           )}
@@ -578,7 +588,7 @@ export default async function DashboardPage({
                             requestPagination.page <= 1 && "pointer-events-none opacity-40"
                           )}
                         >
-                          Previous
+                          {dashboardCopy.requests.previous}
                         </Link>
                         <div className="flex items-center gap-2">
                           {buildVisibleRequestPages(requestPagination.page, requestPagination.totalPages).map(
@@ -623,11 +633,14 @@ export default async function DashboardPage({
                               "pointer-events-none opacity-40"
                           )}
                         >
-                          Next
+                          {dashboardCopy.requests.next}
                         </Link>
                       </div>
                       <span className="text-xs text-black/50">
-                        Page {requestPagination.page} of {requestPagination.totalPages}
+                        {formatI18n(dashboardCopy.requests.page, {
+                          page: requestPagination.page,
+                          total: requestPagination.totalPages,
+                        })}
                       </span>
                     </div>
                   ) : null}
@@ -637,6 +650,7 @@ export default async function DashboardPage({
             {view === "explore" ? (
               <ExplorePanel
                 isLoggedIn={!!data}
+                labels={dashboardCopy.explore}
                 models={exploreData.modelDocRows.map((model) => ({
                   id: model.id,
                   displayName: model.displayName,
@@ -654,22 +668,28 @@ export default async function DashboardPage({
             {view === "dashboard" ? (
               <section className="p-0">
                 <div className="mb-4">
-                  <h2 className="text-xl font-semibold text-black">Billing details</h2>
+                  <h2 className="text-xl font-semibold text-black">{dashboardCopy.billing.title}</h2>
                   <p className="mt-1 text-sm text-black/55">
-                    Top-up ledger and Stripe receipt/invoice download links for completed payments.
+                    {dashboardCopy.billing.description}
                   </p>
                 </div>
                 <div className="relative w-full overflow-auto">
                   <table className="w-full min-w-[860px] text-sm">
                     <thead>
                       <tr className="border-b border-black/10 text-left">
-                        {["Time", "Type", "Amount", "Description", "Operation"].map(
+                        {[
+                          dashboardCopy.requests.time,
+                          dashboardCopy.billing.type,
+                          dashboardCopy.billing.amount,
+                          dashboardCopy.billing.descriptionColumn,
+                          dashboardCopy.billing.operation,
+                        ].map(
                           (heading) => (
                             <th
                               key={heading}
                               className={cn(
                                 "h-10 px-2 text-[10px] tracking-[1px] text-black/50",
-                                heading === "Operation"
+                                heading === dashboardCopy.billing.operation
                                   ? "sticky right-0 z-20 bg-white text-right"
                                   : ""
                               )}
@@ -704,14 +724,14 @@ export default async function DashboardPage({
                                     rel="noreferrer"
                                     className="inline-flex h-8 items-center rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-[#075985] transition-colors hover:bg-[#E0F2FE]"
                                   >
-                                    Open Billing Document
+                                    {dashboardCopy.billing.openDocument}
                                   </a>
                                 ) : (
                                   <span
-                                    title="Requires matching Stripe credentials for this billing record."
+                                    title={dashboardCopy.billing.unavailableTitle}
                                     className="inline-flex h-8 items-center rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-[#64748B]"
                                   >
-                                    Document unavailable
+                                    {dashboardCopy.billing.unavailable}
                                   </span>
                                 )}
                               </div>
@@ -721,7 +741,7 @@ export default async function DashboardPage({
                       ) : (
                         <tr>
                           <td className="px-2 py-20 text-center text-sm text-black/50" colSpan={5}>
-                            No incoming billing records yet
+                            {dashboardCopy.billing.empty}
                           </td>
                         </tr>
                       )}
@@ -749,7 +769,7 @@ export default async function DashboardPage({
                           normalizedBillingPage <= 1 && "pointer-events-none opacity-40"
                         )}
                       >
-                        Previous
+                        {dashboardCopy.requests.previous}
                       </Link>
                       <div className="flex items-center gap-2">
                         {buildVisibleRequestPages(normalizedBillingPage, billingTotalPages).map(
@@ -800,11 +820,14 @@ export default async function DashboardPage({
                             "pointer-events-none opacity-40"
                         )}
                       >
-                        Next
+                        {dashboardCopy.requests.next}
                       </Link>
                     </div>
                     <span className="text-xs text-black/50">
-                      Page {normalizedBillingPage} of {billingTotalPages}
+                      {formatI18n(dashboardCopy.requests.page, {
+                        page: normalizedBillingPage,
+                        total: billingTotalPages,
+                      })}
                     </span>
                   </div>
                 ) : null}
@@ -815,10 +838,17 @@ export default async function DashboardPage({
               <>
                 <section className="p-0">
                   <div className="mb-4 flex items-center">
-                    <CreateKeyButton className="w-full justify-center sm:w-auto" />
+                    <CreateKeyButton
+                      className="w-full justify-center sm:w-auto"
+                      labels={{
+                        unavailable: dashboardCopy.createKey.unavailable,
+                        button: dashboardCopy.createKey.button,
+                      }}
+                      sheetLabels={dashboardCopy.createKey}
+                    />
                   </div>
 
-                  <ApiKeysTable apiKeys={apiKeys} />
+                  <ApiKeysTable apiKeys={apiKeys} labels={dashboardCopy.apiKeys} />
                 </section>
               </>
             ) : null}
@@ -837,25 +867,25 @@ export default async function DashboardPage({
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-base font-semibold text-black">{user.name}</p>
-                      <p className="truncate text-sm text-black/55">{user.email ?? "No email on file"}</p>
+                      <p className="truncate text-sm text-black/55">{user.email ?? dashboardCopy.account.noEmail}</p>
                     </div>
                   </div>
 
                   <div className="mt-5 grid gap-3 text-sm">
                     <div className="rounded-lg border border-black/[0.06] bg-[#F8FCFF] px-3 py-2">
-                      <p className="text-xs text-black/45">Sign-in methods</p>
+                      <p className="text-xs text-black/45">{dashboardCopy.account.signInMethods}</p>
                       <p className="mt-1 text-black">
                         {Array.from(new Set([...user.authProviders, ...(user.hasPasswordSignIn ? ["email"] : [])])).length > 0
                           ? Array.from(new Set([...user.authProviders, ...(user.hasPasswordSignIn ? ["email"] : [])]))
-                              .map((provider) => provider === "email" ? "Email password" : provider)
+                              .map((provider) => provider === "email" ? dashboardCopy.account.emailPassword : provider)
                               .join(", ")
-                          : "Google"}
+                          : dashboardCopy.account.google}
                       </p>
                     </div>
                     <div className="rounded-lg border border-black/[0.06] bg-[#F8FCFF] px-3 py-2">
-                      <p className="text-xs text-black/45">Password sign-in</p>
+                      <p className="text-xs text-black/45">{dashboardCopy.account.passwordSignIn}</p>
                       <p className="mt-1 text-black">
-                        {user.hasPasswordSignIn ? "Enabled" : "Not set"}
+                        {user.hasPasswordSignIn ? dashboardCopy.account.enabled : dashboardCopy.account.notSet}
                       </p>
                     </div>
                   </div>
@@ -864,15 +894,15 @@ export default async function DashboardPage({
                 <div className="rounded-xl border border-black/[0.08] bg-white p-5">
                   <div className="mb-4">
                     <h2 className="text-base font-semibold text-black">
-                      {user.hasPasswordSignIn ? "Update password" : "Set password"}
+                      {user.hasPasswordSignIn ? dashboardCopy.account.updatePassword : dashboardCopy.account.setPassword}
                     </h2>
                     <p className="mt-1 text-sm leading-6 text-black/55">
                       {user.hasPasswordSignIn
-                        ? "Update the password used for email sign-in."
-                        : "Set a password for this Google account so you can also sign in with Gmail and password."}
+                        ? dashboardCopy.account.updatePasswordHelp
+                        : dashboardCopy.account.setPasswordHelp}
                     </p>
                   </div>
-                  <AccountPasswordForm hasPassword={user.hasPasswordSignIn} />
+                  <AccountPasswordForm hasPassword={user.hasPasswordSignIn} labels={dashboardCopy.account} />
                 </div>
               </section>
             ) : null}

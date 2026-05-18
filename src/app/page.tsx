@@ -306,15 +306,10 @@ export default async function Home() {
                 items={headerNavItems.map((item) => ({ ...item }))}
                 labels={copy.mobileMenu}
               />
-              <LanguageSwitcher
-                locale={locale}
-                label={copy.language.short}
-                nextLabel={copy.language.nextShort}
-                ariaLabel={copy.language.switchTo}
-              />
               {user ? (
                 <>
                   <HeaderUserMenu
+                    locale={locale}
                     userLabel={user.email ?? (user.user_metadata?.name as string | undefined) ?? null}
                     userAvatarUrl={
                       (user.user_metadata?.avatar_url as string | undefined) ??
@@ -330,22 +325,27 @@ export default async function Home() {
                       signOut: copy.nav.signOut,
                       refreshingBalance: copy.account.refreshingBalance,
                       refreshBalance: copy.account.refreshBalance,
+                      language: copy.account.language,
+                      english: copy.account.english,
+                      chinese: copy.account.chinese,
                     }}
                   />
-                  <Link
-                    href="/dashboard"
-                    className="inline-flex h-9 items-center justify-center rounded-full bg-[#38BDF8] px-4 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284C7]"
-                  >
-                    {copy.nav.dashboard}
-                  </Link>
                 </>
               ) : (
-                <Link
-                  href={destination}
-                  className="inline-flex h-9 items-center justify-center rounded-md bg-[linear-gradient(135deg,#0EA5E9_0%,#06B6D4_100%)] px-4 text-[13px] font-medium text-white shadow-sm shadow-sky-500/20 transition-all hover:shadow-md hover:shadow-sky-500/30"
-                >
-                  {destinationLabel}
-                </Link>
+                <>
+                  <LanguageSwitcher
+                    locale={locale}
+                    label={copy.language.short}
+                    nextLabel={copy.language.nextShort}
+                    ariaLabel={copy.language.switchTo}
+                  />
+                  <Link
+                    href={destination}
+                    className="inline-flex h-9 items-center justify-center rounded-md bg-[linear-gradient(135deg,#0EA5E9_0%,#06B6D4_100%)] px-4 text-[13px] font-medium text-white shadow-sm shadow-sky-500/20 transition-all hover:shadow-md hover:shadow-sky-500/30"
+                  >
+                    {destinationLabel}
+                  </Link>
+                </>
               )}
             </div>
           </div>
@@ -1072,9 +1072,9 @@ function StartModeCard({
   preview: ReactNode;
 }) {
   return (
-    <div className={`${CARD_CLASS} flex h-[300px] flex-col justify-between overflow-hidden bg-[#FAFAF9] md:h-auto md:min-h-[380px] lg:min-h-[440px]`}>
+    <div className={`${CARD_CLASS} flex min-h-[320px] flex-col justify-between overflow-hidden bg-[#FAFAF9] md:min-h-[380px] lg:min-h-[440px]`}>
       <div
-        className="flex h-[216px] shrink-0 items-center justify-center overflow-hidden p-3 sm:p-4 md:h-auto md:flex-1 md:p-6"
+        className="flex min-h-[188px] shrink-0 items-center justify-center p-3 sm:p-4 md:min-h-0 md:flex-1 md:p-6"
         style={{
           backgroundImage:
             "radial-gradient(circle, rgba(17,24,39,0.13) 1.5px, transparent 1.5px)",
@@ -1083,16 +1083,18 @@ function StartModeCard({
       >
         {preview}
       </div>
-      <div className="flex h-[84px] shrink-0 flex-col justify-center gap-2 border-t border-black/[0.06] bg-white px-4 py-3 md:h-auto md:flex-row md:items-center md:justify-between md:gap-3 md:px-6 md:py-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <h3 className="text-base font-semibold text-[#111827] md:text-2xl">{title}</h3>
-          <span className="rounded-md bg-[#BAE6FD] px-2 py-1 text-[10px] font-bold text-[#111827] md:text-[11px]">
+      <div className="flex shrink-0 flex-col justify-between gap-2 border-t border-black/[0.06] bg-white px-4 py-3 md:gap-3 md:px-6 md:py-5">
+        <div className="flex min-w-0 items-center gap-2 md:gap-2.5">
+          <h3 className="text-[13px] font-semibold leading-tight text-[#111827] md:whitespace-nowrap md:text-[14px] lg:text-[13px] xl:text-[16px] 2xl:text-[18px]">
+            {title}
+          </h3>
+          <span className="shrink-0 whitespace-nowrap rounded-md bg-[#BAE6FD] px-2 py-1 text-[10px] font-bold leading-none text-[#111827] md:text-[11px]">
             {badge}
           </span>
         </div>
         <Link
           href={href}
-          className="group inline-flex h-8 w-fit shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-[#111827] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0B1220] md:h-10 md:px-4 md:text-sm"
+          className="group inline-flex h-8 w-fit shrink-0 items-center justify-center gap-1 self-start whitespace-nowrap rounded-lg bg-[#111827] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0B1220] md:h-10 md:px-4 md:text-sm"
         >
           {cta}
           <ChevronRight className="size-4 text-white/70 transition-transform group-hover:translate-x-0.5" />
@@ -1129,7 +1131,7 @@ function PlaygroundModePreview({ copy }: { copy: ReturnType<typeof getI18n>["hom
         <div className="space-y-2 md:space-y-3">
           <div className="rounded-lg border border-black/[0.06] bg-[#FAFAF9] p-2 md:p-3">
             <p className="text-[10px] font-medium text-[#6B7280] md:text-xs">{copy.prompt}</p>
-            <div className="mt-1 h-9 overflow-hidden rounded-md bg-white p-2 text-[10px] leading-4 text-[#111827] md:mt-2 md:h-16 md:p-3 md:text-xs md:leading-5">
+            <div className="mt-1 min-h-9 rounded-md bg-white p-2 text-[10px] leading-4 text-[#111827] md:mt-2 md:min-h-16 md:p-3 md:text-xs md:leading-5">
               {copy.promptExample}
             </div>
           </div>
@@ -1157,7 +1159,7 @@ function ApiModePreview({ copy }: { copy: ReturnType<typeof getI18n>["home"] }) 
         </div>
         <span className="text-xs text-white/45">{copy.copy}</span>
       </div>
-      <pre className="max-h-[158px] overflow-hidden p-4 text-[11px] leading-5 text-[#E5E7EB] md:max-h-none md:p-5 md:text-[12px] md:leading-6">
+      <pre className="overflow-x-auto p-4 text-[10px] leading-5 text-[#E5E7EB] md:p-5 md:text-[12px] md:leading-6">
         <code>{`curl -X POST https://api.openoctopus.com/v1/images/generations \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ooq_your_api_key" \\
@@ -1189,7 +1191,7 @@ function CliModePreview() {
         </span>
       </div>
       <div className="space-y-3 p-4 md:space-y-4 md:p-5">
-        <pre className="max-h-[126px] overflow-hidden rounded-lg border border-white/10 bg-black/24 p-3 text-[11px] leading-5 text-[#E0F2FE] md:max-h-none md:p-4 md:text-[12px] md:leading-6">
+        <pre className="overflow-x-auto rounded-lg border border-white/10 bg-black/24 p-3 text-[10px] leading-5 text-[#E0F2FE] md:p-4 md:text-[12px] md:leading-6">
           <code>{`npm i -g @openoctopus/cli
 ooct auth login
 ooct run openoctopus/image-captioner-molmo2 \\
@@ -1198,7 +1200,7 @@ ooct run openoctopus/image-captioner-molmo2 \\
         </pre>
         <div className="rounded-lg border border-white/10 bg-white/[0.06] p-3">
           <p className="text-[11px] font-semibold uppercase text-[#7DD3FC]">Output</p>
-          <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/82 md:line-clamp-none">
+          <p className="mt-2 text-sm leading-6 text-white/82">
             A pixel art landscape with a magnifying glass highlighting a mountain scene.
           </p>
         </div>

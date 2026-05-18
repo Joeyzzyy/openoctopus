@@ -48,15 +48,10 @@ export async function MarketingHeader({
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            <LanguageSwitcher
-              locale={locale}
-              label={copy.language.short}
-              nextLabel={copy.language.nextShort}
-              ariaLabel={copy.language.switchTo}
-            />
             {isLoggedIn ? (
               <>
                 <HeaderUserMenu
+                  locale={locale}
                   userLabel={userLabel}
                   userAvatarUrl={userAvatarUrl}
                   walletBalanceLabel={walletBalanceLabel}
@@ -68,22 +63,27 @@ export async function MarketingHeader({
                     signOut: copy.nav.signOut,
                     refreshingBalance: copy.account.refreshingBalance,
                     refreshBalance: copy.account.refreshBalance,
+                    language: copy.account.language,
+                    english: copy.account.english,
+                    chinese: copy.account.chinese,
                   }}
                 />
-                <Link
-                  href="/dashboard"
-                  className="inline-flex h-9 items-center justify-center rounded-full bg-[#38BDF8] px-4 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284C7]"
-                >
-                  {copy.nav.dashboard}
-                </Link>
               </>
             ) : (
-              <Link
-                href="/login"
-                className="inline-flex h-9 items-center justify-center rounded-md bg-[#111827] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0B1220]"
-              >
-                {copy.nav.signIn}
-              </Link>
+              <>
+                <LanguageSwitcher
+                  locale={locale}
+                  label={copy.language.short}
+                  nextLabel={copy.language.nextShort}
+                  ariaLabel={copy.language.switchTo}
+                />
+                <Link
+                  href="/login"
+                  className="inline-flex h-9 items-center justify-center rounded-md bg-[#111827] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0B1220]"
+                >
+                  {copy.nav.signIn}
+                </Link>
+              </>
             )}
           </div>
         </div>

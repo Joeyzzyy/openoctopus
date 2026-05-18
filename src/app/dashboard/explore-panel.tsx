@@ -16,32 +16,64 @@ type ExploreModel = {
   modelHref: string;
 };
 
-function capabilityToCategory(capability: string) {
+type ExploreLabels = {
+  providers: string;
+  all: string;
+  allProviders: string;
+  category: string;
+  noCover: string;
+  noDescription: string;
+  pricingUnavailable: string;
+  noMatches: string;
+  textToVideo: string;
+  imageToImage: string;
+  textToImage: string;
+  text: string;
+  other: string;
+};
+
+const defaultLabels: ExploreLabels = {
+  providers: "Model Providers",
+  all: "ALL",
+  allProviders: "All providers",
+  category: "Category",
+  noCover: "No cover image",
+  noDescription: "No introduction available yet.",
+  pricingUnavailable: "Pricing unavailable",
+  noMatches: "No models match the selected provider/category filters.",
+  textToVideo: "Text to Video",
+  imageToImage: "Image to Image",
+  textToImage: "Text to Image",
+  text: "Text",
+  other: "Other",
+};
+
+function capabilityToCategory(capability: string, labels: ExploreLabels) {
   const normalized = capability.toLowerCase();
   if (normalized.includes("video")) {
-    return "Text to Video";
+    return labels.textToVideo;
   }
   if (normalized.includes("image_edit")) {
-    return "Image to Image";
+    return labels.imageToImage;
   }
   if (normalized.includes("image")) {
-    return "Text to Image";
+    return labels.textToImage;
   }
   if (normalized.includes("text") || normalized.includes("code")) {
-    return "Text";
+    return labels.text;
   }
-  return "Other";
+  return labels.other;
 }
 
-function modelToCategory(model: ExploreModel) {
-  return model.modelTypeLabel.trim() || capabilityToCategory(model.capability);
+function modelToCategory(model: ExploreModel, labels: ExploreLabels) {
+  return model.modelTypeLabel.trim() || capabilityToCategory(model.capability, labels);
 }
 
-function buildCategoryList(models: ExploreModel[]) {
+function buildCategoryList(models: ExploreModel[], labels: ExploreLabels) {
   const seen = new Set<string>();
   const categories: string[] = [];
   for (const model of models) {
-    const category = modelToCategory(model);
+    const category = modelToCategory(model, labels);
     if (!seen.has(category)) {
       seen.add(category);
       categories.push(category);
@@ -53,15 +85,17 @@ function buildCategoryList(models: ExploreModel[]) {
 export function ExplorePanel({
   models,
   isLoggedIn = true,
+  labels = defaultLabels,
 }: {
   models: ExploreModel[];
   isLoggedIn?: boolean;
+  labels?: ExploreLabels;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const providers = useMemo(() => Array.from(new Set(models.map((item) => item.providerName))), [models]);
-  const categories = useMemo(() => buildCategoryList(models), [models]);
+  const categories = useMemo(() => buildCategoryList(models, labels), [labels, models]);
   const [activeProvider, setActiveProvider] = useState<string>("all");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const effectiveSelectedCategories = selectedCategories.length > 0 ? selectedCategories : categories;
@@ -69,20 +103,20 @@ export function ExplorePanel({
     const counts = new Map<string, number>();
     for (const model of models) {
       if (activeProvider !== "all" && model.providerName !== activeProvider) continue;
-      const category = modelToCategory(model);
+      const category = modelToCategory(model, labels);
       counts.set(category, (counts.get(category) ?? 0) + 1);
     }
     return counts;
-  }, [activeProvider, models]);
+  }, [activeProvider, labels, models]);
 
   const filteredModels = useMemo(() => {
     return models.filter((model) => {
-      const category = modelToCategory(model);
+      const category = modelToCategory(model, labels);
       const providerMatched = activeProvider === "all" || model.providerName === activeProvider;
       const categoryMatched = effectiveSelectedCategories.includes(category);
       return providerMatched && categoryMatched;
     });
-  }, [activeProvider, effectiveSelectedCategories, models]);
+  }, [activeProvider, effectiveSelectedCategories, labels, models]);
 
   const toggleCategory = (category: string) => {
     setSelectedCategories((prev) => {
@@ -97,7 +131,7 @@ export function ExplorePanel({
   return (
     <section className="space-y-4">
       <div className="rounded-2xl border border-[#BAE6FD] bg-white p-4">
-        <p className="mb-3 text-xs font-medium uppercase tracking-[1px] text-black/45">Model Providers</p>
+        <p className="mb-3 text-xs font-medium uppercase tracking-[1px] text-black/45">{labels.providers}</p>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -109,8 +143,8 @@ export function ExplorePanel({
                 : "border-[#BAE6FD] bg-white text-black/65 hover:bg-[#E0F2FE]"
             )}
           >
-            <span className="inline-flex size-5 items-center justify-center rounded-full bg-black/5 text-[10px]">ALL</span>
-            <span>All providers</span>
+            <span className="inline-flex size-5 items-center justify-center rounded-full bg-black/5 text-[10px]">{labels.all}</span>
+            <span>{labels.allProviders}</span>
           </button>
           {providers.map((provider) => (
             <button
@@ -135,7 +169,7 @@ export function ExplorePanel({
 
       <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="rounded-2xl border border-[#BAE6FD] bg-white p-4">
-          <p className="mb-3 text-xs font-medium uppercase tracking-[1px] text-black/45">Category</p>
+          <p className="mb-3 text-xs font-medium uppercase tracking-[1px] text-black/45">{labels.category}</p>
           <div className="space-y-2">
             {categories.map((category) => (
               <label key={category} className="flex cursor-pointer items-center gap-2 text-sm text-black/80">
@@ -159,7 +193,7 @@ export function ExplorePanel({
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {filteredModels.length > 0 ? (
             filteredModels.map((model) => {
-              const category = modelToCategory(model);
+              const category = modelToCategory(model, labels);
               return (
                 <a
                   key={model.id}
@@ -182,7 +216,7 @@ export function ExplorePanel({
                         <img src={model.coverImageUrl} alt={model.displayName} className="h-full w-full object-cover" />
                       ) : (
                         <div className="flex h-full items-center justify-center px-2 text-center text-xs text-black/40">
-                          No cover image
+                          {labels.noCover}
                         </div>
                       )}
                     </div>
@@ -191,10 +225,10 @@ export function ExplorePanel({
                         <p className="text-[10px] uppercase tracking-[0.8px] text-black/45">{category}</p>
                         <h3 className="line-clamp-1 text-sm font-semibold text-black">{model.displayName}</h3>
                         <p className="line-clamp-2 text-xs leading-5 text-black/60">
-                          {model.modelDescription || "No introduction available yet."}
+                          {model.modelDescription || labels.noDescription}
                         </p>
                       </div>
-                      <p className="text-xs font-medium text-[#0369A1]">{model.priceLabel || "Pricing unavailable"}</p>
+                      <p className="text-xs font-medium text-[#0369A1]">{model.priceLabel || labels.pricingUnavailable}</p>
                     </div>
                   </div>
                 </a>
@@ -202,7 +236,7 @@ export function ExplorePanel({
             })
           ) : (
             <div className="col-span-full rounded-2xl border border-dashed border-black/[0.12] bg-[#F8FCFF] p-6 text-sm text-black/55">
-              No models match the selected provider/category filters.
+              {labels.noMatches}
             </div>
           )}
         </div>

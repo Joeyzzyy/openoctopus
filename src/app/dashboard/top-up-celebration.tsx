@@ -3,7 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-export function TopUpCelebration() {
+export function TopUpCelebration({
+  labels = {
+    fallback: "Balance updated successfully",
+    title: "Top-up completed",
+    amountPrefix: "Balance +",
+  },
+}: {
+  labels?: {
+    fallback: string;
+    title: string;
+    amountPrefix: string;
+  };
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -44,8 +56,8 @@ export function TopUpCelebration() {
 
     setAmountLabel(
       safeAmount !== null
-        ? `Balance +$${safeAmount.toFixed(2)}`
-        : "Balance updated successfully"
+        ? `${labels.amountPrefix}$${safeAmount.toFixed(2)}`
+        : labels.fallback
     );
     setVisible(true);
 
@@ -62,7 +74,7 @@ export function TopUpCelebration() {
       window.clearTimeout(cleanupTimer);
       window.clearTimeout(hideTimer);
     };
-  }, [pathname, router, searchParams]);
+  }, [labels.amountPrefix, labels.fallback, pathname, router, searchParams]);
 
   if (!visible || !amountLabel) {
     return null;
@@ -88,7 +100,7 @@ export function TopUpCelebration() {
 
       <div className="pointer-events-none fixed inset-x-0 top-20 z-50 flex justify-center px-4">
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-center shadow-[0_16px_42px_rgba(16,185,129,0.22)]">
-          <p className="text-sm font-semibold text-emerald-700">Top-up completed</p>
+          <p className="text-sm font-semibold text-emerald-700">{labels.title}</p>
           <p className="mt-1 text-base font-bold text-emerald-800">{amountLabel}</p>
         </div>
       </div>
