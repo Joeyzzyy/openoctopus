@@ -19,7 +19,7 @@ import { TopUpCelebration } from "./top-up-celebration";
 import { AccountPasswordForm } from "./account-password-form";
 import { ExplorePanel } from "./explore-panel";
 import { buildModelCanonicalPath, loadModelsPageData } from "@/app/(marketing)/models/data";
-import { CopyTextButton } from "@/app/ops-hub/copy-text-button";
+import { RequestPromptDialogButton } from "./request-prompt-dialog-button";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -263,12 +263,21 @@ function RequestOutputPreview({
   return <div className={`flex items-center justify-center text-[11px] text-black/50 ${sizeClassName}`}>File</div>;
 }
 
-function summarizePromptWords(prompt: string, wordLimit = 10) {
-  const words = prompt.trim().split(/\s+/).filter((word) => word.length > 0);
-  if (words.length <= wordLimit) {
-    return prompt.trim();
-  }
-  return `${words.slice(0, wordLimit).join(" ")} ...`;
+function RequestOutputPlaceholder({
+  label,
+  sizeClassName,
+}: {
+  label: string;
+  sizeClassName: string;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-center rounded-md border border-dashed border-black/[0.12] bg-black/[0.03] text-[10px] text-black/45 ${sizeClassName}`}
+      title={label}
+    >
+      <span className="max-w-full truncate px-1">{label}</span>
+    </div>
+  );
 }
 
 export default async function DashboardPage({
@@ -475,7 +484,7 @@ export default async function DashboardPage({
                             <div className="mt-3 rounded-xl border border-black/[0.08] bg-white px-3 py-2">
                               <p className="text-[11px] tracking-[0.35px] text-black/45">{dashboardCopy.requests.prompt}</p>
                               <p
-                                className="mt-1 h-5 overflow-hidden text-sm leading-5 text-black/80"
+                                className="mt-1 h-5 overflow-hidden truncate whitespace-nowrap text-sm leading-5 text-black/80"
                                 title={row.promptText}
                               >
                                 {row.promptText}
@@ -518,19 +527,25 @@ export default async function DashboardPage({
                         <thead>
                           <tr className="border-b border-black/10 text-left">
                             {[
-                              dashboardCopy.requests.time,
+                              dashboardCopy.requests.id,
                               dashboardCopy.requests.output,
                               dashboardCopy.requests.source,
-                              dashboardCopy.requests.id,
                               dashboardCopy.requests.vendor,
                               dashboardCopy.requests.status,
                               dashboardCopy.requests.latency,
                               dashboardCopy.requests.cost,
+                              dashboardCopy.requests.time,
+                              dashboardCopy.requests.operation,
                             ].map(
                               (heading) => (
                                 <th
                                   key={heading}
-                                  className="h-10 px-2 text-[10px] tracking-[1px] text-black/50"
+                                  className={cn(
+                                    "h-10 px-2 text-[10px] tracking-[1px] text-black/50",
+                                    heading === dashboardCopy.requests.operation
+                                      ? "sticky right-0 z-20 bg-white text-right"
+                                      : ""
+                                  )}
                                 >
                                   {heading}
                                 </th>
@@ -545,9 +560,13 @@ export default async function DashboardPage({
                                 key={row.requestId}
                                 className="border-b border-black/10 transition-colors hover:bg-black/[0.02]"
                               >
-                                <td className="px-2 py-3 text-xs text-black/60">{row.createdAtLabel}</td>
-                                <td className="px-2 py-3 align-middle">
-                                  <div className="flex items-center gap-3">
+                                <td className="px-2 py-3 text-xs text-black/60">
+                                  <span className="block max-w-[180px] truncate" title={row.requestId}>
+                                    {row.requestId}
+                                  </span>
+                                </td>
+                                <td className="w-[360px] max-w-[360px] px-2 py-3 align-middle">
+                                  <div className="flex w-[340px] items-center gap-3 overflow-hidden">
                                     {row.outputAssets.length > 0 ? (
                                       <div className="flex shrink-0 gap-1">
                                         {row.outputAssets.slice(0, 2).map((asset, index) => (
@@ -568,27 +587,27 @@ export default async function DashboardPage({
                                           </a>
                                         ))}
                                       </div>
-                                    ) : null}
-                                  <div className="min-w-0">
-                                    <p className="text-sm text-black">{row.model}</p>
-                                    <p className="text-xs text-black/45">{row.capability}</p>
-                                    {row.promptText ? (
-                                      <div className="mt-1 flex items-start gap-2">
-                                        <p
-                                          className="min-w-0 flex-1 truncate text-xs leading-5 text-black/55"
-                                          title={row.promptText}
-                                        >
-                                          {summarizePromptWords(row.promptText)}
-                                        </p>
-                                        <CopyTextButton value={row.promptText} label={dashboardCopy.requests.prompt} />
+                                    ) : (
+                                      <div className="flex shrink-0 gap-1">
+                                        <RequestOutputPlaceholder label={row.status} sizeClassName="size-12" />
                                       </div>
-                                    ) : null}
+                                    )}
+                                  <div className="min-w-0 flex-1 overflow-hidden">
+                                    <p className="truncate text-sm text-black" title={row.model}>{row.model}</p>
+                                    <p className="truncate text-xs text-black/45" title={row.capability}>{row.capability}</p>
                                   </div>
                                   </div>
                                 </td>
-                                <td className="px-2 py-3 text-sm text-black">{row.requestSourceLabel}</td>
-                                <td className="px-2 py-3 text-xs text-black/60">{row.requestId}</td>
-                                <td className="px-2 py-3 text-sm text-black">{row.vendor}</td>
+                                <td className="px-2 py-3 text-sm text-black">
+                                  <span className="block max-w-[180px] truncate" title={row.requestSourceLabel}>
+                                    {row.requestSourceLabel}
+                                  </span>
+                                </td>
+                                <td className="px-2 py-3 text-sm text-black">
+                                  <span className="block max-w-[120px] truncate" title={row.vendor}>
+                                    {row.vendor}
+                                  </span>
+                                </td>
                                 <td className="px-2 py-3">
                                   <span
                                     className={cn(
@@ -601,11 +620,26 @@ export default async function DashboardPage({
                                 </td>
                                 <td className="px-2 py-3 text-sm text-black/70">{row.latency}</td>
                                 <td className="px-2 py-3 text-sm text-black/70">{row.cost}</td>
+                                <td className="px-2 py-3 text-xs text-black/60">
+                                  <span className="block max-w-[120px] truncate" title={row.createdAtLabel}>
+                                    {row.createdAtLabel}
+                                  </span>
+                                </td>
+                                <td className="sticky right-0 z-10 bg-white px-2 py-3 text-right text-sm">
+                                  {row.promptText ? (
+                                    <RequestPromptDialogButton
+                                      prompt={row.promptText}
+                                      buttonLabel={dashboardCopy.requests.viewPrompt}
+                                      title={dashboardCopy.requests.promptDialogTitle}
+                                      description={dashboardCopy.requests.promptDialogDescription}
+                                    />
+                                  ) : null}
+                                </td>
                               </tr>
                             ))
                           ) : (
                             <tr>
-                              <td className="px-2 py-20 text-center text-sm text-black/50" colSpan={8}>
+                              <td className="px-2 py-20 text-center text-sm text-black/50" colSpan={9}>
                                 {dashboardCopy.requests.emptyTitle}
                               </td>
                             </tr>
