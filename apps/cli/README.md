@@ -10,3 +10,5 @@ ooct run openoctopus/image-captioner-molmo2 --image ./input.png --detail-level l
 ```
 
 The CLI discovers supported models from the OpenOctopus model manifest at runtime, so newly published Playground/API capabilities can be used without changing the CLI.
+
+For file-like inputs such as `reference_images`, `reference_videos`, and `reference_audios`, the CLI accepts either local file paths or existing `http(s)` URLs. Local files are uploaded automatically before submission.

@@ -34,8 +34,16 @@ function normalizeInputSchema(inputSchema: unknown) {
         const isFileLike =
           normalizedName === "image" ||
           normalizedName === "images" ||
+          normalizedName === "video" ||
+          normalizedName === "videos" ||
+          normalizedName === "audio" ||
+          normalizedName === "audios" ||
           normalizedName.endsWith("_image") ||
           normalizedName.endsWith("_images") ||
+          normalizedName.endsWith("_video") ||
+          normalizedName.endsWith("_videos") ||
+          normalizedName.endsWith("_audio") ||
+          normalizedName.endsWith("_audios") ||
           normalizedName.endsWith("_file") ||
           normalizedName.endsWith("_files");
         return {

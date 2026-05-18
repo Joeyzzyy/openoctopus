@@ -306,12 +306,44 @@ function isLikelyFileParam(param: ManifestParam) {
   return param.format === "file_url_or_file" || param.format === "image_url_or_file";
 }
 
+function isRemoteAssetUrl(value: string) {
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
 function mimeFromPath(path: string) {
   const lower = path.toLowerCase();
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
   if (lower.endsWith(".webp")) return "image/webp";
   if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".mp4")) return "video/mp4";
+  if (lower.endsWith(".webm")) return "video/webm";
+  if (lower.endsWith(".mov")) return "video/quicktime";
+  if (lower.endsWith(".mp3")) return "audio/mpeg";
+  if (lower.endsWith(".wav")) return "audio/wav";
+  if (lower.endsWith(".m4a")) return "audio/mp4";
+  if (lower.endsWith(".aac")) return "audio/aac";
+  if (lower.endsWith(".ogg")) return "audio/ogg";
   return "image/png";
+}
+
+async function resolveFileLikeValue(
+  config: Config,
+  param: ManifestParam,
+  value: string | string[]
+) {
+  if (Array.isArray(value)) {
+    const uploaded = await Promise.all(
+      value.map(async (item) =>
+        isRemoteAssetUrl(item) ? item : (await uploadFile(config, item, param.name)).url
+      )
+    );
+    return uploaded;
+  }
+  if (isRemoteAssetUrl(value)) {
+    return value;
+  }
+  const uploaded = await uploadFile(config, value, param.name);
+  return uploaded.url;
 }
 
 async function uploadFile(config: Config, filePath: string, field = "file") {
@@ -351,9 +383,11 @@ async function buildInput(config: Config, model: ManifestModel, flags: ParsedArg
       continue;
     }
     let value = coerceValue(param, raw);
-    if (typeof value === "string" && isLikelyFileParam(param) && !value.startsWith("http://") && !value.startsWith("https://")) {
-      const uploaded = await uploadFile(config, value, param.name);
-      value = uploaded.url;
+    if (
+      isLikelyFileParam(param) &&
+      (typeof value === "string" || (Array.isArray(value) && value.every((item) => typeof item === "string")))
+    ) {
+      value = await resolveFileLikeValue(config, param, value);
     }
     if (param.name === "prompt") {
       prompt = String(value);
