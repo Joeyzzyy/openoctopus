@@ -6,8 +6,10 @@ import { useEffect, useRef, useState } from "react";
 
 export function HomeMobileMenu({
   items,
+  labels = { open: "Open menu", close: "Close menu" },
 }: {
   items: Array<{ label: string; href: string }>;
+  labels?: { open: string; close: string };
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -29,7 +31,7 @@ export function HomeMobileMenu({
     <div ref={rootRef} className="relative lg:hidden">
       <button
         type="button"
-        aria-label={open ? "Close menu" : "Open menu"}
+        aria-label={open ? labels.close : labels.open}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
         className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-black/[0.08] bg-white text-[#374151] transition-colors hover:bg-black/[0.03]"

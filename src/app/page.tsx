@@ -7,68 +7,42 @@ import {
   ChevronRight,
   ShieldCheck,
   Sparkles,
+  Terminal,
   WandSparkles,
 } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { HomeMobileMenu } from "@/components/marketing/home-mobile-menu";
 import { HeaderUserMenu } from "@/components/marketing/header-user-menu";
+import { LanguageSwitcher } from "@/components/marketing/language-switcher";
 import { buildAbsoluteUrl } from "./(marketing)/models/data";
 import { loadHeaderWalletBalanceLabel } from "@/lib/header-wallet";
+import { getI18n } from "@/lib/i18n";
+import { getLocale } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
-
-const HEADER_NAV_ITEMS = [
-  { label: "Explore", href: "/dashboard?view=explore" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "Learn More", href: "/resource" },
-];
-
-const FOOTER_NAV_ITEMS = [
-  { label: "Models", href: "/models" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "Docs", href: "/docs" },
-  { label: "Learn More", href: "/resource" },
-  { label: "Tools", href: "/tools" },
-];
 
 const SECTION_X_PADDING = "px-6 md:px-8";
 const SECTION_Y_PADDING = "py-14 md:py-20";
 const CARD_CLASS =
   "rounded-xl border border-sky-950/[0.08] bg-white shadow-[0_10px_30px_rgba(14,165,233,0.06)] transition-all duration-200 hover:border-[#38BDF8]/40 hover:shadow-[0_18px_45px_rgba(14,165,233,0.14)]";
 
-const CAPABILITY_CARDS = [
+const CAPABILITY_CARD_CONFIG = [
   {
     variant: "providers",
-    title: "One API for Any Model",
-    description:
-      "Access all major models through a single, unified interface. OpenAI SDK works out of the box.",
     href: "/bestof",
-    cta: "Browse all",
   },
   {
     variant: "routing",
-    title: "Higher Availability",
-    description:
-      "Reliable AI models via our distributed infrastructure. Fall back to other providers when one goes down.",
     href: "/docs",
-    cta: "Learn more",
     external: true,
   },
   {
     variant: "performance",
-    title: "Price and Performance",
-    description:
-      "Keep image and video costs predictable with transparent model pricing and unified wallet billing.",
     href: "/docs",
-    cta: "Learn more",
     external: true,
   },
   {
     variant: "policy",
-    title: "Custom Data Policies",
-    description:
-      "Protect your organization with fine grained data policies. Ensure prompts only go to the models and providers you trust.",
     href: "/docs",
-    cta: "View docs",
     external: true,
   },
 ];
@@ -244,14 +218,32 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
+  const locale = await getLocale();
+  const copy = getI18n(locale);
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const destination = user ? "/dashboard" : "/login";
-  const destinationLabel = user ? "Dashboard" : "Sign In";
+  const destinationLabel = user ? copy.nav.dashboard : copy.nav.signIn;
   const walletBalanceLabel = user ? await loadHeaderWalletBalanceLabel(user.id) : null;
+  const headerNavItems = [
+    { label: copy.nav.explore, href: "/dashboard?view=explore" },
+    { label: copy.nav.pricing, href: "/pricing" },
+    { label: copy.nav.learnMore, href: "/resource" },
+  ];
+  const footerNavItems = [
+    { label: copy.nav.models, href: "/models" },
+    { label: copy.nav.pricing, href: "/pricing" },
+    { label: copy.nav.docs, href: "/docs" },
+    { label: copy.nav.learnMore, href: "/resource" },
+    { label: copy.nav.tools, href: "/tools" },
+  ];
+  const capabilityCards = CAPABILITY_CARD_CONFIG.map((card, index) => ({
+    ...card,
+    ...copy.home.capabilityCards[index],
+  }));
 
   return (
     <div className="min-h-screen bg-white text-[#111827]" style={{ colorScheme: "light" }}>
@@ -298,7 +290,7 @@ export default async function Home() {
             </Link>
 
             <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 lg:flex">
-              {HEADER_NAV_ITEMS.map((item) => (
+              {headerNavItems.map((item) => (
                 <Link
                   key={item.label}
                   href={item.href}
@@ -310,7 +302,16 @@ export default async function Home() {
             </nav>
 
             <div className="absolute right-0 flex items-center gap-2 lg:static lg:ml-auto">
-              <HomeMobileMenu items={HEADER_NAV_ITEMS.map((item) => ({ ...item }))} />
+              <HomeMobileMenu
+                items={headerNavItems.map((item) => ({ ...item }))}
+                labels={copy.mobileMenu}
+              />
+              <LanguageSwitcher
+                locale={locale}
+                label={copy.language.short}
+                nextLabel={copy.language.nextShort}
+                ariaLabel={copy.language.switchTo}
+              />
               {user ? (
                 <>
                   <HeaderUserMenu
@@ -321,12 +322,21 @@ export default async function Home() {
                       null
                     }
                     walletBalanceLabel={walletBalanceLabel}
+                    labels={{
+                      openMenu: copy.account.openMenu,
+                      userFallback: copy.account.userFallback,
+                      walletBalance: copy.account.walletBalance,
+                      dashboard: copy.nav.dashboard,
+                      signOut: copy.nav.signOut,
+                      refreshingBalance: copy.account.refreshingBalance,
+                      refreshBalance: copy.account.refreshBalance,
+                    }}
                   />
                   <Link
                     href="/dashboard"
                     className="inline-flex h-9 items-center justify-center rounded-full bg-[#38BDF8] px-4 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284C7]"
                   >
-                    Dashboard
+                    {copy.nav.dashboard}
                   </Link>
                 </>
               ) : (
@@ -371,7 +381,7 @@ export default async function Home() {
               <div className="relative z-10 grid items-center gap-10 lg:grid-cols-[1.08fr_0.92fr]">
                 <div className="max-w-3xl">
                   <div className="mb-7 flex flex-wrap gap-2">
-                    {["Image generation", "Image editing", "Unified billing"].map((item) => (
+                    {copy.home.chips.map((item) => (
                       <span
                         key={item}
                         className="rounded-full border border-[#7DD3FC]/40 bg-[#F0F9FF]/90 px-3.5 py-1.5 text-[11px] font-semibold text-[#075985] shadow-sm shadow-sky-200/40"
@@ -381,18 +391,17 @@ export default async function Home() {
                     ))}
                   </div>
                   <h1 className="max-w-3xl text-[40px] font-bold leading-[1.04] tracking-[-0.032em] text-[#082F49] sm:text-5xl md:text-6xl lg:text-[72px]">
-                    Your Creative AI
+                    {copy.home.heroTitle}
                     <span className="block bg-[linear-gradient(92deg,#0284C7_0%,#38BDF8_42%,#06B6D4_68%,#075985_100%)] bg-clip-text pb-2 font-serif italic leading-[1.14] tracking-[-0.045em] text-transparent">
-                      Model Layer.
+                      {copy.home.heroHighlight}
                     </span>
                   </h1>
                   <p className="mt-5 max-w-2xl text-sm leading-6 text-[#475569] md:text-base md:leading-7">
-                    OpenOctopus helps teams turn image generation and editing models into production-ready API
-                    infrastructure, with playground testing, unified billing, and one key for every supported model.
+                    {copy.home.heroDescription}
                   </p>
                   <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                     <PrimaryLink href="/models">
-                      Explore Models
+                      {copy.home.exploreModels}
                       <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
                     </PrimaryLink>
                     <SecondaryLink href={destination}>{destinationLabel}</SecondaryLink>
@@ -404,25 +413,25 @@ export default async function Home() {
           </div>
         </section>
 
-        <HowItWorksSection />
+        <HowItWorksSection copy={copy.home} />
 
-        <ProviderEcosystemSection />
+        <ProviderEcosystemSection copy={copy.home} />
 
-        <ApiPowerSection />
+        <ApiPowerSection copy={copy.home} />
 
         <section className={`mx-auto w-full max-w-7xl space-y-8 ${SECTION_X_PADDING} pb-14 md:pb-20`}>
           <SectionHeader
-            title="Built for model operations"
-            description="Route requests, review pricing, manage API keys, and keep playground testing close to production API usage."
+            title={copy.home.opsTitle}
+            description={copy.home.opsDescription}
           />
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            {CAPABILITY_CARDS.map((card) => (
+            {capabilityCards.map((card) => (
               <CapabilityCard key={card.title} {...card} />
             ))}
           </div>
         </section>
 
-        <BottomPricingCta destination={destination} destinationLabel={destinationLabel} />
+        <BottomPricingCta copy={copy.home} destination={destination} destinationLabel={destinationLabel} />
 
       </main>
 
@@ -431,12 +440,12 @@ export default async function Home() {
           <div className="flex items-center gap-4">
             <Logo className="text-[#111827]" />
             <span className="hidden text-[13px] text-[#9CA3AF] md:inline">
-              Creative model routing with spend control.
+              {copy.footer.tagline}
             </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-[13px] text-[#6B7280]">
-            {FOOTER_NAV_ITEMS.map((item) => (
+            {footerNavItems.map((item) => (
               <Link key={item.label} href={item.href} className="transition-colors hover:text-[#111827]">
                 {item.label}
               </Link>
@@ -450,12 +459,12 @@ export default async function Home() {
   );
 }
 
-function ApiPowerSection() {
+function ApiPowerSection({ copy }: { copy: ReturnType<typeof getI18n>["home"] }) {
   return (
     <section className={`mx-auto w-full max-w-7xl ${SECTION_X_PADDING} ${SECTION_Y_PADDING}`}>
       <SectionHeader
-        title="Discover the Power of Our APIs"
-        description="Explore the image generation and editing models currently available on OpenOctopus."
+        title={copy.discoverTitle}
+        description={copy.discoverDescription}
       />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {API_POWER_CARDS.map((model) => (
@@ -496,7 +505,7 @@ function ApiPowerSection() {
         href="/models"
         className="group mx-auto mt-10 flex w-fit items-center justify-center gap-1 text-sm font-medium text-[#6B7280] transition-colors hover:text-[#111827] hover:underline"
       >
-        View More
+        {copy.viewMore}
         <ChevronRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
       </Link>
     </section>
@@ -554,26 +563,26 @@ function SecondaryLink({
   );
 }
 
-function ProviderEcosystemSection() {
+function ProviderEcosystemSection({ copy }: { copy: ReturnType<typeof getI18n>["home"] }) {
   return (
-    <section className="relative overflow-hidden border-y border-black/[0.06] bg-[radial-gradient(circle_at_50%_0%,rgba(194,123,59,0.14),transparent_34rem),linear-gradient(180deg,#ffffff_0%,rgba(250,250,249,0.82)_48%,#ffffff_100%)] py-14">
+    <section className="relative overflow-hidden border-y border-sky-950/[0.06] bg-[radial-gradient(circle_at_50%_0%,rgba(56,189,248,0.18),transparent_34rem),linear-gradient(180deg,#ffffff_0%,rgba(240,249,255,0.86)_48%,#ffffff_100%)] py-14">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(255,255,255,0.88),transparent)]" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(0deg,rgba(255,255,255,0.9),transparent)]" />
       <div className={`relative z-10 mx-auto w-full max-w-7xl ${SECTION_X_PADDING}`}>
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-[#6B7280]">
-              Top model ecosystems, one API
+              {copy.providersEyebrow}
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#111827] sm:text-3xl">
-              Production model providers on OpenOctopus
+              {copy.providersTitle}
             </h2>
           </div>
           <Link
             href="/models"
             className="group inline-flex items-center gap-2 text-sm font-semibold text-[#38BDF8] transition-colors hover:text-[#0284C7]"
           >
-            View all providers
+            {copy.viewAllProviders}
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>
@@ -582,9 +591,9 @@ function ProviderEcosystemSection() {
             <Link
               key={model.name}
               href="/models"
-              className="group flex min-h-[72px] min-w-0 items-center gap-3 rounded-xl border border-black/[0.08] bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#38BDF8]/40 hover:shadow-md"
+              className="group flex min-h-[72px] min-w-0 items-center gap-3 rounded-xl border border-sky-950/[0.08] bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#38BDF8]/40 hover:shadow-md"
             >
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-black/[0.08] bg-white">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-sky-950/[0.08] bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={model.image}
@@ -781,9 +790,11 @@ function HeroOctopusOrbit() {
 }
 
 function BottomPricingCta({
+  copy,
   destination,
   destinationLabel,
 }: {
+  copy: ReturnType<typeof getI18n>["home"];
   destination: string;
   destinationLabel: string;
 }) {
@@ -800,13 +811,13 @@ function BottomPricingCta({
         />
         <div className="relative z-10 flex w-full flex-col items-center justify-center px-6 py-16 text-center md:px-10 md:py-20">
           <span className="mb-5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-white/70 backdrop-blur">
-            Transparent pricing, one balance
+            {copy.ctaEyebrow}
           </span>
           <h2 className="max-w-4xl text-3xl font-semibold tracking-tight text-white md:text-5xl">
-            Ready to Build Something Amazing?
+            {copy.ctaTitle}
           </h2>
           <p className="mt-5 max-w-xl text-sm leading-6 text-white/72 md:text-base">
-            Access image, video, and editing models with one account. Start building in minutes with developer-friendly docs and unified billing.
+            {copy.ctaDescription}
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row">
             <Link
@@ -820,13 +831,13 @@ function BottomPricingCta({
               href="/pricing"
               className="inline-flex h-11 items-center justify-center rounded-lg border border-white/15 bg-white/10 px-6 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/15"
             >
-              View Pricing
+              {copy.viewPricing}
             </Link>
             <Link
               href="/docs"
               className="text-sm font-medium text-white/78 underline-offset-4 transition-colors hover:text-white hover:underline"
             >
-              View Documentation
+              {copy.viewDocumentation}
             </Link>
           </div>
         </div>
@@ -972,7 +983,7 @@ function CapabilityPreview({ variant }: { variant: string }) {
 
 function ProviderOrb({ label, index }: { label: string; index: number }) {
   const shifted = index >= 5 && index < 10 ? "translate-x-9" : index >= 15 && index < 20 ? "translate-x-9" : "";
-  const palette = ["#E8F0FE", "#ECFDF5", "#FEF3C7", "#F3E8FF", "#FEE2E2"];
+  const palette = ["#E0F2FE", "#E0F7FA", "#DBEAFE", "#ECFEFF", "#DFF6FF"];
 
   return (
     <div
@@ -994,46 +1005,53 @@ function ProviderOrb({ label, index }: { label: string; index: number }) {
   );
 }
 
-function HowItWorksSection() {
+function HowItWorksSection({ copy }: { copy: ReturnType<typeof getI18n>["home"] }) {
   return (
     <section className={`relative z-10 mx-auto -mt-2 w-full max-w-7xl ${SECTION_X_PADDING} pb-14 md:-mt-4 md:pb-16`}>
       <div className="mb-7 flex flex-col items-start gap-4 md:mb-8">
         <span className="rounded-full border border-[#38BDF8]/20 bg-[#38BDF8]/5 px-3 py-1 text-[11px] font-medium text-[#075985]">
-          Start in minutes
+          {copy.startEyebrow}
         </span>
         <div className="max-w-3xl">
           <h2 className="text-3xl font-semibold tracking-tight text-[#111827] md:text-5xl">
-            From playground to production.
+            {copy.startTitle}
           </h2>
           <p className="mt-4 text-sm leading-6 text-[#6B7280] md:text-base">
-            Test a model visually in Playground, then move the same inputs into an OpenOctopus API request when you are ready to ship.
+            {copy.startDescription}
           </p>
         </div>
         <div className="flex flex-wrap gap-8 text-sm font-semibold text-[#111827]">
           <Link href="/models" className="group inline-flex items-center gap-1 transition-colors hover:text-[#38BDF8]">
-            Explore models
+            {copy.exploreModels}
             <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
           <Link href="/docs" className="group inline-flex items-center gap-1 transition-colors hover:text-[#38BDF8]">
-            Read API docs
+            {copy.readDocs}
             <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <StartModeCard
-          title="Use in Playground"
-          badge="No code"
-          cta="Open models"
+          title={copy.usePlayground}
+          badge={copy.noCode}
+          cta={copy.openModels}
           href="/models"
-          preview={<PlaygroundModePreview />}
+          preview={<PlaygroundModePreview copy={copy} />}
         />
         <StartModeCard
-          title="Use through API"
-          badge="OpenAI compatible"
-          cta="View docs"
+          title={copy.useApi}
+          badge={copy.openAiCompatible}
+          cta={copy.viewDocs}
           href="/docs"
-          preview={<ApiModePreview />}
+          preview={<ApiModePreview copy={copy} />}
+        />
+        <StartModeCard
+          title={copy.useCli}
+          badge="npm install"
+          cta={copy.readDocs}
+          href="/docs"
+          preview={<CliModePreview />}
         />
       </div>
     </section>
@@ -1054,9 +1072,9 @@ function StartModeCard({
   preview: ReactNode;
 }) {
   return (
-    <div className={`${CARD_CLASS} flex min-h-[440px] flex-col justify-between overflow-hidden bg-[#FAFAF9]`}>
+    <div className={`${CARD_CLASS} flex h-[300px] flex-col justify-between overflow-hidden bg-[#FAFAF9] md:h-auto md:min-h-[380px] lg:min-h-[440px]`}>
       <div
-        className="flex flex-1 items-center justify-center p-6"
+        className="flex h-[216px] shrink-0 items-center justify-center overflow-hidden p-3 sm:p-4 md:h-auto md:flex-1 md:p-6"
         style={{
           backgroundImage:
             "radial-gradient(circle, rgba(17,24,39,0.13) 1.5px, transparent 1.5px)",
@@ -1065,16 +1083,16 @@ function StartModeCard({
       >
         {preview}
       </div>
-      <div className="flex flex-col gap-4 border-t border-black/[0.06] bg-white px-5 py-5 md:flex-row md:items-center md:justify-between md:px-6">
+      <div className="flex h-[84px] shrink-0 flex-col justify-center gap-2 border-t border-black/[0.06] bg-white px-4 py-3 md:h-auto md:flex-row md:items-center md:justify-between md:gap-3 md:px-6 md:py-5">
         <div className="flex flex-wrap items-center gap-3">
-          <h3 className="text-xl font-semibold text-[#111827] md:text-2xl">{title}</h3>
-          <span className="rounded-md bg-[#BAE6FD] px-2 py-1 text-[11px] font-bold text-[#111827]">
+          <h3 className="text-base font-semibold text-[#111827] md:text-2xl">{title}</h3>
+          <span className="rounded-md bg-[#BAE6FD] px-2 py-1 text-[10px] font-bold text-[#111827] md:text-[11px]">
             {badge}
           </span>
         </div>
         <Link
           href={href}
-          className="group inline-flex h-10 w-fit items-center justify-center gap-1 rounded-lg bg-[#111827] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0B1220]"
+          className="group inline-flex h-8 w-fit shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-[#111827] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0B1220] md:h-10 md:px-4 md:text-sm"
         >
           {cta}
           <ChevronRight className="size-4 text-white/70 transition-transform group-hover:translate-x-0.5" />
@@ -1084,62 +1102,62 @@ function StartModeCard({
   );
 }
 
-function PlaygroundModePreview() {
+function PlaygroundModePreview({ copy }: { copy: ReturnType<typeof getI18n>["home"] }) {
   return (
-    <div className="w-full max-w-md rounded-xl border border-black/[0.08] bg-white p-4 shadow-[0_18px_45px_rgba(17,24,39,0.10)]">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="w-full max-w-md rounded-xl border border-black/[0.08] bg-white p-2.5 shadow-[0_18px_45px_rgba(17,24,39,0.10)] md:p-4">
+      <div className="mb-2 flex items-center justify-between md:mb-4">
         <div className="flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-[#38BDF8]/10 text-[#38BDF8]">
-            <WandSparkles className="size-4" />
+          <div className="flex size-7 items-center justify-center rounded-lg bg-[#38BDF8]/10 text-[#38BDF8] md:size-8">
+            <WandSparkles className="size-3.5 md:size-4" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-[#111827]">OpenAI Image2 Edit</p>
-            <p className="text-xs text-[#6B7280]">image-to-image</p>
+            <p className="text-xs font-semibold text-[#111827] md:text-sm">OpenAI Image2 Edit</p>
+            <p className="text-[10px] text-[#6B7280] md:text-xs">image-to-image</p>
           </div>
         </div>
         <span className="rounded-md bg-[#24BE58]/10 px-2 py-1 text-[10px] font-semibold text-[#15803D]">
-          Ready
+          {copy.ready}
         </span>
       </div>
-      <div className="grid gap-3 md:grid-cols-[0.86fr_1.14fr]">
-        <div className="flex aspect-[4/5] items-center justify-center rounded-lg border border-dashed border-black/[0.14] bg-[#FAFAF9]">
+      <div className="grid gap-2 md:grid-cols-[0.86fr_1.14fr] md:gap-3">
+        <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-black/[0.14] bg-[#FAFAF9] md:h-auto md:aspect-[4/5]">
           <div className="text-center">
-            <Sparkles className="mx-auto size-5 text-[#38BDF8]" />
-            <p className="mt-2 text-xs font-medium text-[#6B7280]">Upload image</p>
+            <Sparkles className="mx-auto size-4 text-[#38BDF8] md:size-5" />
+            <p className="mt-1 text-[10px] font-medium text-[#6B7280] md:mt-2 md:text-xs">{copy.uploadImage}</p>
           </div>
         </div>
-        <div className="space-y-3">
-          <div className="rounded-lg border border-black/[0.06] bg-[#FAFAF9] p-3">
-            <p className="text-xs font-medium text-[#6B7280]">Prompt</p>
-            <div className="mt-2 h-16 rounded-md bg-white p-3 text-xs leading-5 text-[#111827]">
-              Make the product photo cleaner and brighter.
+        <div className="space-y-2 md:space-y-3">
+          <div className="rounded-lg border border-black/[0.06] bg-[#FAFAF9] p-2 md:p-3">
+            <p className="text-[10px] font-medium text-[#6B7280] md:text-xs">{copy.prompt}</p>
+            <div className="mt-1 h-9 overflow-hidden rounded-md bg-white p-2 text-[10px] leading-4 text-[#111827] md:mt-2 md:h-16 md:p-3 md:text-xs md:leading-5">
+              {copy.promptExample}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {["1:1", "webp"].map((item) => (
-              <div key={item} className="rounded-md bg-[#38BDF8]/10 px-3 py-2 text-center text-xs font-semibold text-[#075985]">
+              <div key={item} className="rounded-md bg-[#38BDF8]/10 px-2 py-1.5 text-center text-[10px] font-semibold text-[#075985] md:px-3 md:py-2 md:text-xs">
                 {item}
               </div>
             ))}
           </div>
-          <div className="h-9 rounded-lg bg-[#111827]" />
+          <div className="hidden h-9 rounded-lg bg-[#111827] md:block" />
         </div>
       </div>
     </div>
   );
 }
 
-function ApiModePreview() {
+function ApiModePreview({ copy }: { copy: ReturnType<typeof getI18n>["home"] }) {
   return (
     <div className="w-full max-w-md overflow-hidden rounded-xl border border-black/[0.08] bg-[#0B0D10] shadow-[0_18px_45px_rgba(17,24,39,0.16)]">
       <div className="flex items-center justify-between border-b border-white/10 bg-[#111827] px-4 py-3">
         <div className="flex gap-2 text-xs font-medium text-white/72">
           <span className="rounded-md bg-white/10 px-2 py-1 text-white">OpenOctopus REST</span>
-          <span className="hidden rounded-md px-2 py-1 md:inline">Async task</span>
+          <span className="hidden rounded-md px-2 py-1 md:inline">{copy.asyncTask}</span>
         </div>
-        <span className="text-xs text-white/45">copy</span>
+        <span className="text-xs text-white/45">{copy.copy}</span>
       </div>
-      <pre className="overflow-hidden p-5 text-[12px] leading-6 text-[#E5E7EB]">
+      <pre className="max-h-[158px] overflow-hidden p-4 text-[11px] leading-5 text-[#E5E7EB] md:max-h-none md:p-5 md:text-[12px] md:leading-6">
         <code>{`curl -X POST https://api.openoctopus.com/v1/images/generations \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ooq_your_api_key" \\
@@ -1152,6 +1170,39 @@ function ApiModePreview() {
     }
   }'`}</code>
       </pre>
+    </div>
+  );
+}
+
+function CliModePreview() {
+  return (
+    <div className="w-full max-w-md overflow-hidden rounded-xl border border-black/[0.08] bg-[#082F49] shadow-[0_18px_45px_rgba(8,47,73,0.18)]">
+      <div className="flex items-center justify-between border-b border-white/10 bg-[#0C4A6E] px-4 py-3">
+        <div className="flex items-center gap-2 text-xs font-medium text-white/72">
+          <span className="flex size-7 items-center justify-center rounded-md bg-white/10 text-white">
+            <Terminal className="size-4" />
+          </span>
+          <span className="text-white">OpenOctopus CLI</span>
+        </div>
+        <span className="rounded-md bg-[#38BDF8]/18 px-2 py-1 text-[10px] font-semibold text-[#BAE6FD]">
+          ooct
+        </span>
+      </div>
+      <div className="space-y-3 p-4 md:space-y-4 md:p-5">
+        <pre className="max-h-[126px] overflow-hidden rounded-lg border border-white/10 bg-black/24 p-3 text-[11px] leading-5 text-[#E0F2FE] md:max-h-none md:p-4 md:text-[12px] md:leading-6">
+          <code>{`npm i -g @openoctopus/cli
+ooct auth login
+ooct run openoctopus/image-captioner-molmo2 \\
+  --image ./input.png \\
+  --detail-level low`}</code>
+        </pre>
+        <div className="rounded-lg border border-white/10 bg-white/[0.06] p-3">
+          <p className="text-[11px] font-semibold uppercase text-[#7DD3FC]">Output</p>
+          <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/82 md:line-clamp-none">
+            A pixel art landscape with a magnifying glass highlighting a mountain scene.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

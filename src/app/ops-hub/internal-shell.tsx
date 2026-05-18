@@ -38,11 +38,23 @@ export function InternalShell({
   activeTab,
   selectedTemplateKey,
   tabs,
+  labels = {
+    staticConfig: "静态配置",
+    dynamicConfig: "动态配置",
+    overviewData: "总览数据",
+    loading: "正在加载当前分区...",
+  },
   children,
 }: {
   activeTab: InternalTabKey;
   selectedTemplateKey?: string;
   tabs: readonly TabItem[];
+  labels?: {
+    staticConfig: string;
+    dynamicConfig: string;
+    overviewData: string;
+    loading: string;
+  };
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -87,15 +99,15 @@ export function InternalShell({
       <aside className="lg:sticky lg:top-5 lg:self-start">
         <div className="space-y-2.5">
           <div className="rounded-xl border border-[#BAE6FD] bg-white p-2.5 shadow-sm">
-            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-[#64748B]">静态配置</p>
+            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-[#64748B]">{labels.staticConfig}</p>
             {renderTabs(staticTabs)}
           </div>
           <div className="rounded-xl border border-[#BAE6FD] bg-white p-2.5 shadow-sm">
-            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-[#64748B]">动态配置</p>
+            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-[#64748B]">{labels.dynamicConfig}</p>
             {renderTabs(dynamicTabs)}
           </div>
           <div className="rounded-xl border border-[#BAE6FD] bg-white p-2.5 shadow-sm">
-            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-[#64748B]">总览数据</p>
+            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-[#64748B]">{labels.overviewData}</p>
             {renderTabs(overviewTabs)}
           </div>
         </div>
@@ -107,7 +119,7 @@ export function InternalShell({
             <div className="rounded-xl border border-[#BAE6FD] bg-white px-4 py-3 shadow-[0_18px_40px_rgba(14,165,233,0.08)]">
               <div className="flex items-center gap-3 text-sm text-black/70">
                 <span className="inline-flex size-4 animate-spin rounded-full border-2 border-sky-200 border-t-[#0284C7]" />
-                正在加载当前分区...
+                {labels.loading}
               </div>
             </div>
           </div>

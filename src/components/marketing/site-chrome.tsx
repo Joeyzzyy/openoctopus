@@ -1,22 +1,11 @@
 import Link from "next/link";
 import { Logo } from "@/components/layout/Logo";
 import { HeaderUserMenu } from "@/components/marketing/header-user-menu";
+import { LanguageSwitcher } from "@/components/marketing/language-switcher";
+import { getI18n } from "@/lib/i18n";
+import { getLocale } from "@/lib/i18n-server";
 
-const HEADER_NAV_ITEMS = [
-  { label: "Explore", href: "/dashboard?view=explore" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "Learn More", href: "/resource" },
-];
-
-const FOOTER_NAV_ITEMS = [
-  { label: "Models", href: "/models" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "Docs", href: "/docs" },
-  { label: "Learn More", href: "/resource" },
-  { label: "Tools", href: "/tools" },
-];
-
-export function MarketingHeader({
+export async function MarketingHeader({
   isLoggedIn = false,
   userLabel,
   userAvatarUrl,
@@ -27,6 +16,14 @@ export function MarketingHeader({
   userAvatarUrl?: string | null;
   walletBalanceLabel?: string | null;
 }) {
+  const locale = await getLocale();
+  const copy = getI18n(locale);
+  const headerNavItems = [
+    { label: copy.nav.explore, href: "/dashboard?view=explore" },
+    { label: copy.nav.pricing, href: "/pricing" },
+    { label: copy.nav.learnMore, href: "/resource" },
+  ];
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center px-6 md:px-8">
@@ -39,7 +36,7 @@ export function MarketingHeader({
           </Link>
 
           <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 lg:flex">
-            {HEADER_NAV_ITEMS.map((item) => (
+            {headerNavItems.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
@@ -51,18 +48,33 @@ export function MarketingHeader({
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            <LanguageSwitcher
+              locale={locale}
+              label={copy.language.short}
+              nextLabel={copy.language.nextShort}
+              ariaLabel={copy.language.switchTo}
+            />
             {isLoggedIn ? (
               <>
                 <HeaderUserMenu
                   userLabel={userLabel}
                   userAvatarUrl={userAvatarUrl}
                   walletBalanceLabel={walletBalanceLabel}
+                  labels={{
+                    openMenu: copy.account.openMenu,
+                    userFallback: copy.account.userFallback,
+                    walletBalance: copy.account.walletBalance,
+                    dashboard: copy.nav.dashboard,
+                    signOut: copy.nav.signOut,
+                    refreshingBalance: copy.account.refreshingBalance,
+                    refreshBalance: copy.account.refreshBalance,
+                  }}
                 />
                 <Link
                   href="/dashboard"
                   className="inline-flex h-9 items-center justify-center rounded-full bg-[#38BDF8] px-4 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284C7]"
                 >
-                  Dashboard
+                  {copy.nav.dashboard}
                 </Link>
               </>
             ) : (
@@ -70,7 +82,7 @@ export function MarketingHeader({
                 href="/login"
                 className="inline-flex h-9 items-center justify-center rounded-md bg-[#111827] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0B1220]"
               >
-                Sign In
+                {copy.nav.signIn}
               </Link>
             )}
           </div>
@@ -80,19 +92,29 @@ export function MarketingHeader({
   );
 }
 
-export function MarketingFooter() {
+export async function MarketingFooter() {
+  const locale = await getLocale();
+  const copy = getI18n(locale);
+  const footerNavItems = [
+    { label: copy.nav.models, href: "/models" },
+    { label: copy.nav.pricing, href: "/pricing" },
+    { label: copy.nav.docs, href: "/docs" },
+    { label: copy.nav.learnMore, href: "/resource" },
+    { label: copy.nav.tools, href: "/tools" },
+  ];
+
   return (
     <footer className="border-t border-black/[0.06] bg-[#FCFCFA]">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-10 md:flex-row md:items-center md:justify-between md:px-8 md:py-12">
         <div className="flex items-center gap-4">
           <Logo className="text-[#111827]" />
           <span className="hidden text-[13px] text-[#9CA3AF] md:inline">
-            Creative model routing with spend control.
+            {copy.footer.tagline}
           </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-4 text-[13px] text-[#6B7280]">
-          {FOOTER_NAV_ITEMS.map((item) => (
+          {footerNavItems.map((item) => (
             <Link key={item.label} href={item.href} className="transition-colors hover:text-[#111827]">
               {item.label}
             </Link>

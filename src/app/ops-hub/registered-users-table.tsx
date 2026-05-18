@@ -248,12 +248,6 @@ export function RegisteredUsersTable({
   return (
     <div className="overflow-hidden rounded-3xl border border-[#DDF4FF] bg-[#F8FCFF] shadow-[0_20px_70px_rgba(17,24,39,0.04)]">
       <div className="flex flex-col gap-2 border-b border-[#DDF4FF] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-black">用户管理</p>
-          <p className="mt-1 text-xs text-black/45">
-            {userPagination.totalCount} users · page {safeUserPage} of {userPagination.totalPages}
-          </p>
-        </div>
         <form
           className="flex w-full gap-2 sm:w-auto"
           onSubmit={(event) => {

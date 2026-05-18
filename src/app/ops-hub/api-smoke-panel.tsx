@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import type { ApiSmokeRecord } from "@/lib/api-smoke-records";
+import { OpsHubRefreshButton } from "./refresh-button";
 
 type SmokeAsset = {
   url: string;
@@ -318,13 +319,11 @@ export function ApiSmokePanel({ records }: { records: ApiSmokeRecord[] }) {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
-        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
             <ModelHealthOverview records={records} />
           </div>
-          <code className="rounded-md border border-[#BAE6FD] bg-white px-2 py-1 text-[11px] text-black/55">
-            npm run smoke:images
-          </code>
+          <OpsHubRefreshButton label="刷新结果" />
         </div>
 
         {records.length > 0 ? (
@@ -406,7 +405,7 @@ export function ApiSmokePanel({ records }: { records: ApiSmokeRecord[] }) {
           <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
             <p className="text-sm font-medium text-black">还没有 API smoke 记录</p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
-              在本地运行 OPENOCTOPUS_API_KEY=ooq_xxx npm run smoke:images 后，这里会显示脚本写入的连通性结果。
+              这里会显示本地脚本写入的连通性结果。
             </p>
           </div>
         )}

@@ -11,6 +11,14 @@ type ProductTopTabsProps = {
   requestDetailsHref?: string;
   accountHref?: string;
   isLoggedIn?: boolean;
+  labels?: {
+    dashboard: string;
+    explore: string;
+    models: string;
+    apiKeys: string;
+    requestDetails: string;
+    account: string;
+  };
 };
 type ProductTopTabKey =
   | "dashboard"
@@ -28,6 +36,14 @@ export function ProductTopTabs({
   requestDetailsHref = "/dashboard?view=request-details&requestsPage=1&billingPage=1&analyticsInterval=minute&analyticsRange=24h",
   accountHref = "/dashboard?view=account",
   isLoggedIn = true,
+  labels = {
+    dashboard: "Dashboard",
+    explore: "Explore",
+    models: "Models",
+    apiKeys: "API Keys",
+    requestDetails: "Request Details",
+    account: "Account",
+  },
 }: ProductTopTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -40,37 +56,37 @@ export function ProductTopTabs({
       [
         {
           key: "dashboard",
-          label: "Dashboard",
+          label: labels.dashboard,
           href: dashboardHref,
           active: pathname === "/dashboard" && dashboardView === "dashboard",
         },
         {
           key: "explore",
-          label: "Explore",
+          label: labels.explore,
           href: exploreHref,
           active: pathname === "/dashboard" && dashboardView === "explore",
         },
         {
           key: "models",
-          label: "Models",
+          label: labels.models,
           href: modelsHref,
           active: pathname === modelsHref || pathname.startsWith(`${modelsHref}/`),
         },
         {
           key: "api-keys",
-          label: "API Keys",
+          label: labels.apiKeys,
           href: apiKeysHref,
           active: pathname === "/dashboard" && dashboardView === "api-keys",
         },
         {
           key: "request-details",
-          label: "Request Details",
+          label: labels.requestDetails,
           href: requestDetailsHref,
           active: pathname === "/dashboard" && dashboardView === "request-details",
         },
         {
           key: "account",
-          label: "Account",
+          label: labels.account,
           href: accountHref,
           active: pathname === "/dashboard" && dashboardView === "account",
         },
@@ -81,6 +97,7 @@ export function ProductTopTabs({
       dashboardHref,
       dashboardView,
       exploreHref,
+      labels,
       modelsHref,
       pathname,
       requestDetailsHref,

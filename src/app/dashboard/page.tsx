@@ -8,6 +8,8 @@ import {
 import { MarketingHeader } from "@/components/marketing/site-chrome";
 import { ProductTopTabs } from "@/components/marketing/product-top-tabs";
 import { getDashboardData } from "@/lib/dashboard-server";
+import { getI18n } from "@/lib/i18n";
+import { getLocale } from "@/lib/i18n-server";
 import { cn } from "@/lib/utils";
 import { CreateKeyButton } from "./dashboard-actions";
 import { ApiKeysTable } from "./api-keys-table";
@@ -220,6 +222,8 @@ export default async function DashboardPage({
 }: {
   searchParams: SearchParams;
 }) {
+  const locale = await getLocale();
+  const copy = getI18n(locale);
   const resolvedSearchParams = await searchParams;
   const view = parseDashboardView(getSearchValue(resolvedSearchParams, "view"));
   const analyticsInterval = parseRequestInterval(
@@ -348,8 +352,16 @@ export default async function DashboardPage({
           analyticsInterval,
           analyticsRange,
           modelType: selectedModelType,
-          modelSlug: selectedModelSlug,
-        })}
+            modelSlug: selectedModelSlug,
+          })}
+          labels={{
+            dashboard: copy.nav.dashboard,
+            explore: copy.nav.explore,
+            models: copy.nav.models,
+            apiKeys: locale === "zh" ? "API 密钥" : "API Keys",
+            requestDetails: locale === "zh" ? "请求详情" : "Request Details",
+            account: locale === "zh" ? "账户" : "Account",
+          }}
         />
         <div className="mt-2 xl:mt-4">
           <section className="min-h-[calc(100vh-108px)] min-w-0">

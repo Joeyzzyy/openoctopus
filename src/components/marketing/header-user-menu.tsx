@@ -9,10 +9,28 @@ export function HeaderUserMenu({
   userLabel,
   userAvatarUrl,
   walletBalanceLabel,
+  labels = {
+    openMenu: "Open account menu",
+    userFallback: "OpenOctopus User",
+    walletBalance: "Wallet balance",
+    dashboard: "Dashboard",
+    signOut: "Sign out",
+    refreshingBalance: "Refreshing balance",
+    refreshBalance: "Refresh balance",
+  },
 }: {
   userLabel?: string | null;
   userAvatarUrl?: string | null;
   walletBalanceLabel?: string | null;
+  labels?: {
+    openMenu: string;
+    userFallback: string;
+    walletBalance: string;
+    dashboard: string;
+    signOut: string;
+    refreshingBalance: string;
+    refreshBalance: string;
+  };
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -41,7 +59,7 @@ export function HeaderUserMenu({
           </span>
           <button
             type="button"
-            aria-label={isRefreshing ? "Refreshing balance" : "Refresh balance"}
+            aria-label={isRefreshing ? labels.refreshingBalance : labels.refreshBalance}
             disabled={isRefreshing}
             onClick={() => {
               startRefreshTransition(() => {
@@ -56,24 +74,24 @@ export function HeaderUserMenu({
       ) : null}
       <button
         type="button"
-        aria-label="Open account menu"
+        aria-label={labels.openMenu}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
         className="inline-flex size-9 items-center justify-center overflow-hidden rounded-full border border-[#BAE6FD] bg-white text-[12px] font-semibold text-[#0369A1] shadow-sm transition-colors hover:bg-[#F0F9FF]"
       >
         {userAvatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={userAvatarUrl} alt={userLabel ?? "User avatar"} className="h-full w-full object-cover" />
+          <img src={userAvatarUrl} alt={userLabel ?? labels.userFallback} className="h-full w-full object-cover" />
         ) : (
           <span>{avatarFallback}</span>
         )}
       </button>
       {open ? (
         <div className="absolute right-0 top-11 z-20 w-64 rounded-xl border border-black/[0.08] bg-white p-3 shadow-xl">
-          <p className="truncate text-sm font-medium text-black">{userLabel ?? "OpenOctopus User"}</p>
+          <p className="truncate text-sm font-medium text-black">{userLabel ?? labels.userFallback}</p>
           {walletBalanceLabel ? (
             <>
-              <p className="mt-2 text-xs text-black/55">Wallet balance</p>
+              <p className="mt-2 text-xs text-black/55">{labels.walletBalance}</p>
               <p className="text-lg font-semibold text-black">{walletBalanceLabel}</p>
             </>
           ) : null}
@@ -83,14 +101,14 @@ export function HeaderUserMenu({
               onClick={() => setOpen(false)}
               className="inline-flex h-9 w-full items-center justify-center rounded-md bg-[#111827] px-3 text-sm font-medium text-white hover:bg-[#0B1220]"
             >
-              Dashboard
+              {labels.dashboard}
             </Link>
             <form action="/auth/sign-out" method="post">
               <button
                 type="submit"
                 className="inline-flex h-9 w-full items-center justify-center rounded-md border border-black/[0.12] bg-white px-3 text-sm font-medium text-black/80 hover:bg-black/[0.03]"
               >
-                Sign out
+                {labels.signOut}
               </button>
             </form>
           </div>

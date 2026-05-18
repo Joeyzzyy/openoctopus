@@ -39,7 +39,9 @@ export const metadata: Metadata = {
   description:
     "OpenOctopus — AI media generation platform with model budgets, API keys, and spend oversight.",
   icons: {
-    icon: "/icon.svg",
+    icon: "/icon.png",
+    shortcut: "/favicon.ico",
+    apple: "/apple-icon.png",
   },
 };
 

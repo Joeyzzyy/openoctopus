@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "@/components/layout/Logo";
+import { LanguageSwitcher } from "@/components/marketing/language-switcher";
+import { formatI18n, getI18n } from "@/lib/i18n";
+import { getLocale } from "@/lib/i18n-server";
 import { getInternalAdminData } from "@/lib/internal-admin-server";
 import { getApiSmokeRecords } from "@/lib/api-smoke-records";
 import { getInternalAdminUser } from "@/lib/internal-access";
@@ -487,23 +490,33 @@ function SectionShell({
   title,
   description,
   headerRight,
+  bare = false,
   children,
 }: {
   id: string;
   title: string;
   description: string;
   headerRight?: React.ReactNode;
+  bare?: boolean;
   children: React.ReactNode;
 }) {
+  const hasHeader = Boolean(title || description || headerRight);
+
+  if (bare) {
+    return <section id={id}>{children}</section>;
+  }
+
   return (
     <section id={id} className="rounded-2xl border border-[#BAE6FD] bg-white p-4 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-black">{title}</h2>
-          <p className="mt-1 text-sm text-black/55">{description}</p>
+      {hasHeader ? (
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            {title ? <h2 className="text-xl font-semibold text-black">{title}</h2> : null}
+            {description ? <p className="mt-1 text-sm text-black/55">{description}</p> : null}
+          </div>
+          {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
         </div>
-        {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
-      </div>
+      ) : null}
       {children}
     </section>
   );
@@ -748,6 +761,9 @@ export default async function InternalPage({
 }: {
   searchParams: SearchParams;
 }) {
+  const locale = await getLocale();
+  const copy = getI18n(locale);
+  const internalCopy = copy.internal;
   const internalAdminUser = await getInternalAdminUser();
 
   if (!internalAdminUser) {
@@ -755,6 +771,50 @@ export default async function InternalPage({
   }
 
   const resolvedSearchParams = await searchParams;
+  const displayTabs = tabs.map((tab) => ({
+    ...tab,
+    label: internalCopy.tabs[tab.key],
+  }));
+  const displayCapabilityOptions = capabilityOptions.map((option) => ({
+    ...option,
+    label:
+      option.value === "image_generation"
+        ? internalCopy.options.imageGeneration
+        : option.value === "image_edit"
+          ? internalCopy.options.imageEdit
+          : option.value === "image_recognition"
+            ? internalCopy.options.imageRecognition
+            : internalCopy.options.videoGeneration,
+  }));
+  const displayProviderStatusOptions = providerStatusOptions.map((option) => ({
+    ...option,
+    label:
+      option.value === "healthy"
+        ? internalCopy.options.healthy
+        : option.value === "degraded"
+          ? internalCopy.options.degraded
+          : internalCopy.options.offline,
+  }));
+  const displayMonitoringIntervalOptions = [
+    { value: "minute", label: internalCopy.options.byMinute },
+    { value: "hour", label: internalCopy.options.byHour },
+    { value: "day", label: internalCopy.options.byDay },
+  ] as const;
+  const displayMonitoringRangeOptions = [
+    { value: "60m", label: internalCopy.options.last60m },
+    { value: "6h", label: internalCopy.options.last6h },
+    { value: "24h", label: internalCopy.options.last24h },
+    { value: "7d", label: internalCopy.options.last7d },
+    { value: "30d", label: internalCopy.options.last30d },
+    { value: "90d", label: internalCopy.options.last90d },
+  ] as const;
+  const displayMonitoringStatusOptions = [
+    { value: "all", label: internalCopy.options.allRequests },
+    { value: "inflight", label: internalCopy.options.inflight },
+    { value: "succeeded", label: internalCopy.options.succeeded },
+    { value: "failed", label: internalCopy.options.failed },
+    { value: "cancelled", label: internalCopy.options.cancelled },
+  ] as const;
   const selectedMonitoringInterval = parseMonitoringInterval(
     getSearchValue(resolvedSearchParams, "monitoringInterval")
   );
@@ -918,14 +978,14 @@ export default async function InternalPage({
       ? monitoringHealthSummary.failed / monitoringHealthSummary.settled * 100
       : 0;
   const selectedMonitoringIntervalLabel =
-    monitoringIntervalOptions.find((option) => option.value === selectedMonitoringInterval)?.label ??
-    "按小时";
+    displayMonitoringIntervalOptions.find((option) => option.value === selectedMonitoringInterval)?.label ??
+    internalCopy.options.byHour;
   const selectedMonitoringRangeLabel =
-    monitoringRangeOptions.find((option) => option.value === selectedMonitoringRange)?.label ??
-    "最近 24 小时";
+    displayMonitoringRangeOptions.find((option) => option.value === selectedMonitoringRange)?.label ??
+    internalCopy.options.last24h;
   const selectedMonitoringStatusLabel =
-    monitoringStatusOptions.find((option) => option.value === selectedMonitoringStatus)?.label ??
-    "全部请求";
+    displayMonitoringStatusOptions.find((option) => option.value === selectedMonitoringStatus)?.label ??
+    internalCopy.options.allRequests;
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#F8FCFF] text-[#111111]">
       <header className="fixed left-0 right-0 top-0 z-50 w-full border-b border-[#BAE6FD] bg-[#F8FCFF]">
@@ -938,26 +998,44 @@ export default async function InternalPage({
               <Logo className="text-[#111827]" />
             </Link>
             <span className="ml-3 inline-flex items-center rounded-md border border-[#BAE6FD] bg-white px-2.5 py-1 text-[12px] font-medium text-[#075985]">
-              内部控制台
+              {internalCopy.badge}
             </span>
+            <div className="ml-auto">
+              <LanguageSwitcher
+                locale={locale}
+                label={copy.language.short}
+                nextLabel={copy.language.nextShort}
+                ariaLabel={copy.language.switchTo}
+              />
+            </div>
           </div>
         </div>
       </header>
 
       <div className="relative mx-auto w-full max-w-[1960px] px-3 pb-10 pt-[72px] xl:px-4">
         <section className="min-h-[calc(100vh-108px)] py-4">
-          <InternalShell activeTab={activeTab} selectedTemplateKey={selectedTemplateKey} tabs={tabs}>
+          <InternalShell
+            activeTab={activeTab}
+            selectedTemplateKey={selectedTemplateKey}
+            tabs={displayTabs}
+            labels={{
+              staticConfig: internalCopy.staticConfig,
+              dynamicConfig: internalCopy.dynamicConfig,
+              overviewData: internalCopy.overviewData,
+              loading: internalCopy.loading,
+            }}
+          >
           {activeTab === "public-models" ? (
             <>
               <section className="mb-6">
                 <SectionShell
                 id="public-models-panel"
-                title="可售模型管理"
+                title={internalCopy.sections.publicModels}
                 description=" "
                 headerRight={
                   <div className="flex items-center gap-2">
                     <CreateSupportedModelButton
-                      capabilityOptions={capabilityOptions}
+                      capabilityOptions={displayCapabilityOptions}
                       modelVendors={data.modelVendors}
                       models={data.supportedModels}
                     />
@@ -974,7 +1052,7 @@ export default async function InternalPage({
                   providers={data.providers}
                   workerTemplates={data.workerTemplates ?? []}
                   modelVendors={data.modelVendors}
-                  capabilityOptions={capabilityOptions}
+                  capabilityOptions={displayCapabilityOptions}
                 />
                 </SectionShell>
               </section>
@@ -985,14 +1063,14 @@ export default async function InternalPage({
             <>
               <SectionShell
                 id="providers-panel"
-                title="供应商管理"
+                title={internalCopy.sections.providers}
                 description=" "
-                headerRight={<CreateProviderButton providerStatusOptions={providerStatusOptions} />}
+                headerRight={<CreateProviderButton providerStatusOptions={displayProviderStatusOptions} />}
               >
               <ProvidersPanel
                 providers={data.providers}
                 credentials={data.providerCredentials}
-                providerStatusOptions={providerStatusOptions}
+                providerStatusOptions={displayProviderStatusOptions}
               />
               </SectionShell>
             </>
@@ -1002,7 +1080,7 @@ export default async function InternalPage({
             <>
               <SectionShell
                 id="model-vendors-panel"
-                title="模型厂商管理"
+                title={internalCopy.sections.modelVendors}
                 description=" "
                 headerRight={<CreateModelVendorButton />}
               >
@@ -1018,8 +1096,8 @@ export default async function InternalPage({
             <>
               <SectionShell
                 id="image-response-contracts-panel"
-                title="图片返回结构约定"
-                description="维护 internal Playground 与对外 API 的图片返回结构契约。"
+                title={internalCopy.sections.imageContracts}
+                description={internalCopy.sections.imageContractsDescription}
               >
                 <ImageResponseContractPanel />
               </SectionShell>
@@ -1030,7 +1108,7 @@ export default async function InternalPage({
             <>
               <SectionShell
                 id="worker-templates-panel"
-                title="API 调用格式配置"
+                title={internalCopy.sections.workerTemplates}
                 description=" "
               >
                 <WorkerTemplatesPanel
@@ -1045,8 +1123,8 @@ export default async function InternalPage({
             <>
               <SectionShell
                 id="gateway-error-definitions-panel"
-                title="统一错误码"
-                description="维护所有对外请求失败时返回的错误码、HTTP 状态码、用户文案与可重试标记。"
+                title={internalCopy.sections.errorDefinitions}
+                description={internalCopy.sections.errorDefinitionsDescription}
               >
                 <GatewayErrorDefinitionsPanel definitions={data.gatewayErrorDefinitions} />
               </SectionShell>
@@ -1057,8 +1135,8 @@ export default async function InternalPage({
             <section>
               <SectionShell
                 id="internal-model-ai-usage-logs-panel"
-                title="内部 AI 消费记录"
-                description="仅 internal 使用：记录文档 URL 自动解析的调用轨迹、token 与估算成本。"
+                title=""
+                description=""
               >
                 <InternalModelAiUsageLogsPanel
                   logs={data.internalModelAiUsageLogs}
@@ -1072,8 +1150,9 @@ export default async function InternalPage({
             <section>
               <SectionShell
                 id="api-smoke-panel"
-                title="API 连通性"
+                title=""
                 description=""
+                bare
               >
                 <ApiSmokePanel records={apiSmokeRecords} />
               </SectionShell>
@@ -1096,9 +1175,9 @@ export default async function InternalPage({
                     <div className="mb-4 rounded-2xl border border-[#DDF4FF] bg-[#F8FCFF] p-3">
                       <div className="grid gap-3 lg:grid-cols-4">
                         <div>
-                          <p className="text-[11px] tracking-[0.35px] text-black/45">时间粒度</p>
+                          <p className="text-[11px] tracking-[0.35px] text-black/45">{internalCopy.monitoring.interval}</p>
                           <div className="mt-2 flex flex-wrap gap-1.5">
-                            {monitoringIntervalOptions.map((option) => (
+                            {displayMonitoringIntervalOptions.map((option) => (
                               <a
                                 key={option.value}
                                 href={buildMonitoringHref({
@@ -1121,9 +1200,9 @@ export default async function InternalPage({
                         </div>
 
                         <div>
-                          <p className="text-[11px] tracking-[0.35px] text-black/45">时间范围</p>
+                          <p className="text-[11px] tracking-[0.35px] text-black/45">{internalCopy.monitoring.range}</p>
                           <div className="mt-2 flex flex-wrap gap-1.5">
-                            {monitoringRangeOptions.map((option) => (
+                            {displayMonitoringRangeOptions.map((option) => (
                               <a
                                 key={option.value}
                                 href={buildMonitoringHref({
@@ -1146,9 +1225,9 @@ export default async function InternalPage({
                         </div>
 
                         <div>
-                          <p className="text-[11px] tracking-[0.35px] text-black/45">请求状态</p>
+                          <p className="text-[11px] tracking-[0.35px] text-black/45">{internalCopy.monitoring.status}</p>
                           <div className="mt-2 flex flex-wrap gap-1.5">
-                            {monitoringStatusOptions.map((option) => (
+                            {displayMonitoringStatusOptions.map((option) => (
                               <a
                                 key={option.value}
                                 href={buildMonitoringHref({
@@ -1171,7 +1250,7 @@ export default async function InternalPage({
                         </div>
 
                         <div>
-                          <p className="text-[11px] tracking-[0.35px] text-black/45">模型</p>
+                          <p className="text-[11px] tracking-[0.35px] text-black/45">{internalCopy.monitoring.model}</p>
                           <form action="/ops-hub" className="mt-2 flex gap-1.5">
                             <input type="hidden" name="tab" value={activeTab} />
                             <input type="hidden" name="monitoringView" value={effectiveMonitoringView} />
@@ -1195,7 +1274,7 @@ export default async function InternalPage({
                               disabled={monitoringSeries.length === 0}
                               className="h-8 shrink-0 rounded-md border border-[#BAE6FD] bg-white px-2.5 text-[11px] font-medium text-black/72 hover:bg-[#E0F2FE] disabled:cursor-not-allowed disabled:text-black/35"
                             >
-                              应用
+                              {internalCopy.monitoring.apply}
                             </button>
                           </form>
                         </div>
@@ -1204,34 +1283,40 @@ export default async function InternalPage({
 
                     <div className="mb-5 grid gap-3 md:grid-cols-6">
                       <OverviewCard
-                        title="模型总数"
+                        title={internalCopy.monitoring.totalModels}
                         value={monitoringSummary.modelCount}
-                        note="通过模型筛选查看单张折线图"
+                        note={locale === "zh" ? "通过模型筛选查看单张折线图" : "Filter by model to inspect one chart"}
                       />
                       <OverviewCard
-                        title="活跃模型"
+                        title={internalCopy.monitoring.activeModels}
                         value={monitoringSummary.activeModelCount}
-                        note={`${selectedMonitoringRangeLabel} 内至少调用过一次`}
+                        note={formatI18n(internalCopy.monitoring.inRangeCalled, { range: selectedMonitoringRangeLabel })}
                       />
                       <OverviewCard
-                        title="总调用量"
+                        title={internalCopy.monitoring.totalRequests}
                         value={monitoringSummary.requestCount}
-                        note={`${selectedMonitoringRangeLabel} · ${selectedMonitoringStatusLabel}`}
+                        note={formatI18n(internalCopy.monitoring.rangeAndStatus, {
+                          range: selectedMonitoringRangeLabel,
+                          status: selectedMonitoringStatusLabel,
+                        })}
                       />
                       <OverviewCard
-                        title="单桶峰值"
+                        title={internalCopy.monitoring.peakBucket}
                         value={monitoringSummary.peakValue}
                         note={`${selectedMonitoringIntervalLabel}`}
                       />
                       <OverviewCard
-                        title="成功率"
+                        title={internalCopy.monitoring.successRate}
                         value={formatPercent(monitoringSuccessRate)}
-                        note={`已结算 ${monitoringHealthSummary.settled} 条`}
+                        note={formatI18n(internalCopy.monitoring.settled, { count: monitoringHealthSummary.settled })}
                       />
                       <OverviewCard
-                        title="失败率"
+                        title={internalCopy.monitoring.failureRate}
                         value={formatPercent(monitoringFailureRate)}
-                        note={`失败 ${monitoringHealthSummary.failed} · 取消 ${monitoringHealthSummary.cancelled}`}
+                        note={formatI18n(internalCopy.monitoring.failedCancelled, {
+                          failed: monitoringHealthSummary.failed,
+                          cancelled: monitoringHealthSummary.cancelled,
+                        })}
                       />
                     </div>
                   </>
@@ -1264,7 +1349,7 @@ export default async function InternalPage({
                               labels={series.labels}
                               total={series.total}
                               peak={series.peak}
-                              intervalLabel={selectedMonitoringIntervalLabel.replace("按", "")}
+                              intervalLabel={locale === "zh" ? selectedMonitoringIntervalLabel.replace("按", "") : selectedMonitoringIntervalLabel.replace("By ", "")}
                               successRate={formatPercent(successRate)}
                               failureRate={formatPercent(failureRate)}
                               settledCount={health.settled}
@@ -1275,8 +1360,8 @@ export default async function InternalPage({
                       </div>
                     ) : (
                       <EmptyState
-                        title="还没有模型监控数据"
-                        detail="先创建可售模型，或者等待网关产生新的 inference_requests。这里会按模型筛选展示单张调用折线图。"
+                        title={internalCopy.monitoring.noDataTitle}
+                        detail={internalCopy.monitoring.noDataDetail}
                       />
                     )}
 
@@ -1286,15 +1371,9 @@ export default async function InternalPage({
                 {activeTab === "monitoring-problems" ? (
                   <div className="rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] p-4">
                       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-black">异常请求快查</p>
-                          <p className="mt-0.5 text-xs text-black/50">
-                            只拉取 failed / queued，后端分页每页 10 条，用于快速定位超时和失败请求。
-                          </p>
-                        </div>
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="text-xs text-black/45">
-                            共 {data.problemRequestPagination.totalCount} 条
+                            {formatI18n(internalCopy.monitoring.problemCount, { count: data.problemRequestPagination.totalCount })}
                           </p>
                           <OpsHubRefreshButton />
                         </div>
@@ -1315,8 +1394,8 @@ export default async function InternalPage({
                                 createdLabel: request.createdLabel,
                                 startedLabel: request.startedLabel,
                                 completedLabel: request.completedLabel,
-                                providerLabel: `上游：${request.providerName} / ${request.upstreamModelSlug}`,
-                                callerLabel: `调用方：${request.actorName} · ${request.apiKeyName} · ${request.apiKeyPrefix} · ${request.sourceLabel}`,
+                                providerLabel: `${internalCopy.monitoring.upstream}: ${request.providerName} / ${request.upstreamModelSlug}`,
+                                callerLabel: `${internalCopy.monitoring.caller}: ${request.actorName} · ${request.apiKeyName} · ${request.apiKeyPrefix} · ${request.sourceLabel}`,
                                 errorMessage: request.error_message,
                                 lastAttempt: request.lastAttempt,
                                 upstreamRawText: request.upstreamRawText,
@@ -1330,15 +1409,18 @@ export default async function InternalPage({
                         </div>
                       ) : (
                         <EmptyState
-                          title="没有 failed / queued 请求"
-                          detail="当前没有需要优先排查的问题请求。"
+                          title={internalCopy.monitoring.noProblemsTitle}
+                          detail={internalCopy.monitoring.noProblemsDetail}
                         />
                       )}
 
                       {data.problemRequestPagination.totalPages > 1 ? (
                         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-black/55">
                           <span>
-                            第 {data.problemRequestPagination.page} / {data.problemRequestPagination.totalPages} 页
+                            {formatI18n(internalCopy.monitoring.page, {
+                              page: data.problemRequestPagination.page,
+                              total: data.problemRequestPagination.totalPages,
+                            })}
                           </span>
                           <div className="flex gap-2">
                             <a
@@ -1357,7 +1439,7 @@ export default async function InternalPage({
                                   : "bg-white text-black/65 hover:bg-[#E0F2FE]"
                               }`}
                             >
-                              上一页
+                              {internalCopy.monitoring.previous}
                             </a>
                             <a
                               aria-disabled={data.problemRequestPagination.page >= data.problemRequestPagination.totalPages}
@@ -1378,7 +1460,7 @@ export default async function InternalPage({
                                   : "bg-white text-black/65 hover:bg-[#E0F2FE]"
                               }`}
                             >
-                              下一页
+                              {internalCopy.monitoring.next}
                             </a>
                           </div>
                         </div>

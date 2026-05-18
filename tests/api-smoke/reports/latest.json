@@ -18,17 +18,33 @@
       }
     },
     "keyPrefix": "ooq_B90...Mopg",
-    "startedAt": "2026-05-18T05:12:54.797Z",
-    "success": false,
-    "submitStatus": 404,
+    "startedAt": "2026-05-18T05:15:15.018Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "46fd9eab-59f0-4197-8cbf-4eec98c79d9b",
+    "finalStatus": "succeeded",
+    "assetCount": 0,
     "submitResponse": {
-      "message": "Route POST:/v1/images/recognitions not found",
-      "error": "Not Found",
-      "statusCode": 404
+      "id": "46fd9eab-59f0-4197-8cbf-4eec98c79d9b",
+      "status": "queued"
     },
-    "taskResponse": null,
-    "errorMessage": "Route POST:/v1/images/recognitions not found",
-    "completedAt": "2026-05-18T05:12:56.369Z",
-    "latencyMs": 1572
+    "pollUrl": "https://api.openoctopus.com/v1/tasks/46fd9eab-59f0-4197-8cbf-4eec98c79d9b",
+    "taskResponse": {
+      "id": "46fd9eab-59f0-4197-8cbf-4eec98c79d9b",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "18468eb8-9b14-4302-a625-f5c602003bbd",
+      "status": "succeeded",
+      "capability": "image_recognition",
+      "public_model_slug": "openoctopus/image-captioner-molmo2",
+      "output_payload": {
+        "text": "A pixelated landscape poster showcases a magnifying glass over a mountain scene. The poster features various pixelated images, including a woman, a man, and a camera. The design has a retro, video game-inspired aesthetic with vibrant colors and a nostalgic feel."
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-18T05:15:16.543586+00:00",
+      "completed_at": "2026-05-18T05:15:29.167+00:00"
+    },
+    "completedAt": "2026-05-18T05:15:30.286Z",
+    "latencyMs": 15268
   }
 ]
