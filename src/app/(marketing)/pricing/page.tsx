@@ -101,7 +101,7 @@ function groupRowsByProvider(rows: PricingRow[]) {
 
 function PricingTable({ rows }: { rows: PricingRow[] }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="max-w-full overflow-x-auto">
       <div className="grid min-w-[980px] grid-cols-[minmax(180px,0.9fr)_minmax(280px,1.1fr)_minmax(420px,1.6fr)] gap-x-8 border-b border-black/[0.08] bg-[#FAFAFA] px-4 py-2 text-xs font-medium tracking-[0.3px] text-black/60">
         <span>Model</span>
         <span>Price</span>
@@ -202,7 +202,7 @@ export default async function PricingPage() {
           Go to Models
         </Link>
       </div>
-      <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="rounded-xl border border-black/[0.08] bg-white p-3 lg:sticky lg:top-20 lg:self-start">
           <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-black/45">Providers</p>
           <nav className="grid gap-1">
@@ -218,12 +218,12 @@ export default async function PricingPage() {
             ))}
           </nav>
         </aside>
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           {providerGroups.map((group) => (
             <section
               key={group.provider}
               id={providerAnchor(group.provider)}
-              className="scroll-mt-24 overflow-hidden rounded-xl border border-black/[0.08] bg-white"
+              className="min-w-0 scroll-mt-24 overflow-hidden rounded-xl border border-black/[0.08] bg-white"
             >
               <div className="flex items-center justify-between gap-4 border-b border-black/[0.08] px-4 py-3">
                 <h2 className="text-base font-semibold text-black">{group.provider}</h2>

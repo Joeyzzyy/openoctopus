@@ -132,12 +132,20 @@ export function RegisteredUsersTable({
   const searchParams = useSearchParams();
   const [expandedUserIds, setExpandedUserIds] = useState<Set<string>>(new Set());
   const [requestPagesByUserId, setRequestPagesByUserId] = useState<Record<string, RequestPageState>>({});
+  const [workspaceModalUserId, setWorkspaceModalUserId] = useState<string | null>(null);
+  const [keysModalUserId, setKeysModalUserId] = useState<string | null>(null);
+  const [balanceModalUserId, setBalanceModalUserId] = useState<string | null>(null);
+  const [addBalanceModalUserId, setAddBalanceModalUserId] = useState<string | null>(null);
   const [query, setQuery] = useState(userSearch);
   const safeUserPage = Math.min(userPagination.page, userPagination.totalPages);
   const pageStart = userPagination.totalCount === 0
     ? 0
     : (safeUserPage - 1) * userPagination.pageSize + 1;
   const pageEnd = Math.min(safeUserPage * userPagination.pageSize, userPagination.totalCount);
+  const workspaceModalUser = users.find((user) => user.id === workspaceModalUserId) ?? null;
+  const keysModalUser = users.find((user) => user.id === keysModalUserId) ?? null;
+  const balanceModalUser = users.find((user) => user.id === balanceModalUserId) ?? null;
+  const addBalanceModalUser = users.find((user) => user.id === addBalanceModalUserId) ?? null;
 
   useEffect(() => {
     setQuery(userSearch);
@@ -230,6 +238,13 @@ export function RegisteredUsersTable({
     }
   }
 
+  function closeModals() {
+    setWorkspaceModalUserId(null);
+    setKeysModalUserId(null);
+    setBalanceModalUserId(null);
+    setAddBalanceModalUserId(null);
+  }
+
   return (
     <div className="overflow-hidden rounded-3xl border border-black/[0.06] bg-[#FCFCFA] shadow-[0_20px_70px_rgba(17,24,39,0.04)]">
       <div className="flex flex-col gap-2 border-b border-black/[0.06] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -315,13 +330,41 @@ export function RegisteredUsersTable({
                   <td className="px-5 py-4 font-medium text-black">{user.balanceLabel}</td>
                   <td className="px-5 py-4 text-black/65">{user.apiKeys.length}</td>
                   <td className="px-5 py-4">
-                    <div className="flex items-start gap-2">
+                    <div className="flex flex-wrap items-start gap-2">
                       <button
                         type="button"
                         onClick={() => expandUser(user.id)}
                         className="inline-flex h-8 items-center justify-center rounded-full border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/68 transition-colors hover:border-black/20 hover:bg-[#F7F3EA]"
                       >
-                        {expanded ? "收起明细" : "展开明细"}
+                        {expanded ? "收起请求" : "请求"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWorkspaceModalUserId(user.id)}
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/68 transition-colors hover:border-black/20 hover:bg-[#F7F3EA]"
+                      >
+                        Workspace
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setKeysModalUserId(user.id)}
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/68 transition-colors hover:border-black/20 hover:bg-[#F7F3EA]"
+                      >
+                        Keys
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBalanceModalUserId(user.id)}
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/68 transition-colors hover:border-black/20 hover:bg-[#F7F3EA]"
+                      >
+                        余额
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAddBalanceModalUserId(user.id)}
+                        className="inline-flex h-8 items-center justify-center rounded-full bg-black px-3 text-xs font-medium text-white transition-colors hover:bg-black/85"
+                      >
+                        加余额
                       </button>
                       <div>
                         <RegisteredUserDeleteButton
@@ -338,101 +381,7 @@ export function RegisteredUsersTable({
                   <tr className="bg-white">
                     <td colSpan={5} className="px-5 pb-6 pt-3">
                       <div className="rounded-3xl border border-black/[0.06] bg-[#F7F3EA] p-4">
-                        <div className="grid gap-3 md:grid-cols-3">
-                          <div className="rounded-2xl border border-black/[0.06] bg-white p-4">
-                            <p className="text-[11px] uppercase tracking-[0.5px] text-black/35">Workspace</p>
-                            <p className="mt-2 font-medium text-black/80">{user.workspaceName}</p>
-                            <p className="mt-2 break-all text-xs text-black/40">
-                              {user.workspaceId ?? "无 workspace"}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl border border-black/[0.06] bg-white p-4">
-                            <p className="text-[11px] uppercase tracking-[0.5px] text-black/35">Workspace Slug</p>
-                            <p className="mt-2 break-all text-sm text-black/70">
-                              {user.workspaceSlug ?? "none"}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl border border-black/[0.06] bg-white p-4">
-                            <p className="text-[11px] uppercase tracking-[0.5px] text-black/35">余额构成</p>
-                            <p className="mt-2 text-lg font-semibold text-black">{user.balanceLabel}</p>
-                            <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-black/55">
-                              <span>充值 {user.walletBreakdown.topupLabel}</span>
-                              <span>赠送 {user.walletBreakdown.systemCreditLabel}</span>
-                              <span>消耗 {user.walletBreakdown.usageLabel}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
-                          <section className="rounded-2xl border border-black/[0.06] bg-white p-4">
-                            <div className="mb-3 flex items-center justify-between">
-                              <p className="text-xs font-medium text-black/70">旗下 Key</p>
-                              <span className="text-[11px] text-black/35">{user.apiKeys.length} total</span>
-                            </div>
-                            {user.apiKeys.length > 0 ? (
-                              <div className="grid gap-2 md:grid-cols-2">
-                                {user.apiKeys.map((apiKey) => (
-                                  <div
-                                    key={apiKey.id}
-                                    className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5"
-                                  >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="truncate text-xs font-medium text-black">
-                                        {apiKey.name || "未命名 Key"}
-                                      </span>
-                                      <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-[0.25px] text-black/55">
-                                        {apiKey.status}
-                                      </span>
-                                    </div>
-                                    <p className="mt-1 text-[11px] text-black/45">
-                                      {apiKey.keyPrefix} · {apiKey.environment} · {apiKey.createdLabel}
-                                    </p>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-black/35">暂无 Key</span>
-                            )}
-                          </section>
-
-                          <section className="rounded-2xl border border-black/[0.06] bg-white p-4">
-                            <p className="text-xs font-medium text-black/70">后台加余额</p>
-                            <p className="mt-1 text-[11px] text-black/40">Manual adjustment to this workspace wallet.</p>
-                            {user.workspaceId ? (
-                              <form
-                                action={addUserBalanceAction}
-                                className="mt-3"
-                              >
-                                <input type="hidden" name="userId" value={user.id} />
-                                <div className="grid gap-2">
-                                  <input
-                                    name="amount"
-                                    type="number"
-                                    min="0.01"
-                                    step="0.01"
-                                    placeholder="金额 USD"
-                                    className="h-9 rounded-md border border-black/10 bg-white px-2 text-xs outline-none"
-                                  />
-                                  <input
-                                    name="description"
-                                    placeholder="备注（可选）"
-                                    className="h-9 min-w-0 rounded-md border border-black/10 bg-white px-2 text-xs outline-none"
-                                  />
-                                  <button
-                                    type="submit"
-                                    className="h-9 shrink-0 rounded-md bg-black px-3 text-xs font-medium text-white hover:bg-black/85"
-                                  >
-                                    加款
-                                  </button>
-                                </div>
-                              </form>
-                            ) : (
-                              <span className="text-xs text-black/40">无 workspace，不能加款</span>
-                            )}
-                          </section>
-                        </div>
-
-                        <section className="mt-4 rounded-2xl border border-black/[0.06] bg-white p-4">
+                        <section className="rounded-2xl border border-black/[0.06] bg-white p-4">
                           {(() => {
                             const requestPage = requestPagesByUserId[user.id] ?? {
                               rows: user.recentRequests ?? [],
@@ -600,6 +549,170 @@ export function RegisteredUsersTable({
           </button>
         </div>
       </div>
+      {workspaceModalUser ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6" role="dialog" aria-modal="true">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-black">Workspace 信息</p>
+                <p className="mt-1 text-xs text-black/45">{workspaceModalUser.email ?? workspaceModalUser.id}</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeModals}
+                className="size-8 rounded-full border border-black/[0.08] text-sm text-black/55 hover:bg-black/[0.03]"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mt-5 grid gap-3">
+              <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                <p className="text-[11px] uppercase tracking-[0.5px] text-black/35">Workspace</p>
+                <p className="mt-2 font-medium text-black/80">{workspaceModalUser.workspaceName}</p>
+                <p className="mt-2 break-all text-xs text-black/40">
+                  {workspaceModalUser.workspaceId ?? "无 workspace"}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+                <p className="text-[11px] uppercase tracking-[0.5px] text-black/35">Workspace Slug</p>
+                <p className="mt-2 break-all text-sm text-black/70">
+                  {workspaceModalUser.workspaceSlug ?? "none"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {keysModalUser ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6" role="dialog" aria-modal="true">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-black">旗下 Key</p>
+                <p className="mt-1 text-xs text-black/45">{keysModalUser.apiKeys.length} total · {keysModalUser.email ?? keysModalUser.id}</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeModals}
+                className="size-8 rounded-full border border-black/[0.08] text-sm text-black/55 hover:bg-black/[0.03]"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mt-5 max-h-[60vh] overflow-auto">
+              {keysModalUser.apiKeys.length > 0 ? (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {keysModalUser.apiKeys.map((apiKey) => (
+                    <div
+                      key={apiKey.id}
+                      className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-xs font-medium text-black">
+                          {apiKey.name || "未命名 Key"}
+                        </span>
+                        <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-[0.25px] text-black/55">
+                          {apiKey.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-black/45">
+                        {apiKey.keyPrefix} · {apiKey.environment} · {apiKey.createdLabel}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6 text-sm text-black/40">
+                  暂无 Key
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {balanceModalUser ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6" role="dialog" aria-modal="true">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-black">余额构成</p>
+                <p className="mt-1 text-xs text-black/45">{balanceModalUser.email ?? balanceModalUser.id}</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeModals}
+                className="size-8 rounded-full border border-black/[0.08] text-sm text-black/55 hover:bg-black/[0.03]"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mt-5 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+              <p className="text-[11px] uppercase tracking-[0.5px] text-black/35">当前余额</p>
+              <p className="mt-2 text-2xl font-semibold text-black">{balanceModalUser.balanceLabel}</p>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-xs text-black/55">
+                <span className="rounded-xl bg-white px-3 py-2">充值 {balanceModalUser.walletBreakdown.topupLabel}</span>
+                <span className="rounded-xl bg-white px-3 py-2">赠送 {balanceModalUser.walletBreakdown.systemCreditLabel}</span>
+                <span className="rounded-xl bg-white px-3 py-2">消耗 {balanceModalUser.walletBreakdown.usageLabel}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {addBalanceModalUser ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6" role="dialog" aria-modal="true">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-black">后台加余额</p>
+                <p className="mt-1 text-xs text-black/45">Manual adjustment to this workspace wallet.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeModals}
+                className="size-8 rounded-full border border-black/[0.08] text-sm text-black/55 hover:bg-black/[0.03]"
+              >
+                ×
+              </button>
+            </div>
+            {addBalanceModalUser.workspaceId ? (
+              <form action={addUserBalanceAction} className="mt-5">
+                <input type="hidden" name="userId" value={addBalanceModalUser.id} />
+                <div className="grid gap-3">
+                  <label className="grid gap-1.5 text-xs font-medium text-black/65">
+                    金额 USD
+                    <input
+                      name="amount"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="例如 10.00"
+                      className="h-10 rounded-md border border-black/10 bg-white px-3 text-sm font-normal outline-none"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-xs font-medium text-black/65">
+                    备注
+                    <input
+                      name="description"
+                      placeholder="可选"
+                      className="h-10 min-w-0 rounded-md border border-black/10 bg-white px-3 text-sm font-normal outline-none"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    className="h-10 rounded-md bg-black px-4 text-sm font-medium text-white hover:bg-black/85"
+                  >
+                    确认加款
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="mt-5 rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6 text-sm text-black/40">
+                无 workspace，不能加款
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
