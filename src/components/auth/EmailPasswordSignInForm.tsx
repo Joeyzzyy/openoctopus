@@ -52,7 +52,7 @@ export function EmailPasswordSignInForm({
           type="email"
           required
           autoComplete="email"
-          className="h-11 w-full rounded-md border border-black/[0.12] bg-white px-3 text-sm text-black outline-none transition-colors focus:border-[#E58A35] focus:ring-2 focus:ring-[#F4C37B]/30"
+          className="h-11 w-full rounded-md border border-black/[0.12] bg-white px-3 text-sm text-black outline-none transition-colors focus:border-[#38BDF8] focus:ring-2 focus:ring-[#BAE6FD]/30"
         />
       </label>
       <label className="block space-y-2">
@@ -63,7 +63,7 @@ export function EmailPasswordSignInForm({
             type={showPassword ? "text" : "password"}
             required
             autoComplete="current-password"
-            className="h-11 w-full rounded-md border border-black/[0.12] bg-white px-3 pr-10 text-sm text-black outline-none transition-colors focus:border-[#E58A35] focus:ring-2 focus:ring-[#F4C37B]/30"
+            className="h-11 w-full rounded-md border border-black/[0.12] bg-white px-3 pr-10 text-sm text-black outline-none transition-colors focus:border-[#38BDF8] focus:ring-2 focus:ring-[#BAE6FD]/30"
           />
           <button
             type="button"

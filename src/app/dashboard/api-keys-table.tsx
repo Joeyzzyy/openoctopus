@@ -31,7 +31,7 @@ type ApiKey = {
 
 const keyToneStyles = {
   active: "border-[#D7EADB] bg-[#EDF8F0] text-[#167A3D]",
-  warning: "border-[#F2DEC0] bg-[#FFF3E2] text-[#9B6A00]",
+  warning: "border-[#BAE6FD] bg-[#E0F2FE] text-[#9B6A00]",
   paused: "border-black/[0.08] bg-[#F3F4F6] text-[#666666]",
 };
 
@@ -39,7 +39,7 @@ const inputClassName =
   "h-8 rounded-md border-black/[0.08] bg-white font-mono text-sm text-[#111827]";
 
 const secondaryButtonClassName =
-  "inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#E7E0D3] bg-white text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA] hover:text-[#111827]";
+  "inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#BAE6FD] bg-white text-[#075985] transition-colors hover:bg-[#E0F2FE] hover:text-[#111827]";
 
 export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -108,7 +108,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
 
   if (apiKeys.length === 0) {
     return (
-      <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] px-4 py-8 text-center text-sm text-[#6B7280]">
+      <div className="rounded-2xl border border-black/[0.08] bg-[#F8FCFF] px-4 py-8 text-center text-sm text-[#6B7280]">
         No API keys have been created yet.
       </div>
     );
@@ -157,7 +157,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
+                <div className="rounded-xl border border-black/[0.06] bg-[#F8FCFF] px-3 py-2.5">
                   <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-[#7b8778]">
                     Budget
                   </p>
@@ -174,7 +174,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                     </p>
                   )}
                 </div>
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
+                <div className="rounded-xl border border-black/[0.06] bg-[#F8FCFF] px-3 py-2.5">
                   <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-[#7b8778]">
                     Spent
                   </p>
@@ -182,7 +182,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                     {key.spent}
                   </p>
                 </div>
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
+                <div className="rounded-xl border border-black/[0.06] bg-[#F8FCFF] px-3 py-2.5">
                   <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-[#7b8778]">
                     Requests
                   </p>
@@ -190,7 +190,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                     {key.requests}
                   </p>
                 </div>
-                <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
+                <div className="rounded-xl border border-black/[0.06] bg-[#F8FCFF] px-3 py-2.5">
                   <p className="font-mono text-[9px] uppercase tracking-[0.5px] text-[#7b8778]">
                     Last Used
                   </p>
@@ -356,7 +356,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                           </button>
                           <button
                             onClick={cancelEdit}
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#BAE6FD] bg-white text-[#075985] transition-colors hover:bg-[#E0F2FE]"
                             title="Cancel"
                           >
                             <X className="h-3.5 w-3.5" />
@@ -367,7 +367,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                           <button
                             onClick={() => startEdit(key)}
                             disabled={key.systemGenerated}
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#BAE6FD] bg-white text-[#075985] transition-colors hover:bg-[#E0F2FE]"
                             title="Edit name & budget"
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -375,7 +375,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
                           <button
                             onClick={() => handleToggle(key.id, key.rawStatus)}
                             disabled={isPending || key.systemGenerated}
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA] disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#BAE6FD] bg-white text-[#075985] transition-colors hover:bg-[#E0F2FE] disabled:cursor-not-allowed disabled:opacity-50"
                             title={key.rawStatus === "paused" ? "Resume key" : "Pause key"}
                           >
                             {key.rawStatus === "paused" ? (
@@ -406,7 +406,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
       <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent
           showCloseButton={false}
-          className="rounded-[24px] border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-md"
+          className="rounded-[24px] border border-black/[0.08] bg-[#F8FCFF] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-md"
         >
           <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
             <DialogTitle className="text-sm font-semibold uppercase tracking-[1px] text-[#111827]">
@@ -428,7 +428,7 @@ export function ApiKeysTable({ apiKeys }: { apiKeys: ApiKey[] }) {
               <button
                 type="button"
                 onClick={() => setDeleteTarget(null)}
-                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white px-4 text-[11px] font-semibold uppercase tracking-[1px] text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]"
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md border border-[#BAE6FD] bg-white px-4 text-[11px] font-semibold uppercase tracking-[1px] text-[#075985] transition-colors hover:bg-[#E0F2FE]"
               >
                 Cancel
               </button>

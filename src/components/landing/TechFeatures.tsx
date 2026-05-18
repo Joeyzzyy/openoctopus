@@ -5,7 +5,7 @@ import Image from "next/image";
 
 export function TechFeatures() {
   return (
-    <section className="bg-[#FAFAF8] px-6 py-16 md:px-20 md:py-20">
+    <section className="bg-[#F8FCFF] px-6 py-16 md:px-20 md:py-20">
       <div className="mx-auto max-w-[1280px]">
         {/* Heading */}
         <FadeIn className="mb-10 flex max-w-[876px] flex-col gap-4">
@@ -24,7 +24,7 @@ export function TechFeatures() {
           {/* Row 1 */}
           <div className="flex flex-col gap-4 lg:flex-row">
             {/* Vast Model Library — 45% */}
-            <FadeIn className="relative h-[380px] w-full shrink-0 overflow-hidden rounded-2xl bg-[#F2F0EB] lg:h-[420px] lg:w-[45%]">
+            <FadeIn className="relative h-[380px] w-full shrink-0 overflow-hidden rounded-2xl bg-[#EAF7FF] lg:h-[420px] lg:w-[45%]">
               <div className="absolute top-[10px] right-0 h-[220px] w-[600px] sm:h-[260px] md:h-[280px] lg:h-[287px]">
                 <Image
                   alt=""
@@ -48,7 +48,7 @@ export function TechFeatures() {
             {/* Blazing Fast Inference — flex-1 */}
             <FadeIn
               delay={0.1}
-              className="relative h-[380px] w-full overflow-hidden rounded-2xl bg-[#F2F0EB] lg:h-[420px] lg:flex-1"
+              className="relative h-[380px] w-full overflow-hidden rounded-2xl bg-[#EAF7FF] lg:h-[420px] lg:flex-1"
             >
               <div className="absolute top-6 right-6 left-6 z-10 lg:w-[584px]">
                 <h3 className="mb-2 text-2xl font-medium leading-7 text-[#1C1917]">
@@ -79,7 +79,7 @@ export function TechFeatures() {
             {/* Built for Scale — 55% */}
             <FadeIn
               delay={0.15}
-              className="relative h-[380px] w-full shrink-0 overflow-hidden rounded-2xl bg-[#F2F0EB] lg:h-[420px] lg:w-[55%]"
+              className="relative h-[380px] w-full shrink-0 overflow-hidden rounded-2xl bg-[#EAF7FF] lg:h-[420px] lg:w-[55%]"
             >
               <div className="absolute top-6 right-6 left-6 z-10 lg:w-[642px]">
                 <h3 className="mb-2 text-2xl font-medium leading-7 text-[#1C1917]">
@@ -107,7 +107,7 @@ export function TechFeatures() {
             {/* Security — flex-1 */}
             <FadeIn
               delay={0.2}
-              className="relative h-[380px] w-full overflow-hidden rounded-2xl bg-[#F2F0EB] lg:h-[420px] lg:flex-1"
+              className="relative h-[380px] w-full overflow-hidden rounded-2xl bg-[#EAF7FF] lg:h-[420px] lg:flex-1"
             >
               <div className="absolute inset-0">
                 <Image

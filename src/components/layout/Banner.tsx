@@ -15,7 +15,7 @@ export function Banner() {
     <div
       className="fixed top-0 z-[60] w-full overflow-hidden transition-all duration-300"
       style={{
-        background: "linear-gradient(90deg, #9A4E2C 0%, #C27B3B 100%)",
+        background: "linear-gradient(90deg, #9A4E2C 0%, #38BDF8 100%)",
         height: isVisible ? "36px" : "0px",
       }}
     >

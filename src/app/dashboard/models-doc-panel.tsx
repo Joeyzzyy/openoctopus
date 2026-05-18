@@ -73,7 +73,7 @@ export function ModelsDocPanel({
     <>
       {isPending ? (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900/80">
+          <div className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900/80">
             Loading model documentation...
           </div>
           <LoadingSkeleton />

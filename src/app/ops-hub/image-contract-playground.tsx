@@ -208,7 +208,7 @@ export function ImageContractPlayground() {
   }, [taskResponseText]);
 
   return (
-    <section className="rounded-xl border border-black/[0.08] bg-white p-4">
+    <section className="rounded-xl border border-[#BAE6FD] bg-white p-4">
       <div className="mb-4">
         <h3 className="text-base font-semibold text-black">图片输出契约 Playground</h3>
         <p className="mt-2 text-sm leading-6 text-black/60">
@@ -217,12 +217,12 @@ export function ImageContractPlayground() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
+        <div className="rounded-xl border border-[#DDF4FF] bg-[#F8FCFF] p-3">
           <p className="text-[11px] tracking-[0.35px] text-black/55">请求体（POST /v1/images/generations）</p>
           <textarea
             value={requestBodyText}
             onChange={(event) => setRequestBodyText(event.target.value)}
-            className="mt-2 h-64 w-full rounded-md border border-black/[0.08] bg-white p-3 font-mono text-xs text-black outline-none focus:border-black/20"
+            className="mt-2 h-64 w-full rounded-md border border-[#BAE6FD] bg-white p-3 font-mono text-xs text-black outline-none focus:border-black/20"
           />
           <div className="mt-3 space-y-2 text-xs">
             {requestValidation.checks.map((check) => (
@@ -241,12 +241,12 @@ export function ImageContractPlayground() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
+        <div className="rounded-xl border border-[#DDF4FF] bg-[#F8FCFF] p-3">
           <p className="text-[11px] tracking-[0.35px] text-black/55">返回体（GET /v1/tasks/:id）</p>
           <textarea
             value={taskResponseText}
             onChange={(event) => setTaskResponseText(event.target.value)}
-            className="mt-2 h-64 w-full rounded-md border border-black/[0.08] bg-white p-3 font-mono text-xs text-black outline-none focus:border-black/20"
+            className="mt-2 h-64 w-full rounded-md border border-[#BAE6FD] bg-white p-3 font-mono text-xs text-black outline-none focus:border-black/20"
           />
           <div className="mt-3 space-y-2 text-xs">
             {responseValidation.checks.map((check) => (

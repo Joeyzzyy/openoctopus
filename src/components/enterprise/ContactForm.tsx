@@ -28,7 +28,7 @@ export function ContactForm() {
   return (
     <section
       id="contact-us"
-      className="scroll-mt-20 bg-[#FAFAF8] px-6 pb-16 pt-16 md:px-12 md:pb-24 md:pt-20 lg:px-20"
+      className="scroll-mt-20 bg-[#F8FCFF] px-6 pb-16 pt-16 md:px-12 md:pb-24 md:pt-20 lg:px-20"
     >
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-col gap-12 lg:flex-row lg:justify-between">

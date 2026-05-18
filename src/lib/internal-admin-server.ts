@@ -29,8 +29,8 @@ type SupportedModelRow = {
   provider: string;
   model_slug: string;
   display_name: string;
-  modality: "image" | "video" | "audio";
-  capability: "image_generation" | "image_edit" | "video_generation" | null;
+  modality: "image" | "video" | "audio" | "text";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
   billing_config: Record<string, unknown> | null;
   unit_label: string;
   default_unit_cost: number;
@@ -90,7 +90,7 @@ type ProviderModelRow = {
   supported_model_id: string | null;
   public_model_slug: string;
   upstream_model_slug: string;
-  capability: "image_generation" | "image_edit" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
   active: boolean;
   pricing: Record<string, unknown> | null;
   input_schema: Record<string, unknown> | null;
@@ -115,7 +115,7 @@ type ProviderModelShowcaseAssetRow = {
 type RoutingRuleRow = {
   id: string;
   workspace_id: string | null;
-  capability: "image_generation" | "image_edit" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
   public_model_slug: string;
   primary_provider_model_id: string;
   fallback_provider_model_id: string | null;
@@ -867,7 +867,7 @@ async function fetchGlobalMonitoringData(
         .select(
           "id, workspace_id, capability, public_model_slug, status, error_code, error_message, output_payload, created_at, started_at, completed_at"
         )
-        .in("capability", ["image_generation", "image_edit"])
+        .in("capability", ["image_generation", "image_edit", "image_recognition"])
         .gte("created_at", sinceIso)
         .order("created_at", { ascending: false })
         .limit(120),

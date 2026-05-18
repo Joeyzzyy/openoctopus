@@ -108,7 +108,7 @@ function CategoryCard({ category, size }: { category: Category; size: "large" | 
         sizes="400px"
         unoptimized
       />
-      <div className="absolute inset-0 bg-[#FAFAF8]/85 p-3 md:p-4 flex flex-col justify-center">
+      <div className="absolute inset-0 bg-[#F8FCFF]/85 p-3 md:p-4 flex flex-col justify-center">
         <h3 className="font-display font-medium text-[#1C1917] text-sm md:text-base leading-tight">{category.name}</h3>
         <p className="font-mono text-sm text-[#1C1917]/55">{category.count} models</p>
       </div>
@@ -151,7 +151,7 @@ export function ToolsShowcase() {
   const dragRow4 = useDrag();
 
   return (
-    <section className="bg-[#F2F0EB] py-16 md:py-24 overflow-hidden">
+    <section className="bg-[#EAF7FF] py-16 md:py-24 overflow-hidden">
       <div className="text-center mb-12 px-4">
         <h2 className="font-display text-3xl md:text-5xl font-semibold text-[#1C1917] mb-4">
           The complete creative stack

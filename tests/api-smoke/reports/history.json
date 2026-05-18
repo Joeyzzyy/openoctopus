@@ -2,6 +2,65 @@
   {
     "api": "POST /v1/images/generations",
     "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "molmo2-image-captioner",
+    "caseId": "molmo2-image-captioner-basic",
+    "model": "openoctopus/image-captioner-molmo2",
+    "endpoint": "/v1/images/recognitions",
+    "baseUrl": "https://api.openoctopus.com",
+    "requestUrl": "https://api.openoctopus.com/v1/images/recognitions",
+    "requestPayload": {
+      "model": "openoctopus/image-captioner-molmo2",
+      "prompt": "Describe this image in detail.",
+      "input": {
+        "image": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/588ee0a8-692a-4a8b-8056-a455a227c6a9/playground-input-1779078881540-1767172504525281953-tnvfnljh.png",
+        "detail_level": "medium",
+        "enable_sync_mode": false
+      }
+    },
+    "keyPrefix": "ooq_B90...Mopg",
+    "startedAt": "2026-05-18T05:12:54.797Z",
+    "success": false,
+    "submitStatus": 404,
+    "submitResponse": {
+      "message": "Route POST:/v1/images/recognitions not found",
+      "error": "Not Found",
+      "statusCode": 404
+    },
+    "taskResponse": null,
+    "errorMessage": "Route POST:/v1/images/recognitions not found",
+    "completedAt": "2026-05-18T05:12:56.369Z",
+    "latencyMs": 1572
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "molmo2-image-captioner",
+    "caseId": "molmo2-image-captioner-basic",
+    "model": "openoctopus/image-captioner-molmo2",
+    "endpoint": "/v1/images/recognitions",
+    "baseUrl": "https://api.openoctopus.com",
+    "requestUrl": "https://api.openoctopus.com/v1/images/recognitions",
+    "requestPayload": {
+      "model": "openoctopus/image-captioner-molmo2",
+      "prompt": "Describe this image in detail.",
+      "input": {
+        "image": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/588ee0a8-692a-4a8b-8056-a455a227c6a9/playground-input-1779078881540-1767172504525281953-tnvfnljh.png",
+        "detail_level": "medium",
+        "enable_sync_mode": false
+      }
+    },
+    "keyPrefix": "ooq_B90...Mopg",
+    "startedAt": "2026-05-18T05:11:41.273Z",
+    "success": false,
+    "submitResponse": null,
+    "taskResponse": null,
+    "errorMessage": "fetch failed",
+    "completedAt": "2026-05-18T05:11:41.293Z",
+    "latencyMs": 21
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
     "suite": "nano-banana-2",
     "caseId": "nano-banana-2-basic",
     "model": "openoctopus/nano-banana-2",

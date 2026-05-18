@@ -104,7 +104,7 @@ export function HeroSlideshow() {
   const currentSlide = SLIDES[currentIndex];
 
   return (
-    <section className="relative h-[420px] w-full overflow-hidden bg-[#0C0A09] sm:h-[480px] md:h-[560px] lg:h-[640px]">
+    <section className="relative h-[420px] w-full overflow-hidden bg-[#06131F] sm:h-[480px] md:h-[560px] lg:h-[640px]">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentSlide.id}
@@ -130,7 +130,7 @@ export function HeroSlideshow() {
                 "linear-gradient(180deg, rgba(12,10,9,0.22) 0%, rgba(12,10,9,0.38) 38%, rgba(12,10,9,0.92) 100%)",
             }}
           />
-          <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[#0C0A09] via-[#0C0A09]/60 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[#06131F] via-[#06131F]/60 to-transparent" />
         </motion.div>
       </AnimatePresence>
 
@@ -146,7 +146,7 @@ export function HeroSlideshow() {
               className="flex max-w-[640px] flex-col items-start gap-3 lg:pb-1"
             >
               {currentSlide.badge ? (
-                <span className="rounded-md bg-[#C27B3B] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[1px] text-white">
+                <span className="rounded-md bg-[#38BDF8] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[1px] text-white">
                   {currentSlide.badge}
                 </span>
               ) : null}

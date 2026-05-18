@@ -35,7 +35,7 @@ export function HeaderUserMenu({
   return (
     <div ref={rootRef} className="relative flex items-center gap-2">
       {walletBalanceLabel ? (
-        <div className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#E7C89A] bg-[#FFF8EC] pl-3 pr-1 text-[#9A4F18] shadow-sm">
+        <div className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#BAE6FD] bg-[#F0F9FF] pl-3 pr-1 text-[#0369A1] shadow-sm">
           <span className="max-w-[92px] truncate text-[12px] font-semibold sm:max-w-[132px] sm:text-[13px]">
             {walletBalanceLabel}
           </span>
@@ -48,7 +48,7 @@ export function HeaderUserMenu({
                 router.refresh();
               });
             }}
-            className="inline-flex size-7 items-center justify-center rounded-full text-[#9A4F18]/65 transition-colors hover:bg-[#F1D5A8]/35 hover:text-[#7A3E12] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex size-7 items-center justify-center rounded-full text-[#0369A1]/65 transition-colors hover:bg-[#F1D5A8]/35 hover:text-[#7A3E12] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
           </button>
@@ -59,7 +59,7 @@ export function HeaderUserMenu({
         aria-label="Open account menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex size-9 items-center justify-center overflow-hidden rounded-full border border-[#E7C89A] bg-white text-[12px] font-semibold text-[#9A4F18] shadow-sm transition-colors hover:bg-[#FFF8EC]"
+        className="inline-flex size-9 items-center justify-center overflow-hidden rounded-full border border-[#BAE6FD] bg-white text-[12px] font-semibold text-[#0369A1] shadow-sm transition-colors hover:bg-[#F0F9FF]"
       >
         {userAvatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

@@ -122,6 +122,10 @@ function buildAssetFromResult(
   requestId?: string,
   capability?: Capability
 ) {
+  if (capability === "image_recognition") {
+    return null;
+  }
+
   const inferredType = (() => {
     if (capability === "video_generation") return "video";
     if (capability === "image_generation" || capability === "image_edit") return "image";
@@ -167,6 +171,41 @@ function buildAssetFromResult(
 
     return { url: resultValue, type: inferredType };
   }
+  return null;
+}
+
+function buildTextFromResult(
+  data: Record<string, unknown>,
+  cfg: Record<string, unknown>,
+  capability?: Capability
+) {
+  if (capability !== "image_recognition") {
+    return null;
+  }
+
+  const configuredPath = readString(cfg.resultTextPath, "");
+  const candidatePaths = configuredPath
+    ? [configuredPath]
+    : [
+        "caption",
+        "text",
+        "description",
+        "output",
+        "result.caption",
+        "result.text",
+        "result.description",
+        "result.output",
+        "result",
+        "outputs.0",
+      ];
+
+  for (const path of candidatePaths) {
+    const value = readPath(data, path);
+    if (isNonEmptyString(value)) {
+      return value;
+    }
+  }
+
   return null;
 }
 
@@ -239,10 +278,21 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
       data,
       resultUrlPath,
       cfg,
-      input.requestId
+      input.requestId,
+      input.capability
     );
+    const text = buildTextFromResult(data, cfg, input.capability);
     const isSyncMode = mode === "sync" || mode === "sync-json-v1";
     const hasPollMode = mode === "async" || mode === "async-poll" || mode === "rest-async-poll-v1" || Boolean(pollPath);
+
+    if (text && (isSyncMode || status.isSuccess || !hasPollMode)) {
+      return {
+        mode: "sync",
+        upstreamRequestId: String(taskId ?? input.requestId),
+        output: { raw: data, text },
+        estimatedCost: 0,
+      };
+    }
 
     if (
       asset &&
@@ -296,10 +346,12 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
       data,
       resultUrlPath,
       cfg,
-      input.requestId
+      input.requestId,
+      input.capability
     );
+    const text = buildTextFromResult(data, cfg, input.capability);
 
-    if (status.isFailed && !asset) {
+    if (status.isFailed && !asset && !text) {
       const upstreamError = classifyUpstreamError({
         data,
         fallbackMessage: "Upstream request failed",
@@ -309,6 +361,15 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
         success: false,
         errorCode: upstreamError.errorCode,
         errorMessage: upstreamError.errorMessage,
+        raw: data,
+      };
+    }
+    if (status.isSuccess && text) {
+      return {
+        done: true,
+        success: true,
+        output: { raw: data, text },
+        actualCost: 0,
         raw: data,
       };
     }
@@ -335,8 +396,23 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
         resultData,
         resultUrlPath,
         cfg,
-        input.requestId
+        input.requestId,
+        input.capability
       );
+      const resultText = buildTextFromResult(resultData, cfg, input.capability);
+
+      if (resultText) {
+        return {
+          done: true,
+          success: true,
+          output: { raw: resultData, text: resultText },
+          actualCost: 0,
+          raw: {
+            poll: data,
+            result: resultData,
+          },
+        };
+      }
 
       if (resultAsset) {
         return {

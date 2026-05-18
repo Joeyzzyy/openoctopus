@@ -63,7 +63,7 @@ export function ImageResponseContractPanel() {
           className={`inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium transition-colors ${
             activeTab === "playground"
               ? "border-black bg-black text-white"
-              : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+              : "border-[#BAE6FD] bg-white text-black/72 hover:bg-[#E0F2FE]"
           }`}
         >
           Playground 返回结构
@@ -74,17 +74,17 @@ export function ImageResponseContractPanel() {
           className={`inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium transition-colors ${
             activeTab === "api"
               ? "border-black bg-black text-white"
-              : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+              : "border-[#BAE6FD] bg-white text-black/72 hover:bg-[#E0F2FE]"
           }`}
         >
           API 返回结构
         </button>
       </div>
 
-      <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+      <div className="rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
         <p className="text-sm font-medium text-black">{content.title}</p>
         <p className="mt-1 text-xs leading-5 text-black/55">{content.note}</p>
-        <pre className="mt-3 max-h-[460px] overflow-auto rounded-md border border-black/[0.08] bg-white p-3 text-xs leading-5 text-black/80">
+        <pre className="mt-3 max-h-[460px] overflow-auto rounded-md border border-[#BAE6FD] bg-white p-3 text-xs leading-5 text-black/80">
           {JSON.stringify(content.payload, null, 2)}
         </pre>
       </div>

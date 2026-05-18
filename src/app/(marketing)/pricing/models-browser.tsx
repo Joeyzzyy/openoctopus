@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CircleHelp, Download, X } from "lucide-react";
+import { Check, CircleHelp, Copy, Download, X } from "lucide-react";
 import type { GatewayErrorDocRow, ModelDocRow } from "../models/data";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
@@ -16,6 +16,9 @@ type JsonSchemaField = {
   description?: string;
   exposedToCustomer: boolean;
   enumValues?: string[];
+  minimum?: number;
+  maximum?: number;
+  step?: number;
 };
 
 type PlaygroundUpload = {
@@ -127,6 +130,15 @@ function taskStatusLabel(status: TaskStatus) {
   return "Idle";
 }
 
+function taskStatusClass(status: TaskStatus) {
+  if (status === "succeeded") return "border-[#B7E4C7] bg-[#ECFDF3] text-[#166534]";
+  if (status === "failed") return "border-[#F2B8B5] bg-[#FEF2F2] text-[#B42318]";
+  if (status === "queued" || status === "processing" || status === "submitting") {
+    return "border-[#BAE6FD] bg-[#F0F9FF] text-[#0369A1]";
+  }
+  return "border-black/[0.08] bg-white text-black/55";
+}
+
 function decodeHtmlEntities(text: string) {
   return text
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
@@ -156,7 +168,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
           href={match[3]}
           target="_blank"
           rel="noreferrer"
-          className="text-[#9A4F18] underline underline-offset-4"
+          className="text-[#0369A1] underline underline-offset-4"
         >
           {match[2]}
         </a>
@@ -229,13 +241,38 @@ function sanitizeReadmeHtml(html: string) {
   return sanitized.trim();
 }
 
-function HtmlReadme({ html }: { html: string }) {
+function ReadmeSeoHeading({
+  eyebrow,
+  heading,
+  intro,
+}: {
+  eyebrow: string;
+  heading: string;
+  intro: string;
+}) {
+  return (
+    <div className="mb-5 border-b border-black/[0.08] pb-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#0369A1]">{eyebrow}</p>
+      <h1 className="mt-2 text-3xl font-semibold tracking-tight text-black sm:text-4xl">{heading}</h1>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-black/62">{intro}</p>
+    </div>
+  );
+}
+
+function HtmlReadme({
+  html,
+  seoHeading,
+}: {
+  html: string;
+  seoHeading?: { eyebrow: string; heading: string; intro: string };
+}) {
   const sanitizedHtml = useMemo(() => sanitizeReadmeHtml(html), [html]);
 
   if (!sanitizedHtml) return null;
 
   return (
     <section className="rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm">
+      {seoHeading ? <ReadmeSeoHeading {...seoHeading} /> : null}
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-black">README</h2>
         <p className="mt-1 text-sm text-black/55">
@@ -243,7 +280,7 @@ function HtmlReadme({ html }: { html: string }) {
         </p>
       </div>
       <article
-        className="readme-html space-y-4 text-[15px] leading-7 text-black/75 [&_a]:text-[#9A4F18] [&_a]:underline [&_a]:underline-offset-4 [&_blockquote]:border-l-4 [&_blockquote]:border-[#E58A35] [&_blockquote]:bg-[#FFF8EC] [&_blockquote]:px-4 [&_blockquote]:py-3 [&_blockquote]:italic [&_code]:rounded [&_code]:bg-black/[0.05] [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-3xl [&_h1]:font-semibold [&_h1]:tracking-tight [&_h1]:text-black [&_h2]:pt-2 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-black [&_h3]:pt-1 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-black [&_li]:my-1 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-5 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:border [&_pre]:border-black/[0.08] [&_pre]:bg-[#111827] [&_pre]:px-4 [&_pre]:py-4 [&_pre]:text-sm [&_pre]:leading-6 [&_pre]:text-white/90 [&_strong]:font-semibold [&_strong]:text-black [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5"
+        className="readme-html space-y-4 text-[15px] leading-7 text-black/75 [&_a]:text-[#0369A1] [&_a]:underline [&_a]:underline-offset-4 [&_blockquote]:border-l-4 [&_blockquote]:border-[#38BDF8] [&_blockquote]:bg-[#F0F9FF] [&_blockquote]:px-4 [&_blockquote]:py-3 [&_blockquote]:italic [&_code]:rounded [&_code]:bg-black/[0.05] [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-3xl [&_h1]:font-semibold [&_h1]:tracking-tight [&_h1]:text-black [&_h2]:pt-2 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-black [&_h3]:pt-1 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-black [&_li]:my-1 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-5 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:border [&_pre]:border-black/[0.08] [&_pre]:bg-[#111827] [&_pre]:px-4 [&_pre]:py-4 [&_pre]:text-sm [&_pre]:leading-6 [&_pre]:text-white/90 [&_strong]:font-semibold [&_strong]:text-black [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5"
         dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
     </section>
@@ -436,13 +473,20 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
   return blocks;
 }
 
-function MarkdownReadme({ markdown }: { markdown: string }) {
+function MarkdownReadme({
+  markdown,
+  seoHeading,
+}: {
+  markdown: string;
+  seoHeading?: { eyebrow: string; heading: string; intro: string };
+}) {
   const blocks = useMemo(() => parseMarkdownBlocks(markdown), [markdown]);
 
   if (blocks.length === 0) return null;
 
   return (
     <section className="rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm">
+      {seoHeading ? <ReadmeSeoHeading {...seoHeading} /> : null}
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-black">README</h2>
         <p className="mt-1 text-sm text-black/55">
@@ -477,7 +521,7 @@ function MarkdownReadme({ markdown }: { markdown: string }) {
             return (
               <blockquote
                 key={index}
-                className="border-l-4 border-[#E58A35] bg-[#FFF8EC] px-4 py-3 italic text-black/70"
+                className="border-l-4 border-[#38BDF8] bg-[#F0F9FF] px-4 py-3 italic text-black/70"
               >
                 {renderMultilineText(block.text, `quote-${index}`)}
               </blockquote>
@@ -486,7 +530,7 @@ function MarkdownReadme({ markdown }: { markdown: string }) {
 
           if (block.type === "list") {
             return (
-              <ul key={index} className="list-disc space-y-2 pl-5 marker:text-[#9A4F18]">
+              <ul key={index} className="list-disc space-y-2 pl-5 marker:text-[#0369A1]">
                 {block.items.map((item, itemIndex) => (
                   <li key={itemIndex}>{renderInlineMarkdown(item, `list-${index}-${itemIndex}`)}</li>
                 ))}
@@ -496,7 +540,7 @@ function MarkdownReadme({ markdown }: { markdown: string }) {
 
           if (block.type === "ordered-list") {
             return (
-              <ol key={index} className="list-decimal space-y-2 pl-5 marker:text-[#9A4F18]">
+              <ol key={index} className="list-decimal space-y-2 pl-5 marker:text-[#0369A1]">
                 {block.items.map((item, itemIndex) => (
                   <li key={itemIndex}>{renderInlineMarkdown(item, `olist-${index}-${itemIndex}`)}</li>
                 ))}
@@ -577,7 +621,7 @@ function FieldHelpTooltip({
       <button
         type="button"
         aria-label={`About ${label}`}
-        className="inline-flex size-4 items-center justify-center rounded-full text-black/35 outline-none transition-colors hover:text-[#9A4F18] focus-visible:text-[#9A4F18]"
+        className="inline-flex size-4 items-center justify-center rounded-full text-black/35 outline-none transition-colors hover:text-[#0369A1] focus-visible:text-[#0369A1]"
       >
         <CircleHelp className="size-3.5" />
       </button>
@@ -586,6 +630,17 @@ function FieldHelpTooltip({
       </span>
     </span>
   );
+}
+
+function readOptionalNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
 }
 
 function parseInputSchemaText(schemaText: string): JsonSchemaField[] {
@@ -638,6 +693,9 @@ function parseInputSchemaText(schemaText: string): JsonSchemaField[] {
                 ? row.customerVisible
                 : true,
           enumValues: enumValues && enumValues.length > 0 ? enumValues : undefined,
+          minimum: readOptionalNumber(row.minimum ?? row.min),
+          maximum: readOptionalNumber(row.maximum ?? row.max),
+          step: readOptionalNumber(row.step),
         });
       }
       return fields;
@@ -688,6 +746,9 @@ function parseInputSchemaText(schemaText: string): JsonSchemaField[] {
               ? propertySchema.customerVisible
               : true,
         enumValues: enumValues && enumValues.length > 0 ? enumValues : undefined,
+        minimum: readOptionalNumber(propertySchema.minimum ?? propertySchema.min),
+        maximum: readOptionalNumber(propertySchema.maximum ?? propertySchema.max),
+        step: readOptionalNumber(propertySchema.step),
       });
     }
     return fields;
@@ -722,7 +783,63 @@ function isResolutionField(key: string) {
 }
 
 function isImageUploadField(field: JsonSchemaField) {
-  return field.key.trim().toLowerCase() === "images";
+  const key = field.key.trim().toLowerCase();
+  if (["num_images", "number_of_images", "image_count", "n_images"].includes(key)) return false;
+  return (
+    key === "images" ||
+    key === "image" ||
+    key === "face_image" ||
+    key === "source_image" ||
+    key === "target_image" ||
+    key === "input_image" ||
+    key === "reference_image" ||
+    key === "init_image" ||
+    key === "mask_image" ||
+    key.endsWith("_image") ||
+    key.endsWith("_images")
+  );
+}
+
+function normalizeImageFieldKey(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function isFaceImageField(field: JsonSchemaField) {
+  const normalized = normalizeImageFieldKey(field.key);
+  return normalized === "faceimage" || normalized.includes("face");
+}
+
+function pickPlaygroundExampleForField(
+  field: JsonSchemaField,
+  examples: ModelDocRow["playgroundInputExamples"]
+) {
+  const normalizedFieldKey = normalizeImageFieldKey(field.key);
+  const exact = examples.find((item) => normalizeImageFieldKey(item.fieldKey) === normalizedFieldKey);
+  if (exact) return exact;
+  if (isFaceImageField(field)) return null;
+  return examples.find((item) => item.fieldKey === null) ?? null;
+}
+
+function isMultipleImageUploadField(field: JsonSchemaField) {
+  const key = field.key.trim().toLowerCase();
+  return field.type === "array" || key === "images" || key.endsWith("_images");
+}
+
+function isSliderNumberField(field: JsonSchemaField) {
+  return field.type === "number" && field.minimum !== undefined && field.maximum !== undefined;
+}
+
+function buildNumberSelectOptions(field: JsonSchemaField) {
+  if (field.minimum === undefined || field.maximum === undefined) return [];
+  const step = field.step && field.step > 0 ? field.step : 1;
+  const start = Math.min(field.minimum, field.maximum);
+  const end = Math.max(field.minimum, field.maximum);
+  const options: string[] = [];
+  for (let value = start; value <= end + step / 1000; value += step) {
+    options.push(Number(value.toFixed(8)).toString());
+    if (options.length >= 200) break;
+  }
+  return options.length > 0 ? options : [String(field.minimum)];
 }
 
 function formatUploadSize(size: number) {
@@ -892,6 +1009,17 @@ function extractImageAssets(output: unknown): PlaygroundImageAsset[] {
   return assets;
 }
 
+function extractTextOutput(output: unknown): string | null {
+  if (!isRecord(output)) return null;
+  const candidates = [output.text, output.caption, output.description, output.output];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+  }
+  return null;
+}
+
 export function ModelsBrowser({
   rows,
   vendorOptions,
@@ -1022,6 +1150,7 @@ export function ModelsBrowser({
   const [authRequiredModalOpen, setAuthRequiredModalOpen] = useState(false);
   const [topUpRequiredModalOpen, setTopUpRequiredModalOpen] = useState(false);
   const [resultCopied, setResultCopied] = useState(false);
+  const [textOutputCopied, setTextOutputCopied] = useState(false);
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
   const [playgroundUploads, setPlaygroundUploads] = useState<Record<string, PlaygroundUpload[]>>({});
@@ -1029,6 +1158,10 @@ export function ModelsBrowser({
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const playgroundImageAssets = useMemo(
     () => extractImageAssets(playgroundOutput),
+    [playgroundOutput]
+  );
+  const playgroundTextOutput = useMemo(
+    () => extractTextOutput(playgroundOutput),
     [playgroundOutput]
   );
   useEffect(() => {
@@ -1110,6 +1243,11 @@ export function ModelsBrowser({
       ? selectedModel.modelDescription ||
         `${selectedModel.displayName} by ${selectedModel.providerName} with playground access, API examples, and pricing details.`
       : "Browse public AI model tools with playground access, API examples, pricing details, and provider-backed documentation.";
+  const seoHeading = {
+    eyebrow: isModelDetailRoute && selectedModel ? `${selectedModel.providerName} model tool` : "Model catalog",
+    heading: pageHeading,
+    intro: pageIntro,
+  };
   const parsedFields = useMemo(
     () =>
       parseInputSchemaText(selectedModel?.inputSchemaText ?? "").filter(
@@ -1198,6 +1336,17 @@ export function ModelsBrowser({
             next[field.key] = "false";
             changed = true;
           }
+          continue;
+        }
+
+        if (isSliderNumberField(field)) {
+          const options = buildNumberSelectOptions(field);
+          const defaultValue = options[0] ?? String(field.minimum);
+          const currentNumber = Number(existing);
+          if (!existing || !Number.isFinite(currentNumber) || !options.includes(existing)) {
+            next[field.key] = defaultValue;
+            changed = true;
+          }
         }
       }
 
@@ -1206,8 +1355,8 @@ export function ModelsBrowser({
   }, [parsedFields]);
 
   useEffect(() => {
-    const exampleUrl = selectedModel?.playgroundInputImageUrl;
-    if (!exampleUrl) return;
+    const examples = selectedModel?.playgroundInputExamples ?? [];
+    if (examples.length === 0) return;
     const imageFields = parsedFields.filter(isImageUploadField);
     if (imageFields.length === 0) return;
 
@@ -1217,10 +1366,12 @@ export function ModelsBrowser({
       for (const field of imageFields) {
         const currentUploads = next[field.key] ?? [];
         if (currentUploads.length > 0) continue;
+        const example = pickPlaygroundExampleForField(field, examples);
+        if (!example) continue;
         next[field.key] = [
           {
-            url: exampleUrl,
-            name: "Example image",
+            url: example.imageUrl,
+            name: example.fieldKey ? `Example ${example.fieldKey}` : "Example image",
             mimeType: "image/*",
             size: 0,
           },
@@ -1229,7 +1380,7 @@ export function ModelsBrowser({
       }
       return changed ? next : current;
     });
-  }, [parsedFields, selectedModel?.playgroundInputImageUrl]);
+  }, [parsedFields, selectedModel?.playgroundInputExamples]);
 
   useEffect(() => {
     const prefillPrompt = searchParams.get("prompt")?.trim();
@@ -1242,6 +1393,8 @@ export function ModelsBrowser({
   const inferEndpoint = (capability: string | null | undefined) =>
     capability === "image_edit"
       ? "/v1/images/edits"
+      : capability === "image_recognition"
+        ? "/v1/images/recognitions"
       : capability?.includes("video")
         ? "/v1/videos/generations"
         : "/v1/images/generations";
@@ -1287,7 +1440,9 @@ export function ModelsBrowser({
 
       setPlaygroundUploads((current) => ({
         ...current,
-        [field.key]: [...(current[field.key] ?? []), ...uploaded],
+        [field.key]: isMultipleImageUploadField(field)
+          ? [...(current[field.key] ?? []), ...uploaded]
+          : uploaded.slice(0, 1),
       }));
     } catch (error) {
       setValidationErrors((current) => ({
@@ -1350,7 +1505,9 @@ export function ModelsBrowser({
         if (isImageUploadField(field)) {
           const uploads = playgroundUploads[field.key] ?? [];
           if (uploads.length > 0) {
-            inputPayload[field.key] = uploads.map((item) => item.url);
+            inputPayload[field.key] = isMultipleImageUploadField(field)
+              ? uploads.map((item) => item.url)
+              : uploads[0]?.url;
           }
           continue;
         }
@@ -1583,6 +1740,17 @@ export function ModelsBrowser({
     }
   };
 
+  const copyTextOutput = async () => {
+    if (!playgroundTextOutput) return;
+    try {
+      await navigator.clipboard.writeText(playgroundTextOutput);
+      setTextOutputCopied(true);
+      setTimeout(() => setTextOutputCopied(false), 1500);
+    } catch {
+      setTextOutputCopied(false);
+    }
+  };
+
   const downloadImage = async (src: string, filename: string, mimeType?: string) => {
     try {
       const requestedFilename = replaceFileExtension(filename, imageExtensionFromMimeType(mimeType));
@@ -1625,20 +1793,16 @@ export function ModelsBrowser({
 
   return (
     <section className="space-y-3 sm:space-y-4">
-      <header className="rounded-xl border border-[#E9DEC9] bg-white px-4 py-4 shadow-sm sm:rounded-2xl sm:px-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9A4F18]">
-          {isModelDetailRoute && selectedModel ? `${selectedModel.providerName} model tool` : "Model catalog"}
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-black sm:text-4xl">
-          {pageHeading}
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-black/62">
-          {pageIntro}
-        </p>
-      </header>
+      {!isModelDetailRoute ? (
+        <header className="rounded-xl border border-[#BAE6FD] bg-white px-4 py-4 shadow-sm sm:rounded-2xl sm:px-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#0369A1]">{seoHeading.eyebrow}</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-black sm:text-4xl">{seoHeading.heading}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-black/62">{seoHeading.intro}</p>
+        </header>
+      ) : null}
       <div className="space-y-2.5">
         {selectedModel ? (
-          <div className="rounded-xl border border-[#E9DEC9] bg-[linear-gradient(135deg,#FFF7EA_0%,#FFFDFC_55%,#F6F1E7_100%)] p-3 sm:rounded-2xl sm:p-3.5">
+          <div className="rounded-xl border border-[#BAE6FD] bg-[linear-gradient(135deg,#E0F2FE_0%,#FFFDFC_55%,#E0F2FE_100%)] p-3 sm:rounded-2xl sm:p-3.5">
             <div className="grid gap-2.5 sm:gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
               <label className="block">
                 <span className="mb-1 block text-[11px] font-medium tracking-[0.2px] text-black/50">Vendor</span>
@@ -1677,7 +1841,7 @@ export function ModelsBrowser({
               {selectedModel.modelDescription || "This model does not have a detailed description yet."}
             </p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
-              <span className="inline-flex rounded-full border border-[#E7C89A] bg-white/80 px-3 py-1 text-xs font-medium text-[#9A4F18]">
+              <span className="inline-flex rounded-full border border-[#BAE6FD] bg-white/80 px-3 py-1 text-xs font-medium text-[#0369A1]">
                 {selectedModel.providerName}
               </span>
               <span className="inline-flex rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
@@ -1696,17 +1860,17 @@ export function ModelsBrowser({
       <div className="relative min-w-0 max-w-full">
         <div className="min-w-0 space-y-4">
       <section className="min-w-0 max-w-full rounded-xl border border-black/[0.08] bg-white p-2 shadow-sm sm:rounded-2xl sm:p-3">
-        <div className="mb-2 border-b border-black/[0.08] pb-1.5">
-          <div className="grid grid-cols-2 gap-1 sm:flex sm:items-center">
+        <div className="mb-3 rounded-lg border border-black/[0.08] bg-[#F6F8FB] p-1">
+          <div className="grid grid-cols-2 gap-1">
             {(["playground", "api"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => handleMainTabChange(tab)}
-                className={`h-10 cursor-pointer rounded-md border-b-2 px-3 text-sm font-medium sm:rounded-none ${
+                className={`h-10 cursor-pointer rounded-md border px-3 text-[14px] font-bold transition-colors ${
                   tab === mainTab
-                    ? "border-[#E58A35] text-[#9A4F18]"
-                    : "border-transparent text-[#6B7280] hover:bg-black/[0.02] hover:text-[#111827]"
+                    ? "border-[#38BDF8] bg-white text-[#0369A1]"
+                    : "border-transparent text-[#4B5563] hover:bg-white/70 hover:text-[#111827]"
                 }`}
               >
                 {tab === "api" ? "API" : "Playground"}
@@ -1740,7 +1904,7 @@ export function ModelsBrowser({
                             disabled={isSubmitting || uploadingFields[field.key]}
                             type="file"
                             accept="image/png,image/jpeg,image/webp"
-                            multiple
+                            multiple={isMultipleImageUploadField(field)}
                             onChange={(event) => {
                               void uploadPlaygroundImages(field, event.target.files);
                               event.target.value = "";
@@ -1782,11 +1946,16 @@ export function ModelsBrowser({
                                     <p className="truncate text-xs font-medium text-black/75">
                                       {upload.name}
                                     </p>
-                                    {selectedModel?.playgroundInputPrompt && upload.url === selectedModel.playgroundInputImageUrl ? (
+                                    {(() => {
+                                      const example = selectedModel?.playgroundInputExamples.find(
+                                        (item) => item.imageUrl === upload.url
+                                      );
+                                      return example?.prompt ? (
                                       <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-black/45">
-                                        {selectedModel.playgroundInputPrompt}
+                                        {example.prompt}
                                       </p>
-                                    ) : null}
+                                      ) : null;
+                                    })()}
                                     <p className="mt-1 text-[11px] text-black/45">
                                       {upload.mimeType}
                                       {upload.size > 0 ? ` · ${formatUploadSize(upload.size)}` : ""}
@@ -1894,10 +2063,28 @@ export function ModelsBrowser({
                           }`}
                           placeholder="One value per line, comma-separated, or a JSON array"
                         />
+                      ) : isSliderNumberField(field) ? (
+                        <select
+                          disabled={isSubmitting}
+                          value={playgroundForm[field.key] ?? buildNumberSelectOptions(field)[0] ?? String(field.minimum)}
+                          onChange={(event) =>
+                            setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
+                          }
+                          className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03]"
+                        >
+                          {buildNumberSelectOptions(field).map((value) => (
+                            <option key={value} value={value}>
+                              {value}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
                         <input
                           disabled={isSubmitting}
                           type={field.type === "number" ? "number" : "text"}
+                          min={field.type === "number" ? field.minimum : undefined}
+                          max={field.type === "number" ? field.maximum : undefined}
+                          step={field.type === "number" ? field.step ?? "any" : undefined}
                           value={playgroundForm[field.key] ?? ""}
                           onChange={(event) =>
                             setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
@@ -1924,41 +2111,55 @@ export function ModelsBrowser({
                 >
                   {isSubmitting ? "Generating..." : `Generate ${priceTag ? `(${priceTag})` : ""}`}
                 </button>
-                {taskId ? <span className="min-w-0 truncate text-xs text-black/45">Task: {taskId}</span> : null}
               </div>
             </section>
 
             <section className="flex min-h-[300px] flex-col rounded-lg border border-black/[0.08] bg-[#FAFAFA] p-3 sm:min-h-[360px] sm:rounded-xl sm:p-4">
-              <div className="mb-3 grid gap-2 sm:flex sm:items-center sm:justify-between">
-                <h3 className="text-sm font-medium text-black">Output</h3>
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  {playgroundImageAssets.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        downloadImage(
-                          playgroundImageAssets[0].url,
-                          `${slugifyPathPart(selectedModel?.publicModel || "generated-image")}-1.png`,
-                          playgroundImageAssets[0].mimeType
-                        )
-                      }
-                      className="inline-flex h-8 items-center gap-1 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03] sm:h-7"
-                    >
-                      <Download className="size-3.5" />
-                      <span className="hidden sm:inline">Download image</span>
-                      <span className="sm:hidden">Download</span>
-                    </button>
-                  ) : null}
-                  {playgroundOutput ? (
-                    <button
-                      type="button"
-                      onClick={() => setResultModalOpen(true)}
-                      className="h-8 rounded border border-black/[0.12] px-2 text-xs text-black/70 hover:bg-black/[0.03] sm:h-7"
-                    >
-                      Result JSON
-                    </button>
-                  ) : null}
-                  <div className="min-w-0 text-xs capitalize text-black/60">Status: {taskStatusLabel(taskStatus)}</div>
+              <div className="mb-3 rounded-lg border border-black/[0.06] bg-white px-3 py-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-medium text-black">Output</h3>
+                  <span
+                    className={`inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium ${taskStatusClass(taskStatus)}`}
+                  >
+                    Status: {taskStatusLabel(taskStatus)}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-col gap-2 border-t border-black/[0.06] pt-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 text-xs text-black/55">
+                    <span className="mr-1 text-black/35">Task</span>
+                    {taskId ? (
+                      <code className="break-all font-mono text-[11px] text-black/70">{taskId}</code>
+                    ) : (
+                      <span className="text-black/35">Waiting for request</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {playgroundImageAssets.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          downloadImage(
+                            playgroundImageAssets[0].url,
+                            `${slugifyPathPart(selectedModel?.publicModel || "generated-image")}-1.png`,
+                            playgroundImageAssets[0].mimeType
+                          )
+                        }
+                        className="inline-flex h-8 items-center gap-1 rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                      >
+                        <Download className="size-3.5" />
+                        <span>Download image</span>
+                      </button>
+                    ) : null}
+                    {playgroundOutput ? (
+                      <button
+                        type="button"
+                        onClick={() => setResultModalOpen(true)}
+                        className="inline-flex h-8 items-center rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                      >
+                        Result JSON
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
               {playgroundError ? (
@@ -1982,12 +2183,30 @@ export function ModelsBrowser({
                 </div>
               ) : isSubmitting ? (
                 <div className="flex min-h-[220px] flex-1 flex-col items-center justify-center rounded-md border border-black/[0.08] bg-white sm:min-h-[280px]">
-                  <span className="inline-flex size-7 animate-spin rounded-full border-2 border-[#E7E0D3] border-t-[#E58A35]" />
+                  <span className="inline-flex size-7 animate-spin rounded-full border-2 border-[#BAE6FD] border-t-[#38BDF8]" />
                   <p className="mt-3 text-sm font-medium text-black">Generating...</p>
                   <p className="mt-1 text-xs text-black/55">{taskStatusLabel(taskStatus)}</p>
                 </div>
               ) : playgroundOutput ? (
                 <div className="space-y-3">
+                  {playgroundTextOutput ? (
+                    <div className="rounded-md border border-black/[0.08] bg-white p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-black/55">Text output</p>
+                        <button
+                          type="button"
+                          onClick={copyTextOutput}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                        >
+                          {textOutputCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                          {textOutputCopied ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                      <p className="whitespace-pre-wrap break-words rounded-md bg-[#F8FCFF] px-3 py-2 text-sm leading-6 text-black/80">
+                        {playgroundTextOutput}
+                      </p>
+                    </div>
+                  ) : null}
                   {playgroundImageAssets.length > 0 ? (
                     <div className="grid gap-2">
                       {playgroundImageAssets.map((asset, index) => (
@@ -2072,8 +2291,8 @@ export function ModelsBrowser({
                   onClick={() => handleModelChange(model.publicModel)}
                   className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
                     active
-                      ? "border-[#E58A35] bg-[#FFF8EC]"
-                      : "border-black/[0.08] bg-[#FCFCFA] hover:border-[#E7C89A] hover:bg-[#FFFBF4]"
+                      ? "border-[#38BDF8] bg-[#F0F9FF]"
+                      : "border-black/[0.08] bg-[#FCFCFA] hover:border-[#BAE6FD] hover:bg-[#FFFBF4]"
                   }`}
                 >
                   <div className="text-[13px] font-medium leading-5 text-black">{model.displayName}</div>
@@ -2094,10 +2313,16 @@ export function ModelsBrowser({
 
       {mainTab === "playground" && selectedModel?.readmeMarkdown?.trim() ? (
         looksLikeHtmlDocument(selectedModel.readmeMarkdown) ? (
-          <HtmlReadme html={selectedModel.readmeMarkdown} />
+          <HtmlReadme html={selectedModel.readmeMarkdown} seoHeading={isModelDetailRoute ? seoHeading : undefined} />
         ) : (
-          <MarkdownReadme markdown={selectedModel.readmeMarkdown} />
+          <MarkdownReadme markdown={selectedModel.readmeMarkdown} seoHeading={isModelDetailRoute ? seoHeading : undefined} />
         )
+      ) : mainTab === "playground" && isModelDetailRoute ? (
+        <section className="rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm">
+          <ReadmeSeoHeading {...seoHeading} />
+          <h2 className="text-lg font-semibold text-black">README</h2>
+          <p className="mt-1 text-sm text-black/55">Supplemental model documentation has not been added yet.</p>
+        </section>
       ) : null}
         </div>
       </div>

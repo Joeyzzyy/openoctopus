@@ -14,7 +14,7 @@ type SupportedModelOption = {
   id: string;
   modelSlug: string;
   displayName: string;
-  capability: "image_generation" | "image_edit" | "video_generation" | null;
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
   billingConfigText?: string;
 };
 
@@ -44,7 +44,7 @@ type ProviderModelOption = {
   supportedModelName: string;
   providerName: string;
   upstreamModelSlug: string;
-  capability: "image_generation" | "image_edit" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
 };
 
 type BillingFormState = {
@@ -83,6 +83,7 @@ type ExecutionConfigFormState = {
   taskIdPath: string;
   statusPath: string;
   resultUrlPath: string;
+  resultTextPath: string;
   submitBodyTemplate: string;
   docRequestExampleJson: string;
   docSubmitResponseExampleJson: string;
@@ -100,6 +101,9 @@ type SchemaFieldState = {
   example: string;
   exposedToCustomer: boolean;
   enumValues: string[];
+  minimum: string;
+  maximum: string;
+  step: string;
 };
 
 function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormState> {
@@ -185,6 +189,7 @@ const ASPECT_RATIO_CANDIDATES = [
 const RESOLUTION_CANDIDATES = ["0.5k", "1k", "2k", "3k", "4k"];
 const SIZE_CANDIDATES = ["1024*1024", "1024*1536", "1536*1024"];
 const QUALITY_CANDIDATES = ["medium", "low", "high"];
+const DETAIL_LEVEL_CANDIDATES = ["low", "medium", "high"];
 const OUTPUT_FORMAT_CANDIDATES = ["png", "jpeg", "webp"];
 const BACKGROUND_CANDIDATES = ["auto", "transparent", "opaque"];
 const BOOLEAN_SURCHARGE_CANDIDATES = ["enable_web_search", "enable_image_search"];
@@ -251,6 +256,10 @@ function isQualityFieldName(value: string) {
   return value.trim().toLowerCase() === "quality";
 }
 
+function isDetailLevelFieldName(value: string) {
+  return value.trim().toLowerCase() === "detail_level";
+}
+
 function isOutputFormatFieldName(value: string) {
   return value.trim().toLowerCase() === "output_format";
 }
@@ -266,6 +275,9 @@ function defaultEnumValuesForKnownInputField(fieldName: string) {
   }
   if (normalized === "quality") {
     return ["medium", "low", "high"];
+  }
+  if (normalized === "detail_level") {
+    return DETAIL_LEVEL_CANDIDATES;
   }
   if (normalized === "output_format") {
     return ["png", "jpeg", "webp"];
@@ -303,6 +315,19 @@ function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields")
           key === "params" && parsedEnumValues.length === 0
             ? defaultEnumValuesForKnownInputField(name)
             : [];
+        const minimum =
+          row.minimum !== undefined && row.minimum !== null
+            ? String(row.minimum)
+            : row.min !== undefined && row.min !== null
+              ? String(row.min)
+              : "";
+        const maximum =
+          row.maximum !== undefined && row.maximum !== null
+            ? String(row.maximum)
+            : row.max !== undefined && row.max !== null
+              ? String(row.max)
+              : "";
+        const step = row.step !== undefined && row.step !== null ? String(row.step) : "";
         return {
           id: randomFieldId(),
           name,
@@ -317,6 +342,9 @@ function parseSchemaFieldsFromText(schemaText: string, key: "params" | "fields")
                 ? row.customerVisible
                 : true,
           enumValues: parsedEnumValues.length > 0 ? parsedEnumValues : fallbackEnumValues,
+          minimum,
+          maximum,
+          step,
         } satisfies SchemaFieldState;
       })
       .filter((row): row is SchemaFieldState => Boolean(row));
@@ -334,6 +362,13 @@ function readJsonRecord(value: string) {
   } catch {
     return null;
   }
+}
+
+function parseOptionalNumber(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function hasPositivePricingCharge(pricingText: string) {
@@ -420,6 +455,9 @@ function SchemaFieldEditor({
     example: "",
     exposedToCustomer: true,
     enumValues: [],
+    minimum: "",
+    maximum: "",
+    step: "",
   });
 
   useEffect(() => {
@@ -444,6 +482,9 @@ function SchemaFieldEditor({
       example: "",
       exposedToCustomer: true,
       enumValues: [],
+      minimum: "",
+      maximum: "",
+      step: "",
     });
     setEditorOpen(true);
   };
@@ -459,16 +500,47 @@ function SchemaFieldEditor({
       toast.error("请先填写参数名");
       return;
     }
+    if (
+      [draft.minimum, draft.maximum, draft.step].some((value) => {
+        const trimmed = value.trim();
+        return trimmed.length > 0 && !Number.isFinite(Number(trimmed));
+      })
+    ) {
+      toast.error("最小值、最大值和阶梯值必须是数字");
+      return;
+    }
+    const nextEnumValues =
+      keyName === "params" &&
+      isDetailLevelFieldName(draft.name) &&
+      normalizeEnumValues(draft.enumValues).length === 0
+        ? DETAIL_LEVEL_CANDIDATES
+        : normalizeEnumValues(draft.enumValues);
     if (editingId) {
       setRows((current) =>
         current.map((row) =>
-          row.id === editingId ? { ...draft, name: draft.name.trim(), enumValues: normalizeEnumValues(draft.enumValues) } : row
+          row.id === editingId
+            ? {
+                ...draft,
+                name: draft.name.trim(),
+                enumValues: nextEnumValues,
+                minimum: draft.minimum.trim(),
+                maximum: draft.maximum.trim(),
+                step: draft.step.trim(),
+              }
+            : row
         )
       );
     } else {
       setRows((current) => [
         ...current,
-        { ...draft, name: draft.name.trim(), enumValues: normalizeEnumValues(draft.enumValues) },
+        {
+          ...draft,
+          name: draft.name.trim(),
+          enumValues: nextEnumValues,
+          minimum: draft.minimum.trim(),
+          maximum: draft.maximum.trim(),
+          step: draft.step.trim(),
+        },
       ]);
     }
     setEditorOpen(false);
@@ -487,6 +559,9 @@ function SchemaFieldEditor({
       example: row.example.trim(),
       exposedToCustomer: row.exposedToCustomer,
       enumValues: normalizeEnumValues(row.enumValues),
+      minimum: row.minimum.trim(),
+      maximum: row.maximum.trim(),
+      step: row.step.trim(),
     }))
     .filter((row) => row.name.length > 0);
 
@@ -500,6 +575,9 @@ function SchemaFieldEditor({
         example: row.example || undefined,
         exposedToCustomer: row.exposedToCustomer,
         enum: row.enumValues.length > 0 ? row.enumValues : undefined,
+        minimum: parseOptionalNumber(row.minimum),
+        maximum: parseOptionalNumber(row.maximum),
+        step: parseOptionalNumber(row.step),
       })),
     },
     null,
@@ -510,7 +588,7 @@ function SchemaFieldEditor({
   }, [onSchemaChange, schemaValue]);
 
   return (
-    <div className="space-y-3 rounded-xl border border-black/[0.08] bg-white p-3">
+    <div className="space-y-3 rounded-xl border border-[#BAE6FD] bg-white p-3">
       <input type="hidden" name={name} value={schemaValue} />
 
       <div className="flex items-center justify-between gap-2">
@@ -518,7 +596,7 @@ function SchemaFieldEditor({
           type="button"
           onClick={openCreateEditor}
           disabled={disabled}
-          className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-black/[0.03] disabled:opacity-50"
+          className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-[#E0F2FE] disabled:opacity-50"
         >
           添加字段
         </button>
@@ -528,7 +606,7 @@ function SchemaFieldEditor({
       <div className="space-y-2">
         {rows.length === 0 ? <p className="text-xs text-black/45">暂无字段，点击“添加字段”开始配置。</p> : null}
         {rows.map((row) => (
-          <div key={row.id} className="rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-3">
+          <div key={row.id} className="rounded-lg border border-[#BAE6FD] bg-[#F8FCFF] p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-black">{row.name}</p>
@@ -539,7 +617,7 @@ function SchemaFieldEditor({
                   type="button"
                   onClick={() => openEditEditor(row)}
                   disabled={disabled}
-                  className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-black/[0.04] disabled:opacity-50"
+                  className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-[#E0F2FE] disabled:opacity-50"
                 >
                   编辑
                 </button>
@@ -555,7 +633,7 @@ function SchemaFieldEditor({
                     removeRow(row.id);
                   }}
                   disabled={disabled}
-                  className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-black/[0.04] disabled:opacity-50"
+                  className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-[#E0F2FE] disabled:opacity-50"
                 >
                   删除
                 </button>
@@ -563,16 +641,21 @@ function SchemaFieldEditor({
             </div>
             <p className="mt-2 text-xs leading-5 text-black/65">{row.description || "未填写说明"}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-black/55">
-              <span className="rounded border border-black/[0.08] bg-white px-2 py-0.5">示例：{row.example || "-"}</span>
-              <span className="rounded border border-black/[0.08] bg-white px-2 py-0.5">
+              <span className="rounded border border-[#BAE6FD] bg-white px-2 py-0.5">示例：{row.example || "-"}</span>
+              <span className="rounded border border-[#BAE6FD] bg-white px-2 py-0.5">
                 可选值：{row.enumValues.length > 0 ? row.enumValues.join(", ") : "-"}
               </span>
+              {row.minimum || row.maximum || row.step ? (
+                <span className="rounded border border-[#BAE6FD] bg-white px-2 py-0.5">
+                  范围：{row.minimum || "-"} - {row.maximum || "-"} · 阶梯：{row.step || "-"}
+                </span>
+              ) : null}
               {includeRequired ? (
-                <span className="rounded border border-black/[0.08] bg-white px-2 py-0.5">
+                <span className="rounded border border-[#BAE6FD] bg-white px-2 py-0.5">
                   必填：{row.required ? "是" : "否"}
                 </span>
               ) : null}
-              <span className="rounded border border-black/[0.08] bg-white px-2 py-0.5">
+              <span className="rounded border border-[#BAE6FD] bg-white px-2 py-0.5">
                 对外开放：{row.exposedToCustomer ? "是" : "否"}
               </span>
             </div>
@@ -582,13 +665,13 @@ function SchemaFieldEditor({
 
       {editorOpen ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-xl rounded-xl border border-black/[0.08] bg-white p-4 shadow-2xl">
+          <div className="w-full max-w-xl rounded-xl border border-[#BAE6FD] bg-white p-4 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
               <h4 className="text-sm font-semibold text-black">{editingId ? "编辑字段" : "新增字段"}</h4>
               <button
                 type="button"
                 onClick={() => setEditorOpen(false)}
-                className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-black/[0.04]"
+                className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-[#E0F2FE]"
               >
                 关闭
               </button>
@@ -621,8 +704,43 @@ function SchemaFieldEditor({
                 className={`${formInputClassName} h-9 text-xs md:col-span-2`}
                 placeholder="示例值"
               />
+              {keyName === "params" && (draft.type === "number" || draft.type === "integer") ? (
+                <div className="grid gap-2 md:col-span-2 md:grid-cols-3">
+                  <input
+                    value={draft.minimum}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, minimum: event.target.value }))
+                    }
+                    disabled={disabled}
+                    className={`${formInputClassName} h-9 text-xs`}
+                    placeholder="最小值，如 0"
+                    inputMode="decimal"
+                  />
+                  <input
+                    value={draft.maximum}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, maximum: event.target.value }))
+                    }
+                    disabled={disabled}
+                    className={`${formInputClassName} h-9 text-xs`}
+                    placeholder="最大值，如 10"
+                    inputMode="decimal"
+                  />
+                  <input
+                    value={draft.step}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, step: event.target.value }))
+                    }
+                    disabled={disabled}
+                    className={`${formInputClassName} h-9 text-xs`}
+                    placeholder="阶梯值，如 1 或 0.5"
+                    inputMode="decimal"
+                  />
+                </div>
+              ) : null}
               {!isResolutionFieldName(draft.name) &&
               !isQualityFieldName(draft.name) &&
+              !isDetailLevelFieldName(draft.name) &&
               !isOutputFormatFieldName(draft.name) &&
               !isSizeFieldName(draft.name) &&
               !isBackgroundFieldName(draft.name) ? (
@@ -640,7 +758,7 @@ function SchemaFieldEditor({
                 />
               ) : null}
               {isResolutionFieldName(draft.name) ? (
-                <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
+                <div className="rounded-md border border-[#BAE6FD] bg-[#F8FCFF] p-2.5 md:col-span-2">
                   <p className="mb-2 text-[11px] text-black/60">常用分辨率（可多选）</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {RESOLUTION_CANDIDATES.map((resolution) => {
@@ -674,7 +792,7 @@ function SchemaFieldEditor({
                 </div>
               ) : null}
               {isSizeFieldName(draft.name) ? (
-                <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
+                <div className="rounded-md border border-[#BAE6FD] bg-[#F8FCFF] p-2.5 md:col-span-2">
                   <p className="mb-2 text-[11px] text-black/60">size 可选值（可多选）</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {SIZE_CANDIDATES.map((value) => {
@@ -708,7 +826,7 @@ function SchemaFieldEditor({
                 </div>
               ) : null}
               {isQualityFieldName(draft.name) ? (
-                <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
+                <div className="rounded-md border border-[#BAE6FD] bg-[#F8FCFF] p-2.5 md:col-span-2">
                   <p className="mb-2 text-[11px] text-black/60">quality 可选值（可多选）</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {QUALITY_CANDIDATES.map((value) => {
@@ -741,8 +859,44 @@ function SchemaFieldEditor({
                   </div>
                 </div>
               ) : null}
+              {isDetailLevelFieldName(draft.name) ? (
+                <div className="rounded-md border border-[#BAE6FD] bg-[#F8FCFF] p-2.5 md:col-span-2">
+                  <p className="mb-2 text-[11px] text-black/60">detail_level 可选值（低 / 中 / 高）</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {DETAIL_LEVEL_CANDIDATES.map((value) => {
+                      const checked = draft.enumValues.includes(value);
+                      const label = value === "low" ? "低" : value === "medium" ? "中" : "高";
+                      return (
+                        <label key={value} className="inline-flex items-center gap-2 text-xs text-black/75">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) =>
+                              setDraft((current) => {
+                                const set = new Set(current.enumValues);
+                                if (event.target.checked) {
+                                  set.add(value);
+                                } else {
+                                  set.delete(value);
+                                }
+                                return {
+                                  ...current,
+                                  enumValues: Array.from(set),
+                                };
+                              })
+                            }
+                            className="size-3.5"
+                          />
+                          {label} <span className="text-black/40">({value})</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <FieldHint help="如果不手动勾选，保存 detail_level 字段时会默认写入 low、medium、high 三个可选值。" />
+                </div>
+              ) : null}
               {isOutputFormatFieldName(draft.name) ? (
-                <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
+                <div className="rounded-md border border-[#BAE6FD] bg-[#F8FCFF] p-2.5 md:col-span-2">
                   <p className="mb-2 text-[11px] text-black/60">output_format 可选值（可多选）</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {OUTPUT_FORMAT_CANDIDATES.map((value) => {
@@ -776,7 +930,7 @@ function SchemaFieldEditor({
                 </div>
               ) : null}
               {isBackgroundFieldName(draft.name) ? (
-                <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
+                <div className="rounded-md border border-[#BAE6FD] bg-[#F8FCFF] p-2.5 md:col-span-2">
                   <p className="mb-2 text-[11px] text-black/60">background 可选值（可多选）</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {BACKGROUND_CANDIDATES.map((value) => {
@@ -810,7 +964,7 @@ function SchemaFieldEditor({
                 </div>
               ) : null}
               {draft.name.trim() === "aspect_ratio" ? (
-                <div className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2.5 md:col-span-2">
+                <div className="rounded-md border border-[#BAE6FD] bg-[#F8FCFF] p-2.5 md:col-span-2">
                   <p className="mb-2 text-[11px] text-black/60">常用比例（可多选）</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {ASPECT_RATIO_CANDIDATES.map((ratio) => {
@@ -878,7 +1032,7 @@ function SchemaFieldEditor({
               <button
                 type="button"
                 onClick={() => setEditorOpen(false)}
-                className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-black/[0.03]"
+                className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-[#E0F2FE]"
               >
                 取消
               </button>
@@ -894,7 +1048,7 @@ function SchemaFieldEditor({
         </div>
       ) : null}
 
-      <details className="rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2">
+      <details className="rounded-md border border-[#BAE6FD] bg-[#F8FCFF] p-2">
         <summary className="cursor-pointer text-[11px] text-black/60">JSON 预览</summary>
         <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[11px] text-black/70">
           {schemaValue}
@@ -981,15 +1135,15 @@ function buildDocExamplesFromSchemas(inputSchemaText: string, outputSchemaText: 
 }
 
 const formInputClassName =
-  "h-10 w-full rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+  "h-10 w-full rounded-md border border-[#BAE6FD] bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
 
 const formTextAreaClassName =
-  "w-full rounded-md border border-black/[0.08] bg-white px-3 py-2.5 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+  "w-full rounded-md border border-[#BAE6FD] bg-white px-3 py-2.5 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
 
 const formSelectClassName =
-  "h-10 w-full rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+  "h-10 w-full rounded-md border border-[#BAE6FD] bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
 
-const panelSurfaceClassName = "rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 shadow-sm";
+const panelSurfaceClassName = "rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] p-4 shadow-sm";
 
 function parseBillingFormState(initialValue?: string): BillingFormState {
   const fallback: BillingFormState = {
@@ -1377,6 +1531,7 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
     taskIdPath: "name",
     statusPath: "done",
     resultUrlPath: "response.outputUrl",
+    resultTextPath: "",
     submitBodyTemplate: "",
     docRequestExampleJson: "",
     docSubmitResponseExampleJson: "",
@@ -1441,9 +1596,13 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
           ? parsed.statusPath
           : fallback.statusPath,
       resultUrlPath:
-        typeof parsed.resultUrlPath === "string" && parsed.resultUrlPath.trim().length > 0
+        typeof parsed.resultUrlPath === "string"
           ? parsed.resultUrlPath
           : fallback.resultUrlPath,
+      resultTextPath:
+        typeof parsed.resultTextPath === "string"
+          ? parsed.resultTextPath
+          : fallback.resultTextPath,
       submitBodyTemplate:
         typeof parsed.submitBodyTemplate === "string"
           ? parsed.submitBodyTemplate
@@ -1491,8 +1650,12 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
     resultMimeType: state.resultMimeType.trim(),
     submitPath: state.submitPath.trim(),
     taskIdPath: state.taskIdPath.trim(),
-    resultUrlPath: state.resultUrlPath.trim(),
   };
+  result.resultUrlPath = state.resultUrlPath.trim();
+  const resultTextPath = (state.resultTextPath ?? "").trim();
+  if (resultTextPath) {
+    result.resultTextPath = resultTextPath;
+  }
   if (shouldPersistAsyncFields) {
     result.pollPath = state.pollPath.trim();
     result.statusPath = state.statusPath.trim();
@@ -1652,6 +1815,7 @@ function FieldHint({
 function capabilityLabel(value: SupportedModelOption["capability"]) {
   if (value === "image_generation") return "图片生成";
   if (value === "image_edit") return "图片编辑";
+  if (value === "image_recognition") return "图片识别";
   if (value === "video_generation") return "视频生成";
   return "未知";
 }
@@ -1700,11 +1864,11 @@ function ParameterMultiplierTable({
   help: string;
 }) {
   return (
-    <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+    <div className="rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
       <p className="text-[11px] tracking-[0.35px] text-black/60">{title}</p>
-      <div className="mt-2 overflow-x-auto rounded-lg border border-black/[0.06] bg-white">
+      <div className="mt-2 overflow-x-auto rounded-lg border border-[#DDF4FF] bg-white">
         <table className="w-full min-w-[360px] text-left text-xs">
-          <thead className="bg-[#FAFAF9] text-black/45">
+          <thead className="bg-[#F8FCFF] text-black/45">
             <tr>
               <th className="px-2 py-2 font-medium">启用</th>
               <th className="px-2 py-2 font-medium">{valueLabel}</th>
@@ -1734,7 +1898,7 @@ function ParameterMultiplierTable({
                       value={inputValue}
                       disabled={!enabled}
                       onChange={(event) => onChange(candidate, event.target.value)}
-                      className="h-8 w-28 rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black disabled:bg-black/[0.03] disabled:text-black/35"
+                      className="h-8 w-28 rounded-md border border-[#BAE6FD] bg-white px-2 text-xs text-black disabled:bg-black/[0.03] disabled:text-black/35"
                     />
                   </td>
                 </tr>
@@ -1758,11 +1922,11 @@ function BooleanSurchargeTable({
   const candidates = Array.from(new Set([...BOOLEAN_SURCHARGE_CANDIDATES, ...Object.keys(values)]));
 
   return (
-    <div className="mt-3 rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+    <div className="mt-3 rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
       <p className="text-[11px] tracking-[0.35px] text-black/60">布尔参数附加费</p>
-      <div className="mt-2 overflow-x-auto rounded-lg border border-black/[0.06] bg-white">
+      <div className="mt-2 overflow-x-auto rounded-lg border border-[#DDF4FF] bg-white">
         <table className="w-full min-w-[460px] text-left text-xs">
-          <thead className="bg-[#FAFAF9] text-black/45">
+          <thead className="bg-[#F8FCFF] text-black/45">
             <tr>
               <th className="px-2 py-2 font-medium">启用</th>
               <th className="px-2 py-2 font-medium">boolean 参数</th>
@@ -1792,7 +1956,7 @@ function BooleanSurchargeTable({
                       value={inputValue}
                       disabled={!enabled}
                       onChange={(event) => onChange(candidate, event.target.value)}
-                      className="h-8 w-28 rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black disabled:bg-black/[0.03] disabled:text-black/35"
+                      className="h-8 w-28 rounded-md border border-[#BAE6FD] bg-white px-2 text-xs text-black disabled:bg-black/[0.03] disabled:text-black/35"
                     />
                   </td>
                 </tr>
@@ -1828,13 +1992,13 @@ export function BillingConfigEditor({
   const booleanSurchargeMap = safeParseLooseNumberMap(state.booleanSurchargesJson);
   const inputMethod = state.chargeInputTokens
     ? "input_tokens"
-    : state.chargePerRequest
-      ? "per_request"
-      : "none";
+    : "none";
   const outputMethod = state.chargeOutputTokens
     ? state.outputPriceMode || "output_tokens"
     : state.chargeCombinationPrices
       ? state.outputPriceMode || "combination_prices"
+      : state.chargePerRequest
+        ? "per_request"
       : state.chargePerImage
       ? state.outputPriceMode || "per_image"
       : state.chargePerVideo
@@ -1847,7 +2011,6 @@ export function BillingConfigEditor({
     setState((current) => ({
       ...current,
       chargeInputTokens: method === "input_tokens",
-      chargePerRequest: method === "per_request",
     }));
   };
 
@@ -1857,6 +2020,7 @@ export function BillingConfigEditor({
       outputPriceMode: method,
       chargeOutputTokens: method === "output_tokens",
       chargeCombinationPrices: method === "combination_prices" || method === "resolution_multiplier" || method === "quality_multiplier",
+      chargePerRequest: method === "per_request",
       chargePerImage: method === "per_image",
       chargePerVideo: method === "per_video",
       chargePerSecond: method === "per_second",
@@ -1908,7 +2072,7 @@ export function BillingConfigEditor({
   };
 
   return (
-    <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-[#BAE6FD] bg-white p-4 shadow-sm">
       <input type="hidden" name={name} value={hiddenValue} />
       <div className="grid gap-3 md:grid-cols-[120px_minmax(0,1fr)]">
         <label className="block">
@@ -1926,10 +2090,10 @@ export function BillingConfigEditor({
           />
         </label>
 
-        <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-3">
+        <div className="rounded-xl border border-[#DDF4FF] bg-[#F8FCFF] px-3 py-3">
           <p className="text-[11px] tracking-[0.35px] text-black/45">成本计费维度</p>
           <div className="mt-2 grid gap-3 md:grid-cols-2">
-            <div className="rounded-lg border border-black/[0.08] bg-white p-2.5">
+            <div className="rounded-lg border border-[#BAE6FD] bg-white p-2.5">
               <p className="mb-2 text-[11px] font-medium text-black/55">输入成本</p>
               <select
                 value={inputMethod}
@@ -1937,11 +2101,10 @@ export function BillingConfigEditor({
                 className={formSelectClassName}
               >
                 <option value="none">不计费</option>
-                <option value="per_request">按请求</option>
                 <option value="input_tokens">按输入 Token（每百万）</option>
               </select>
             </div>
-            <div className="rounded-lg border border-black/[0.08] bg-white p-2.5">
+            <div className="rounded-lg border border-[#BAE6FD] bg-white p-2.5">
               <p className="mb-2 text-[11px] font-medium text-black/55">输出成本</p>
               <select
                 value={outputMethod}
@@ -1949,6 +2112,7 @@ export function BillingConfigEditor({
                 className={formSelectClassName}
               >
                 <option value="none">不计费</option>
+                <option value="per_request">按次 / 每次请求</option>
                 <option value="per_image">按图片</option>
                 <option value="resolution_multiplier">按 resolution 阶梯单价</option>
                 <option value="quality_multiplier">按 quality 阶梯单价</option>
@@ -1964,9 +2128,9 @@ export function BillingConfigEditor({
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
-        {inputMethod === "per_request" ? (
+        {outputMethod === "per_request" ? (
           <BillingNumberField
-            label="输入成本金额（每次请求）"
+            label="输出成本金额（每次请求）"
             value={state.costPerRequest}
             onChange={(value) => setState((current) => ({ ...current, costPerRequest: value }))}
           />
@@ -2010,11 +2174,11 @@ export function BillingConfigEditor({
       </div>
 
       {outputMethod === "combination_prices" ? (
-      <div className="mt-3 rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+      <div className="mt-3 rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
         <p className="text-[11px] tracking-[0.35px] text-black/60">resolution + quality 组合阶梯单价</p>
-        <div className="mt-2 overflow-x-auto rounded-lg border border-black/[0.06] bg-white">
+        <div className="mt-2 overflow-x-auto rounded-lg border border-[#DDF4FF] bg-white">
           <table className="min-w-[560px] w-full text-left text-xs">
-            <thead className="bg-[#FAFAF9] text-black/45">
+            <thead className="bg-[#F8FCFF] text-black/45">
               <tr>
                 <th className="px-2 py-2 font-medium">启用</th>
                 <th className="px-2 py-2 font-medium">resolution</th>
@@ -2050,7 +2214,7 @@ export function BillingConfigEditor({
                           value={inputValue}
                           disabled={!enabled}
                           onChange={(event) => updateCombinationPrice(key, event.target.value)}
-                          className="h-8 w-28 rounded-md border border-black/[0.08] bg-white px-2 text-xs text-black disabled:bg-black/[0.03] disabled:text-black/35"
+                          className="h-8 w-28 rounded-md border border-[#BAE6FD] bg-white px-2 text-xs text-black disabled:bg-black/[0.03] disabled:text-black/35"
                         />
                       </td>
                     </tr>
@@ -2091,7 +2255,7 @@ export function BillingConfigEditor({
 
       <BooleanSurchargeTable values={booleanSurchargeMap} onChange={updateBooleanSurcharge} />
 
-      <div className="mt-3 rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
+      <div className="mt-3 rounded-xl border border-[#DDF4FF] bg-[#F8FCFF] px-3 py-2.5">
         <p className="text-[11px] tracking-[0.35px] text-black/45">{generatedLabel}</p>
         <code className="mt-1 block break-all text-xs leading-5 text-black/55">{hiddenValue}</code>
       </div>
@@ -2116,12 +2280,15 @@ export function CreateProviderModelForm({
   defaultActive = true,
   defaultShowcaseCoverUrl = null,
   defaultPlaygroundInputUrl = null,
+  defaultFacePlaygroundInputUrl = null,
   defaultShowcaseGalleryUrls = [],
   defaultShowcaseCoverPrompt = "",
   defaultPlaygroundInputPrompt = "",
+  defaultFacePlaygroundInputPrompt = "",
   defaultShowcaseGalleryPrompts = [],
   defaultShowcaseCoverAssetId,
   defaultPlaygroundInputAssetId,
+  defaultFacePlaygroundInputAssetId,
   defaultShowcaseGalleryAssetIds = [],
   providerModelId,
   disabled,
@@ -2147,12 +2314,15 @@ export function CreateProviderModelForm({
   defaultActive?: boolean;
   defaultShowcaseCoverUrl?: string | null;
   defaultPlaygroundInputUrl?: string | null;
+  defaultFacePlaygroundInputUrl?: string | null;
   defaultShowcaseGalleryUrls?: string[];
   defaultShowcaseCoverPrompt?: string;
   defaultPlaygroundInputPrompt?: string;
+  defaultFacePlaygroundInputPrompt?: string;
   defaultShowcaseGalleryPrompts?: string[];
   defaultShowcaseCoverAssetId?: string;
   defaultPlaygroundInputAssetId?: string;
+  defaultFacePlaygroundInputAssetId?: string;
   defaultShowcaseGalleryAssetIds?: string[];
   providerModelId?: string;
   disabled: boolean;
@@ -2227,10 +2397,12 @@ export function CreateProviderModelForm({
   const templateIsAsync =
     executionTemplate === "rest-async-poll-v1" || executionTemplate === "upload-async-poll-v1";
   const isAsyncMode = executionConfigState.mode === "async" || (executionConfigState.mode === "auto" && templateIsAsync);
+  const isImageRecognitionModel = selectedSupportedModel?.capability === "image_recognition";
   const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("ai-autofill");
   void defaultActive;
   const [selectedCoverFileName, setSelectedCoverFileName] = useState("");
   const [selectedPlaygroundInputFileName, setSelectedPlaygroundInputFileName] = useState("");
+  const [selectedFacePlaygroundInputFileName, setSelectedFacePlaygroundInputFileName] = useState("");
   const [selectedGalleryFileNames, setSelectedGalleryFileNames] = useState<string[]>([]);
   const galleryPromptPlaceholder = defaultShowcaseGalleryPrompts
     .map((prompt, index) => `${index + 1}. ${prompt}`)
@@ -2383,7 +2555,12 @@ export function CreateProviderModelForm({
           nextRootTab ??= "manage";
           nextActiveTab ??= "basic";
         }
-        if (!executionConfigState.resultUrlPath.trim()) {
+        if (isImageRecognitionModel && !executionConfigState.resultTextPath.trim()) {
+          missing.push("resultTextPath");
+          nextRootTab ??= "manage";
+          nextActiveTab ??= "basic";
+        }
+        if (!isImageRecognitionModel && !executionConfigState.resultUrlPath.trim()) {
           missing.push("resultUrlPath");
           nextRootTab ??= "manage";
           nextActiveTab ??= "basic";
@@ -2507,7 +2684,7 @@ export function CreateProviderModelForm({
             className={formInputClassName}
             placeholder="https://provider-docs.example.com/model-doc"
           />
-          <div className="h-[65vh] overflow-hidden rounded-lg border border-black/[0.08] bg-[#FCFCFA]">
+          <div className="h-[65vh] overflow-hidden rounded-lg border border-[#BAE6FD] bg-[#F8FCFF]">
             {executionConfigState.docSourceUrl.trim() ? (
               <iframe
                 src={executionConfigState.docSourceUrl.trim()}
@@ -2524,7 +2701,7 @@ export function CreateProviderModelForm({
       ) : null}
       {rootTab === "manage" ? (
       <div className="grid items-start gap-3 lg:grid-cols-[210px_minmax(0,1fr)]">
-        <aside className="self-start rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-1.5">
+        <aside className="self-start rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-1.5">
           <nav className="space-y-1">
             {tabItems.map((tab) => {
               const active = activeTab === tab.key;
@@ -2581,12 +2758,12 @@ export function CreateProviderModelForm({
           </div>
           <FieldHint help="粘贴文档全文后自动填充输入参数、输出参数、供应商成本配置，并在识别结果里标注三大区域的人工检查建议。" />
           {autofillSummary ? (
-            <p className="mt-1.5 rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2 py-1.5 text-xs text-black/65">
+            <p className="mt-1.5 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-2 py-1.5 text-xs text-black/65">
               {autofillSummary}
             </p>
           ) : null}
           {autofillPreviewJson ? (
-            <div className="mt-1.5 rounded-md border border-black/[0.08] bg-[#FCFCFA] p-2">
+            <div className="mt-1.5 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] p-2">
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <p className="text-[11px] tracking-[0.35px] text-black/60">识别结果 JSON（空字段表示未识别）</p>
                 <button
@@ -2599,7 +2776,7 @@ export function CreateProviderModelForm({
                       toast.error("复制失败，请重试");
                     }
                   }}
-                  className="inline-flex h-7 cursor-pointer items-center rounded border border-black/[0.1] bg-white px-2 text-[11px] text-black/65 hover:bg-black/[0.03]"
+                  className="inline-flex h-7 cursor-pointer items-center rounded border border-black/[0.1] bg-white px-2 text-[11px] text-black/65 hover:bg-[#E0F2FE]"
                 >
                   复制 JSON
                 </button>
@@ -2610,7 +2787,7 @@ export function CreateProviderModelForm({
             </div>
           ) : null}
           {autofillReview ? (
-            <div className="mt-1.5 rounded-md border border-black/[0.08] bg-white p-2">
+            <div className="mt-1.5 rounded-md border border-[#BAE6FD] bg-white p-2">
               <p className="mb-1.5 text-[11px] tracking-[0.35px] text-black/60">风险检查结果（建议人工检查）</p>
               <div className="grid gap-2 md:grid-cols-3">
                 {([
@@ -2672,7 +2849,7 @@ export function CreateProviderModelForm({
                       toast.error("复制失败，请重试");
                     }
                   }}
-                  className="inline-flex h-7 cursor-pointer items-center rounded border border-black/[0.1] bg-white px-2 text-[11px] text-black/65 hover:bg-black/[0.03]"
+                  className="inline-flex h-7 cursor-pointer items-center rounded border border-black/[0.1] bg-white px-2 text-[11px] text-black/65 hover:bg-[#E0F2FE]"
                 >
                   复制调试内容
                 </button>
@@ -2740,7 +2917,7 @@ export function CreateProviderModelForm({
           <input
             value={capabilityLabel(selectedSupportedModel?.capability ?? null)}
             readOnly
-            className="h-10 w-full rounded-md border border-black/[0.08] bg-black/[0.03] px-3 text-sm text-black/60 outline-none"
+            className="h-10 w-full rounded-md border border-[#BAE6FD] bg-black/[0.03] px-3 text-sm text-black/60 outline-none"
           />
           <FieldHint help="这里跟随可售模型锁定，避免把图片和视频实现混在一起。" />
         </label>
@@ -2770,7 +2947,7 @@ export function CreateProviderModelForm({
         >
         <div className="block md:col-span-2">
           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">调用协议配置</span>
-          <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+          <div className="rounded-2xl border border-[#BAE6FD] bg-white p-4 shadow-sm">
             <div className="mb-3 grid gap-3 md:grid-cols-2">
               <label className="block">
                 <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">快速填充（复制已有模型）</span>
@@ -3023,46 +3200,68 @@ export function CreateProviderModelForm({
                       resultUrlPath: event.target.value,
                     }))
                   }
-                  required
+                  required={!isImageRecognitionModel}
                   disabled={disabled}
                   className={formInputClassName}
                   placeholder="例如 data.outputs.0 / response.outputUrl"
                 />
               </label>
-              <label className="block">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">结果值类型</span>
-                <select
-                  value={executionConfigState.resultValueType}
-                  onChange={(event) =>
-                    setExecutionConfigState((current) => ({
-                      ...current,
-                      resultValueType: event.target.value,
-                    }))
-                  }
-                  disabled={disabled}
-                  className={formSelectClassName}
-                >
-                  <option value="url">URL</option>
-                  <option value="base64">Base64</option>
-                </select>
-              </label>
-              {executionConfigState.resultValueType === "base64" ? (
-                <label className="block">
-                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Base64 MIME 类型</span>
+              {isImageRecognitionModel ? (
+                <label className="block md:col-span-2">
+                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">文本结果字段路径（JSON path）resultTextPath</span>
                   <input
-                    value={executionConfigState.resultMimeType}
+                    value={executionConfigState.resultTextPath}
                     onChange={(event) =>
                       setExecutionConfigState((current) => ({
                         ...current,
-                        resultMimeType: event.target.value,
+                        resultTextPath: event.target.value,
                       }))
                     }
+                    required
                     disabled={disabled}
                     className={formInputClassName}
-                    placeholder="image/png"
+                    placeholder="例如 data.outputs.0 / data.caption / data.text"
                   />
                 </label>
               ) : null}
+              {isImageRecognitionModel ? null : (
+                <>
+                  <label className="block">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">结果值类型</span>
+                    <select
+                      value={executionConfigState.resultValueType}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          resultValueType: event.target.value,
+                        }))
+                      }
+                      disabled={disabled}
+                      className={formSelectClassName}
+                    >
+                      <option value="url">URL</option>
+                      <option value="base64">Base64</option>
+                    </select>
+                  </label>
+                  {executionConfigState.resultValueType === "base64" ? (
+                    <label className="block">
+                      <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Base64 MIME 类型</span>
+                      <input
+                        value={executionConfigState.resultMimeType}
+                        onChange={(event) =>
+                          setExecutionConfigState((current) => ({
+                            ...current,
+                            resultMimeType: event.target.value,
+                          }))
+                        }
+                        disabled={disabled}
+                        className={formInputClassName}
+                        placeholder="image/png"
+                      />
+                    </label>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -3084,7 +3283,7 @@ export function CreateProviderModelForm({
                   setSeedPricingText(selectedSupportedModel.billingConfigText ?? "");
                   toast.success("已从当前可售模型售价同步");
                 }}
-                className="rounded-md border border-black/[0.08] bg-white px-2.5 py-1 text-[11px] font-medium text-black/65 hover:bg-black/[0.03]"
+                className="rounded-md border border-[#BAE6FD] bg-white px-2.5 py-1 text-[11px] font-medium text-black/65 hover:bg-[#E0F2FE]"
               >
                 从可售模型售价同步
               </button>
@@ -3160,7 +3359,7 @@ export function CreateProviderModelForm({
           }}
           className={activeTab === "doc-examples" ? "" : "hidden"}
         >
-          <div className="block rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+          <div className="block rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-[11px] tracking-[0.35px] text-black/60">文档示例配置（用于 Dashboard API Quickstart）</p>
               <button
@@ -3178,7 +3377,7 @@ export function CreateProviderModelForm({
                   }));
                   toast.success("已根据输入/输出参数生成示例 JSON");
                 }}
-                className="inline-flex h-7 items-center rounded border border-black/[0.12] bg-white px-2 text-[11px] text-black/70 hover:bg-black/[0.03]"
+                className="inline-flex h-7 items-center rounded border border-[#7DD3FC]/45 bg-white px-2 text-[11px] text-black/70 hover:bg-[#E0F2FE]"
               >
                 一键生成示例 JSON
               </button>
@@ -3249,7 +3448,7 @@ export function CreateProviderModelForm({
                 placeholder={"# google/imagen4\n\n> Short model summary for SEO and user education.\n\n## Overview\n\n- **Endpoint**: `https://api.example.com/...`\n- **Model ID**: `google/imagen4`"}
               />
             </label>
-            <div className="rounded-xl border border-black/[0.08] bg-white p-3">
+            <div className="rounded-xl border border-[#BAE6FD] bg-white p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-[11px] tracking-[0.35px] text-black/60">README 生成提示词（复制给模型生成 markdown）</p>
                 <button
@@ -3262,7 +3461,7 @@ export function CreateProviderModelForm({
                       toast.error("复制失败，请手动复制");
                     }
                   }}
-                  className="inline-flex h-7 items-center rounded border border-black/[0.12] bg-white px-2 text-[11px] text-black/70 hover:bg-black/[0.03]"
+                  className="inline-flex h-7 items-center rounded border border-[#7DD3FC]/45 bg-white px-2 text-[11px] text-black/70 hover:bg-[#E0F2FE]"
                 >
                   复制提示词
                 </button>
@@ -3282,16 +3481,16 @@ export function CreateProviderModelForm({
           }}
           className={activeTab === "showcase-assets" ? "" : "hidden"}
         >
-          <div className="space-y-4 rounded-xl border border-black/[0.08] bg-white p-3">
+          <div className="space-y-4 rounded-xl border border-[#BAE6FD] bg-white p-3">
             <p className="text-[11px] tracking-[0.35px] text-black/60">效果图素材（工具页封面与作品轮播）</p>
 
-            <section className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+            <section className="rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <p className="text-xs font-medium text-black/80">封面图区域</p>
                 <span className="text-[11px] text-black/45">单张封面</span>
               </div>
               {defaultShowcaseCoverUrl ? (
-                <div className="rounded-lg border border-black/[0.08] bg-white p-3">
+                <div className="rounded-lg border border-[#BAE6FD] bg-white p-3">
                   <p className="mb-2 text-[11px] text-black/55">已上传封面</p>
                   {defaultShowcaseCoverAssetId ? (
                     <input type="hidden" name="existingShowcaseCoverAssetId" value={defaultShowcaseCoverAssetId} />
@@ -3301,7 +3500,7 @@ export function CreateProviderModelForm({
                     <img
                       src={defaultShowcaseCoverUrl}
                       alt="Current model cover"
-                      className="h-28 w-28 rounded-lg border border-black/[0.08] object-cover"
+                      className="h-28 w-28 rounded-lg border border-[#BAE6FD] object-cover"
                     />
                     <div>
                       <label className="block">
@@ -3323,7 +3522,7 @@ export function CreateProviderModelForm({
                   </div>
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-black/[0.12] bg-white p-3 text-xs text-black/50">
+                <div className="rounded-lg border border-dashed border-[#7DD3FC]/45 bg-white p-3 text-xs text-black/50">
                   暂无封面图
                 </div>
               )}
@@ -3353,13 +3552,13 @@ export function CreateProviderModelForm({
               </div>
             </section>
 
-            <section className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+            <section className="rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <p className="text-xs font-medium text-black/80">Playground 示例输入图</p>
                 <span className="text-[11px] text-black/45">图片编辑模型 demo 用</span>
               </div>
               {defaultPlaygroundInputUrl ? (
-                <div className="rounded-lg border border-black/[0.08] bg-white p-3">
+                <div className="rounded-lg border border-[#BAE6FD] bg-white p-3">
                   <p className="mb-2 text-[11px] text-black/55">已上传示例输入图</p>
                   {defaultPlaygroundInputAssetId ? (
                     <input type="hidden" name="existingPlaygroundInputAssetId" value={defaultPlaygroundInputAssetId} />
@@ -3369,7 +3568,7 @@ export function CreateProviderModelForm({
                     <img
                       src={defaultPlaygroundInputUrl}
                       alt="Current playground input"
-                      className="h-28 w-28 rounded-lg border border-black/[0.08] object-cover"
+                      className="h-28 w-28 rounded-lg border border-[#BAE6FD] object-cover"
                     />
                     <div>
                       <label className="block">
@@ -3391,7 +3590,7 @@ export function CreateProviderModelForm({
                   </div>
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-black/[0.12] bg-white p-3 text-xs text-black/50">
+                <div className="rounded-lg border border-dashed border-[#7DD3FC]/45 bg-white p-3 text-xs text-black/50">
                   暂无 Playground 示例输入图
                 </div>
               )}
@@ -3419,9 +3618,77 @@ export function CreateProviderModelForm({
                   />
                 </label>
               </div>
+
+              <div className="mt-4 rounded-lg border border-[#BAE6FD] bg-white p-3">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-black/80">face_image 示例输入图</p>
+                  <span className="text-[11px] text-black/45">搭配 face_image 字段自动填充</span>
+                </div>
+                {defaultFacePlaygroundInputUrl ? (
+                  <div className="rounded-lg border border-[#BAE6FD] bg-[#F8FCFF] p-3">
+                    <p className="mb-2 text-[11px] text-black/55">已上传 face_image 示例图</p>
+                    {defaultFacePlaygroundInputAssetId ? (
+                      <input type="hidden" name="existingFacePlaygroundInputAssetId" value={defaultFacePlaygroundInputAssetId} />
+                    ) : null}
+                    <div className="grid gap-3 md:grid-cols-[132px_1fr]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={defaultFacePlaygroundInputUrl}
+                        alt="Current face_image playground input"
+                        className="h-28 w-28 rounded-lg border border-[#BAE6FD] object-cover"
+                      />
+                      <div>
+                        <label className="block">
+                          <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">face_image 示例说明</span>
+                          <textarea
+                            name="existingFacePlaygroundInputPrompt"
+                            defaultValue={defaultFacePlaygroundInputPrompt}
+                            disabled={disabled}
+                            className={formTextAreaClassName}
+                            rows={4}
+                            placeholder="说明这张 face_image 适合怎么搭配主图使用"
+                          />
+                        </label>
+                        <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#B54432]">
+                          <input type="checkbox" name="removeFacePlaygroundInput" className="size-3.5" />
+                          删除当前 face_image 示例图
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] p-3 text-xs text-black/50">
+                    暂无 face_image 示例输入图
+                  </div>
+                )}
+
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上传 face_image 示例图（单张）</span>
+                    <input
+                      type="file"
+                      name="facePlaygroundInputFile"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      onChange={(event) => setSelectedFacePlaygroundInputFileName(event.target.files?.[0]?.name ?? "")}
+                      className="block w-full text-xs text-black/65 file:mr-3 file:rounded-md file:border-0 file:bg-black file:px-3 file:py-2 file:text-xs file:font-medium file:text-white hover:file:bg-black/90"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">新 face_image 示例说明</span>
+                    <textarea
+                      name="facePlaygroundInputPrompt"
+                      defaultValue=""
+                      disabled={disabled}
+                      className={formTextAreaClassName}
+                      rows={5}
+                      placeholder="例如：这张图会自动填入 face_image，与主输入图搭配使用。"
+                    />
+                  </label>
+                </div>
+              </div>
             </section>
 
-            <section className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+            <section className="rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <p className="text-xs font-medium text-black/80">作品素材区域</p>
                 <span className="text-[11px] text-black/45">{defaultShowcaseGalleryUrls.length} 张已上传</span>
@@ -3429,7 +3696,7 @@ export function CreateProviderModelForm({
               {defaultShowcaseGalleryUrls.length > 0 ? (
                 <div className="space-y-2">
                   {defaultShowcaseGalleryUrls.map((url, index) => (
-                    <div key={url} className="rounded-lg border border-black/[0.08] bg-white p-3">
+                    <div key={url} className="rounded-lg border border-[#BAE6FD] bg-white p-3">
                       {defaultShowcaseGalleryAssetIds[index] ? (
                         <input
                           type="hidden"
@@ -3443,7 +3710,7 @@ export function CreateProviderModelForm({
                         <img
                           src={url}
                           alt="Current showcase asset"
-                          className="h-20 w-20 rounded-lg border border-black/[0.08] object-cover"
+                          className="h-20 w-20 rounded-lg border border-[#BAE6FD] object-cover"
                         />
                         <div>
                           <label className="block">
@@ -3474,7 +3741,7 @@ export function CreateProviderModelForm({
                   ))}
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-black/[0.12] bg-white p-3 text-xs text-black/50">
+                <div className="rounded-lg border border-dashed border-[#7DD3FC]/45 bg-white p-3 text-xs text-black/50">
                   暂无作品素材图
                 </div>
               )}
@@ -3514,11 +3781,12 @@ export function CreateProviderModelForm({
               </div>
             </section>
 
-            <div className="rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-3">
+            <div className="rounded-lg border border-[#BAE6FD] bg-[#F8FCFF] p-3">
               <p className="mb-2 text-[11px] text-black/55">本次待上传</p>
               <ShowcaseUploadStatus
                 coverFileName={selectedCoverFileName}
                 playgroundInputFileName={selectedPlaygroundInputFileName}
+                facePlaygroundInputFileName={selectedFacePlaygroundInputFileName}
                 galleryFileNames={selectedGalleryFileNames}
               />
             </div>
@@ -3532,7 +3800,7 @@ export function CreateProviderModelForm({
           <SubmitButton
             label={submitLabel}
             pendingLabel={
-              selectedCoverFileName || selectedPlaygroundInputFileName || selectedGalleryFileNames.length > 0
+              selectedCoverFileName || selectedPlaygroundInputFileName || selectedFacePlaygroundInputFileName || selectedGalleryFileNames.length > 0
                 ? "上传并保存中..."
                 : "保存中..."
             }
@@ -3620,7 +3888,7 @@ export function CreateRoutingRuleForm({
                     : "请先创建可售模型"
                 }
                 readOnly
-                className="h-10 w-full rounded-md border border-black/[0.08] bg-black/[0.03] px-3 text-sm text-black/60 outline-none"
+                className="h-10 w-full rounded-md border border-[#BAE6FD] bg-black/[0.03] px-3 text-sm text-black/60 outline-none"
               />
               <input type="hidden" name="supportedModelId" value={supportedModelId} />
             </>
@@ -3651,7 +3919,7 @@ export function CreateRoutingRuleForm({
           <input
             value={capabilityLabel(selectedSupportedModel?.capability ?? null)}
             readOnly
-            className="h-10 w-full rounded-md border border-black/[0.08] bg-black/[0.03] px-3 text-sm text-black/60 outline-none"
+            className="h-10 w-full rounded-md border border-[#BAE6FD] bg-black/[0.03] px-3 text-sm text-black/60 outline-none"
           />
           <input
             type="hidden"
@@ -3779,18 +4047,24 @@ function FormAutoClose({
 function ShowcaseUploadStatus({
   coverFileName,
   playgroundInputFileName,
+  facePlaygroundInputFileName,
   galleryFileNames,
 }: {
   coverFileName: string;
   playgroundInputFileName: string;
+  facePlaygroundInputFileName: string;
   galleryFileNames: string[];
 }) {
   const { pending } = useFormStatus();
-  const hasSelectedFiles = Boolean(coverFileName) || Boolean(playgroundInputFileName) || galleryFileNames.length > 0;
+  const hasSelectedFiles =
+    Boolean(coverFileName) ||
+    Boolean(playgroundInputFileName) ||
+    Boolean(facePlaygroundInputFileName) ||
+    galleryFileNames.length > 0;
 
   if (pending && hasSelectedFiles) {
     return (
-      <div className="rounded-xl border border-[#F3D9B4] bg-[#FFF8EC] px-3 py-2.5 text-xs leading-5 text-[#8A4B16]">
+      <div className="rounded-xl border border-[#BAE6FD] bg-[#F0F9FF] px-3 py-2.5 text-xs leading-5 text-[#075985]">
         正在上传素材图并保存配置。当前提交流程会在完成后一次性返回，所以这里不显示百分比进度。
       </div>
     );
@@ -3798,7 +4072,7 @@ function ShowcaseUploadStatus({
 
   if (!hasSelectedFiles) {
     return (
-      <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] px-3 py-2.5 text-xs leading-5 text-black/55">
+      <div className="rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] px-3 py-2.5 text-xs leading-5 text-black/55">
         图片会在点击保存后，随整张表单一起上传到 Supabase Storage；现在不是选中文件后立即上传。
       </div>
     );
@@ -3809,6 +4083,7 @@ function ShowcaseUploadStatus({
       已选择待上传素材：
       {coverFileName ? ` 封面 1 张（${coverFileName}）` : ""}
       {playgroundInputFileName ? ` Playground 示例 1 张（${playgroundInputFileName}）` : ""}
+      {facePlaygroundInputFileName ? ` face_image 示例 1 张（${facePlaygroundInputFileName}）` : ""}
       {galleryFileNames.length > 0
         ? ` 作品图 ${galleryFileNames.length} 张（${galleryFileNames.join("、")}）`
         : ""}

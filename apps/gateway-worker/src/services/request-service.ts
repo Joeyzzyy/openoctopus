@@ -19,8 +19,12 @@ type ProviderCredentialRow = {
 
 export type UnifiedRequestInput = {
   apiKey: string;
-  endpoint: "/v1/images/generations" | "/v1/images/edits" | "/v1/videos/generations";
-  capability: "image_generation" | "image_edit" | "video_generation";
+  endpoint:
+    | "/v1/images/generations"
+    | "/v1/images/edits"
+    | "/v1/images/recognitions"
+    | "/v1/videos/generations";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
   requestSource?: "api" | "playground";
   model: string;
   prompt?: string;

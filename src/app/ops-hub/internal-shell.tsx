@@ -69,8 +69,8 @@ export function InternalShell({
             }}
             className={`block rounded-lg border px-2.5 py-2 transition-colors ${
               active
-                ? "border-[#111827] bg-[#111827] text-white"
-                : "border-black/[0.08] bg-[#FCFCFA] text-black/75 hover:bg-white"
+                ? "border-[#0284C7] bg-[#0284C7] text-white"
+                : "border-[#BAE6FD] bg-[#F8FCFF] text-[#075985] hover:bg-[#E0F2FE]"
             }`}
           >
             <div className="min-w-0">
@@ -86,16 +86,16 @@ export function InternalShell({
     <div className="grid gap-4 lg:grid-cols-[244px_minmax(0,1fr)]">
       <aside className="lg:sticky lg:top-5 lg:self-start">
         <div className="space-y-2.5">
-          <div className="rounded-xl border border-black/[0.08] bg-white p-2.5 shadow-sm">
-            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-black/45">静态配置</p>
+          <div className="rounded-xl border border-[#BAE6FD] bg-white p-2.5 shadow-sm">
+            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-[#64748B]">静态配置</p>
             {renderTabs(staticTabs)}
           </div>
-          <div className="rounded-xl border border-black/[0.08] bg-white p-2.5 shadow-sm">
-            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-black/45">动态配置</p>
+          <div className="rounded-xl border border-[#BAE6FD] bg-white p-2.5 shadow-sm">
+            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-[#64748B]">动态配置</p>
             {renderTabs(dynamicTabs)}
           </div>
-          <div className="rounded-xl border border-black/[0.08] bg-white p-2.5 shadow-sm">
-            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-black/45">总览数据</p>
+          <div className="rounded-xl border border-[#BAE6FD] bg-white p-2.5 shadow-sm">
+            <p className="mb-1.5 px-1 text-[11px] tracking-[0.3px] text-[#64748B]">总览数据</p>
             {renderTabs(overviewTabs)}
           </div>
         </div>
@@ -103,10 +103,10 @@ export function InternalShell({
 
       <div className="relative min-w-0">
         {isPending ? (
-          <div className="absolute inset-0 z-20 flex items-start justify-center rounded-2xl border border-black/[0.08] bg-[rgba(252,252,250,0.72)] px-6 py-24 backdrop-blur-[2px]">
-            <div className="rounded-xl border border-black/[0.08] bg-white px-4 py-3 shadow-[0_18px_40px_rgba(17,24,39,0.06)]">
+          <div className="absolute inset-0 z-20 flex items-start justify-center rounded-2xl border border-[#BAE6FD] bg-[rgba(248,252,255,0.78)] px-6 py-24 backdrop-blur-[2px]">
+            <div className="rounded-xl border border-[#BAE6FD] bg-white px-4 py-3 shadow-[0_18px_40px_rgba(14,165,233,0.08)]">
               <div className="flex items-center gap-3 text-sm text-black/70">
-                <span className="inline-flex size-4 animate-spin rounded-full border-2 border-black/15 border-t-black" />
+                <span className="inline-flex size-4 animate-spin rounded-full border-2 border-sky-200 border-t-[#0284C7]" />
                 正在加载当前分区...
               </div>
             </div>

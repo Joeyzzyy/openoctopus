@@ -36,14 +36,14 @@ export function ExploreHero() {
               className="inline-flex items-center gap-1.5 rounded-[4px] border border-black/10 bg-white px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[1.1px] text-[#111111] transition-colors hover:bg-black/[0.03]"
             >
               Image Generator
-              <Flame className="h-3.5 w-3.5 text-orange-400" />
+              <Flame className="h-3.5 w-3.5 text-sky-400" />
             </Link>
             <Link
               href="/models"
               className="inline-flex items-center gap-1.5 rounded-[4px] border border-black/10 bg-white px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[1.1px] text-[#111111] transition-colors hover:bg-black/[0.03]"
             >
               Video Generator
-              <Flame className="h-3.5 w-3.5 text-orange-400" />
+              <Flame className="h-3.5 w-3.5 text-sky-400" />
             </Link>
           </div>
         </FadeIn>

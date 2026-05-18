@@ -24,7 +24,7 @@ const FOOTER_SECTIONS = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-white/10 bg-[#0C0A09] py-16 md:px-20 md:pt-20">
+    <footer className="border-t border-white/10 bg-[#06131F] py-16 md:px-20 md:pt-20">
       <div className="mx-auto w-full max-w-7xl px-5 xl:px-0">
         <FadeIn>
           <div className="flex w-full flex-col items-start justify-between gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-center">

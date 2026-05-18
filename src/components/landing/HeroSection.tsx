@@ -55,9 +55,9 @@ export function HeroSection() {
         <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-4xl mx-auto">
           {[
             "from-blue-500/20 to-purple-500/20",
-            "from-pink-500/20 to-orange-500/20",
+            "from-sky-400/20 to-cyan-500/20",
             "from-green-500/20 to-teal-500/20",
-            "from-yellow-500/20 to-red-500/20",
+            "from-cyan-300/20 to-blue-500/20",
           ].map((gradient, i) => (
             <div
               key={i}

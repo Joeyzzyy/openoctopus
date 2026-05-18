@@ -20,11 +20,13 @@ const providerStatusSchema = z.enum(["healthy", "degraded", "offline"]);
 const capabilitySchema = z.enum([
   "image_generation",
   "image_edit",
+  "image_recognition",
   "video_generation",
 ]);
-const modalitySchema = z.enum(["image", "video", "audio"]);
+const modalitySchema = z.enum(["image", "video", "audio", "text"]);
 const modelVendorNameSchema = z.string().trim().min(2).max(80);
 const MODEL_SHOWCASE_BUCKET = "model-showcase-assets";
+const FACE_PLAYGROUND_INPUT_MARKER = "[[playground_input:face_image]]";
 
 function normalizeOptionalText(value: FormDataEntryValue | null) {
   if (typeof value !== "string") {
@@ -71,6 +73,24 @@ function sanitizePathPart(value: string) {
     .slice(0, 48) || "asset";
 }
 
+function slugifyPublicPathPart(value: string | null | undefined) {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function revalidateModelPages(provider: RuntimeProvider | null, publicModelSlug: string) {
+  revalidatePath("/models");
+
+  const providerPathPart = slugifyPublicPathPart(provider?.name ?? provider?.slug);
+  const modelPathPart = slugifyPublicPathPart(publicModelSlug);
+  if (providerPathPart && modelPathPart) {
+    revalidatePath(`/models/${providerPathPart}/${modelPathPart}`);
+  }
+}
+
 function inferImageExtension(file: File) {
   const fromType =
     file.type === "image/png"
@@ -88,6 +108,14 @@ function inferImageExtension(file: File) {
     return fromName === "jpeg" ? "jpg" : fromName;
   }
   return "png";
+}
+
+function encodeFacePlaygroundPrompt(prompt: string | null) {
+  return prompt ? `${FACE_PLAYGROUND_INPUT_MARKER}\n${prompt}` : FACE_PLAYGROUND_INPUT_MARKER;
+}
+
+function isFacePlaygroundInputRow(row: { asset_kind: string; alt_text: string | null }) {
+  return row.asset_kind === "gallery" && row.alt_text?.startsWith(FACE_PLAYGROUND_INPUT_MARKER);
 }
 
 async function uploadShowcaseImage(input: {
@@ -141,6 +169,11 @@ async function syncProviderModelShowcaseAssets(input: {
   existingPlaygroundInputAssetId: string | null;
   existingPlaygroundInputPrompt: string | null;
   removePlaygroundInput: boolean;
+  facePlaygroundInputFile: File | null;
+  facePlaygroundInputPrompt: string | null;
+  existingFacePlaygroundInputAssetId: string | null;
+  existingFacePlaygroundInputPrompt: string | null;
+  removeFacePlaygroundInput: boolean;
   galleryFiles: File[];
   galleryPrompts: string[];
   existingGalleryPromptUpdates: Array<{ id: string; prompt: string | null }>;
@@ -162,7 +195,9 @@ async function syncProviderModelShowcaseAssets(input: {
   const existingCover = existing.filter((row) => row.asset_kind === "cover");
   const existingPlaygroundInput = existing.filter((row) => row.asset_kind === "playground_input");
   const existingGallery = existing.filter((row) => row.asset_kind === "gallery");
-  const existingGalleryById = new Map(existingGallery.map((row) => [row.id, row]));
+  const facePlaygroundInput = existingGallery.filter(isFacePlaygroundInputRow);
+  const regularGallery = existingGallery.filter((row) => !isFacePlaygroundInputRow(row));
+  const existingGalleryById = new Map(regularGallery.map((row) => [row.id, row]));
 
   const deleteRows = async (
     rows: Array<{
@@ -199,6 +234,10 @@ async function syncProviderModelShowcaseAssets(input: {
 
   if (input.removePlaygroundInput || input.playgroundInputFile) {
     await deleteRows(existingPlaygroundInput);
+  }
+
+  if (input.removeFacePlaygroundInput || input.facePlaygroundInputFile) {
+    await deleteRows(facePlaygroundInput);
   }
 
   if (!input.removeCover && !input.coverFile && input.existingCoverAssetId) {
@@ -238,13 +277,37 @@ async function syncProviderModelShowcaseAssets(input: {
     }
   }
 
-  if (input.replaceGallery && existingGallery.length > 0) {
-    await deleteRows(existingGallery);
+  if (
+    !input.removeFacePlaygroundInput &&
+    !input.facePlaygroundInputFile &&
+    input.existingFacePlaygroundInputAssetId
+  ) {
+    const facePlaygroundInputPrompt = input.existingFacePlaygroundInputPrompt?.trim() || null;
+    const encodedPrompt = encodeFacePlaygroundPrompt(facePlaygroundInputPrompt);
+    const existingFacePlaygroundInputRow = facePlaygroundInput.find(
+      (row) => row.id === input.existingFacePlaygroundInputAssetId
+    );
+    if (
+      existingFacePlaygroundInputRow &&
+      (existingFacePlaygroundInputRow.alt_text ?? null) !== encodedPrompt
+    ) {
+      const { error } = await input.supabase
+        .from("provider_model_showcase_assets")
+        .update({ alt_text: encodedPrompt })
+        .eq("id", existingFacePlaygroundInputRow.id);
+      if (error) {
+        throw new Error(error.message);
+      }
+    }
+  }
+
+  if (input.replaceGallery && regularGallery.length > 0) {
+    await deleteRows(regularGallery);
   }
 
   if (!input.replaceGallery && input.deleteGalleryAssetIds.length > 0) {
     await deleteRows(
-      existingGallery.filter((row) => input.deleteGalleryAssetIds.includes(row.id))
+      regularGallery.filter((row) => input.deleteGalleryAssetIds.includes(row.id))
     );
   }
 
@@ -302,10 +365,29 @@ async function syncProviderModelShowcaseAssets(input: {
     }
   }
 
+  if (input.facePlaygroundInputFile) {
+    const uploaded = await uploadShowcaseImage({
+      supabase: input.supabase,
+      providerModelId: input.providerModelId,
+      file: input.facePlaygroundInputFile,
+      kind: "gallery",
+    });
+    const { error } = await input.supabase.from("provider_model_showcase_assets").insert({
+      provider_model_id: input.providerModelId,
+      asset_kind: "gallery",
+      ...uploaded,
+      alt_text: encodeFacePlaygroundPrompt(input.facePlaygroundInputPrompt),
+      sort_order: -1,
+    });
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
   if (input.galleryFiles.length > 0) {
     const remainingGallery = input.replaceGallery
       ? []
-      : existingGallery.filter((row) => !input.deleteGalleryAssetIds.includes(row.id));
+      : regularGallery.filter((row) => !input.deleteGalleryAssetIds.includes(row.id));
     const nextSortOrder = input.replaceGallery
       ? 0
       : remainingGallery.reduce((max, row) => Math.max(max, Number(row.sort_order ?? 0)), -1) + 1;
@@ -1951,7 +2033,8 @@ export async function createSupportedModel(formData: FormData) {
 
   const invalidCapabilityForModality =
     (parsed.modality === "image" &&
-      !["image_generation", "image_edit"].includes(parsed.capability)) ||
+      !["image_generation", "image_edit", "image_recognition"].includes(parsed.capability)) ||
+    (parsed.modality === "text" && parsed.capability !== "image_recognition") ||
     (parsed.modality === "video" && parsed.capability !== "video_generation");
 
   if (invalidCapabilityForModality) {
@@ -2139,7 +2222,8 @@ export async function updateSupportedModelDetails(formData: FormData) {
 
   const invalidCapabilityForModality =
     (parsed.modality === "image" &&
-      !["image_generation", "image_edit"].includes(parsed.capability)) ||
+      !["image_generation", "image_edit", "image_recognition"].includes(parsed.capability)) ||
+    (parsed.modality === "text" && parsed.capability !== "image_recognition") ||
     (parsed.modality === "video" && parsed.capability !== "video_generation");
 
   if (invalidCapabilityForModality) {
@@ -2331,6 +2415,9 @@ export async function createProviderModel(formData: FormData) {
     const playgroundInputFile = isNonEmptyFile(formData.get("playgroundInputFile"))
       ? (formData.get("playgroundInputFile") as File)
       : null;
+    const facePlaygroundInputFile = isNonEmptyFile(formData.get("facePlaygroundInputFile"))
+      ? (formData.get("facePlaygroundInputFile") as File)
+      : null;
     const showcaseGalleryFiles = formData
       .getAll("showcaseGalleryFiles")
       .filter((value): value is File => isNonEmptyFile(value));
@@ -2342,6 +2429,7 @@ export async function createProviderModel(formData: FormData) {
       .filter((value): value is string => typeof value === "string");
     const removeShowcaseCover = parseBooleanField(formData.get("removeShowcaseCover"));
     const removePlaygroundInput = parseBooleanField(formData.get("removePlaygroundInput"));
+    const removeFacePlaygroundInput = parseBooleanField(formData.get("removeFacePlaygroundInput"));
     const replaceShowcaseGallery = parseBooleanField(formData.get("replaceShowcaseGallery"));
     const parsed = createProviderModelSchema.parse({
       providerId: formData.get("providerId"),
@@ -2450,6 +2538,11 @@ export async function createProviderModel(formData: FormData) {
         existingPlaygroundInputAssetId: normalizeOptionalText(formData.get("existingPlaygroundInputAssetId")),
         existingPlaygroundInputPrompt: normalizeOptionalText(formData.get("existingPlaygroundInputPrompt")),
         removePlaygroundInput,
+        facePlaygroundInputFile,
+        facePlaygroundInputPrompt: normalizeOptionalText(formData.get("facePlaygroundInputPrompt")),
+        existingFacePlaygroundInputAssetId: normalizeOptionalText(formData.get("existingFacePlaygroundInputAssetId")),
+        existingFacePlaygroundInputPrompt: normalizeOptionalText(formData.get("existingFacePlaygroundInputPrompt")),
+        removeFacePlaygroundInput,
         galleryFiles: showcaseGalleryFiles,
         galleryPrompts:
           normalizeOptionalText(formData.get("showcaseGalleryPromptsText"))
@@ -2482,6 +2575,7 @@ export async function createProviderModel(formData: FormData) {
     });
 
     revalidatePath("/ops-hub");
+    revalidateModelPages(provider, supportedModelRow.model_slug);
   } catch (error) {
     const message = error instanceof Error ? error.message : "保存失败，请稍后重试。";
     redirect(
@@ -2575,6 +2669,7 @@ export async function updateProviderModelState(formData: FormData) {
   });
 
   revalidatePath("/ops-hub");
+  revalidatePath("/models");
 }
 
 const updateProviderModelDetailsSchema = z.object({
@@ -2599,6 +2694,9 @@ export async function updateProviderModelDetails(formData: FormData) {
   const playgroundInputFile = isNonEmptyFile(formData.get("playgroundInputFile"))
     ? (formData.get("playgroundInputFile") as File)
     : null;
+  const facePlaygroundInputFile = isNonEmptyFile(formData.get("facePlaygroundInputFile"))
+    ? (formData.get("facePlaygroundInputFile") as File)
+    : null;
   const showcaseGalleryFiles = formData
     .getAll("showcaseGalleryFiles")
     .filter((value): value is File => isNonEmptyFile(value));
@@ -2610,6 +2708,7 @@ export async function updateProviderModelDetails(formData: FormData) {
     .filter((value): value is string => typeof value === "string");
   const removeShowcaseCover = parseBooleanField(formData.get("removeShowcaseCover"));
   const removePlaygroundInput = parseBooleanField(formData.get("removePlaygroundInput"));
+  const removeFacePlaygroundInput = parseBooleanField(formData.get("removeFacePlaygroundInput"));
   const replaceShowcaseGallery = parseBooleanField(formData.get("replaceShowcaseGallery"));
   const parsed = updateProviderModelDetailsSchema.parse({
     providerModelId: formData.get("providerModelId"),
@@ -2717,6 +2816,11 @@ export async function updateProviderModelDetails(formData: FormData) {
     existingPlaygroundInputAssetId: normalizeOptionalText(formData.get("existingPlaygroundInputAssetId")),
     existingPlaygroundInputPrompt: normalizeOptionalText(formData.get("existingPlaygroundInputPrompt")),
     removePlaygroundInput,
+    facePlaygroundInputFile,
+    facePlaygroundInputPrompt: normalizeOptionalText(formData.get("facePlaygroundInputPrompt")),
+    existingFacePlaygroundInputAssetId: normalizeOptionalText(formData.get("existingFacePlaygroundInputAssetId")),
+    existingFacePlaygroundInputPrompt: normalizeOptionalText(formData.get("existingFacePlaygroundInputPrompt")),
+    removeFacePlaygroundInput,
     galleryFiles: showcaseGalleryFiles,
     galleryPrompts:
       normalizeOptionalText(formData.get("showcaseGalleryPromptsText"))
@@ -2748,6 +2852,7 @@ export async function updateProviderModelDetails(formData: FormData) {
   });
 
   revalidatePath("/ops-hub");
+  revalidateModelPages(provider, supportedModelRow.model_slug);
 }
 
 const deleteProviderModelSchema = z.object({

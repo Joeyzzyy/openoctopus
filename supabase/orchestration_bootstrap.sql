@@ -16,7 +16,7 @@ begin
   if not exists (
     select 1 from pg_type where typname = 'request_capability'
   ) then
-    create type public.request_capability as enum ('image_generation', 'image_edit', 'video_generation');
+    create type public.request_capability as enum ('image_generation', 'image_edit', 'image_recognition', 'video_generation');
   end if;
 
   if not exists (

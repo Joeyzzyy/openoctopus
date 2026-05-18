@@ -1,7 +1,7 @@
 create table if not exists public.provider_capability_execution_configs (
   id uuid primary key default gen_random_uuid(),
   provider_id uuid not null references public.providers(id) on delete cascade,
-  capability text not null check (capability in ('image_generation', 'image_edit', 'video_generation')),
+  capability text not null check (capability in ('image_generation', 'image_edit', 'image_recognition', 'video_generation')),
   execution_template text not null,
   execution_config jsonb not null default '{}'::jsonb,
   active boolean not null default true,

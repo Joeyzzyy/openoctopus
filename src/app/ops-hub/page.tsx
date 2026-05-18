@@ -100,6 +100,7 @@ type InternalTabKey = (typeof tabs)[number]["key"];
 const capabilityOptions = [
   { value: "image_generation", label: "图片生成" },
   { value: "image_edit", label: "图片编辑" },
+  { value: "image_recognition", label: "图片识别" },
   { value: "video_generation", label: "视频生成" },
 ] as const;
 
@@ -471,7 +472,7 @@ function OverviewCard({
   note: string;
 }) {
   return (
-    <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] px-3 py-2.5 shadow-sm">
+    <div className="rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] px-3 py-2.5 shadow-sm">
       <div className="min-w-0">
         <p className="text-[11px] tracking-[0.35px] text-black/60">{title}</p>
         <p className="text-lg font-medium tracking-tight text-black">{value}</p>
@@ -495,7 +496,7 @@ function SectionShell({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+    <section id={id} className="rounded-2xl border border-[#BAE6FD] bg-white p-4 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-black">{title}</h2>
@@ -516,7 +517,7 @@ function EmptyState({
   detail: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+    <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
       <p className="text-sm font-medium text-black">{title}</p>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">{detail}</p>
     </div>
@@ -549,7 +550,7 @@ function MonitoringChartCard({
   const maxValue = Math.max(...points, 1);
 
   return (
-    <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-[#BAE6FD] bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <p className="break-all text-sm font-medium text-black">{title}</p>
@@ -564,7 +565,7 @@ function MonitoringChartCard({
           <div className="inline-flex items-center gap-2 rounded-md border border-[#F0D1CB] bg-[#FFF1EE] px-2.5 py-1 text-[11px] text-[#B54432]">
             <span>失败率 {failureRate}</span>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-md border border-black/[0.08] bg-[#FCFCFA] px-2.5 py-1 text-[11px] text-black/60">
+          <div className="inline-flex items-center gap-2 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-2.5 py-1 text-[11px] text-black/60">
             <span>峰值 {maxValue}</span>
           </div>
         </div>
@@ -575,7 +576,7 @@ function MonitoringChartCard({
         <span>进行中 {inflightCount}</span>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
+      <div className="mt-4 rounded-2xl border border-[#DDF4FF] bg-[#F8FCFF] p-3">
         <MonitoringLineChart title={title} points={points} labels={labels} />
       </div>
     </div>
@@ -626,14 +627,14 @@ function UnifiedTaskCard({
     request.startedLabel ?? (request.status === "failed" ? "未开始（提交失败）" : "等待中");
 
   return (
-    <article className="rounded-xl border border-black/[0.08] bg-white px-3 py-3">
+    <article className="rounded-xl border border-[#BAE6FD] bg-white px-3 py-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
                 inflight
-                  ? "border-[#F2DEC0] bg-[#FFF3E2] text-[#9A5A00]"
+                  ? "border-[#BAE6FD] bg-[#E0F2FE] text-[#0369A1]"
                   : request.status === "succeeded"
                     ? "border-[#D7EADB] bg-[#EDF8F0] text-[#1F6B3B]"
                     : "border-[#F0D1CB] bg-[#FFF1EE] text-[#B54432]"
@@ -641,10 +642,10 @@ function UnifiedTaskCard({
             >
               {request.status}
             </span>
-            <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
+            <span className="inline-flex h-6 items-center rounded-md border border-[#BAE6FD] bg-[#E0F2FE] px-2 text-[11px] text-[#0369A1]">
               {request.capability}
             </span>
-            <span className="inline-flex h-6 items-center rounded-md border border-black/[0.08] bg-white px-2 text-[11px] text-black/55">
+            <span className="inline-flex h-6 items-center rounded-md border border-[#BAE6FD] bg-white px-2 text-[11px] text-black/55">
               {request.createdLabel}
             </span>
           </div>
@@ -676,7 +677,7 @@ function UnifiedTaskCard({
           ) : null}
         </div>
 
-        <div className="rounded-md border border-black/[0.06] bg-[#FCFCFA] px-2.5 py-1.5 text-[11px] text-black/55">
+        <div className="rounded-md border border-[#DDF4FF] bg-[#F8FCFF] px-2.5 py-1.5 text-[11px] text-black/55">
           <span className="font-medium text-black/60">请求 ID：</span>
           <span className="font-mono">{request.id}</span>
         </div>
@@ -696,9 +697,9 @@ function UnifiedTaskCard({
         </div>
       ) : null}
 
-      <div className="mt-3 rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5">
+      <div className="mt-3 rounded-lg border border-[#DDF4FF] bg-[#F8FCFF] px-3 py-2.5">
           {attempt ? (
-            <div className="mt-3 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-xs">
+            <div className="mt-3 rounded-lg border border-[#DDF4FF] bg-white px-3 py-2 text-xs">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-black/58">最后一次尝试 #{attempt.attemptNo}</span>
                 <span className="text-black/50">{attempt.updatedLabel ?? "等待中"}</span>
@@ -720,7 +721,7 @@ function UnifiedTaskCard({
           ) : null}
 
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            <details className="rounded-lg border border-black/[0.06] bg-white px-3 py-2">
+            <details className="rounded-lg border border-[#DDF4FF] bg-white px-3 py-2">
               <summary className="cursor-pointer list-none text-[11px] font-medium uppercase tracking-[0.5px] text-black/55">
                 上游完整返回
               </summary>
@@ -728,7 +729,7 @@ function UnifiedTaskCard({
                 {request.upstreamRawText ?? "null"}
               </pre>
             </details>
-            <details className="rounded-lg border border-black/[0.06] bg-white px-3 py-2">
+            <details className="rounded-lg border border-[#DDF4FF] bg-white px-3 py-2">
               <summary className="cursor-pointer list-none text-[11px] font-medium uppercase tracking-[0.5px] text-black/55">
                 对客返回 JSON
               </summary>
@@ -926,38 +927,22 @@ export default async function InternalPage({
     monitoringStatusOptions.find((option) => option.value === selectedMonitoringStatus)?.label ??
     "全部请求";
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-[#FCFCFA] text-[#111111]">
-      <header className="fixed left-0 right-0 top-0 z-50 w-full border-b border-black/[0.06] bg-[#FCFCFA]/95 backdrop-blur-xl">
+    <main className="relative min-h-screen overflow-x-hidden bg-[#F8FCFF] text-[#111111]">
+      <header className="fixed left-0 right-0 top-0 z-50 w-full border-b border-[#BAE6FD] bg-[#F8FCFF]">
         <div className="mx-auto flex h-14 w-full max-w-[1960px] items-center px-3 xl:px-4">
           <div className="relative flex w-full items-center text-sm md:text-base">
             <Link
               href="/"
-              className="-ml-2 rounded-md px-2 py-1.5 text-[#6B7280] transition-colors hover:bg-black/[0.03] hover:text-[#111827]"
+              className="-ml-2 rounded-md px-2 py-1.5 text-[#475569] transition-colors hover:bg-[#E0F2FE] hover:text-[#075985]"
             >
               <Logo className="text-[#111827]" />
             </Link>
-            <span className="ml-3 inline-flex items-center rounded-md border border-black/[0.08] bg-white px-2.5 py-1 text-[12px] font-medium text-black/65">
+            <span className="ml-3 inline-flex items-center rounded-md border border-[#BAE6FD] bg-white px-2.5 py-1 text-[12px] font-medium text-[#075985]">
               内部控制台
             </span>
           </div>
         </div>
       </header>
-      <div
-        className="pointer-events-none fixed inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at top, rgba(243, 226, 201, 0.52), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(252,252,250,1) 46%)",
-        }}
-      />
-      <div
-        className="pointer-events-none fixed inset-x-0 top-0 h-[360px] opacity-45"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(17,24,39,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(17,24,39,0.035) 1px, transparent 1px)",
-          backgroundSize: "44px 44px",
-          maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)",
-        }}
-      />
 
       <div className="relative mx-auto w-full max-w-[1960px] px-3 pb-10 pt-[72px] xl:px-4">
         <section className="min-h-[calc(100vh-108px)] py-4">
@@ -1108,7 +1093,7 @@ export default async function InternalPage({
 
                 {activeTab === "monitoring-overview" ? (
                   <>
-                    <div className="mb-4 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3">
+                    <div className="mb-4 rounded-2xl border border-[#DDF4FF] bg-[#F8FCFF] p-3">
                       <div className="grid gap-3 lg:grid-cols-4">
                         <div>
                           <p className="text-[11px] tracking-[0.35px] text-black/45">时间粒度</p>
@@ -1126,7 +1111,7 @@ export default async function InternalPage({
                                 className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
                                   selectedMonitoringInterval === option.value
                                     ? "border-black bg-black text-white"
-                                    : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                                    : "border-[#BAE6FD] bg-white text-black/72 hover:bg-[#E0F2FE]"
                                 }`}
                               >
                                 {option.label}
@@ -1151,7 +1136,7 @@ export default async function InternalPage({
                                 className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
                                   selectedMonitoringRange === option.value
                                     ? "border-black bg-black text-white"
-                                    : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                                    : "border-[#BAE6FD] bg-white text-black/72 hover:bg-[#E0F2FE]"
                                 }`}
                               >
                                 {option.label}
@@ -1176,7 +1161,7 @@ export default async function InternalPage({
                                 className={`inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
                                   selectedMonitoringStatus === option.value
                                     ? "border-black bg-black text-white"
-                                    : "border-black/10 bg-white text-black/72 hover:bg-black/[0.03]"
+                                    : "border-[#BAE6FD] bg-white text-black/72 hover:bg-[#E0F2FE]"
                                 }`}
                               >
                                 {option.label}
@@ -1197,7 +1182,7 @@ export default async function InternalPage({
                               name="monitoringModel"
                               disabled={monitoringSeries.length === 0}
                               defaultValue={selectedMonitoringModel}
-                              className="h-8 w-full rounded-md border border-black/10 bg-white px-2.5 text-[11px] font-medium text-black/72 outline-none"
+                              className="h-8 w-full rounded-md border border-[#BAE6FD] bg-white px-2.5 text-[11px] font-medium text-black/72 outline-none"
                             >
                               {monitoringSeries.map((series) => (
                                 <option key={series.modelSlug} value={series.modelSlug}>
@@ -1208,7 +1193,7 @@ export default async function InternalPage({
                             <button
                               type="submit"
                               disabled={monitoringSeries.length === 0}
-                              className="h-8 shrink-0 rounded-md border border-black/10 bg-white px-2.5 text-[11px] font-medium text-black/72 hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:text-black/35"
+                              className="h-8 shrink-0 rounded-md border border-[#BAE6FD] bg-white px-2.5 text-[11px] font-medium text-black/72 hover:bg-[#E0F2FE] disabled:cursor-not-allowed disabled:text-black/35"
                             >
                               应用
                             </button>
@@ -1299,7 +1284,7 @@ export default async function InternalPage({
                 ) : null}
 
                 {activeTab === "monitoring-problems" ? (
-                  <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4">
+                  <div className="rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] p-4">
                       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                         <div>
                           <p className="text-sm font-semibold text-black">异常请求快查</p>
@@ -1366,10 +1351,10 @@ export default async function InternalPage({
                                 model: selectedMonitoringModel,
                                 problemRequestPage: Math.max(1, data.problemRequestPagination.page - 1),
                               })}
-                              className={`rounded-md border border-black/10 px-3 py-1.5 ${
+                              className={`rounded-md border border-[#BAE6FD] px-3 py-1.5 ${
                                 data.problemRequestPagination.page <= 1
                                   ? "pointer-events-none text-black/25"
-                                  : "bg-white text-black/65 hover:bg-black/[0.03]"
+                                  : "bg-white text-black/65 hover:bg-[#E0F2FE]"
                               }`}
                             >
                               上一页
@@ -1387,10 +1372,10 @@ export default async function InternalPage({
                                   data.problemRequestPagination.page + 1
                                 ),
                               })}
-                              className={`rounded-md border border-black/10 px-3 py-1.5 ${
+                              className={`rounded-md border border-[#BAE6FD] px-3 py-1.5 ${
                                 data.problemRequestPagination.page >= data.problemRequestPagination.totalPages
                                   ? "pointer-events-none text-black/25"
-                                  : "bg-white text-black/65 hover:bg-black/[0.03]"
+                                  : "bg-white text-black/65 hover:bg-[#E0F2FE]"
                               }`}
                             >
                               下一页

@@ -97,7 +97,7 @@ function SmokeDetailBlock({
   const formattedValue = formatSmokeJson(value);
 
   return (
-    <div className="min-w-0 rounded-lg border border-black/[0.08] bg-white px-3 py-2">
+    <div className="min-w-0 rounded-lg border border-[#BAE6FD] bg-white px-3 py-2">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[11px] font-medium uppercase tracking-[0.35px] text-black/45">
           {title}
@@ -105,7 +105,7 @@ function SmokeDetailBlock({
         <button
           type="button"
           onClick={() => onCopy(formattedValue, copyId)}
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-black/[0.08] bg-white text-black/55 transition-colors hover:bg-black/[0.03] hover:text-black/75"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#BAE6FD] bg-white text-black/55 transition-colors hover:bg-[#E0F2FE] hover:text-black/75"
           aria-label={`复制 ${title}`}
           title={`复制 ${title}`}
         >
@@ -143,7 +143,7 @@ function SmokeImageCell({
       <img
         src={firstAsset.url}
         alt={`${record.caseId} result`}
-        className="h-14 w-14 rounded-md border border-black/[0.08] bg-[#FCFCFA] object-cover"
+        className="h-14 w-14 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] object-cover"
       />
     </button>
   );
@@ -175,8 +175,8 @@ function SmokeModal({
         className="absolute inset-0 cursor-default"
         onClick={onClose}
       />
-      <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-xl border border-black/[0.08] bg-white shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
-        <div className="flex items-start justify-between gap-3 border-b border-black/[0.08] px-4 py-3">
+      <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-xl border border-[#BAE6FD] bg-white shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+        <div className="flex items-start justify-between gap-3 border-b border-[#BAE6FD] px-4 py-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-black">
               {modal.kind === "image" ? "Smoke 输出图片" : "Smoke 请求详情"}
@@ -188,7 +188,7 @@ function SmokeModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-black/[0.08] bg-white text-lg leading-none text-black/60 hover:bg-black/[0.03]"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[#BAE6FD] bg-white text-lg leading-none text-black/60 hover:bg-[#E0F2FE]"
             aria-label="关闭"
           >
             ×
@@ -196,7 +196,7 @@ function SmokeModal({
         </div>
 
         {modal.kind === "image" ? (
-          <div className="flex max-h-[calc(90vh-68px)] items-center justify-center overflow-auto bg-[#F6F8FB] p-4">
+          <div className="flex max-h-[calc(90vh-68px)] items-center justify-center overflow-auto bg-[#F0F9FF] p-4">
             <a href={modal.asset.url} target="_blank" rel="noreferrer">
               <img
                 src={modal.asset.url}
@@ -206,7 +206,7 @@ function SmokeModal({
             </a>
           </div>
         ) : (
-          <div className="max-h-[calc(90vh-68px)] overflow-auto bg-[#FCFCFA] p-4">
+          <div className="max-h-[calc(90vh-68px)] overflow-auto bg-[#F8FCFF] p-4">
             <div className="grid gap-3 lg:grid-cols-2">
               <SmokeDetailBlock
                 title="Request URL"
@@ -285,7 +285,7 @@ function ModelHealthOverview({ records }: { records: ApiSmokeRecord[] }) {
       {models.map((item) => {
         const passed = item.records.filter((record) => record.success).length;
         return (
-          <div key={item.model} className="rounded-lg border border-black/[0.08] bg-white px-3 py-2">
+          <div key={item.model} className="rounded-lg border border-[#BAE6FD] bg-white px-3 py-2">
             <div className="flex items-start justify-between gap-3">
               <p className="min-w-0 break-all font-mono text-[11px] font-medium text-black/70">
                 {item.model}
@@ -317,20 +317,20 @@ export function ApiSmokePanel({ records }: { records: ApiSmokeRecord[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+      <div className="rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
         <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0 flex-1">
             <ModelHealthOverview records={records} />
           </div>
-          <code className="rounded-md border border-black/[0.08] bg-white px-2 py-1 text-[11px] text-black/55">
+          <code className="rounded-md border border-[#BAE6FD] bg-white px-2 py-1 text-[11px] text-black/55">
             npm run smoke:images
           </code>
         </div>
 
         {records.length > 0 ? (
-          <div className="overflow-x-auto rounded-xl border border-black/[0.08] bg-white">
+          <div className="overflow-x-auto rounded-xl border border-[#BAE6FD] bg-white">
             <table className="w-full min-w-[1120px] border-collapse text-left text-xs">
-              <thead className="bg-[#F6F8FB] text-[11px] uppercase tracking-[0.35px] text-black/45">
+              <thead className="bg-[#F0F9FF] text-[11px] uppercase tracking-[0.35px] text-black/45">
                 <tr>
                   <th className="px-3 py-2 font-medium">时间</th>
                   <th className="px-3 py-2 font-medium">结果</th>
@@ -341,12 +341,12 @@ export function ApiSmokePanel({ records }: { records: ApiSmokeRecord[] }) {
                   <th className="px-3 py-2 font-medium">图片</th>
                   <th className="px-3 py-2 font-medium">耗时</th>
                   <th className="px-3 py-2 font-medium">Key</th>
-                  <th className="sticky right-0 z-10 whitespace-nowrap border-l border-black/[0.06] bg-[#F6F8FB] px-3 py-2 font-medium">详情</th>
+                  <th className="sticky right-0 z-10 whitespace-nowrap border-l border-[#DDF4FF] bg-[#F0F9FF] px-3 py-2 font-medium">详情</th>
                 </tr>
               </thead>
               <tbody>
                 {records.map((record, index) => (
-                  <tr key={`${record.completedAt}-${record.caseId}-${index}`} className="border-t border-black/[0.06] align-top">
+                  <tr key={`${record.completedAt}-${record.caseId}-${index}`} className="border-t border-[#DDF4FF] align-top">
                     <td className="whitespace-nowrap px-3 py-2 text-black/60">
                       {formatSmokeTimestamp(record.completedAt)}
                     </td>
@@ -388,11 +388,11 @@ export function ApiSmokePanel({ records }: { records: ApiSmokeRecord[] }) {
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-black/45">
                       {record.keyPrefix}
                     </td>
-                    <td className="sticky right-0 z-10 whitespace-nowrap border-l border-black/[0.06] bg-white px-3 py-2">
+                    <td className="sticky right-0 z-10 whitespace-nowrap border-l border-[#DDF4FF] bg-white px-3 py-2">
                       <button
                         type="button"
                         onClick={() => setModal({ kind: "details", record })}
-                        className="inline-flex h-7 whitespace-nowrap items-center rounded-md border border-black/[0.1] bg-white px-2.5 text-[11px] font-medium text-black/65 hover:bg-black/[0.03]"
+                        className="inline-flex h-7 whitespace-nowrap items-center rounded-md border border-black/[0.1] bg-white px-2.5 text-[11px] font-medium text-black/65 hover:bg-[#E0F2FE]"
                       >
                         详情
                       </button>
@@ -403,7 +403,7 @@ export function ApiSmokePanel({ records }: { records: ApiSmokeRecord[] }) {
             </table>
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+          <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
             <p className="text-sm font-medium text-black">还没有 API smoke 记录</p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
               在本地运行 OPENOCTOPUS_API_KEY=ooq_xxx npm run smoke:images 后，这里会显示脚本写入的连通性结果。

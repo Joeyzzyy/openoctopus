@@ -30,7 +30,7 @@ export function Header({
       className={cn(
         "fixed top-0 z-50 w-full transition-all duration-300",
         isScrolled || shouldUseSolidHeader
-          ? "border-b border-white/8 bg-[#0C0A09]/90 backdrop-blur-xl"
+          ? "border-b border-white/8 bg-[#06131F]/90 backdrop-blur-xl"
           : "bg-transparent"
       )}
       style={{ top: "var(--banner-h, 36px)" }}
@@ -60,7 +60,7 @@ export function Header({
 
           <Link
             href={isLoggedIn ? "/dashboard" : "/login"}
-            className="flex h-9 w-[96px] items-center justify-center rounded-lg bg-[#C27B3B] text-center text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-[#A6642D]"
+            className="flex h-9 w-[96px] items-center justify-center rounded-lg bg-[#38BDF8] text-center text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284C7]"
           >
             {isLoggedIn ? "Dashboard" : "Sign In"}
           </Link>
@@ -79,7 +79,7 @@ export function Header({
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="border-t border-white/10 bg-[#0C0A09]/95 backdrop-blur-xl lg:hidden">
+        <div className="border-t border-white/10 bg-[#06131F]/95 backdrop-blur-xl lg:hidden">
           <div className="mx-auto max-w-7xl px-4 py-4">
             <nav className="flex flex-col gap-1">
               {NAV_ITEMS.map((item) => (

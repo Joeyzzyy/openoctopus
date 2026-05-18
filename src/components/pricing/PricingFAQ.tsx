@@ -10,7 +10,7 @@ export function PricingFAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section className="bg-[#FAFAF8] px-6 py-20 md:px-12 md:py-28 lg:px-20">
+    <section className="bg-[#F8FCFF] px-6 py-20 md:px-12 md:py-28 lg:px-20">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-col gap-12 lg:flex-row lg:gap-24">
           <FadeIn className="lg:w-80 lg:shrink-0">

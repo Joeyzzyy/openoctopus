@@ -7,7 +7,7 @@ type SupportedModelRow = {
   provider: string;
   model_slug: string;
   display_name: string;
-  capability: "image_generation" | "image_edit" | "video_generation" | null;
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
   billing_config: unknown;
   active: boolean;
   created_at: string;
@@ -41,6 +41,11 @@ export type ModelDocRow = {
   showcaseImagePrompts: Array<string | null>;
   playgroundInputImageUrl: string | null;
   playgroundInputPrompt: string | null;
+  playgroundInputExamples: Array<{
+    fieldKey: string | null;
+    imageUrl: string;
+    prompt: string | null;
+  }>;
   modelTypeLabel: string;
   priceLabel: string;
   modelDescription: string;
@@ -117,6 +122,7 @@ function readKeywordList(value: unknown) {
 }
 
 const QUALITY_ORDER = ["low", "medium", "high"];
+const FACE_PLAYGROUND_INPUT_MARKER = "[[playground_input:face_image]]";
 
 function formatUsd(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -137,6 +143,15 @@ function splitCombinationKey(key: string) {
 
 function tierDimensionLabel(name: string, value: string) {
   return value === "default" ? "" : `${name}: ${value}`;
+}
+
+function isFacePlaygroundInputAsset(asset: ProviderModelShowcaseAssetRow) {
+  return asset.asset_kind === "gallery" && asset.alt_text?.startsWith(FACE_PLAYGROUND_INPUT_MARKER);
+}
+
+function stripFacePlaygroundPrompt(value: string | null) {
+  if (!value?.startsWith(FACE_PLAYGROUND_INPUT_MARKER)) return value;
+  return value.slice(FACE_PLAYGROUND_INPUT_MARKER.length).trim() || null;
 }
 
 function readPriceTiers(value: unknown) {
@@ -545,6 +560,12 @@ export const loadModelsPageData = cache(async () => {
     const priceTiers = readPriceTiers(model.billing_config);
     const booleanSurcharges = readBooleanSurcharges(model.billing_config);
 
+    const playgroundInputAssets = [
+      ...showcaseAssets.filter((asset) => asset.asset_kind === "playground_input"),
+      ...showcaseAssets.filter(isFacePlaygroundInputAsset),
+    ];
+    const primaryPlaygroundInputAsset = playgroundInputAssets[0] ?? null;
+
     return {
       id: model.id,
       publicModel: model.model_slug,
@@ -574,15 +595,20 @@ export const loadModelsPageData = cache(async () => {
       coverImagePrompt:
         showcaseAssets.find((asset) => asset.asset_kind === "cover")?.alt_text ?? null,
       showcaseImageUrls: showcaseAssets
-        .filter((asset) => asset.asset_kind === "gallery")
+        .filter((asset) => asset.asset_kind === "gallery" && !isFacePlaygroundInputAsset(asset))
         .map((asset) => asset.public_url),
       showcaseImagePrompts: showcaseAssets
-        .filter((asset) => asset.asset_kind === "gallery")
+        .filter((asset) => asset.asset_kind === "gallery" && !isFacePlaygroundInputAsset(asset))
         .map((asset) => asset.alt_text ?? null),
       playgroundInputImageUrl:
-        showcaseAssets.find((asset) => asset.asset_kind === "playground_input")?.public_url ?? null,
+        primaryPlaygroundInputAsset?.public_url ?? null,
       playgroundInputPrompt:
-        showcaseAssets.find((asset) => asset.asset_kind === "playground_input")?.alt_text ?? null,
+        primaryPlaygroundInputAsset?.alt_text ?? null,
+      playgroundInputExamples: playgroundInputAssets.map((asset) => ({
+        fieldKey: isFacePlaygroundInputAsset(asset) ? "face_image" : null,
+        imageUrl: asset.public_url,
+        prompt: stripFacePlaygroundPrompt(asset.alt_text ?? null),
+      })),
       modelTypeLabel: readMetaField(model.billing_config, "modelType"),
       priceLabel: billingSummary(model.billing_config),
       modelDescription: readMetaField(model.billing_config, "modelDescription"),

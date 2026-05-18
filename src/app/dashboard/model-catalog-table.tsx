@@ -13,7 +13,7 @@ export function ModelCatalogTable({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-8 text-sm text-black/50">
+      <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#F8FCFF] px-4 py-8 text-sm text-black/50">
         No available models.
       </div>
     );

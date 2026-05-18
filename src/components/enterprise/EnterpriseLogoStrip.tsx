@@ -1,6 +1,6 @@
 export function EnterpriseLogoStrip() {
   return (
-    <section className="bg-[#FAFAF8] px-6 pt-16 md:px-12 md:pt-20 lg:px-20">
+    <section className="bg-[#F8FCFF] px-6 pt-16 md:px-12 md:pt-20 lg:px-20">
       <div className="mx-auto max-w-4xl">
         <svg
           width="879"

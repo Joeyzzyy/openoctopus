@@ -48,7 +48,7 @@ export function ModelCatalogFilters({
   }, [grouped, selectedType]);
 
   return (
-    <div className="grid gap-3 rounded-2xl border border-[#F0DFC3] bg-[#FFFBF4] p-3 md:grid-cols-2">
+    <div className="grid gap-3 rounded-2xl border border-[#BAE6FD] bg-[#F0F9FF] p-3 md:grid-cols-2">
       <label className="block">
         <span className="mb-1.5 block text-[11px] tracking-[0.35px] text-black/55">Model Type</span>
         <select
@@ -65,7 +65,7 @@ export function ModelCatalogFilters({
                 : (nextVisibleModels[0]?.slug ?? null);
             onNavigate(nextType, nextSlug);
           }}
-          className="h-9 w-full rounded-md border border-[#E7E0D3] bg-white px-3 text-xs text-black/80 focus:border-[#E58A35]"
+          className="h-9 w-full rounded-md border border-[#BAE6FD] bg-white px-3 text-xs text-black/80 focus:border-[#38BDF8]"
         >
           <option value="image">Image</option>
           <option value="video">Video</option>
@@ -78,7 +78,7 @@ export function ModelCatalogFilters({
         <select
           value={selectedModelSlug ?? visibleModels[0]?.slug ?? ""}
           onChange={(event) => onNavigate(selectedType, event.target.value || null)}
-          className="h-9 w-full rounded-md border border-[#E7E0D3] bg-white px-3 text-xs text-black/80 focus:border-[#E58A35]"
+          className="h-9 w-full rounded-md border border-[#BAE6FD] bg-white px-3 text-xs text-black/80 focus:border-[#38BDF8]"
         >
           {visibleModels.map((item) => (
             <option key={item.slug} value={item.slug}>

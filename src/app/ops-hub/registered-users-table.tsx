@@ -246,8 +246,8 @@ export function RegisteredUsersTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-black/[0.06] bg-[#FCFCFA] shadow-[0_20px_70px_rgba(17,24,39,0.04)]">
-      <div className="flex flex-col gap-2 border-b border-black/[0.06] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="overflow-hidden rounded-3xl border border-[#DDF4FF] bg-[#F8FCFF] shadow-[0_20px_70px_rgba(17,24,39,0.04)]">
+      <div className="flex flex-col gap-2 border-b border-[#DDF4FF] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-medium text-black">用户管理</p>
           <p className="mt-1 text-xs text-black/45">
@@ -265,7 +265,7 @@ export function RegisteredUsersTable({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search by name or email"
-            className="h-9 min-w-0 flex-1 rounded-full border border-black/[0.08] bg-[#FCFCFA] px-3 text-sm text-black outline-none transition-colors placeholder:text-black/35 focus:border-black/25 sm:w-80"
+            className="h-9 min-w-0 flex-1 rounded-full border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-sm text-black outline-none transition-colors placeholder:text-black/35 focus:border-[#38BDF8] sm:w-80"
           />
           <button
             type="submit"
@@ -280,7 +280,7 @@ export function RegisteredUsersTable({
                 setQuery("");
                 navigateUsers(1, "");
               }}
-              className="h-9 rounded-full border border-black/[0.08] bg-white px-4 text-xs font-medium text-black/65 hover:border-black/20"
+              className="h-9 rounded-full border border-[#BAE6FD] bg-white px-4 text-xs font-medium text-black/65 hover:border-[#38BDF8]"
             >
               Clear
             </button>
@@ -288,7 +288,7 @@ export function RegisteredUsersTable({
         </form>
       </div>
       <table className="w-full min-w-[920px] border-collapse text-left">
-        <thead className="bg-[#F4F0E8] text-[11px] uppercase tracking-[0.55px] text-black/45">
+        <thead className="bg-[#E0F2FE] text-[11px] uppercase tracking-[0.55px] text-black/45">
           <tr>
             <th className="px-5 py-3 font-medium">用户</th>
             <th className="px-5 py-3 font-medium">角色</th>
@@ -310,7 +310,7 @@ export function RegisteredUsersTable({
 
             return (
               <Fragment key={user.id}>
-                <tr className={expanded ? "bg-white" : "bg-[#FCFCFA] hover:bg-white"}>
+                <tr className={expanded ? "bg-white" : "bg-[#F8FCFF] hover:bg-white"}>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#111827] text-xs font-semibold uppercase text-white">
@@ -334,28 +334,28 @@ export function RegisteredUsersTable({
                       <button
                         type="button"
                         onClick={() => expandUser(user.id)}
-                        className="inline-flex h-8 items-center justify-center rounded-full border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/68 transition-colors hover:border-black/20 hover:bg-[#F7F3EA]"
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-black/68 transition-colors hover:border-[#38BDF8] hover:bg-[#E0F2FE]"
                       >
                         {expanded ? "收起请求" : "请求"}
                       </button>
                       <button
                         type="button"
                         onClick={() => setWorkspaceModalUserId(user.id)}
-                        className="inline-flex h-8 items-center justify-center rounded-full border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/68 transition-colors hover:border-black/20 hover:bg-[#F7F3EA]"
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-black/68 transition-colors hover:border-[#38BDF8] hover:bg-[#E0F2FE]"
                       >
                         Workspace
                       </button>
                       <button
                         type="button"
                         onClick={() => setKeysModalUserId(user.id)}
-                        className="inline-flex h-8 items-center justify-center rounded-full border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/68 transition-colors hover:border-black/20 hover:bg-[#F7F3EA]"
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-black/68 transition-colors hover:border-[#38BDF8] hover:bg-[#E0F2FE]"
                       >
                         Keys
                       </button>
                       <button
                         type="button"
                         onClick={() => setBalanceModalUserId(user.id)}
-                        className="inline-flex h-8 items-center justify-center rounded-full border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/68 transition-colors hover:border-black/20 hover:bg-[#F7F3EA]"
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-black/68 transition-colors hover:border-[#38BDF8] hover:bg-[#E0F2FE]"
                       >
                         余额
                       </button>
@@ -380,8 +380,8 @@ export function RegisteredUsersTable({
                 {expanded ? (
                   <tr className="bg-white">
                     <td colSpan={5} className="px-5 pb-6 pt-3">
-                      <div className="rounded-3xl border border-black/[0.06] bg-[#F7F3EA] p-4">
-                        <section className="rounded-2xl border border-black/[0.06] bg-white p-4">
+                      <div className="rounded-3xl border border-[#DDF4FF] bg-[#E0F2FE] p-4">
+                        <section className="rounded-2xl border border-[#DDF4FF] bg-white p-4">
                           {(() => {
                             const requestPage = requestPagesByUserId[user.id] ?? {
                               rows: user.recentRequests ?? [],
@@ -407,7 +407,7 @@ export function RegisteredUsersTable({
                                 type="button"
                                 disabled={requestPage.loading}
                                 onClick={() => loadUserRequests(user.id, requestPage.page)}
-                                className="h-8 rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/65 hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="h-8 rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-black/65 hover:bg-[#E0F2FE] disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 {requestPage.loading ? "刷新中..." : "刷新"}
                               </button>
@@ -418,7 +418,7 @@ export function RegisteredUsersTable({
                               {requestPage.error}
                             </div>
                           ) : requestPage.loading ? (
-                            <div className="rounded-xl border border-black/[0.06] bg-white px-4 py-5 text-sm text-black/40">
+                            <div className="rounded-xl border border-[#DDF4FF] bg-white px-4 py-5 text-sm text-black/40">
                               正在加载请求记录...
                             </div>
                           ) : requests.length > 0 ? (
@@ -426,7 +426,7 @@ export function RegisteredUsersTable({
                               {requests.map((request) => (
                                 <article
                                   key={request.id}
-                                  className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3"
+                                  className="rounded-2xl border border-[#DDF4FF] bg-[#F8FCFF] p-3"
                                 >
                                   <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_200px]">
                                     <div className="min-w-0">
@@ -468,19 +468,19 @@ export function RegisteredUsersTable({
                                     </div>
                                   </div>
                                   <div className="mt-3 grid gap-2 lg:grid-cols-2">
-                                          <details className="rounded-lg border border-black/[0.06] bg-[#FCFCFA]">
+                                          <details className="rounded-lg border border-[#DDF4FF] bg-[#F8FCFF]">
                                             <summary className="cursor-pointer px-3 py-2 text-[11px] font-medium text-black/65">
                                               上游完整返回
                                             </summary>
-                                            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all border-t border-black/[0.06] p-3 text-[11px] text-black/70">
+                                            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all border-t border-[#DDF4FF] p-3 text-[11px] text-black/70">
                                               {request.upstreamRawText}
                                             </pre>
                                           </details>
-                                          <details className="rounded-lg border border-black/[0.06] bg-[#FCFCFA]">
+                                          <details className="rounded-lg border border-[#DDF4FF] bg-[#F8FCFF]">
                                             <summary className="cursor-pointer px-3 py-2 text-[11px] font-medium text-black/65">
                                               对客返回 JSON
                                             </summary>
-                                            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all border-t border-black/[0.06] p-3 text-[11px] text-black/70">
+                                            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all border-t border-[#DDF4FF] p-3 text-[11px] text-black/70">
                                               {formatCustomerResponseText(request)}
                                             </pre>
                                           </details>
@@ -489,7 +489,7 @@ export function RegisteredUsersTable({
                               ))}
                             </div>
                           ) : (
-                            <div className="rounded-xl border border-black/[0.06] bg-white px-4 py-5 text-sm text-black/40">
+                            <div className="rounded-xl border border-[#DDF4FF] bg-white px-4 py-5 text-sm text-black/40">
                               暂无请求记录
                             </div>
                           )}
@@ -498,7 +498,7 @@ export function RegisteredUsersTable({
                               type="button"
                               disabled={requestPage.loading || requestPage.page <= 1}
                               onClick={() => loadUserRequests(user.id, Math.max(1, requestPage.page - 1))}
-                              className="h-8 rounded-md border border-black/[0.08] bg-white px-3 text-xs text-black/65 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="h-8 rounded-md border border-[#BAE6FD] bg-white px-3 text-xs text-black/65 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               上一页
                             </button>
@@ -506,7 +506,7 @@ export function RegisteredUsersTable({
                               type="button"
                               disabled={requestPage.loading || requestPage.page >= requestPage.totalPages}
                               onClick={() => loadUserRequests(user.id, Math.min(requestPage.totalPages, requestPage.page + 1))}
-                              className="h-8 rounded-md border border-black/[0.08] bg-white px-3 text-xs text-black/65 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="h-8 rounded-md border border-[#BAE6FD] bg-white px-3 text-xs text-black/65 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               下一页
                             </button>
@@ -524,7 +524,7 @@ export function RegisteredUsersTable({
           })}
         </tbody>
       </table>
-      <div className="flex items-center justify-between border-t border-black/[0.06] bg-white px-5 py-4">
+      <div className="flex items-center justify-between border-t border-[#DDF4FF] bg-white px-5 py-4">
         <p className="text-xs text-black/45">
           Showing {pageStart}
           -
@@ -535,7 +535,7 @@ export function RegisteredUsersTable({
             type="button"
             disabled={safeUserPage <= 1}
             onClick={() => navigateUsers(Math.max(1, safeUserPage - 1))}
-            className="h-8 rounded-md border border-black/[0.08] bg-white px-3 text-xs text-black/65 disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-8 rounded-md border border-[#BAE6FD] bg-white px-3 text-xs text-black/65 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Previous
           </button>
@@ -543,7 +543,7 @@ export function RegisteredUsersTable({
             type="button"
             disabled={safeUserPage >= userPagination.totalPages}
             onClick={() => navigateUsers(Math.min(userPagination.totalPages, safeUserPage + 1))}
-            className="h-8 rounded-md border border-black/[0.08] bg-white px-3 text-xs text-black/65 disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-8 rounded-md border border-[#BAE6FD] bg-white px-3 text-xs text-black/65 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Next
           </button>
@@ -560,20 +560,20 @@ export function RegisteredUsersTable({
               <button
                 type="button"
                 onClick={closeModals}
-                className="size-8 rounded-full border border-black/[0.08] text-sm text-black/55 hover:bg-black/[0.03]"
+                className="size-8 rounded-full border border-[#BAE6FD] text-sm text-black/55 hover:bg-[#E0F2FE]"
               >
                 ×
               </button>
             </div>
             <div className="mt-5 grid gap-3">
-              <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+              <div className="rounded-2xl border border-[#DDF4FF] bg-[#F8FCFF] p-4">
                 <p className="text-[11px] uppercase tracking-[0.5px] text-black/35">Workspace</p>
                 <p className="mt-2 font-medium text-black/80">{workspaceModalUser.workspaceName}</p>
                 <p className="mt-2 break-all text-xs text-black/40">
                   {workspaceModalUser.workspaceId ?? "无 workspace"}
                 </p>
               </div>
-              <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+              <div className="rounded-2xl border border-[#DDF4FF] bg-[#F8FCFF] p-4">
                 <p className="text-[11px] uppercase tracking-[0.5px] text-black/35">Workspace Slug</p>
                 <p className="mt-2 break-all text-sm text-black/70">
                   {workspaceModalUser.workspaceSlug ?? "none"}
@@ -594,7 +594,7 @@ export function RegisteredUsersTable({
               <button
                 type="button"
                 onClick={closeModals}
-                className="size-8 rounded-full border border-black/[0.08] text-sm text-black/55 hover:bg-black/[0.03]"
+                className="size-8 rounded-full border border-[#BAE6FD] text-sm text-black/55 hover:bg-[#E0F2FE]"
               >
                 ×
               </button>
@@ -605,7 +605,7 @@ export function RegisteredUsersTable({
                   {keysModalUser.apiKeys.map((apiKey) => (
                     <div
                       key={apiKey.id}
-                      className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-2.5"
+                      className="rounded-xl border border-[#DDF4FF] bg-[#F8FCFF] px-3 py-2.5"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-xs font-medium text-black">
@@ -622,7 +622,7 @@ export function RegisteredUsersTable({
                   ))}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6 text-sm text-black/40">
+                <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6 text-sm text-black/40">
                   暂无 Key
                 </div>
               )}
@@ -641,12 +641,12 @@ export function RegisteredUsersTable({
               <button
                 type="button"
                 onClick={closeModals}
-                className="size-8 rounded-full border border-black/[0.08] text-sm text-black/55 hover:bg-black/[0.03]"
+                className="size-8 rounded-full border border-[#BAE6FD] text-sm text-black/55 hover:bg-[#E0F2FE]"
               >
                 ×
               </button>
             </div>
-            <div className="mt-5 rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-4">
+            <div className="mt-5 rounded-2xl border border-[#DDF4FF] bg-[#F8FCFF] p-4">
               <p className="text-[11px] uppercase tracking-[0.5px] text-black/35">当前余额</p>
               <p className="mt-2 text-2xl font-semibold text-black">{balanceModalUser.balanceLabel}</p>
               <div className="mt-4 grid grid-cols-3 gap-2 text-xs text-black/55">
@@ -669,7 +669,7 @@ export function RegisteredUsersTable({
               <button
                 type="button"
                 onClick={closeModals}
-                className="size-8 rounded-full border border-black/[0.08] text-sm text-black/55 hover:bg-black/[0.03]"
+                className="size-8 rounded-full border border-[#BAE6FD] text-sm text-black/55 hover:bg-[#E0F2FE]"
               >
                 ×
               </button>
@@ -686,7 +686,7 @@ export function RegisteredUsersTable({
                       min="0.01"
                       step="0.01"
                       placeholder="例如 10.00"
-                      className="h-10 rounded-md border border-black/10 bg-white px-3 text-sm font-normal outline-none"
+                      className="h-10 rounded-md border border-[#BAE6FD] bg-white px-3 text-sm font-normal outline-none"
                     />
                   </label>
                   <label className="grid gap-1.5 text-xs font-medium text-black/65">
@@ -694,7 +694,7 @@ export function RegisteredUsersTable({
                     <input
                       name="description"
                       placeholder="可选"
-                      className="h-10 min-w-0 rounded-md border border-black/10 bg-white px-3 text-sm font-normal outline-none"
+                      className="h-10 min-w-0 rounded-md border border-[#BAE6FD] bg-white px-3 text-sm font-normal outline-none"
                     />
                   </label>
                   <button
@@ -706,7 +706,7 @@ export function RegisteredUsersTable({
                 </div>
               </form>
             ) : (
-              <div className="mt-5 rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6 text-sm text-black/40">
+              <div className="mt-5 rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6 text-sm text-black/40">
                 无 workspace，不能加款
               </div>
             )}

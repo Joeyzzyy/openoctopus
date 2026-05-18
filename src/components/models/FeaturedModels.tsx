@@ -76,7 +76,7 @@ function StatusDots() {
   return (
     <div className="flex items-center gap-px">
       {[0, 1, 2, 3, 4].map((i) => (
-        <div key={i} className="h-3 w-1 rounded-full bg-[#C27B3B]" />
+        <div key={i} className="h-3 w-1 rounded-full bg-[#38BDF8]" />
       ))}
     </div>
   );
@@ -84,7 +84,7 @@ function StatusDots() {
 
 export function FeaturedModels() {
   return (
-    <section className="bg-[#FAFAF8] py-20">
+    <section className="bg-[#F8FCFF] py-20">
       {/* Title */}
       <div className="mx-auto flex max-w-[1160px] flex-col items-center gap-10">
         <div className="flex max-w-[876px] flex-col items-center gap-4 text-center">
@@ -143,7 +143,7 @@ export function FeaturedModels() {
                 <div className="col-span-1 flex items-center justify-between gap-2 md:col-span-4">
                   <span className="font-mono text-sm leading-5 text-[#1C1917]">{model.path}</span>
                   {model.discount && (
-                    <span className="block whitespace-nowrap rounded-full bg-[#C27B3B] px-2.5 font-mono text-[11px] font-medium uppercase leading-5 text-white md:hidden">
+                    <span className="block whitespace-nowrap rounded-full bg-[#38BDF8] px-2.5 font-mono text-[11px] font-medium uppercase leading-5 text-white md:hidden">
                       {model.discount.percent}% off
                     </span>
                   )}
@@ -173,7 +173,7 @@ export function FeaturedModels() {
                 {/* Desktop discount badge */}
                 <div className="col-span-1 hidden items-center md:flex">
                   {model.discount && (
-                    <span className="ml-2 whitespace-nowrap rounded-full bg-[#C27B3B] px-2.5 font-mono text-[11px] font-medium uppercase leading-5 text-white">
+                    <span className="ml-2 whitespace-nowrap rounded-full bg-[#38BDF8] px-2.5 font-mono text-[11px] font-medium uppercase leading-5 text-white">
                       {model.discount.percent}% off
                     </span>
                   )}

@@ -1,0 +1,21 @@
+[
+  {
+    "id": "molmo2-image-captioner-basic",
+    "model": "openoctopus/image-captioner-molmo2",
+    "endpoint": "/v1/images/recognitions",
+    "payload": {
+      "model": "openoctopus/image-captioner-molmo2",
+      "prompt": "Describe this image in detail.",
+      "input": {
+        "image": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/588ee0a8-692a-4a8b-8056-a455a227c6a9/playground-input-1779078881540-1767172504525281953-tnvfnljh.png",
+        "detail_level": "medium",
+        "enable_sync_mode": false
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "assetCountMin": 0
+    }
+  }
+]

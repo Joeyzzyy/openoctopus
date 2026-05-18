@@ -9,7 +9,12 @@ import { buildGatewayErrorResponse, isGatewayValidationError } from "@/lib/gatew
 
 const submitSchema = z.object({
   action: z.literal("submit"),
-  endpoint: z.enum(["/v1/images/generations", "/v1/images/edits", "/v1/videos/generations"]),
+  endpoint: z.enum([
+    "/v1/images/generations",
+    "/v1/images/edits",
+    "/v1/images/recognitions",
+    "/v1/videos/generations",
+  ]),
   model: z.string().min(1),
   prompt: z.string().optional(),
   input: z.record(z.string(), z.unknown()).default({}),

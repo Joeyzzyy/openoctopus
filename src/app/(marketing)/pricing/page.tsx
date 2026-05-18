@@ -151,7 +151,7 @@ function PricingTable({ rows }: { rows: PricingRow[] }) {
                     {row.price.booleanSurcharges.map((surcharge) => (
                       <span
                         key={surcharge.name}
-                        className="inline-flex items-center rounded-md border border-black/[0.06] bg-[#FFF7EA] px-2 py-1 text-xs font-medium text-[#9A4F18]"
+                        className="inline-flex items-center rounded-md border border-black/[0.06] bg-[#E0F2FE] px-2 py-1 text-xs font-medium text-[#0369A1]"
                       >
                         {surcharge.label}
                       </span>

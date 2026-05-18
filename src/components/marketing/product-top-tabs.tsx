@@ -109,7 +109,7 @@ export function ProductTopTabs({
 
   return (
     <>
-      <div className="sticky top-16 z-30 mb-3 border-b border-[#E7E0D3] bg-[#FCFCFA]/95 backdrop-blur-xl">
+      <div className="sticky top-16 z-30 mb-3 border-b border-[#BAE6FD] bg-[#FCFCFA]/95 backdrop-blur-xl">
         <div className="flex items-center gap-1 overflow-x-auto">
           {tabItems.map((item) => {
             const active = optimisticActiveKey === item.key;
@@ -120,7 +120,7 @@ export function ProductTopTabs({
                 onClick={() => handleTabClick(item.key, item.href)}
                 className={`inline-flex h-10 shrink-0 items-center border-b-2 px-3 text-sm font-medium transition-colors ${
                   active
-                    ? "border-[#E58A35] text-[#9A4F18]"
+                    ? "border-[#38BDF8] text-[#0369A1]"
                     : "border-transparent text-[#6B7280] hover:text-[#111827]"
                 }`}
               >

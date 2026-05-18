@@ -10,7 +10,7 @@ const badgeStyles: Record<string, string> = {
 const taskColors: Record<string, string> = {
   "text-to-video": "bg-blue-500/15 text-blue-400",
   "text-to-image": "bg-emerald-500/15 text-emerald-400",
-  "image-to-video": "bg-orange-500/15 text-orange-400",
+  "image-to-video": "bg-sky-500/15 text-sky-400",
   "audio-to-video": "bg-pink-500/15 text-pink-400",
 };
 

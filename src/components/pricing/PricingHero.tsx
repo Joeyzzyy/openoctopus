@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 
 export function PricingHero() {
   return (
-    <section className="bg-[#FAFAF8] px-6 pb-4 pt-32 md:px-12 md:pb-8 md:pt-40 lg:px-20">
+    <section className="bg-[#F8FCFF] px-6 pb-4 pt-32 md:px-12 md:pb-8 md:pt-40 lg:px-20">
       <div className="mx-auto max-w-7xl">
         <FadeIn>
           <div className="flex flex-col items-center gap-4 text-center">

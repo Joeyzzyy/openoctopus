@@ -71,7 +71,7 @@ export function CreateKeySheet({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[28px] border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-xl"
+        className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[28px] border border-black/[0.08] bg-[#F8FCFF] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-xl"
       >
         <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
           <DialogTitle className="text-sm font-semibold uppercase tracking-[1px] text-[#111827]">
@@ -109,7 +109,7 @@ export function CreateKeySheet({
                 <button
                   type="button"
                   onClick={copySecret}
-                  className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white transition-colors hover:bg-[#FFF7EA]"
+                  className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-[#BAE6FD] bg-white transition-colors hover:bg-[#E0F2FE]"
                 >
                   {copied ? (
                     <Check className="h-4 w-4 text-[#15803D]" />
@@ -143,7 +143,7 @@ export function CreateKeySheet({
               <Link
                 href="#quickstart"
                 onClick={() => handleClose(false)}
-                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md border border-[#E7E0D3] bg-white px-4 text-[11px] font-semibold uppercase tracking-[1px] text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA] sm:flex-1"
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md border border-[#BAE6FD] bg-white px-4 text-[11px] font-semibold uppercase tracking-[1px] text-[#075985] transition-colors hover:bg-[#E0F2FE] sm:flex-1"
               >
                 Open Quickstart
               </Link>
@@ -193,7 +193,7 @@ export function CreateKeySheet({
                     <SelectItem
                       key={e}
                       value={e}
-                      className="cursor-pointer text-[#111827] focus:bg-[#FFF7EA] focus:text-[#111827]"
+                      className="cursor-pointer text-[#111827] focus:bg-[#E0F2FE] focus:text-[#111827]"
                     >
                       {e}
                     </SelectItem>

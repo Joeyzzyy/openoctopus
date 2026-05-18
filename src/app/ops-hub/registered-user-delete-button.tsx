@@ -40,9 +40,9 @@ export function RegisteredUserDeleteButton({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton={false}
-          className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-lg"
+          className="rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] sm:max-w-lg"
         >
-          <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5">
+          <DialogHeader className="border-b border-[#BAE6FD] px-5 pb-4 pt-5">
             <DialogTitle className="font-medium text-black">确认删除用户</DialogTitle>
             <DialogDescription className="text-black/55">
               将删除注册用户「{email}」。如果该用户拥有 workspace，会同步删除该 workspace 旗下的 Key、钱包流水和请求记录。
@@ -53,11 +53,11 @@ export function RegisteredUserDeleteButton({
             这个操作会从 auth 用户表删除该用户，并清理其关联资源。操作不可撤销。
           </div>
 
-          <DialogFooter className="rounded-none border-t border-black/[0.08] bg-transparent p-5 sm:justify-end">
+          <DialogFooter className="rounded-none border-t border-[#BAE6FD] bg-transparent p-5 sm:justify-end">
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="inline-flex h-10 items-center justify-center rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
+              className="inline-flex h-10 items-center justify-center rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-[#E0F2FE]"
             >
               取消
             </button>

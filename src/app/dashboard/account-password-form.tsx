@@ -57,7 +57,7 @@ export function AccountPasswordForm({
               minLength={8}
               required
               autoComplete="new-password"
-              className="h-11 w-full rounded-md border border-black/[0.12] bg-white px-3 pr-10 text-sm text-black outline-none transition-colors focus:border-[#E58A35] focus:ring-2 focus:ring-[#F4C37B]/30"
+              className="h-11 w-full rounded-md border border-black/[0.12] bg-white px-3 pr-10 text-sm text-black outline-none transition-colors focus:border-[#38BDF8] focus:ring-2 focus:ring-[#BAE6FD]/30"
             />
             <button
               type="button"
@@ -80,7 +80,7 @@ export function AccountPasswordForm({
               minLength={8}
               required
               autoComplete="new-password"
-              className="h-11 w-full rounded-md border border-black/[0.12] bg-white px-3 pr-10 text-sm text-black outline-none transition-colors focus:border-[#E58A35] focus:ring-2 focus:ring-[#F4C37B]/30"
+              className="h-11 w-full rounded-md border border-black/[0.12] bg-white px-3 pr-10 text-sm text-black outline-none transition-colors focus:border-[#38BDF8] focus:ring-2 focus:ring-[#BAE6FD]/30"
             />
             <button
               type="button"
@@ -115,7 +115,7 @@ export function AccountPasswordForm({
       <button
         type="submit"
         disabled={isPending || !canSubmit}
-        className="inline-flex h-10 items-center rounded-md border border-[#E58A35] bg-[#E58A35] px-4 text-sm font-medium text-white transition-colors hover:bg-[#cf7626] disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex h-10 items-center rounded-md border border-[#38BDF8] bg-[#38BDF8] px-4 text-sm font-medium text-white transition-colors hover:bg-[#cf7626] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isPending ? "Saving..." : hasPassword ? "Update password" : "Set password"}
       </button>

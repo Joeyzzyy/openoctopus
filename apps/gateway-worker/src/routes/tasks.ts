@@ -259,6 +259,53 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     }
   });
 
+  app.post("/v1/images/recognitions", async (request, reply) => {
+    const parsed = imageRequestSchema.parse(request.body);
+    const authHeader = request.headers.authorization;
+    const apiKey = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
+    const sourceHeader =
+      typeof request.headers["x-openoctopus-request-source"] === "string"
+        ? request.headers["x-openoctopus-request-source"]
+        : "";
+    const requestSource = sourceHeader === "playground" ? "playground" : "api";
+
+    try {
+      const queued = await createQueuedRequest({
+        apiKey,
+        endpoint: "/v1/images/recognitions",
+        capability: "image_recognition",
+        requestSource,
+        model: parsed.model,
+        prompt: parsed.prompt,
+        input: parsed.input,
+      });
+
+      await enqueueInferenceJob({
+        requestId: queued.requestId,
+        workspaceId: queued.workspaceId,
+        apiKeyId: queued.apiKeyId,
+        providerModelId: queued.providerModelId,
+        credentialId: queued.credentialId,
+        providerSlug: queued.providerSlug,
+        providerBaseUrl: queued.providerBaseUrl,
+        providerConfig: queued.providerConfig,
+        capability: "image_recognition",
+        publicModelSlug: parsed.model,
+        upstreamModelSlug: queued.upstreamModelSlug,
+        endpoint: queued.endpoint,
+        prompt: parsed.prompt,
+        input: parsed.input,
+      });
+
+      return reply.code(202).send({
+        id: queued.requestId,
+        status: "queued",
+      });
+    } catch (error) {
+      return sendRequestError(reply, error);
+    }
+  });
+
   app.post("/v1/videos/generations", async (request, reply) => {
     const parsed = videoRequestSchema.parse(request.body);
     const authHeader = request.headers.authorization;

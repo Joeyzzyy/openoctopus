@@ -96,7 +96,7 @@ export function ExplorePanel({
 
   return (
     <section className="space-y-4">
-      <div className="rounded-2xl border border-[#E7E0D3] bg-white p-4">
+      <div className="rounded-2xl border border-[#BAE6FD] bg-white p-4">
         <p className="mb-3 text-xs font-medium uppercase tracking-[1px] text-black/45">Model Providers</p>
         <div className="flex flex-wrap gap-2">
           <button
@@ -105,8 +105,8 @@ export function ExplorePanel({
             className={cn(
               "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors",
               activeProvider === "all"
-                ? "border-[#E58A35] bg-[#FFF1DD] text-[#9A4F18]"
-                : "border-[#E7E0D3] bg-white text-black/65 hover:bg-[#FFF7EA]"
+                ? "border-[#38BDF8] bg-[#E0F2FE] text-[#0369A1]"
+                : "border-[#BAE6FD] bg-white text-black/65 hover:bg-[#E0F2FE]"
             )}
           >
             <span className="inline-flex size-5 items-center justify-center rounded-full bg-black/5 text-[10px]">ALL</span>
@@ -120,8 +120,8 @@ export function ExplorePanel({
               className={cn(
                 "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors",
                 activeProvider === provider
-                  ? "border-[#E58A35] bg-[#FFF1DD] text-[#9A4F18]"
-                  : "border-[#E7E0D3] bg-white text-black/65 hover:bg-[#FFF7EA]"
+                  ? "border-[#38BDF8] bg-[#E0F2FE] text-[#0369A1]"
+                  : "border-[#BAE6FD] bg-white text-black/65 hover:bg-[#E0F2FE]"
               )}
             >
               <span className="inline-flex size-5 items-center justify-center rounded-full bg-black/5 text-[11px] font-semibold">
@@ -134,7 +134,7 @@ export function ExplorePanel({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="rounded-2xl border border-[#E7E0D3] bg-white p-4">
+        <aside className="rounded-2xl border border-[#BAE6FD] bg-white p-4">
           <p className="mb-3 text-xs font-medium uppercase tracking-[1px] text-black/45">Category</p>
           <div className="space-y-2">
             {categories.map((category) => (
@@ -143,7 +143,7 @@ export function ExplorePanel({
                   type="checkbox"
                   checked={effectiveSelectedCategories.includes(category)}
                   onChange={() => toggleCategory(category)}
-                  className="size-4 rounded border-[#CFC6B6] text-[#B7661F] focus:ring-[#E58A35]"
+                  className="size-4 rounded border-[#7DD3FC] text-[#0284C7] focus:ring-[#38BDF8]"
                 />
                 <span className="flex items-center gap-2">
                   <span>{category}</span>
@@ -173,10 +173,10 @@ export function ExplorePanel({
                       router.push(`/login?next=${encodeURIComponent(nextPath)}`);
                     }
                   }}
-                  className="block overflow-hidden rounded-2xl border border-[#E7E0D3] bg-white shadow-sm transition-colors hover:border-[#D7C6AE]"
+                  className="block overflow-hidden rounded-2xl border border-[#BAE6FD] bg-white shadow-sm transition-colors hover:border-[#7DD3FC]"
                 >
                   <div className="flex h-full min-h-[120px] items-center">
-                    <div className="ml-3 size-20 shrink-0 overflow-hidden rounded-lg bg-[#F6F3EE] sm:size-24">
+                    <div className="ml-3 size-20 shrink-0 overflow-hidden rounded-lg bg-[#F0F9FF] sm:size-24">
                       {model.coverImageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={model.coverImageUrl} alt={model.displayName} className="h-full w-full object-cover" />
@@ -194,14 +194,14 @@ export function ExplorePanel({
                           {model.modelDescription || "No introduction available yet."}
                         </p>
                       </div>
-                      <p className="text-xs font-medium text-[#9A4F18]">{model.priceLabel || "Pricing unavailable"}</p>
+                      <p className="text-xs font-medium text-[#0369A1]">{model.priceLabel || "Pricing unavailable"}</p>
                     </div>
                   </div>
                 </a>
               );
             })
           ) : (
-            <div className="col-span-full rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] p-6 text-sm text-black/55">
+            <div className="col-span-full rounded-2xl border border-dashed border-black/[0.12] bg-[#F8FCFF] p-6 text-sm text-black/55">
               No models match the selected provider/category filters.
             </div>
           )}

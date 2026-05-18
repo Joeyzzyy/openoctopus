@@ -10,7 +10,7 @@ const DESKTOP_PREVIEW_IMAGE =
 
 export function ForCreators() {
   return (
-    <section className="bg-[#0C0A09] relative overflow-hidden">
+    <section className="bg-[#06131F] relative overflow-hidden">
       <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-16 md:px-12 md:py-20 lg:flex-row lg:items-center lg:gap-12 lg:px-20">
         {/* Left — text + CTAs */}
         <FadeIn className="flex flex-col gap-4 lg:w-80 lg:shrink-0 lg:pt-6">

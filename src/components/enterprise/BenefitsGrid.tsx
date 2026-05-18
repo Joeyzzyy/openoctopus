@@ -49,7 +49,7 @@ const BENEFITS = [
 
 export function BenefitsGrid() {
   return (
-    <section className="bg-[#FAFAF8] px-6 pt-16 md:px-12 md:pt-20 lg:px-20">
+    <section className="bg-[#F8FCFF] px-6 pt-16 md:px-12 md:pt-20 lg:px-20">
       <div className="mx-auto max-w-7xl">
         <FadeIn className="mb-12 flex max-w-xl flex-col gap-4">
           <h2 className="text-2xl font-bold leading-none tracking-tight text-[#1C1917] md:text-4xl">

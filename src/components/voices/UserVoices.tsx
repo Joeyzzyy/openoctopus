@@ -5,7 +5,7 @@ import { FadeIn } from "@/components/animations/FadeIn";
 
 export function UserVoices() {
   return (
-    <section className="bg-[#F2F0EB] py-16 md:py-20">
+    <section className="bg-[#EAF7FF] py-16 md:py-20">
       {/* Heading */}
       <div className="mb-8 px-6 md:mb-12 md:px-20">
         <h2 className="mx-auto max-w-[1280px] font-display text-[32px] font-semibold leading-none tracking-[-0.03em] text-balance text-[#1C1917] md:text-[48px]">
@@ -24,7 +24,7 @@ export function UserVoices() {
         {testimonials.map((item) => (
           <div
             key={item.name}
-            className="group relative flex w-[300px] shrink-0 flex-col justify-between gap-4 overflow-hidden rounded-2xl bg-[#FAFAF8] p-6 transition-shadow duration-300 hover:shadow-[0px_16px_32px_0px_rgba(0,0,0,0.06)] md:w-[480px] md:p-10"
+            className="group relative flex w-[300px] shrink-0 flex-col justify-between gap-4 overflow-hidden rounded-2xl bg-[#F8FCFF] p-6 transition-shadow duration-300 hover:shadow-[0px_16px_32px_0px_rgba(0,0,0,0.06)] md:w-[480px] md:p-10"
           >
             {/* Content */}
             <div className="relative flex flex-col gap-4">

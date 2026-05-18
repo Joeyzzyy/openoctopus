@@ -1,4 +1,4 @@
-export type Capability = "image_generation" | "image_edit" | "video_generation";
+export type Capability = "image_generation" | "image_edit" | "image_recognition" | "video_generation";
 
 export type ProviderRuntimeContext = {
   slug: string;
@@ -20,6 +20,7 @@ export type SubmitRequestInput = {
 export type PollRequestInput = {
   requestId: string;
   upstreamTaskId: string;
+  capability?: Capability;
   input?: Record<string, unknown>;
   provider: ProviderRuntimeContext;
 };

@@ -85,7 +85,7 @@ export function RequestDetailsFilters({
 
   return (
     <>
-      <div className="mb-4 grid gap-3 rounded-2xl border border-[#F0DFC3] bg-[#FFFBF4] p-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="mb-4 grid gap-3 rounded-2xl border border-[#BAE6FD] bg-[#F0F9FF] p-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <label className="block">
           <span className="mb-1.5 block text-[11px] tracking-[0.35px] text-black/55">
             API key filter
@@ -102,7 +102,7 @@ export function RequestDetailsFilters({
                 })
               );
             }}
-            className="h-10 w-full rounded-md border border-[#E7E0D3] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#E58A35] disabled:cursor-wait disabled:opacity-70"
+            className="h-10 w-full rounded-md border border-[#BAE6FD] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#38BDF8] disabled:cursor-wait disabled:opacity-70"
           >
             <option value="all">All keys</option>
             {apiKeys.map((item) => (
@@ -130,7 +130,7 @@ export function RequestDetailsFilters({
                 })
               );
             }}
-            className="h-10 w-full rounded-md border border-[#E7E0D3] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#E58A35] disabled:cursor-wait disabled:opacity-70"
+            className="h-10 w-full rounded-md border border-[#BAE6FD] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#38BDF8] disabled:cursor-wait disabled:opacity-70"
           >
             {requestIntervalOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -156,7 +156,7 @@ export function RequestDetailsFilters({
                 })
               );
             }}
-            className="h-10 w-full rounded-md border border-[#E7E0D3] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#E58A35] disabled:cursor-wait disabled:opacity-70"
+            className="h-10 w-full rounded-md border border-[#BAE6FD] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#38BDF8] disabled:cursor-wait disabled:opacity-70"
           >
             {rangeOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -167,9 +167,9 @@ export function RequestDetailsFilters({
         </label>
       </div>
       {isPending ? (
-        <div className="fixed inset-x-0 bottom-0 top-[6.5rem] z-[25] flex items-center justify-center bg-[#FCFCFA]/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-[#E7E0D3] bg-white px-5 py-4 shadow-lg">
-            <span className="inline-flex size-8 animate-spin rounded-full border-2 border-[#E7E0D3] border-t-[#E58A35]" />
+        <div className="fixed inset-x-0 bottom-0 top-[6.5rem] z-[25] flex items-center justify-center bg-[#F8FCFF]/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-[#BAE6FD] bg-white px-5 py-4 shadow-lg">
+            <span className="inline-flex size-8 animate-spin rounded-full border-2 border-[#BAE6FD] border-t-[#38BDF8]" />
             <span className="text-sm text-[#7B6A55]">Loading request data...</span>
           </div>
         </div>
@@ -234,7 +234,7 @@ export function InteractiveTrendChartCard({
   };
 
   return (
-    <div className="rounded-2xl border border-[#E7E0D3] bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-[#BAE6FD] bg-white p-4 shadow-sm">
       <div>
         <div>
           <p className="text-sm font-medium text-black">{title}</p>
@@ -242,17 +242,17 @@ export function InteractiveTrendChartCard({
         </div>
       </div>
 
-      <div className="relative mt-4 rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
+      <div className="relative mt-4 rounded-xl border border-black/[0.06] bg-[#F8FCFF] p-3">
         {activePoint && activeLabel ? (
           <div
-            className="pointer-events-none absolute top-4 z-10 min-w-28 rounded-lg border border-[#E7E0D3] bg-white px-3 py-2 text-xs shadow-lg"
+            className="pointer-events-none absolute top-4 z-10 min-w-28 rounded-lg border border-[#BAE6FD] bg-white px-3 py-2 text-xs shadow-lg"
             style={{
               left: `${(activePoint.x / width) * 100}%`,
               transform: activePoint.x > width * 0.75 ? "translateX(-100%)" : "translateX(8px)",
             }}
           >
             <p className="font-medium text-[#111827]">{activeLabel}</p>
-            <p className="mt-1 text-[#9A4F18]">{formatValue(activePoint.value, valueKind)}</p>
+            <p className="mt-1 text-[#0369A1]">{formatValue(activePoint.value, valueKind)}</p>
           </div>
         ) : null}
         <svg
@@ -278,7 +278,7 @@ export function InteractiveTrendChartCard({
           <path
             d={buildLinePath(chartPoints)}
             fill="none"
-            stroke="#E58A35"
+            stroke="#38BDF8"
             strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -291,8 +291,8 @@ export function InteractiveTrendChartCard({
                 cx={point.x}
                 cy={point.y}
                 r={isActive ? 5 : 3}
-                fill={isActive ? "#9A4F18" : "#E58A35"}
-                stroke="#FCFCFA"
+                fill={isActive ? "#0369A1" : "#38BDF8"}
+                stroke="#F8FCFF"
                 strokeWidth="2"
               />
             );

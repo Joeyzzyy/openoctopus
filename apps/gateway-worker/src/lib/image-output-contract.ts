@@ -243,7 +243,7 @@ export function normalizeVideoOutputPayload(outputPayload: unknown) {
 }
 
 export function normalizeOutputPayloadByCapability(input: {
-  capability: "image_generation" | "image_edit" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
   outputPayload: unknown;
 }) {
   if (input.capability === "image_generation" || input.capability === "image_edit") {

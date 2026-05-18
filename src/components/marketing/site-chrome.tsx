@@ -60,7 +60,7 @@ export function MarketingHeader({
                 />
                 <Link
                   href="/dashboard"
-                  className="inline-flex h-9 items-center justify-center rounded-full bg-[#C27B3B] px-4 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[#A6642D]"
+                  className="inline-flex h-9 items-center justify-center rounded-full bg-[#38BDF8] px-4 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284C7]"
                 >
                   Dashboard
                 </Link>

@@ -47,7 +47,7 @@ export function UsageTable({ usageRows }: { usageRows: UsageRow[] }) {
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-2">
         <Select value={keyFilter} onValueChange={(v) => v && setKeyFilter(v)}>
-          <SelectTrigger className="h-8 rounded-md border-black/[0.08] bg-[#FCFCFA] px-2.5 font-mono text-[10px] uppercase tracking-[1px] shadow-sm">
+          <SelectTrigger className="h-8 rounded-md border-black/[0.08] bg-[#F8FCFF] px-2.5 font-mono text-[10px] uppercase tracking-[1px] shadow-sm">
             <SelectValue placeholder="All Keys" />
           </SelectTrigger>
           <SelectContent className="border border-black/[0.08] bg-white text-[#111827]">
@@ -61,7 +61,7 @@ export function UsageTable({ usageRows }: { usageRows: UsageRow[] }) {
         </Select>
 
         <Select value={modelFilter} onValueChange={(v) => v && setModelFilter(v)}>
-          <SelectTrigger className="h-8 rounded-md border-black/[0.08] bg-[#FCFCFA] px-2.5 font-mono text-[10px] uppercase tracking-[1px] shadow-sm">
+          <SelectTrigger className="h-8 rounded-md border-black/[0.08] bg-[#F8FCFF] px-2.5 font-mono text-[10px] uppercase tracking-[1px] shadow-sm">
             <SelectValue placeholder="All Models" />
           </SelectTrigger>
           <SelectContent className="border border-black/[0.08] bg-white text-[#111827]">
@@ -96,7 +96,7 @@ export function UsageTable({ usageRows }: { usageRows: UsageRow[] }) {
               {filtered.map((row, i) => (
                 <div
                   key={`${row.time}-${row.apiKey}-${i}`}
-                  className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] p-3.5 shadow-sm"
+                  className="rounded-2xl border border-black/[0.06] bg-[#F8FCFF] p-3.5 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -181,7 +181,7 @@ export function UsageTable({ usageRows }: { usageRows: UsageRow[] }) {
             </div>
           </>
         ) : (
-          <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-3 py-6 text-center text-sm text-black/50">
+          <div className="rounded-2xl border border-black/[0.06] bg-[#F8FCFF] px-3 py-6 text-center text-sm text-black/50">
             No usage events match the current filters.
           </div>
         )}

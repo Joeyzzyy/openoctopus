@@ -45,9 +45,9 @@ const requestStatusStyles = {
   cancelled: "bg-[#ececec] text-[#666666]",
 };
 
-const activePillClassName = "border-[#E58A35] bg-[#FFF1DD] text-[#9A4F18]";
+const activePillClassName = "border-[#38BDF8] bg-[#E0F2FE] text-[#0369A1]";
 const inactivePillClassName =
-  "border-[#E7E0D3] bg-white text-[#6B5F4E] hover:bg-[#FFF7EA] hover:text-[#111827]";
+  "border-[#BAE6FD] bg-white text-[#075985] hover:bg-[#E0F2FE] hover:text-[#111827]";
 
 const requestIntervalOptions = [
   { value: "minute", label: "By minute" },
@@ -185,9 +185,9 @@ function MetricCard({
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="rounded-2xl border border-[#E7E0D3] bg-white px-4 py-4 shadow-sm">
+    <div className="rounded-2xl border border-[#BAE6FD] bg-white px-4 py-4 shadow-sm">
       <div className="flex items-start gap-3">
-        <div className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#FFF1DD] text-[#B7661F]">
+        <div className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#E0F2FE] text-[#0284C7]">
           <Icon className="size-4" />
         </div>
         <div className="min-w-0">
@@ -208,7 +208,7 @@ function EmptyState({
   detail: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-8">
+    <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#F8FCFF] px-4 py-8">
       <p className="text-sm font-medium text-black">{title}</p>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">{detail}</p>
     </div>
@@ -291,7 +291,7 @@ export default async function DashboardPage({
   ];
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-[#FCFCFA] text-[#111111]">
+    <main className="relative min-h-screen overflow-x-hidden bg-[#F8FCFF] text-[#111111]">
       <AutoRefreshOnReturn />
       <TopUpCelebration />
       <MarketingHeader
@@ -395,7 +395,7 @@ export default async function DashboardPage({
                       requestQueueRows.map((row) => (
                         <article
                           key={row.requestId}
-                          className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-3 shadow-sm"
+                          className="rounded-2xl border border-black/[0.08] bg-[#F8FCFF] p-3 shadow-sm"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
@@ -562,7 +562,7 @@ export default async function DashboardPage({
                           })}
                           aria-disabled={requestPagination.page <= 1}
                           className={cn(
-                            "inline-flex h-8 items-center rounded-md border border-[#E7E0D3] bg-white px-3 text-xs font-medium text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]",
+                            "inline-flex h-8 items-center rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-[#075985] transition-colors hover:bg-[#E0F2FE]",
                             requestPagination.page <= 1 && "pointer-events-none opacity-40"
                           )}
                         >
@@ -606,7 +606,7 @@ export default async function DashboardPage({
                           })}
                           aria-disabled={requestPagination.page >= requestPagination.totalPages}
                           className={cn(
-                            "inline-flex h-8 items-center rounded-md border border-[#E7E0D3] bg-white px-3 text-xs font-medium text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]",
+                            "inline-flex h-8 items-center rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-[#075985] transition-colors hover:bg-[#E0F2FE]",
                             requestPagination.page >= requestPagination.totalPages &&
                               "pointer-events-none opacity-40"
                           )}
@@ -690,14 +690,14 @@ export default async function DashboardPage({
                                     href={row.invoiceUrl ?? row.receiptUrl ?? "#"}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="inline-flex h-8 items-center rounded-md border border-[#E7E0D3] bg-white px-3 text-xs font-medium text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]"
+                                    className="inline-flex h-8 items-center rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-[#075985] transition-colors hover:bg-[#E0F2FE]"
                                   >
                                     Open Billing Document
                                   </a>
                                 ) : (
                                   <span
                                     title="Requires matching Stripe credentials for this billing record."
-                                    className="inline-flex h-8 items-center rounded-md border border-[#E7E0D3] bg-white px-3 text-xs font-medium text-[#9A8B78]"
+                                    className="inline-flex h-8 items-center rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-[#64748B]"
                                   >
                                     Document unavailable
                                   </span>
@@ -733,7 +733,7 @@ export default async function DashboardPage({
                         })}
                         aria-disabled={normalizedBillingPage <= 1}
                         className={cn(
-                          "inline-flex h-8 items-center rounded-md border border-[#E7E0D3] bg-white px-3 text-xs font-medium text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]",
+                          "inline-flex h-8 items-center rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-[#075985] transition-colors hover:bg-[#E0F2FE]",
                           normalizedBillingPage <= 1 && "pointer-events-none opacity-40"
                         )}
                       >
@@ -783,7 +783,7 @@ export default async function DashboardPage({
                         })}
                         aria-disabled={normalizedBillingPage >= billingTotalPages}
                         className={cn(
-                          "inline-flex h-8 items-center rounded-md border border-[#E7E0D3] bg-white px-3 text-xs font-medium text-[#6B5F4E] transition-colors hover:bg-[#FFF7EA]",
+                          "inline-flex h-8 items-center rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-[#075985] transition-colors hover:bg-[#E0F2FE]",
                           normalizedBillingPage >= billingTotalPages &&
                             "pointer-events-none opacity-40"
                         )}
@@ -815,7 +815,7 @@ export default async function DashboardPage({
               <section className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
                 <div className="rounded-xl border border-black/[0.08] bg-white p-5">
                   <div className="flex items-center gap-3">
-                    <div className="inline-flex size-10 items-center justify-center overflow-hidden rounded-full border border-black/[0.08] bg-[#FFF7EA] text-[#9A4F18]">
+                    <div className="inline-flex size-10 items-center justify-center overflow-hidden rounded-full border border-black/[0.08] bg-[#E0F2FE] text-[#0369A1]">
                       {user.avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover" />
@@ -830,7 +830,7 @@ export default async function DashboardPage({
                   </div>
 
                   <div className="mt-5 grid gap-3 text-sm">
-                    <div className="rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-3 py-2">
+                    <div className="rounded-lg border border-black/[0.06] bg-[#F8FCFF] px-3 py-2">
                       <p className="text-xs text-black/45">Sign-in methods</p>
                       <p className="mt-1 text-black">
                         {Array.from(new Set([...user.authProviders, ...(user.hasPasswordSignIn ? ["email"] : [])])).length > 0
@@ -840,7 +840,7 @@ export default async function DashboardPage({
                           : "Google"}
                       </p>
                     </div>
-                    <div className="rounded-lg border border-black/[0.06] bg-[#FCFCFA] px-3 py-2">
+                    <div className="rounded-lg border border-black/[0.06] bg-[#F8FCFF] px-3 py-2">
                       <p className="text-xs text-black/45">Password sign-in</p>
                       <p className="mt-1 text-black">
                         {user.hasPasswordSignIn ? "Enabled" : "Not set"}

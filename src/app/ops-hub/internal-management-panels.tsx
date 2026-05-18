@@ -55,8 +55,8 @@ type SupportedModelSummary = {
   provider: string;
   model_slug: string;
   display_name: string;
-  modality: "image" | "video" | "audio";
-  capability: "image_generation" | "image_edit" | "video_generation" | null;
+  modality: "image" | "video" | "audio" | "text";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
   active: boolean;
   createdLabel: string;
   billingConfigText: string;
@@ -139,7 +139,7 @@ type ProviderModelSummary = {
   supportedModelName: string;
   public_model_slug: string;
   upstream_model_slug: string;
-  capability: "image_generation" | "image_edit" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
   active: boolean;
   pricingText: string;
   pricingSummary: string;
@@ -168,11 +168,26 @@ type ProviderModelSummary = {
   runtimeDiagnostics: string[];
 };
 
+const FACE_PLAYGROUND_INPUT_MARKER = "[[playground_input:face_image]]";
+
+function isPrimaryPlaygroundInputAsset(asset: ProviderModelSummary["showcaseAssets"][number]) {
+  return asset.kind === "playground_input";
+}
+
+function isFacePlaygroundInputAsset(asset: ProviderModelSummary["showcaseAssets"][number]) {
+  return asset.kind === "gallery" && asset.altText?.startsWith(FACE_PLAYGROUND_INPUT_MARKER);
+}
+
+function stripFacePlaygroundPrompt(value: string | null) {
+  if (!value?.startsWith(FACE_PLAYGROUND_INPUT_MARKER)) return value ?? "";
+  return value.slice(FACE_PLAYGROUND_INPUT_MARKER.length).trim();
+}
+
 type RoutingRuleSummary = {
   id: string;
   supportedModelId: string | null;
   public_model_slug: string;
-  capability: "image_generation" | "image_edit" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
   primary_provider_model_id: string;
   fallback_provider_model_id: string | null;
   route_strategy: string;
@@ -201,13 +216,13 @@ type InternalModelAiUsageLogSummary = {
 };
 
 const formInputClassName =
-  "h-10 w-full rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+  "h-10 w-full rounded-md border border-[#BAE6FD] bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
 
 const formTextAreaClassName =
-  "w-full rounded-md border border-black/[0.08] bg-white px-3 py-2.5 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+  "w-full rounded-md border border-[#BAE6FD] bg-white px-3 py-2.5 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
 
 const formSelectClassName =
-  "h-10 w-full rounded-md border border-black/[0.08] bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
+  "h-10 w-full rounded-md border border-[#BAE6FD] bg-white px-3 text-sm text-black outline-none transition-colors focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
 
 function formatCurrency(value: number) {
   const absValue = Math.abs(value);
@@ -365,6 +380,7 @@ const SUPPORTED_MODEL_TYPE_OPTIONS = [
   "llm",
   "video-to-text",
   "image-to-text",
+  "image-to-prompt",
   "speech-to-text",
   "audio-to-audio",
   "video-extend",
@@ -407,12 +423,18 @@ function readTemplateConfigDiagnostics(config: Record<string, unknown> | null) {
   const pollPath = typeof config?.pollPath === "string" ? config.pollPath.trim() : "";
   const taskIdPath = typeof config?.taskIdPath === "string" ? config.taskIdPath.trim() : "";
   const resultUrlPath = typeof config?.resultUrlPath === "string" ? config.resultUrlPath.trim() : "";
+  const resultTextPath = typeof config?.resultTextPath === "string" ? config.resultTextPath.trim() : "";
+  const capability = typeof config?.capability === "string" ? config.capability.trim() : "";
   const statusPath = typeof config?.statusPath === "string" ? config.statusPath.trim() : "";
   const resultValueType = typeof config?.resultValueType === "string" ? config.resultValueType.trim() : "";
   const resultMimeType = typeof config?.resultMimeType === "string" ? config.resultMimeType.trim() : "";
   if (!submitPath) diagnostics.push("缺少 submitPath");
   if (!taskIdPath) diagnostics.push("缺少 taskIdPath");
-  if (!resultUrlPath) diagnostics.push("缺少 resultUrlPath");
+  if (capability === "image_recognition") {
+    if (!resultTextPath) diagnostics.push("缺少 resultTextPath");
+  } else if (!resultUrlPath) {
+    diagnostics.push("缺少 resultUrlPath");
+  }
   if (pollPath && !statusPath) diagnostics.push("已配置 pollPath 但缺少 statusPath");
   if (resultValueType && resultValueType !== "url" && resultValueType !== "base64") {
     diagnostics.push("resultValueType 仅支持 url 或 base64");
@@ -687,7 +709,7 @@ function WorkerTemplateConfigEditor({
           />
         </label>
       ) : null}
-      <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+      <div className="rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
         <p className="text-[11px] text-black/55">配置 JSON 预览（自动生成）</p>
         <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-all text-xs text-black/65">
           {configValue}
@@ -763,7 +785,7 @@ function ModalButton({
     <span
       className={
         tone === "secondary"
-          ? "inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
+          ? "inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-[#E0F2FE]"
           : "inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
       }
     >
@@ -843,8 +865,8 @@ function ManagementDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange} disablePointerDismissal>
       <DialogTrigger disabled={disabled}>{trigger}</DialogTrigger>
-      <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] [&>button]:hidden sm:max-w-5xl">
-        <DialogHeader className="border-b border-black/[0.08] px-5 pb-4 pt-5">
+      <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] [&>button]:hidden sm:max-w-5xl">
+        <DialogHeader className="border-b border-[#BAE6FD] px-5 pb-4 pt-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <DialogTitle className="font-medium text-black">{title}</DialogTitle>
@@ -860,7 +882,7 @@ function ManagementDialog({
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-black/[0.12] bg-white text-black transition-colors hover:bg-black/[0.04]"
+                  className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-[#7DD3FC]/45 bg-white text-black transition-colors hover:bg-[#E0F2FE]"
                   aria-label="Close dialog"
                   title="Close"
                 >
@@ -1020,7 +1042,7 @@ function SupportedModelDetailsForm({
       <input type="hidden" name="supportedModelId" value={model.id} />
       <input type="hidden" name="active" value="true" />
       <div className="grid items-start gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
-        <aside className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-1.5">
+        <aside className="rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-1.5">
           <nav className="space-y-1">
             {[
               { key: "basic" as const, label: "基础信息" },
@@ -1085,19 +1107,20 @@ function SupportedModelDetailsForm({
                 { value: "image", label: "图片" },
                 { value: "video", label: "视频" },
                 { value: "audio", label: "音频" },
+                { value: "text", label: "文本" },
               ]}
             />
             <FormSelect label="能力类型" name="capability" defaultValue={model.capability ?? "image_generation"} options={[...capabilityOptions]} />
           </div>
           <div className={activeTab === "pricing" ? "" : "hidden"}>
-            <div className="mb-3 rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+            <div className="mb-3 rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
               <p className="text-[11px] tracking-[0.35px] text-black/60">已配置映射成本参考</p>
               {providerModelMappings.length > 0 ? (
                 <div className="mt-2 space-y-1.5">
                   {providerModelMappings.map((mapping) => (
                     <div
                       key={mapping.id}
-                      className="flex items-center justify-between gap-3 rounded-md border border-black/[0.06] bg-white px-2.5 py-1.5 text-xs"
+                      className="flex items-center justify-between gap-3 rounded-md border border-[#DDF4FF] bg-white px-2.5 py-1.5 text-xs"
                     >
                       <span className="min-w-0 truncate text-black/65">
                         {mapping.providerName} / {mapping.upstream_model_slug}
@@ -1106,7 +1129,7 @@ function SupportedModelDetailsForm({
                       <button
                         type="button"
                         onClick={() => setPricingSeed(mapping.pricingText)}
-                        className="shrink-0 rounded-md border border-black/[0.08] bg-white px-2 py-1 text-[11px] font-medium text-black/65 hover:bg-black/[0.03]"
+                        className="shrink-0 rounded-md border border-[#BAE6FD] bg-white px-2 py-1 text-[11px] font-medium text-black/65 hover:bg-[#E0F2FE]"
                       >
                         同步到售价
                       </button>
@@ -1177,7 +1200,7 @@ function ActiveCheckbox({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex items-center gap-3 rounded-md border border-black/[0.08] bg-white px-3 py-3 text-sm text-black/72">
+    <label className="flex items-center gap-3 rounded-md border border-[#BAE6FD] bg-white px-3 py-3 text-sm text-black/72">
       <input
         type="checkbox"
         name={name}
@@ -1266,11 +1289,13 @@ export function PublicModelsPanel({
   const modalityLabel = (value: SupportedModelSummary["modality"]) => {
     if (value === "image") return "图片";
     if (value === "video") return "视频";
-    return "音频";
+    if (value === "audio") return "音频";
+    return "文本";
   };
   const capabilityLabel = (value: SupportedModelSummary["capability"]) => {
     if (value === "image_generation") return "图片生成";
     if (value === "image_edit") return "图片编辑";
+    if (value === "image_recognition") return "图片识别";
     if (value === "video_generation") return "视频生成";
     return "未设置";
   };
@@ -1335,7 +1360,7 @@ export function PublicModelsPanel({
     <div className="space-y-4">
       {models.length > 0 ? (
         <div className="space-y-5">
-          <div className="rounded-xl border border-black/[0.08] bg-white p-3">
+          <div className="rounded-xl border border-[#BAE6FD] bg-white p-3">
             <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
               <div>
                 <p className="mb-2 text-[11px] tracking-[0.25px] text-black/55">按类型筛选</p>
@@ -1349,7 +1374,7 @@ export function PublicModelsPanel({
                         className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs transition-colors ${
                           active
                             ? "border-black bg-black text-white"
-                            : "border-black/[0.12] bg-[#FCFCFA] text-black/70 hover:bg-black/[0.04]"
+                            : "border-[#7DD3FC]/45 bg-[#F8FCFF] text-black/70 hover:bg-[#E0F2FE]"
                         }`}
                       >
                         {option.label}
@@ -1374,7 +1399,7 @@ export function PublicModelsPanel({
                         className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs transition-colors ${
                           active
                             ? "border-black bg-black text-white"
-                            : "border-black/[0.12] bg-[#FCFCFA] text-black/70 hover:bg-black/[0.04]"
+                            : "border-[#7DD3FC]/45 bg-[#F8FCFF] text-black/70 hover:bg-[#E0F2FE]"
                         }`}
                       >
                         {option.label}
@@ -1386,9 +1411,9 @@ export function PublicModelsPanel({
             </div>
           </div>
           {visibleModelGroupsWithStatus.map((group) => (
-            <section key={group.category} className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+            <section key={group.category} className="rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
               <div className="mb-3 flex items-center gap-2">
-                <span className="inline-flex rounded-full border border-black/[0.08] bg-white px-2.5 py-1 text-xs font-medium text-black/75">
+                <span className="inline-flex rounded-full border border-[#BAE6FD] bg-white px-2.5 py-1 text-xs font-medium text-black/75">
                   {modelCategoryLabel(group.category)}
                 </span>
                 <span className="text-[11px] text-black/50">{group.models.length} models</span>
@@ -1406,7 +1431,7 @@ export function PublicModelsPanel({
               null;
             const hasRouting = Boolean(activeRoutingRule?.primary_provider_model_id);
             return (
-              <section key={model.id} className="rounded-2xl border border-black/[0.06] bg-white p-3 shadow-sm">
+              <section key={model.id} className="rounded-2xl border border-[#DDF4FF] bg-white p-3 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-2.5">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1419,14 +1444,14 @@ export function PublicModelsPanel({
                     </p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
                       {modelType ? (
-                        <span className="rounded border border-black/[0.1] bg-[#FCFCFA] px-1.5 py-0.5 text-black/62">
+                        <span className="rounded border border-black/[0.1] bg-[#F8FCFF] px-1.5 py-0.5 text-black/62">
                           类型：{modelType}
                         </span>
                       ) : null}
-                      <span className="rounded border border-black/[0.1] bg-[#FCFCFA] px-1.5 py-0.5 text-black/58">
+                      <span className="rounded border border-black/[0.1] bg-[#F8FCFF] px-1.5 py-0.5 text-black/58">
                         添加时间：{model.createdLabel}
                       </span>
-                      <span className="rounded border border-black/[0.1] bg-[#FCFCFA] px-1.5 py-0.5 text-black/65">
+                      <span className="rounded border border-black/[0.1] bg-[#F8FCFF] px-1.5 py-0.5 text-black/65">
                         {model.billingSummary}
                       </span>
                     </div>
@@ -1457,7 +1482,7 @@ export function PublicModelsPanel({
                         className={`inline-flex h-7 min-w-[64px] items-center justify-center rounded-md border px-2 text-[11px] font-medium transition-colors ${
                           model.active
                             ? "border-[#9CC9A5] bg-[#EAF7ED] text-[#2F7A3E] hover:bg-[#def0e3]"
-                            : "border-black/[0.14] bg-[#F2F2F1] text-black/70 hover:bg-[#ebebea]"
+                            : "border-black/[0.14] bg-[#F0F9FF] text-black/70 hover:bg-[#E0F2FE]"
                         }`}
                       >
                         {model.active ? "停用" : "启用"}
@@ -1539,7 +1564,7 @@ export function PublicModelsPanel({
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-lg border border-black/[0.06] bg-[#FAFAF9] p-3">
+                <div className="mt-4 rounded-lg border border-[#DDF4FF] bg-[#F8FCFF] p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <p className="text-[11px] font-medium tracking-[0.25px] text-black/55">供应商供应模型列表</p>
                     <ManagementDialog
@@ -1576,10 +1601,10 @@ export function PublicModelsPanel({
                   {mappings.length === 0 ? (
                     <p className="text-xs text-black/45">暂无映射</p>
                   ) : (
-                    <div className="overflow-x-auto rounded-md border border-black/[0.06] bg-white">
+                    <div className="overflow-x-auto rounded-md border border-[#DDF4FF] bg-white">
                       <table className="min-w-[760px] w-full text-[11px]">
                         <thead>
-                          <tr className="border-b border-black/[0.06] bg-[#FCFCFA] text-black/45">
+                          <tr className="border-b border-[#DDF4FF] bg-[#F8FCFF] text-black/45">
                             <th className="px-2 py-1.5 text-left font-medium">供应商</th>
                             <th className="px-2 py-1.5 text-left font-medium">上游模型</th>
                             <th className="px-2 py-1.5 text-left font-medium">内容状态</th>
@@ -1645,33 +1670,42 @@ export function PublicModelsPanel({
                                           mapping.showcaseAssets.find((asset) => asset.kind === "cover")?.publicUrl ?? null
                                         }
                                         defaultPlaygroundInputUrl={
-                                          mapping.showcaseAssets.find((asset) => asset.kind === "playground_input")?.publicUrl ?? null
+                                          mapping.showcaseAssets.find(isPrimaryPlaygroundInputAsset)?.publicUrl ?? null
+                                        }
+                                        defaultFacePlaygroundInputUrl={
+                                          mapping.showcaseAssets.find(isFacePlaygroundInputAsset)?.publicUrl ?? null
                                         }
                                         defaultShowcaseCoverAssetId={
                                           mapping.showcaseAssets.find((asset) => asset.kind === "cover")?.id
                                         }
                                         defaultPlaygroundInputAssetId={
-                                          mapping.showcaseAssets.find((asset) => asset.kind === "playground_input")?.id
+                                          mapping.showcaseAssets.find(isPrimaryPlaygroundInputAsset)?.id
+                                        }
+                                        defaultFacePlaygroundInputAssetId={
+                                          mapping.showcaseAssets.find(isFacePlaygroundInputAsset)?.id
                                         }
                                         defaultShowcaseCoverPrompt={
                                           mapping.showcaseAssets.find((asset) => asset.kind === "cover")?.altText ?? ""
                                         }
                                         defaultPlaygroundInputPrompt={
-                                          mapping.showcaseAssets.find((asset) => asset.kind === "playground_input")?.altText ?? ""
+                                          mapping.showcaseAssets.find(isPrimaryPlaygroundInputAsset)?.altText ?? ""
+                                        }
+                                        defaultFacePlaygroundInputPrompt={
+                                          stripFacePlaygroundPrompt(mapping.showcaseAssets.find(isFacePlaygroundInputAsset)?.altText ?? null)
                                         }
                                         defaultShowcaseGalleryUrls={
                                           mapping.showcaseAssets
-                                            .filter((asset) => asset.kind === "gallery")
+                                            .filter((asset) => asset.kind === "gallery" && !isFacePlaygroundInputAsset(asset))
                                             .map((asset) => asset.publicUrl)
                                         }
                                         defaultShowcaseGalleryAssetIds={
                                           mapping.showcaseAssets
-                                            .filter((asset) => asset.kind === "gallery")
+                                            .filter((asset) => asset.kind === "gallery" && !isFacePlaygroundInputAsset(asset))
                                             .map((asset) => asset.id)
                                         }
                                         defaultShowcaseGalleryPrompts={
                                           mapping.showcaseAssets
-                                            .filter((asset) => asset.kind === "gallery")
+                                            .filter((asset) => asset.kind === "gallery" && !isFacePlaygroundInputAsset(asset))
                                             .map((asset) => asset.altText ?? "")
                                         }
                                         formId={`provider-model-form-${mapping.id}`}
@@ -1715,11 +1749,11 @@ export function PublicModelsPanel({
             </section>
           ))}
           {visibleModelGroupsWithStatus.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6 text-sm text-black/55">
+            <div className="rounded-xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6 text-sm text-black/55">
               当前筛选下没有可售模型。
             </div>
           ) : null}
-          <div className="flex items-center justify-between rounded-2xl border border-black/[0.06] bg-white px-4 py-3">
+          <div className="flex items-center justify-between rounded-2xl border border-[#DDF4FF] bg-white px-4 py-3">
             <p className="text-xs text-black/45">
               Showing {modelPageStart}-{modelPageEnd} of {modelTotalCount}
             </p>
@@ -1731,8 +1765,8 @@ export function PublicModelsPanel({
                   modelType: activeModelTypeFilter,
                   status: activeStatusFilter,
                 })}
-                className={`h-8 rounded-md border border-black/[0.08] bg-white px-3 py-2 text-xs text-black/65 ${
-                  modelPage <= 1 ? "pointer-events-none opacity-40" : "hover:bg-black/[0.03]"
+                className={`h-8 rounded-md border border-[#BAE6FD] bg-white px-3 py-2 text-xs text-black/65 ${
+                  modelPage <= 1 ? "pointer-events-none opacity-40" : "hover:bg-[#E0F2FE]"
                 }`}
               >
                 Previous
@@ -1744,8 +1778,8 @@ export function PublicModelsPanel({
                   modelType: activeModelTypeFilter,
                   status: activeStatusFilter,
                 })}
-                className={`h-8 rounded-md border border-black/[0.08] bg-white px-3 py-2 text-xs text-black/65 ${
-                  modelPage >= modelTotalPages ? "pointer-events-none opacity-40" : "hover:bg-black/[0.03]"
+                className={`h-8 rounded-md border border-[#BAE6FD] bg-white px-3 py-2 text-xs text-black/65 ${
+                  modelPage >= modelTotalPages ? "pointer-events-none opacity-40" : "hover:bg-[#E0F2FE]"
                 }`}
               >
                 Next
@@ -1754,7 +1788,7 @@ export function PublicModelsPanel({
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有可售模型</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             先创建一个可售模型，例如 `openoctopus/gemini-2.5-flash-image`。
@@ -1811,21 +1845,21 @@ export function ModelVendorsPanel({
   return (
     <div className="space-y-4">
       {vendorRows.length > 0 ? (
-        <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-2xl border border-[#BAE6FD] bg-white shadow-sm">
           <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="text-xs text-black/50">
-                <th className="border-b border-black/[0.08] px-3 py-2.5">模型厂商</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">创建时间</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">操作</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">模型厂商</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">创建时间</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">操作</th>
               </tr>
             </thead>
             <tbody>
               {vendorRows.map((vendor) => (
                 <tr key={vendor.id}>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-sm text-black">{vendor.name}</td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{vendor.createdLabel}</td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-sm text-black">{vendor.name}</td>
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs text-black/60">{vendor.createdLabel}</td>
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle">
                     {!vendor.deletable ? (
                       <span className="text-xs text-black/35">-</span>
                     ) : (
@@ -1854,7 +1888,7 @@ export function ModelVendorsPanel({
           </table>
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有模型厂商</p>
         </div>
       )}
@@ -1954,7 +1988,7 @@ export function CreateSupportedModelButton({
       {({ close }) => (
       <ManagedDialogForm key={`create-supported-model-${formSeed}`} action={createSupportedModel} close={close} className="grid gap-4 md:grid-cols-2">
         {cloneCandidates.length > 0 ? (
-          <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3 md:col-span-2">
+          <div className="rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3 md:col-span-2">
             <p className="mb-2 text-[11px] tracking-[0.35px] text-black/60">从其他可售模型一键套用资料</p>
             <div className="flex flex-col gap-2 md:flex-row md:items-center">
               <select
@@ -1973,7 +2007,7 @@ export function CreateSupportedModelButton({
                 type="button"
                 onClick={applyCreateDraftFromSource}
                 disabled={!sourceModelId}
-                className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-black/[0.12] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:bg-black/[0.03] disabled:text-black/35"
+                className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-[#7DD3FC]/45 bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-[#E0F2FE] disabled:cursor-not-allowed disabled:bg-black/[0.03] disabled:text-black/35"
               >
                 套用到新建表单
               </button>
@@ -2026,6 +2060,7 @@ export function CreateSupportedModelButton({
             { value: "image", label: "图片" },
             { value: "video", label: "视频" },
             { value: "audio", label: "音频" },
+            { value: "text", label: "文本" },
           ]}
           defaultValue={draftValues.modality}
         />
@@ -2162,30 +2197,30 @@ export function EconomicsPanel({
         <>
           <div className="space-y-4">
             {Array.from(groupedByProvider.entries()).map(([providerId, providerGroup]) => (
-              <section key={providerId} className="rounded-2xl border border-black/[0.08] bg-white shadow-sm">
-                <div className="border-b border-black/[0.08] bg-[#F3F7FF] px-4 py-3 text-sm font-semibold text-[#355FB4]">
+              <section key={providerId} className="rounded-2xl border border-[#BAE6FD] bg-white shadow-sm">
+                <div className="border-b border-[#BAE6FD] bg-[#E0F2FE] px-4 py-3 text-sm font-semibold text-[#0369A1]">
                   供应商：{providerGroup.providerName}
                 </div>
                 <div className="space-y-4 p-3">
                   {Array.from(providerGroup.vendors.entries()).map(([vendor, vendorRows]) => (
-                    <div key={`${providerId}-${vendor}`} className="rounded-xl border border-black/[0.06]">
-                      <div className="border-b border-black/[0.06] bg-[#FCFCFA] px-3 py-2 text-xs font-medium text-black/70">
+                    <div key={`${providerId}-${vendor}`} className="rounded-xl border border-[#DDF4FF]">
+                      <div className="border-b border-[#DDF4FF] bg-[#F8FCFF] px-3 py-2 text-xs font-medium text-black/70">
                         模型公司：{vendor}
                       </div>
                       <div className="overflow-x-auto">
                         <table className="min-w-[1860px] border-separate border-spacing-0 text-left text-sm">
                           <thead>
                             <tr className="text-xs text-black/50">
-                              <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
-                              <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">模型 Slug</th>
-                              <th className="w-[140px] border-b border-black/[0.08] px-3 py-2.5">能力</th>
-                              <th className="w-[210px] border-b border-black/[0.08] px-3 py-2.5">参数文档</th>
-                              <th className="w-[240px] border-b border-black/[0.08] px-3 py-2.5">售价</th>
-                              <th className="w-[290px] border-b border-black/[0.08] px-3 py-2.5">成本</th>
-                              <th className="w-[130px] border-b border-black/[0.08] px-3 py-2.5">标准利润</th>
-                              <th className="w-[130px] border-b border-black/[0.08] px-3 py-2.5">来源证据</th>
-                              <th className="w-[110px] border-b border-black/[0.08] px-3 py-2.5">状态</th>
-                              <th className="sticky right-0 z-10 w-[180px] border-b border-black/[0.08] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
+                              <th className="w-[290px] border-b border-[#BAE6FD] px-3 py-2.5">可售模型</th>
+                              <th className="w-[290px] border-b border-[#BAE6FD] px-3 py-2.5">模型 Slug</th>
+                              <th className="w-[140px] border-b border-[#BAE6FD] px-3 py-2.5">能力</th>
+                              <th className="w-[210px] border-b border-[#BAE6FD] px-3 py-2.5">参数文档</th>
+                              <th className="w-[240px] border-b border-[#BAE6FD] px-3 py-2.5">售价</th>
+                              <th className="w-[290px] border-b border-[#BAE6FD] px-3 py-2.5">成本</th>
+                              <th className="w-[130px] border-b border-[#BAE6FD] px-3 py-2.5">标准利润</th>
+                              <th className="w-[130px] border-b border-[#BAE6FD] px-3 py-2.5">来源证据</th>
+                              <th className="w-[110px] border-b border-[#BAE6FD] px-3 py-2.5">状态</th>
+                              <th className="sticky right-0 z-10 w-[180px] border-b border-[#BAE6FD] bg-white px-3 py-2.5 shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
                                 操作
                               </th>
                             </tr>
@@ -2193,23 +2228,23 @@ export function EconomicsPanel({
                           <tbody>
                             {vendorRows.map((row) => (
                               <tr key={row.providerModel.id}>
-                                <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top">
+                                <td className="w-[290px] border-b border-[#DDF4FF] px-3 py-3 align-top">
                                   <p className="text-sm font-medium text-black">{row.supportedModel.display_name}</p>
                                 </td>
-                                <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top">
+                                <td className="w-[290px] border-b border-[#DDF4FF] px-3 py-3 align-top">
                                   <p className="font-mono text-xs text-black/70">{row.supportedModel.model_slug}</p>
                                 </td>
-                                <td className="w-[140px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                                <td className="w-[140px] border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/60">
                                   {row.providerModel.capability}
                                 </td>
-                                <td className="w-[210px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                                <td className="w-[210px] border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/60">
                                   <p>{summarizeInputSchema(row.providerModel.inputSchemaText)}</p>
                                   {readSchemaDocUrl(row.providerModel.inputSchemaText) ? (
                                     <a
                                       href={readSchemaDocUrl(row.providerModel.inputSchemaText) ?? ""}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className="mt-1 inline-flex text-[11px] text-[#355FB4] underline-offset-2 hover:underline"
+                                      className="mt-1 inline-flex text-[11px] text-[#0369A1] underline-offset-2 hover:underline"
                                     >
                                       官方参数文档
                                     </a>
@@ -2217,11 +2252,11 @@ export function EconomicsPanel({
                                     <p className="mt-1 text-[11px] text-black/45">未填官方文档链接</p>
                                   )}
                                 </td>
-                                <td className="w-[240px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">{row.supportedModel.billingSummary}</td>
-                                <td className="w-[290px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                                <td className="w-[240px] border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/60">{row.supportedModel.billingSummary}</td>
+                                <td className="w-[290px] border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/60">
                                   <p>{row.providerModel.pricingSummary}</p>
                                 </td>
-                                <td className="w-[130px] border-b border-black/[0.06] px-3 py-3 align-top">
+                                <td className="w-[130px] border-b border-[#DDF4FF] px-3 py-3 align-top">
                                   {row.margin === null ? (
                                     <p className="text-xs text-black/45">口径不一致</p>
                                   ) : (
@@ -2230,21 +2265,21 @@ export function EconomicsPanel({
                                     </p>
                                   )}
                                 </td>
-                                <td className="w-[130px] border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/60">
+                                <td className="w-[130px] border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/60">
                                   <p>来源字段已移除</p>
                                 </td>
-                                <td className="w-[110px] border-b border-black/[0.06] px-3 py-3 align-top">
+                                <td className="w-[110px] border-b border-[#DDF4FF] px-3 py-3 align-top">
                                   <span
                                     className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
                                       row.providerModel.active
                                         ? "border-[#D7EADB] bg-[#EDF8F0] text-[#335D2D]"
-                                        : "border-black/[0.08] bg-[#FCFCFA] text-black/60"
+                                        : "border-[#BAE6FD] bg-[#F8FCFF] text-black/60"
                                     }`}
                                   >
                                     {row.providerModel.active ? "已启用" : "未启用"}
                                   </span>
                                 </td>
-                                <td className="sticky right-0 z-10 w-[180px] border-b border-black/[0.06] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
+                                <td className="sticky right-0 z-10 w-[180px] border-b border-[#DDF4FF] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.28)]">
                                   <div className="flex flex-wrap gap-2">
                               <ManagementDialog
                                 trigger={<ModalButton tone="secondary">编辑</ModalButton>}
@@ -2279,33 +2314,42 @@ export function EconomicsPanel({
                                       row.providerModel.showcaseAssets.find((asset) => asset.kind === "cover")?.publicUrl ?? null
                                     }
                                     defaultPlaygroundInputUrl={
-                                      row.providerModel.showcaseAssets.find((asset) => asset.kind === "playground_input")?.publicUrl ?? null
+                                      row.providerModel.showcaseAssets.find(isPrimaryPlaygroundInputAsset)?.publicUrl ?? null
+                                    }
+                                    defaultFacePlaygroundInputUrl={
+                                      row.providerModel.showcaseAssets.find(isFacePlaygroundInputAsset)?.publicUrl ?? null
                                     }
                                     defaultShowcaseCoverAssetId={
                                       row.providerModel.showcaseAssets.find((asset) => asset.kind === "cover")?.id
                                     }
                                     defaultPlaygroundInputAssetId={
-                                      row.providerModel.showcaseAssets.find((asset) => asset.kind === "playground_input")?.id
+                                      row.providerModel.showcaseAssets.find(isPrimaryPlaygroundInputAsset)?.id
+                                    }
+                                    defaultFacePlaygroundInputAssetId={
+                                      row.providerModel.showcaseAssets.find(isFacePlaygroundInputAsset)?.id
                                     }
                                     defaultShowcaseCoverPrompt={
                                       row.providerModel.showcaseAssets.find((asset) => asset.kind === "cover")?.altText ?? ""
                                     }
                                     defaultPlaygroundInputPrompt={
-                                      row.providerModel.showcaseAssets.find((asset) => asset.kind === "playground_input")?.altText ?? ""
+                                      row.providerModel.showcaseAssets.find(isPrimaryPlaygroundInputAsset)?.altText ?? ""
+                                    }
+                                    defaultFacePlaygroundInputPrompt={
+                                      stripFacePlaygroundPrompt(row.providerModel.showcaseAssets.find(isFacePlaygroundInputAsset)?.altText ?? null)
                                     }
                                     defaultShowcaseGalleryUrls={
                                       row.providerModel.showcaseAssets
-                                        .filter((asset) => asset.kind === "gallery")
+                                        .filter((asset) => asset.kind === "gallery" && !isFacePlaygroundInputAsset(asset))
                                         .map((asset) => asset.publicUrl)
                                     }
                                     defaultShowcaseGalleryAssetIds={
                                       row.providerModel.showcaseAssets
-                                        .filter((asset) => asset.kind === "gallery")
+                                        .filter((asset) => asset.kind === "gallery" && !isFacePlaygroundInputAsset(asset))
                                         .map((asset) => asset.id)
                                     }
                                     defaultShowcaseGalleryPrompts={
                                       row.providerModel.showcaseAssets
-                                        .filter((asset) => asset.kind === "gallery")
+                                        .filter((asset) => asset.kind === "gallery" && !isFacePlaygroundInputAsset(asset))
                                         .map((asset) => asset.altText ?? "")
                                     }
                                     formId={`provider-model-form-${row.providerModel.id}`}
@@ -2348,7 +2392,7 @@ export function EconomicsPanel({
           </div>
         </>
       ) : (
-        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有可售模型</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             先创建可售模型和供应商模型后，这里才会生成联动测算行。
@@ -2402,33 +2446,33 @@ export function WorkerTemplatesPanel({
   return (
     <div className="space-y-4">
       {rows.length > 0 ? (
-        <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-2xl border border-[#BAE6FD] bg-white shadow-sm">
           <table className="min-w-[1020px] border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="text-xs text-black/50">
-                <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">显示名称</th>
-                <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">模板标识</th>
-                <th className="w-[18%] border-b border-black/[0.08] px-3 py-2.5">模式说明</th>
-                <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
-                <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">上游模型</th>
+                <th className="w-[16%] border-b border-[#BAE6FD] px-3 py-2.5">显示名称</th>
+                <th className="w-[16%] border-b border-[#BAE6FD] px-3 py-2.5">模板标识</th>
+                <th className="w-[18%] border-b border-[#BAE6FD] px-3 py-2.5">模式说明</th>
+                <th className="w-[16%] border-b border-[#BAE6FD] px-3 py-2.5">可售模型</th>
+                <th className="w-[16%] border-b border-[#BAE6FD] px-3 py-2.5">上游模型</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-sm text-black">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-sm text-black">
                     <p>{row.displayName}</p>
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/55">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs text-black/55">
                     {row.slug}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs">
                     <p className="font-medium text-black/72">{row.modeLabel}</p>
                     <p className="mt-1 text-black/60">
                       {row.modeLabel === "任务轮询" ? "提交后轮询获取结果" : "请求成功后直接返回结果"}
                     </p>
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs text-black/60">
                     {row.relatedModels.length > 0 ? (
                       <div className="space-y-1">
                         {row.relatedModels.map((item) => (
@@ -2439,7 +2483,7 @@ export function WorkerTemplatesPanel({
                       <span>-</span>
                     )}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs text-black/60">
                     {row.relatedModels.length > 0 ? (
                       <div className="space-y-1">
                         {row.relatedModels.map((item) => (
@@ -2456,7 +2500,7 @@ export function WorkerTemplatesPanel({
           </table>
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有可用模板</p>
         </div>
       )}
@@ -2476,7 +2520,7 @@ export function GatewayErrorDefinitionsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-black/[0.08] bg-white px-4 py-3 shadow-sm">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#BAE6FD] bg-white px-4 py-3 shadow-sm">
         <div>
           <p className="text-sm font-medium text-black">统一错误码维护</p>
           <p className="mt-1 text-xs leading-5 text-black/55">
@@ -2519,25 +2563,25 @@ export function GatewayErrorDefinitionsPanel({
       </div>
 
       {rows.length > 0 ? (
-        <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-2xl border border-[#BAE6FD] bg-white shadow-sm">
           <table className="min-w-[1280px] border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="text-xs text-black/50">
-                <th className="w-[16%] border-b border-black/[0.08] px-3 py-2.5">错误码</th>
-                <th className="w-[10%] border-b border-black/[0.08] px-3 py-2.5">分类</th>
-                <th className="w-[7%] border-b border-black/[0.08] px-3 py-2.5">状态码</th>
-                <th className="w-[25%] border-b border-black/[0.08] px-3 py-2.5">对外文案</th>
-                <th className="w-[8%] border-b border-black/[0.08] px-3 py-2.5">重试</th>
-                <th className="w-[8%] border-b border-black/[0.08] px-3 py-2.5">启用</th>
-                <th className="w-[8%] border-b border-black/[0.08] px-3 py-2.5">排序</th>
-                <th className="w-[12%] border-b border-black/[0.08] px-3 py-2.5">更新时间</th>
-                <th className="w-[6%] border-b border-black/[0.08] px-3 py-2.5">操作</th>
+                <th className="w-[16%] border-b border-[#BAE6FD] px-3 py-2.5">错误码</th>
+                <th className="w-[10%] border-b border-[#BAE6FD] px-3 py-2.5">分类</th>
+                <th className="w-[7%] border-b border-[#BAE6FD] px-3 py-2.5">状态码</th>
+                <th className="w-[25%] border-b border-[#BAE6FD] px-3 py-2.5">对外文案</th>
+                <th className="w-[8%] border-b border-[#BAE6FD] px-3 py-2.5">重试</th>
+                <th className="w-[8%] border-b border-[#BAE6FD] px-3 py-2.5">启用</th>
+                <th className="w-[8%] border-b border-[#BAE6FD] px-3 py-2.5">排序</th>
+                <th className="w-[12%] border-b border-[#BAE6FD] px-3 py-2.5">更新时间</th>
+                <th className="w-[6%] border-b border-[#BAE6FD] px-3 py-2.5">操作</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top">
                     <p className="font-mono text-xs text-black">{row.code}</p>
                     {row.operatorNotes ? (
                       <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-black/50">
@@ -2545,29 +2589,29 @@ export function GatewayErrorDefinitionsPanel({
                       </p>
                     ) : null}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/65">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/65">
                     {row.category}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/65">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/65">
                     {row.httpStatus}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs leading-5 text-black/72">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top text-xs leading-5 text-black/72">
                     {row.publicMessage}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/65">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/65">
                     {row.retryable ? "是" : "否"}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/65">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/65">
                     {row.active ? "启用" : "停用"}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/65">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/65">
                     {row.sortOrder}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top text-xs text-black/50">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/50">
                     <p>{row.updatedLabel}</p>
                     <p className="mt-1">创建于 {row.createdLabel}</p>
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-top">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top">
                     <ManagementDialog
                       trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                       title={`编辑错误码 ${row.code}`}
@@ -2619,7 +2663,7 @@ export function GatewayErrorDefinitionsPanel({
           </table>
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有错误码定义</p>
         </div>
       )}
@@ -2641,7 +2685,7 @@ export function ProvidersPanel({
       return "border-[#D7EADB] bg-[#EDF8F0] text-[#335D2D]";
     }
     if (status === "degraded") {
-      return "border-[#F2E4BF] bg-[#FCF6E6] text-[#8B6A1A]";
+      return "border-[#BAE6FD] bg-[#E0F2FE] text-[#0369A1]";
     }
     return "border-[#F1D2CC] bg-[#FFF7F5] text-[#8D4336]";
   };
@@ -2649,17 +2693,17 @@ export function ProvidersPanel({
   return (
     <div className="space-y-4">
       {providers.length > 0 ? (
-        <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-2xl border border-[#BAE6FD] bg-white shadow-sm">
           <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="text-xs text-black/50">
-                <th className="border-b border-black/[0.08] px-3 py-2.5">供应商</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">基础 URL</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">状态</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">区域</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">模型</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">密钥数</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">操作</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">供应商</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">基础 URL</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">状态</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">区域</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">模型</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">密钥数</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -2668,25 +2712,25 @@ export function ProvidersPanel({
 
                 return (
                 <tr key={provider.id}>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                    <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle">
                       <p className="text-sm font-medium text-black">{provider.name}</p>
                       <p className="mt-1 text-xs text-black/50">{provider.slug}</p>
                       <RuntimeDiagnostics diagnostics={provider.runtimeDiagnostics} />
                     </td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                    <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle">
                       <p className="max-w-[320px] break-all text-xs text-black/60">{provider.base_url ?? "未填写"}</p>
                     </td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                    <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle">
                       <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${statusToneClassName(provider.status)}`}>
                         {provider.status === "healthy" ? "健康" : provider.status === "degraded" ? "降级" : "离线"}
                       </span>
                     </td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{provider.regionsLabel}</td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                    <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs text-black/60">{provider.regionsLabel}</td>
+                    <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs text-black/60">
                       {provider.activeModelCount}/{provider.modelCount}
                     </td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">{provider.credentialCount}</td>
-                    <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                    <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs text-black/60">{provider.credentialCount}</td>
+                    <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle">
                       <div className="flex flex-wrap gap-2">
                         <ManagementDialog
                           trigger={<ModalButton tone="secondary">编辑</ModalButton>}
@@ -2738,7 +2782,7 @@ export function ProvidersPanel({
           </table>
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有供应商</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             从这里开始录入第一个真实上游供应商。
@@ -2833,14 +2877,14 @@ export function CredentialsPanel({
 
       {credentials.length > 0 ? (
         credentials.map((credential) => (
-          <div key={credential.id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+          <div key={credential.id} className="rounded-2xl border border-[#BAE6FD] bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex h-6 items-center rounded-md border border-[#E9E1CF] bg-[#F6F1E7] px-2 text-[11px] text-[#6F5B27]">
+                  <span className="inline-flex h-6 items-center rounded-md border border-[#BAE6FD] bg-[#E0F2FE] px-2 text-[11px] text-[#0369A1]">
                     {credential.environment}
                   </span>
-                  <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
+                  <span className="inline-flex h-6 items-center rounded-md border border-[#BAE6FD] bg-[#E0F2FE] px-2 text-[11px] text-[#0369A1]">
                     {credential.secretSourceLabel}
                   </span>
                   {credential.is_active ? (
@@ -2871,7 +2915,7 @@ export function CredentialsPanel({
                   <input type="hidden" name="isActive" value={credential.is_active ? "false" : "true"} />
                   <button
                     type="submit"
-                    className="inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-black/[0.08] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-black/[0.03]"
+                    className="inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-[#E0F2FE]"
                   >
                     {credential.is_active ? "停用" : "启用"}
                   </button>
@@ -2952,7 +2996,7 @@ export function CredentialsPanel({
           </div>
         ))
       ) : (
-        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有供应商密钥</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             创建供应商后，在这里登记真实的密钥引用。
@@ -3037,18 +3081,18 @@ export function ModelsPanel({
         </ManagementDialog>
       </div>
 
-      <div className="rounded-2xl border border-[#F1DFC6] bg-[#FFF8EE] px-4 py-3 text-sm text-[#8A5B12] shadow-sm">
+      <div className="rounded-2xl border border-[#BAE6FD] bg-[#F0F9FF] px-4 py-3 text-sm text-[#0369A1] shadow-sm">
         这里维护的是供应商真实成本和供应商模型，不是用户售价。用户售价请去“可售模型”里改。
       </div>
 
       {providerModels.length > 0 ? (
         providerModels.map((item) => (
-          <div key={item.id} className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+          <div key={item.id} className="rounded-2xl border border-[#BAE6FD] bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex h-6 items-center rounded-md border border-[#D8E4F8] bg-[#F3F7FF] px-2 text-[11px] text-[#355FB4]">
-                    {item.capability === "image_generation" ? "图片生成" : item.capability === "image_edit" ? "图片编辑" : "视频生成"}
+                  <span className="inline-flex h-6 items-center rounded-md border border-[#BAE6FD] bg-[#E0F2FE] px-2 text-[11px] text-[#0369A1]">
+                    {item.capability === "image_generation" ? "图片生成" : item.capability === "image_edit" ? "图片编辑" : item.capability === "image_recognition" ? "图片识别" : "视频生成"}
                   </span>
                   <span className="text-sm font-medium text-black">{item.providerName}</span>
                 </div>
@@ -3096,16 +3140,16 @@ export function ModelsPanel({
             </div>
 
             <div className="mt-4 grid gap-3 text-xs text-black/55 xl:grid-cols-3">
-              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
+              <div className="rounded-xl border border-[#DDF4FF] bg-[#F8FCFF] p-3">
                 <p className="text-[11px] tracking-[0.35px] text-black/45">成本配置</p>
                 <p className="mt-2 text-sm font-medium text-black">{item.pricingSummary}</p>
                 <pre className="mt-3 overflow-x-auto whitespace-pre-wrap">{item.pricingText}</pre>
               </div>
-              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
+              <div className="rounded-xl border border-[#DDF4FF] bg-[#F8FCFF] p-3">
                 <p className="text-[11px] tracking-[0.35px] text-black/45">成本来源字段</p>
                 <p className="mt-2 text-sm text-black/45">已移除</p>
               </div>
-              <div className="rounded-xl border border-black/[0.06] bg-[#FCFCFA] p-3">
+              <div className="rounded-xl border border-[#DDF4FF] bg-[#F8FCFF] p-3">
                 <p className="text-[11px] tracking-[0.35px] text-black/45">证据字段</p>
                 <p className="mt-2 text-sm text-black/45">已移除</p>
               </div>
@@ -3114,7 +3158,7 @@ export function ModelsPanel({
           </div>
         ))
       ) : (
-        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有供应商模型</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             创建供应商后，在这里补齐真实上游模型标识和成本配置。
@@ -3145,32 +3189,32 @@ export function InternalModelAiUsageLogsPanel({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-black/[0.08] bg-white p-3">
+        <div className="rounded-xl border border-[#BAE6FD] bg-white p-3">
           <p className="text-[11px] tracking-[0.35px] text-black/45">总调用次数</p>
           <p className="mt-1 text-lg font-semibold text-black">{totalCount}</p>
         </div>
-        <div className="rounded-xl border border-black/[0.08] bg-white p-3">
+        <div className="rounded-xl border border-[#BAE6FD] bg-white p-3">
           <p className="text-[11px] tracking-[0.35px] text-black/45">成功 / 失败</p>
           <p className="mt-1 text-lg font-semibold text-black">{succeeded} / {failed}</p>
         </div>
-        <div className="rounded-xl border border-black/[0.08] bg-white p-3">
+        <div className="rounded-xl border border-[#BAE6FD] bg-white p-3">
           <p className="text-[11px] tracking-[0.35px] text-black/45">估算成本（USD）</p>
           <p className="mt-1 text-lg font-semibold text-black">${totalCost.toFixed(6)}</p>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-2xl border border-[#BAE6FD] bg-white shadow-sm">
         <table className="min-w-[1180px] border-separate border-spacing-0 text-left text-sm">
           <thead>
             <tr className="text-xs text-black/50">
-              <th className="border-b border-black/[0.08] px-3 py-2.5">时间</th>
-              <th className="border-b border-black/[0.08] px-3 py-2.5">状态</th>
-              <th className="border-b border-black/[0.08] px-3 py-2.5">模型</th>
-              <th className="border-b border-black/[0.08] px-3 py-2.5">来源 URL</th>
-              <th className="border-b border-black/[0.08] px-3 py-2.5">Tokens (In/Out/Total)</th>
-              <th className="border-b border-black/[0.08] px-3 py-2.5">延迟</th>
-              <th className="border-b border-black/[0.08] px-3 py-2.5">估算成本</th>
-              <th className="border-b border-black/[0.08] px-3 py-2.5">错误信息</th>
+              <th className="border-b border-[#BAE6FD] px-3 py-2.5">时间</th>
+              <th className="border-b border-[#BAE6FD] px-3 py-2.5">状态</th>
+              <th className="border-b border-[#BAE6FD] px-3 py-2.5">模型</th>
+              <th className="border-b border-[#BAE6FD] px-3 py-2.5">来源 URL</th>
+              <th className="border-b border-[#BAE6FD] px-3 py-2.5">Tokens (In/Out/Total)</th>
+              <th className="border-b border-[#BAE6FD] px-3 py-2.5">延迟</th>
+              <th className="border-b border-[#BAE6FD] px-3 py-2.5">估算成本</th>
+              <th className="border-b border-[#BAE6FD] px-3 py-2.5">错误信息</th>
             </tr>
           </thead>
           <tbody>
@@ -3183,8 +3227,8 @@ export function InternalModelAiUsageLogsPanel({
             ) : (
               logs.map((row) => (
                 <tr key={row.id}>
-                  <td className="border-b border-black/[0.06] px-3 py-2.5 text-xs text-black/65">{row.createdLabel}</td>
-                  <td className="border-b border-black/[0.06] px-3 py-2.5">
+                  <td className="border-b border-[#DDF4FF] px-3 py-2.5 text-xs text-black/65">{row.createdLabel}</td>
+                  <td className="border-b border-[#DDF4FF] px-3 py-2.5">
                     <span
                       className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
                         row.status === "succeeded"
@@ -3195,8 +3239,8 @@ export function InternalModelAiUsageLogsPanel({
                       {row.status === "succeeded" ? "成功" : "失败"}
                     </span>
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-2.5 text-xs text-black/65">{row.model}</td>
-                  <td className="max-w-[360px] border-b border-black/[0.06] px-3 py-2.5">
+                  <td className="border-b border-[#DDF4FF] px-3 py-2.5 text-xs text-black/65">{row.model}</td>
+                  <td className="max-w-[360px] border-b border-[#DDF4FF] px-3 py-2.5">
                     <a
                       href={row.source_url}
                       target="_blank"
@@ -3206,14 +3250,14 @@ export function InternalModelAiUsageLogsPanel({
                       {row.source_url}
                     </a>
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-2.5 font-mono text-xs text-black/65">
+                  <td className="border-b border-[#DDF4FF] px-3 py-2.5 font-mono text-xs text-black/65">
                     {row.inputTokens} / {row.outputTokens} / {row.totalTokens}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-2.5 text-xs text-black/65">{row.latencyMs} ms</td>
-                  <td className="border-b border-black/[0.06] px-3 py-2.5 text-xs text-black/65">
+                  <td className="border-b border-[#DDF4FF] px-3 py-2.5 text-xs text-black/65">{row.latencyMs} ms</td>
+                  <td className="border-b border-[#DDF4FF] px-3 py-2.5 text-xs text-black/65">
                     ${Number(row.estimatedCostUsd ?? 0).toFixed(6)}
                   </td>
-                  <td className="max-w-[340px] break-all border-b border-black/[0.06] px-3 py-2.5 text-xs text-[#8D4336]">
+                  <td className="max-w-[340px] break-all border-b border-[#DDF4FF] px-3 py-2.5 text-xs text-[#8D4336]">
                     {row.error_message ?? "-"}
                   </td>
                 </tr>
@@ -3222,7 +3266,7 @@ export function InternalModelAiUsageLogsPanel({
           </tbody>
         </table>
       </div>
-      <div className="flex items-center justify-between rounded-2xl border border-black/[0.06] bg-white px-4 py-3">
+      <div className="flex items-center justify-between rounded-2xl border border-[#DDF4FF] bg-white px-4 py-3">
         <p className="text-xs text-black/45">
           Showing {pageStart}-{pageEnd} of {totalCount}
         </p>
@@ -3230,8 +3274,8 @@ export function InternalModelAiUsageLogsPanel({
           <a
             aria-disabled={page <= 1}
             href={`/ops-hub?tab=internal-model-ai-usage-logs&aiUsagePage=${Math.max(1, page - 1)}`}
-            className={`h-8 rounded-md border border-black/[0.08] bg-white px-3 py-2 text-xs text-black/65 ${
-              page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-black/[0.03]"
+            className={`h-8 rounded-md border border-[#BAE6FD] bg-white px-3 py-2 text-xs text-black/65 ${
+              page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-[#E0F2FE]"
             }`}
           >
             Previous
@@ -3239,8 +3283,8 @@ export function InternalModelAiUsageLogsPanel({
           <a
             aria-disabled={page >= totalPages}
             href={`/ops-hub?tab=internal-model-ai-usage-logs&aiUsagePage=${Math.min(totalPages, page + 1)}`}
-            className={`h-8 rounded-md border border-black/[0.08] bg-white px-3 py-2 text-xs text-black/65 ${
-              page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-black/[0.03]"
+            className={`h-8 rounded-md border border-[#BAE6FD] bg-white px-3 py-2 text-xs text-black/65 ${
+              page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-[#E0F2FE]"
             }`}
           >
             Next
@@ -3281,54 +3325,54 @@ export function RoutesPanel({
   return (
     <div className="space-y-4">
       {routingRules.length > 0 ? (
-        <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-2xl border border-[#BAE6FD] bg-white shadow-sm">
           <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="text-xs text-black/50">
-                <th className="border-b border-black/[0.08] px-3 py-2.5">可售模型</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">能力</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">范围</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">主路由</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">回退路由</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">策略</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">状态</th>
-                <th className="border-b border-black/[0.08] px-3 py-2.5">操作</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">可售模型</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">能力</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">范围</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">主路由</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">回退路由</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">策略</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">状态</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">操作</th>
               </tr>
             </thead>
             <tbody>
               {routingRules.map((rule) => (
                 <tr key={rule.id}>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle">
                     <p className="text-sm font-medium text-black">{rule.public_model_slug}</p>
                     <RuntimeDiagnostics diagnostics={rule.runtimeDiagnostics} />
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs text-black/60">
                     {rule.capability}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs text-black/60">
                     {rule.scopeLabel}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs text-black/60">
                     {rule.primaryLabel}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs text-black/60">
                     {rule.fallbackLabel}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle text-xs text-black/60">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle text-xs text-black/60">
                     {rule.route_strategy}
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle">
                     <span
                       className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] ${
                         rule.active
                           ? "border-[#D7EADB] bg-[#EDF8F0] text-[#335D2D]"
-                          : "border-black/[0.08] bg-[#FCFCFA] text-black/60"
+                          : "border-[#BAE6FD] bg-[#F8FCFF] text-black/60"
                       } whitespace-nowrap`}
                     >
                       {rule.active ? "已启用" : "未启用"}
                     </span>
                   </td>
-                  <td className="border-b border-black/[0.06] px-3 py-3 align-middle">
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-middle">
                     <div className="flex flex-wrap gap-2">
                       <ManagementDialog
                         trigger={<ModalButton tone="secondary">编辑</ModalButton>}
@@ -3380,7 +3424,7 @@ export function RoutesPanel({
           </table>
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-black/[0.12] bg-[#FCFCFA] px-4 py-6">
+        <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
           <p className="text-sm font-medium text-black">还没有路由</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             至少要先有一个真实供应商模型，才能创建路由。

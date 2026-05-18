@@ -10,10 +10,10 @@ export function TopUpForm({ balanceLabel }: { balanceLabel?: string | null }) {
   const [amount, setAmount] = useState(5);
 
   return (
-    <form action={createTopUpCheckoutSession} className="h-full rounded-2xl border border-[#F0DFC3] bg-[#FFFBF4] p-4 shadow-sm">
+    <form action={createTopUpCheckoutSession} className="h-full rounded-2xl border border-[#BAE6FD] bg-[#F0F9FF] p-4 shadow-sm">
       <div className="flex h-full flex-col gap-3">
         <div className="flex items-start gap-3">
-          <div className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-white text-[#B7661F]">
+          <div className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-white text-[#0284C7]">
             <WalletCards className="size-4" />
           </div>
           <div className="min-w-0">
@@ -33,8 +33,8 @@ export function TopUpForm({ balanceLabel }: { balanceLabel?: string | null }) {
               onClick={() => setAmount(preset)}
               className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
                 amount === preset
-                  ? "border-[#E58A35] bg-[#FFF1DD] text-[#9A4F18]"
-                  : "border-[#E7E0D3] bg-white text-[#6B5F4E] hover:bg-[#FFF7EA]"
+                  ? "border-[#38BDF8] bg-[#E0F2FE] text-[#0369A1]"
+                  : "border-[#BAE6FD] bg-white text-[#075985] hover:bg-[#E0F2FE]"
               }`}
             >
               ${preset}
@@ -52,7 +52,7 @@ export function TopUpForm({ balanceLabel }: { balanceLabel?: string | null }) {
               name="amountUsd"
               value={amount}
               onChange={(event) => setAmount(Number(event.target.value || 1))}
-              className="h-9 min-w-0 flex-1 rounded-md border border-[#E7E0D3] bg-white px-3 text-sm text-black outline-none focus:border-[#E58A35]"
+              className="h-9 min-w-0 flex-1 rounded-md border border-[#BAE6FD] bg-white px-3 text-sm text-black outline-none focus:border-[#38BDF8]"
             />
             <span className="text-black/45">USD</span>
           </label>

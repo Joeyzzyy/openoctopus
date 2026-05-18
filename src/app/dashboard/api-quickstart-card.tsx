@@ -148,7 +148,7 @@ function FieldDocTable({
     <div className="max-w-full overflow-x-auto rounded-xl border border-black/[0.08] bg-white">
       <table className="min-w-[680px] text-xs text-black/75">
         <thead>
-          <tr className="border-b border-black/[0.08] bg-[#FCFCFA] text-[10px] uppercase tracking-[0.8px] text-black/45">
+          <tr className="border-b border-black/[0.08] bg-[#F8FCFF] text-[10px] uppercase tracking-[0.8px] text-black/45">
             <th className="px-3 py-2 text-left">Field</th>
             <th className="px-3 py-2 text-left">Type</th>
             <th className="px-3 py-2 text-left">{kind === "input" ? "Required" : "Exposed"}</th>
@@ -206,7 +206,7 @@ function CodeBlock({
       >
         {copiedBlock === copyId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
       </button>
-      <pre className="max-w-full overflow-x-auto rounded-2xl border border-black/[0.08] bg-[#F6F8FB] p-4 pr-12 font-mono text-[11px] leading-6 text-[#1F2937]">
+      <pre className="max-w-full overflow-x-auto rounded-2xl border border-black/[0.08] bg-[#F0F9FF] p-4 pr-12 font-mono text-[11px] leading-6 text-[#1F2937]">
         <code>{code}</code>
       </pre>
     </div>
@@ -257,6 +257,7 @@ function sanitizeProviderInputSchemaForDocs(schema: Record<string, unknown>) {
 
 function buildEndpoint(capability: string) {
   if (capability === "image_edit") return "/v1/images/edits";
+  if (capability === "image_recognition") return "/v1/images/recognitions";
   return capability.includes("video") ? "/v1/videos/generations" : "/v1/images/generations";
 }
 
@@ -544,8 +545,8 @@ export function ApiQuickstartCard({
 
   const tabClass = (active: boolean) =>
     active
-      ? "border-[#E58A35] bg-[#FFF1DD] text-[#9A4F18]"
-      : "border-[#E7E0D3] bg-white text-[#6B5F4E] hover:bg-[#FFF7EA]";
+      ? "border-[#38BDF8] bg-[#E0F2FE] text-[#0369A1]"
+      : "border-[#BAE6FD] bg-white text-[#075985] hover:bg-[#E0F2FE]";
 
   const jumpToSection = (section: "quickstart" | "input" | "output" | "errors") => {
     setActiveSection(section);
@@ -647,7 +648,7 @@ export function ApiQuickstartCard({
         </button>
       </div>
       <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-2 md:sticky md:top-24 md:self-start max-md:static">
+        <aside className="h-fit rounded-xl border border-black/[0.08] bg-[#F8FCFF] p-2 md:sticky md:top-24 md:self-start max-md:static">
           <nav className="space-y-1">
             <button
               type="button"
@@ -681,7 +682,7 @@ export function ApiQuickstartCard({
         </aside>
         <div className="min-w-0 space-y-3">
           <div ref={quickstartRef} className="space-y-3">
-            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+            <div className="rounded-2xl border border-black/[0.06] bg-[#F8FCFF] px-4 py-3.5">
               <p className="text-[10px] uppercase tracking-[1px] text-black/45">Integration Steps</p>
               <ol className="mt-2 space-y-1.5 text-xs leading-5 text-black/70">
                 <li>1. Request style: <code className="font-mono">{protocolModeLabel}</code></li>
@@ -692,7 +693,7 @@ export function ApiQuickstartCard({
               </ol>
             </div>
 
-            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+            <div className="rounded-2xl border border-black/[0.06] bg-[#F8FCFF] px-4 py-3.5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[10px] uppercase tracking-[1px] text-black/45">Step 1 · Create Request</p>
@@ -724,7 +725,7 @@ export function ApiQuickstartCard({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+            <div className="rounded-2xl border border-black/[0.06] bg-[#F8FCFF] px-4 py-3.5">
               <div>
                 <div>
                   <p className="text-[10px] uppercase tracking-[1px] text-black/45">Poll Task Status</p>
@@ -743,7 +744,7 @@ export function ApiQuickstartCard({
             </div>
 
             {normalizedRequestExampleJson ? (
-              <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div className="rounded-2xl border border-black/[0.06] bg-[#F8FCFF] px-4 py-3.5">
                 <p className="text-[10px] uppercase tracking-[1px] text-black/45">Request Example (From Internal)</p>
                 <div className="mt-3">
                   <CodeBlock
@@ -756,7 +757,7 @@ export function ApiQuickstartCard({
               </div>
             ) : null}
             {selectedModel?.submitResponseExampleJson ? (
-              <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div className="rounded-2xl border border-black/[0.06] bg-[#F8FCFF] px-4 py-3.5">
                 <p className="text-[10px] uppercase tracking-[1px] text-black/45">Submit Response Example</p>
                 <div className="mt-3">
                   <CodeBlock
@@ -771,7 +772,7 @@ export function ApiQuickstartCard({
           </div>
 
           <div ref={inputRef} className="space-y-3">
-            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+            <div className="rounded-2xl border border-black/[0.06] bg-[#F8FCFF] px-4 py-3.5">
               <div>
                 <p className="text-[10px] uppercase tracking-[1px] text-black/45">
                   Input Schema (Standard + Provider Extension)
@@ -797,7 +798,7 @@ export function ApiQuickstartCard({
           </div>
 
           <div ref={outputRef} className="space-y-3">
-            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+            <div className="rounded-2xl border border-black/[0.06] bg-[#F8FCFF] px-4 py-3.5">
               <div>
                 <p className="text-[10px] uppercase tracking-[1px] text-black/45">
                   Output Schema (Standard + Provider Extension)
@@ -824,7 +825,7 @@ export function ApiQuickstartCard({
               </div>
             </div>
             {selectedModel?.normalizedOutputExampleJson ? (
-              <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+              <div className="rounded-2xl border border-black/[0.06] bg-[#F8FCFF] px-4 py-3.5">
                 <p className="text-[10px] uppercase tracking-[1px] text-black/45">Final Output Example (Normalized)</p>
                 <div className="mt-3">
                   <CodeBlock
@@ -839,7 +840,7 @@ export function ApiQuickstartCard({
           </div>
 
           <div ref={errorRef} className="space-y-3">
-            <div className="rounded-2xl border border-black/[0.06] bg-[#FCFCFA] px-4 py-3.5">
+            <div className="rounded-2xl border border-black/[0.06] bg-[#F8FCFF] px-4 py-3.5">
               <p className="text-[10px] uppercase tracking-[1px] text-black/45">Step 4 · Error Handling Guide</p>
               <p className="mt-1 text-xs leading-5 text-black/55">
                 Error codes below are loaded from internal gateway error definitions and should be treated as source of truth.
@@ -847,7 +848,7 @@ export function ApiQuickstartCard({
               <div className="mt-2 max-w-full overflow-x-auto rounded-xl border border-black/[0.08] bg-white">
                 <table className="min-w-[680px] text-xs text-black/75">
                   <thead>
-                    <tr className="border-b border-black/[0.08] bg-[#FCFCFA] text-[10px] uppercase tracking-[0.8px] text-black/45">
+                    <tr className="border-b border-black/[0.08] bg-[#F8FCFF] text-[10px] uppercase tracking-[0.8px] text-black/45">
                       <th className="px-3 py-2 text-left">Code</th>
                       <th className="px-3 py-2 text-left">HTTP</th>
                       <th className="px-3 py-2 text-left">Retryable</th>

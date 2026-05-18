@@ -197,7 +197,7 @@ function InlineProfileDetail({ profile }: { profile: CompetitorProfile }) {
 /* ------------------------------------------------------------------ */
 
 const tierColors: Record<Tier, { badge: string; badgeText: string }> = {
-  focus: { badge: "bg-[#F3E7D8]", badgeText: "text-[#8A5A28]" },
+  focus: { badge: "bg-[#E0F2FE]", badgeText: "text-[#075985]" },
   competitor: { badge: "bg-slate-100", badgeText: "text-slate-600" },
   other: { badge: "bg-stone-100", badgeText: "text-stone-500" },
 };
@@ -280,7 +280,7 @@ function ComparisonTable({ rows }: { rows: ComparisonRow[] }) {
                       {row.relationLike}
                     </p>
                     <p className="mt-2">
-                      <span className="font-bold text-amber-700">不像：</span>
+                      <span className="font-bold text-sky-700">不像：</span>
                       {row.relationUnlike}
                     </p>
                   </td>
@@ -289,7 +289,7 @@ function ComparisonTable({ rows }: { rows: ComparisonRow[] }) {
                   <tr key={`${row.name}-detail`}>
                     <td colSpan={6} className="border-b border-black/8 px-4 pb-5">
                       <details className="group">
-                        <summary className="flex cursor-pointer select-none items-center gap-2 rounded-xl border border-black/8 bg-[#FBFAF7] px-4 py-2.5 transition-all hover:border-black/16 hover:bg-[#F5F1EA] group-open:rounded-b-none group-open:border-b-0 group-open:bg-[#F5F1EA]">
+                        <summary className="flex cursor-pointer select-none items-center gap-2 rounded-xl border border-black/8 bg-[#FBFAF7] px-4 py-2.5 transition-all hover:border-black/16 hover:bg-[#E0F2FE] group-open:rounded-b-none group-open:border-b-0 group-open:bg-[#E0F2FE]">
                           <svg
                             className="h-4 w-4 shrink-0 text-black/40 transition-transform duration-200 group-open:rotate-90"
                             fill="none"

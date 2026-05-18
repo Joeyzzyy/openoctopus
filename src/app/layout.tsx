@@ -50,7 +50,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${dmSans.variable} ${inter.variable} ${jetbrainsMono.variable} dark`}>
-      <body className="min-h-full bg-[#0C0A09] text-[#FAFAF8] font-sans">
+      <body className="min-h-full bg-[#06131F] text-[#F8FCFF] font-sans">
         {children}
         <Suspense fallback={null}>
           <GlobalAlertToaster />

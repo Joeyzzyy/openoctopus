@@ -18,7 +18,7 @@ export type RuntimeCredential = {
 export type RuntimeSupportedModel = {
   id: string;
   model_slug: string;
-  capability: "image_generation" | "image_edit" | "video_generation" | null;
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
 };
 
 export type RuntimeProviderModel = {
@@ -26,7 +26,7 @@ export type RuntimeProviderModel = {
   provider_id: string;
   supported_model_id: string | null;
   upstream_model_slug: string;
-  capability: "image_generation" | "image_edit" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
   active: boolean;
   execution_template?: string | null;
   execution_config?: Record<string, unknown> | null;
@@ -35,7 +35,7 @@ export type RuntimeProviderModel = {
 export type RuntimeRoutingRule = {
   id: string;
   public_model_slug: string;
-  capability: "image_generation" | "image_edit" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
   primary_provider_model_id: string;
   fallback_provider_model_id: string | null;
   active: boolean;
@@ -78,7 +78,10 @@ function detectTemplateMode(config: Record<string, unknown>) {
   return readString(config.pollPath).length > 0 ? "async" : "sync";
 }
 
-function validateTemplateConfig(config: Record<string, unknown>) {
+function validateTemplateConfig(
+  config: Record<string, unknown>,
+  capability?: RuntimeProviderModel["capability"]
+) {
   const diagnostics: string[] = [];
   const resultValueType = readString(config.resultValueType);
   if (readString(config.submitPath).length === 0) {
@@ -87,7 +90,11 @@ function validateTemplateConfig(config: Record<string, unknown>) {
   if (readString(config.taskIdPath).length === 0) {
     diagnostics.push("模板配置缺少 taskIdPath。");
   }
-  if (readString(config.resultUrlPath).length === 0) {
+  if (capability === "image_recognition") {
+    if (readString(config.resultTextPath).length === 0) {
+      diagnostics.push("图片识别模型必须配置 resultTextPath 指向文本输出字段。");
+    }
+  } else if (readString(config.resultUrlPath).length === 0) {
     diagnostics.push("模板配置缺少 resultUrlPath。");
   }
   if (detectTemplateMode(config) === "async" && readString(config.pollPath).length === 0) {
@@ -188,7 +195,7 @@ export function getProviderModelRuntimeDiagnostics(input: {
           ? providerModel.execution_config
           : {}),
       };
-      diagnostics.push(...validateTemplateConfig(mergedConfig));
+      diagnostics.push(...validateTemplateConfig(mergedConfig, providerModel.capability));
       if (
         providerModel.capability === "image_generation" ||
         providerModel.capability === "image_edit"
