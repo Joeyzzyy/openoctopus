@@ -3,13 +3,11 @@ import { unstable_noStore as noStore } from "next/cache";
 import {
   ArrowRight,
   BookOpen,
-  CheckCircle2,
   CircleDollarSign,
   Code2,
   FileCode2,
   Image,
   KeyRound,
-  Layers3,
   ListChecks,
   MonitorPlay,
   MessageSquareText,
@@ -21,7 +19,6 @@ import {
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { createClient } from "@/lib/supabase/server";
 import {
-  buildImageGenerationCurl,
   buildTaskStatusCurl,
   PUBLIC_API_BASE_URL,
 } from "@/lib/api-docs";
@@ -40,15 +37,12 @@ export const metadata = {
 
 const pageSections = [
   { id: "introduction", label: "Introduction" },
-  { id: "quick-start", label: "Quick Start" },
   { id: "authentication", label: "Authentication" },
   { id: "cli", label: "CLI" },
   { id: "rest-api", label: "REST API" },
   { id: "models", label: "Models" },
   { id: "tasks", label: "Tasks" },
-  { id: "billing", label: "Billing" },
   { id: "errors", label: "Errors" },
-  { id: "support", label: "Support" },
 ] as const;
 
 const endpointRows = [
@@ -299,14 +293,7 @@ export default async function DocsPage() {
 
           <div className="min-w-0 space-y-12">
             <section id="introduction" className="rounded-[32px] border border-black/[0.06] bg-white px-6 py-8 shadow-[0_18px_42px_rgba(15,23,42,0.06)] md:px-8">
-              <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#111827]">
-                <BookOpen className="h-4 w-4 text-[#38BDF8]" />
-                OpenOctopus Docs
-              </Link>
-              <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.14em] text-[#0369A1]">
-                Documentation
-              </p>
-              <h1 className="mt-4 max-w-3xl text-4xl font-semibold text-[#111827] md:text-6xl">
+              <h1 className="max-w-3xl text-4xl font-semibold text-[#111827] md:text-6xl">
                 Build with OpenOctopus
               </h1>
               <p className="mt-5 max-w-3xl text-[17px] leading-8 text-[#475569]">
@@ -359,30 +346,6 @@ export default async function DocsPage() {
                 </InfoCard>
               </div>
             </section>
-
-          <DocsSection id="quick-start">
-            <SectionHeader
-              eyebrow="Getting Started"
-              title="Quick start"
-              description="If you are new here, use this order: create an API key, send one request, then keep checking the task until it finishes. You do not need to understand every endpoint before getting started."
-            />
-            <div className="space-y-4">
-              {[
-                "Put your API key in the Authorization header on every request.",
-                "Choose one public model slug and send a request to the matching endpoint.",
-                "If the model runs asynchronously, poll the returned task ID until it finishes.",
-                "When the task succeeds, read the final image, video, or text from the output payload.",
-              ].map((item) => (
-                <div key={item} className="flex gap-3 rounded-2xl border border-black/[0.08] bg-[#FCFCFA] px-4 py-3 text-sm leading-7 text-[#475569]">
-                  <CheckCircle2 className="mt-1 h-4 w-4 flex-none text-[#15803D]" />
-                  <span>{item}</span>
-                </div>
-              ))}
-              <div>
-                <CodeBlock>{buildImageGenerationCurl()}</CodeBlock>
-              </div>
-            </div>
-          </DocsSection>
 
           <DocsSection id="authentication">
             <SectionHeader
@@ -756,25 +719,6 @@ Steps:
 }`}</CodeBlock>
           </DocsSection>
 
-          <DocsSection id="billing">
-            <SectionHeader
-              eyebrow="Pricing & Billing"
-              title="Wallet billing"
-              description="OpenOctopus estimates customer charge before creating a provider job. Actual request costs and top ups are visible in the dashboard."
-            />
-            <div className="grid gap-4 md:grid-cols-3">
-              <InfoCard icon={CircleDollarSign} title="Prepaid wallet">
-                A positive workspace wallet balance is required before requests are accepted.
-              </InfoCard>
-              <InfoCard icon={Layers3} title="Model pricing">
-                Pricing is model specific and can vary by image count, video duration, resolution, quality, or add-ons.
-              </InfoCard>
-              <InfoCard icon={FileCode2} title="Usage records">
-                Usage events, request history, and billing ledger entries are available from the dashboard.
-              </InfoCard>
-            </div>
-          </DocsSection>
-
           <DocsSection id="errors">
             <SectionHeader
               eyebrow="Help"
@@ -826,40 +770,6 @@ Steps:
                   ))}
                 </tbody>
               </table>
-            </div>
-          </DocsSection>
-
-          <DocsSection id="support">
-            <SectionHeader
-              eyebrow="Support"
-              title="Need help?"
-              description="Use the dashboard and model catalog as the source of truth for active models, pricing, generated task history, and API keys."
-            />
-            <div className="grid gap-4 md:grid-cols-2">
-              <Link
-                href="/dashboard"
-                className="group rounded-lg border border-black/[0.08] bg-white p-4 shadow-sm transition-colors hover:border-[#38BDF8]/50"
-              >
-                <div className="flex items-center gap-2 text-[15px] font-semibold text-[#111827]">
-                  <MonitorPlay className="h-4 w-4 text-[#0369A1]" />
-                  Dashboard
-                </div>
-                <p className="mt-2 text-sm leading-6 text-[#475569]">
-                  Manage API keys, wallet, model usage, and request history.
-                </p>
-              </Link>
-              <Link
-                href="/models"
-                className="group rounded-lg border border-black/[0.08] bg-white p-4 shadow-sm transition-colors hover:border-[#38BDF8]/50"
-              >
-                <div className="flex items-center gap-2 text-[15px] font-semibold text-[#111827]">
-                  <Code2 className="h-4 w-4 text-[#0369A1]" />
-                  Model catalog
-                </div>
-                <p className="mt-2 text-sm leading-6 text-[#475569]">
-                  Review model specific request schemas, output schemas, examples, and prices.
-                </p>
-              </Link>
             </div>
           </DocsSection>
 
