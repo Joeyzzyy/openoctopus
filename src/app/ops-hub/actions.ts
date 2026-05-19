@@ -787,6 +787,8 @@ export async function createProvider(formData: FormData) {
   });
 
   revalidatePath("/ops-hub");
+  revalidatePath("/models");
+  revalidatePath("/pricing");
 }
 
 const updateProviderStatusSchema = z.object({
@@ -822,6 +824,8 @@ export async function updateProviderStatus(formData: FormData) {
   });
 
   revalidatePath("/ops-hub");
+  revalidatePath("/models");
+  revalidatePath("/pricing");
 }
 
 const updateProviderSchema = z.object({
@@ -2027,6 +2031,7 @@ const createSupportedModelSchema = z.object({
   seoDescription: z.string().trim().max(2000).nullable(),
   seoKeywords: z.string().trim().max(1000).nullable(),
   modelType: z.string().trim().max(80).nullable(),
+  allowContinuousOperations: z.boolean(),
   modality: modalitySchema,
   capability: capabilitySchema,
   billingConfig: z.unknown(),
@@ -2043,6 +2048,7 @@ export async function createSupportedModel(formData: FormData) {
     seoDescription: normalizeOptionalText(formData.get("seoDescription")),
     seoKeywords: normalizeOptionalText(formData.get("seoKeywords")),
     modelType: normalizeOptionalText(formData.get("modelType")),
+    allowContinuousOperations: parseBooleanField(formData.get("allowContinuousOperations")),
     modality: formData.get("modality"),
     capability: formData.get("capability"),
     billingConfig: parseBillingConfigField(formData.get("billingConfig")).config,
@@ -2058,6 +2064,7 @@ export async function createSupportedModel(formData: FormData) {
       seoDescription: parsed.seoDescription,
       seoKeywords: parsed.seoKeywords,
       modelType: parsed.modelType,
+      allowContinuousOperations: parsed.allowContinuousOperations,
     },
   };
   const legacyBillingFields = deriveLegacyBillingFields(billingConfigWithMeta);
@@ -2215,6 +2222,7 @@ const updateSupportedModelDetailsSchema = z.object({
   seoDescription: z.string().trim().max(2000).nullable(),
   seoKeywords: z.string().trim().max(1000).nullable(),
   modelType: z.string().trim().max(80).nullable(),
+  allowContinuousOperations: z.boolean(),
   modality: modalitySchema,
   capability: capabilitySchema,
   billingConfig: z.unknown(),
@@ -2232,6 +2240,7 @@ export async function updateSupportedModelDetails(formData: FormData) {
     seoDescription: normalizeOptionalText(formData.get("seoDescription")),
     seoKeywords: normalizeOptionalText(formData.get("seoKeywords")),
     modelType: normalizeOptionalText(formData.get("modelType")),
+    allowContinuousOperations: parseBooleanField(formData.get("allowContinuousOperations")),
     modality: formData.get("modality"),
     capability: formData.get("capability"),
     billingConfig: parseBillingConfigField(formData.get("billingConfig")).config,
@@ -2247,6 +2256,7 @@ export async function updateSupportedModelDetails(formData: FormData) {
       seoDescription: parsed.seoDescription,
       seoKeywords: parsed.seoKeywords,
       modelType: parsed.modelType,
+      allowContinuousOperations: parsed.allowContinuousOperations,
     },
   };
   const legacyBillingFields = deriveLegacyBillingFields(billingConfigWithMeta);
@@ -2333,6 +2343,8 @@ export async function updateSupportedModelDetails(formData: FormData) {
   });
 
   revalidatePath("/ops-hub");
+  revalidatePath("/models");
+  revalidatePath("/pricing");
 }
 
 const deleteSupportedModelSchema = z.object({

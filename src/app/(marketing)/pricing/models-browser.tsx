@@ -29,6 +29,14 @@ type PlaygroundUpload = {
   size: number;
 };
 
+type PlaygroundHistoryImage = {
+  url: string;
+  mimeType: string;
+  prompt: string | null;
+  createdAt: string;
+  requestId: string;
+};
+
 type UploadFieldKind = "image" | "video" | "audio";
 
 type TaskStatus =
@@ -858,6 +866,13 @@ function isFaceImageField(field: JsonSchemaField) {
   return normalized === "faceimage" || normalized.includes("face");
 }
 
+function canUseHistoryImageForField(field: JsonSchemaField) {
+  if (!isImageUploadField(field)) return false;
+  const normalized = normalizeImageFieldKey(field.key);
+  if (!normalized) return false;
+  return !["faceimage", "maskimage"].includes(normalized);
+}
+
 function pickPlaygroundExampleForField(
   field: JsonSchemaField,
   examples: ModelDocRow["playgroundInputExamples"]
@@ -1351,6 +1366,8 @@ export function ModelsBrowser({
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
   const [playgroundUploads, setPlaygroundUploads] = useState<Record<string, PlaygroundUpload[]>>({});
+  const [playgroundHistoryImages, setPlaygroundHistoryImages] = useState<PlaygroundHistoryImage[]>([]);
+  const [loadingHistoryImages, setLoadingHistoryImages] = useState(false);
   const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const playgroundImageAssets = useMemo(
@@ -1368,6 +1385,7 @@ export function ModelsBrowser({
   useEffect(() => {
     setPlaygroundForm({});
     setPlaygroundUploads({});
+    setPlaygroundHistoryImages([]);
     setUploadingFields({});
   }, [effectiveModelSlug]);
   const handleProviderChange = (nextProvider: string) => {
@@ -1456,7 +1474,59 @@ export function ModelsBrowser({
       ),
     [selectedModel?.inputSchemaText]
   );
+  const supportsContinuousOperations =
+    selectedModel?.allowContinuousOperations === true &&
+    parsedFields.some((field) => canUseHistoryImageForField(field));
   const isSubmitting = taskStatus === "submitting" || taskStatus === "queued" || taskStatus === "processing";
+
+  useEffect(() => {
+    if (!selectedModel?.publicModel || !supportsContinuousOperations) {
+      setPlaygroundHistoryImages([]);
+      setLoadingHistoryImages(false);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    const loadHistoryImages = async () => {
+      setLoadingHistoryImages(true);
+      try {
+        const response = await fetch(
+          `/api/playground/history-images?model=${encodeURIComponent(selectedModel.publicModel)}`,
+          {
+            method: "GET",
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          images?: PlaygroundHistoryImage[];
+        };
+        if (!response.ok) {
+          throw new Error("Failed to load history images");
+        }
+        if (!cancelled) {
+          setPlaygroundHistoryImages(Array.isArray(payload.images) ? payload.images : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setPlaygroundHistoryImages([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingHistoryImages(false);
+        }
+      }
+    };
+
+    void loadHistoryImages();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [selectedModel?.publicModel, supportsContinuousOperations]);
   const priceTag = useMemo(() => {
     if (!selectedModel) return "";
     const tiers = selectedModel.priceTiers ?? [];
@@ -1571,9 +1641,10 @@ export function ModelsBrowser({
 
   useEffect(() => {
     const examples = selectedModel?.playgroundInputExamples ?? [];
-    if (examples.length === 0) return;
     const imageFields = parsedFields.filter(isImageUploadField);
     if (imageFields.length === 0) return;
+    const latestHistoryImage = playgroundHistoryImages[0] ?? null;
+    if (examples.length === 0 && !latestHistoryImage) return;
 
     setPlaygroundUploads((current) => {
       let changed = false;
@@ -1581,6 +1652,21 @@ export function ModelsBrowser({
       for (const field of imageFields) {
         const currentUploads = next[field.key] ?? [];
         if (currentUploads.length > 0) continue;
+        if (selectedModel?.allowContinuousOperations && canUseHistoryImageForField(field) && loadingHistoryImages) {
+          continue;
+        }
+        if (selectedModel?.allowContinuousOperations && latestHistoryImage && canUseHistoryImageForField(field)) {
+          next[field.key] = [
+            {
+              url: latestHistoryImage.url,
+              name: "Recent generated image",
+              mimeType: latestHistoryImage.mimeType,
+              size: 0,
+            },
+          ];
+          changed = true;
+          continue;
+        }
         const example = pickPlaygroundExampleForField(field, examples);
         if (!example) continue;
         next[field.key] = [
@@ -1595,7 +1681,13 @@ export function ModelsBrowser({
       }
       return changed ? next : current;
     });
-  }, [parsedFields, selectedModel?.playgroundInputExamples]);
+  }, [
+    parsedFields,
+    loadingHistoryImages,
+    playgroundHistoryImages,
+    selectedModel?.allowContinuousOperations,
+    selectedModel?.playgroundInputExamples,
+  ]);
 
   useEffect(() => {
     const prefillPrompt = searchParams.get("prompt")?.trim();
@@ -1694,6 +1786,28 @@ export function ModelsBrowser({
       ...current,
       [fieldKey]: (current[fieldKey] ?? []).filter((_, itemIndex) => itemIndex !== index),
     }));
+  };
+
+  const applyHistoryImageToField = (field: JsonSchemaField, image: PlaygroundHistoryImage) => {
+    const nextUpload: PlaygroundUpload = {
+      url: image.url,
+      name: "Recent generated image",
+      mimeType: image.mimeType,
+      size: 0,
+    };
+
+    setPlaygroundUploads((current) => {
+      return {
+        ...current,
+        [field.key]: [nextUpload],
+      };
+    });
+
+    setValidationErrors((current) => {
+      const next = { ...current };
+      delete next[field.key];
+      return next;
+    });
   };
 
   const submitPlayground = async () => {
@@ -1918,6 +2032,20 @@ export function ModelsBrowser({
         if (statusJson.status === "succeeded") {
           setTaskStatus("succeeded");
           setPlaygroundOutput(statusJson.output_payload ?? statusJson);
+          if (selectedModel?.allowContinuousOperations) {
+            void fetch(
+              `/api/playground/history-images?model=${encodeURIComponent(selectedModel.publicModel)}`,
+              { method: "GET", cache: "no-store" }
+            )
+              .then(async (response) => {
+                const payload = (await response.json().catch(() => ({}))) as {
+                  images?: PlaygroundHistoryImage[];
+                };
+                if (!response.ok) return;
+                setPlaygroundHistoryImages(Array.isArray(payload.images) ? payload.images : []);
+              })
+              .catch(() => {});
+          }
           return;
         }
         if (statusJson.status === "failed") {
@@ -2162,6 +2290,63 @@ export function ModelsBrowser({
                           {uploadingFields[field.key] ? (
                             <p className="mt-2 text-[11px] text-black/55">Uploading...</p>
                           ) : null}
+                          {uploadKind === "image" &&
+                          selectedModel?.allowContinuousOperations &&
+                          canUseHistoryImageForField(field) ? (
+                            <div className="mt-3 rounded-md border border-dashed border-[#BAE6FD] bg-[#F8FCFF] p-2.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[11px] font-medium text-black/65">
+                                  Recent images from your history for this model
+                                </p>
+                                {loadingHistoryImages ? (
+                                  <span className="text-[11px] text-black/45">Loading...</span>
+                                ) : null}
+                              </div>
+                              <p className="mt-1 text-[11px] leading-5 text-black/45">
+                                Choose one image to continue refining it or use it as the base for another generation.
+                              </p>
+                              {playgroundHistoryImages.length > 0 ? (
+                                <div className="mt-2 -mx-1 overflow-x-auto pb-1">
+                                  <div className="flex min-w-max gap-2 px-1">
+                                  {playgroundHistoryImages.slice(0, 8).map((historyImage) => {
+                                    const selected = (playgroundUploads[field.key] ?? []).some(
+                                      (upload) => upload.url === historyImage.url
+                                    );
+                                    return (
+                                      <div
+                                        key={`${field.key}-${historyImage.url}`}
+                                        className="w-28 shrink-0 rounded-md border border-[#DDF4FF] bg-white p-1.5"
+                                      >
+                                        <div className="overflow-hidden rounded bg-[#F7F7F7]">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img
+                                            src={buildDisplayImageUrl(historyImage.url)}
+                                            alt={historyImage.prompt ?? "Recent generated image"}
+                                            className="h-20 w-full object-cover"
+                                          />
+                                        </div>
+                                        <div className="mt-1.5">
+                                          <button
+                                            type="button"
+                                            disabled={isSubmitting || selected}
+                                            onClick={() => applyHistoryImageToField(field, historyImage)}
+                                            className="inline-flex h-7 w-full items-center justify-center whitespace-nowrap rounded-md border border-[#BAE6FD] bg-white px-2 text-[11px] font-medium text-black/70 hover:bg-[#E0F2FE] disabled:cursor-not-allowed disabled:opacity-50"
+                                          >
+                                            {selected ? "Selected" : "Use"}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                  </div>
+                                </div>
+                              ) : !loadingHistoryImages ? (
+                                <p className="mt-2 text-[11px] leading-5 text-black/45">
+                                  No generated images found for this model yet.
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
                           {(playgroundUploads[field.key] ?? []).length > 0 ? (
                             <div className="mt-3 grid gap-3">
                               {(playgroundUploads[field.key] ?? []).map((upload, index) => (
@@ -2182,7 +2367,7 @@ export function ModelsBrowser({
                                   <div className="overflow-hidden rounded bg-white">
                                     {upload.mimeType.startsWith("video/") ? (
                                       <video
-                                        src={upload.url}
+                                        src={buildDisplayImageUrl(upload.url)}
                                         controls
                                         className="max-h-48 w-full rounded bg-black object-contain"
                                       />
@@ -2194,7 +2379,7 @@ export function ModelsBrowser({
                                       <>
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img
-                                          src={upload.url}
+                                          src={buildDisplayImageUrl(upload.url)}
                                           alt={upload.name}
                                           className="max-h-32 w-full object-contain"
                                         />

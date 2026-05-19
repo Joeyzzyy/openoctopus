@@ -26,6 +26,7 @@ export type ModelDocRow = {
   publicModel: string;
   displayName: string;
   providerName: string;
+  allowContinuousOperations: boolean;
   upstreamModelSlug: string;
   capability: string;
   inputSchemaText: string;
@@ -106,6 +107,11 @@ function readMetaField(value: unknown, key: string) {
   } catch {
     return "";
   }
+}
+
+function readMetaBoolean(value: unknown, key: string) {
+  const metadata = parseMetadataRecord(value);
+  return metadata?.[key] === true || metadata?.[key] === "true";
 }
 
 function readKeywordList(value: unknown) {
@@ -610,6 +616,7 @@ export const loadModelsPageData = cache(async () => {
       publicModel: model.model_slug,
       displayName: model.display_name,
       providerName: model.provider,
+      allowContinuousOperations: readMetaBoolean(model.billing_config, "allowContinuousOperations"),
       upstreamModelSlug: mapping && typeof mapping.upstream_model_slug === "string" ? mapping.upstream_model_slug : "",
       capability: mapping && typeof mapping.capability === "string" ? mapping.capability : (model.capability ?? "image_generation"),
       inputSchemaText: JSON.stringify(inputSchema ?? {}, null, 2),

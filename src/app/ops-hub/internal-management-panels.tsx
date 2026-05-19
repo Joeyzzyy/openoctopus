@@ -61,6 +61,7 @@ type SupportedModelSummary = {
   createdLabel: string;
   billingConfigText: string;
   billingSummary: string;
+  allowContinuousOperations: boolean;
   providerModelCount: number;
   activeProviderModelCount: number;
 };
@@ -330,6 +331,19 @@ function readBillingConfigMetadataField(configText: string, key: string) {
     return typeof metadata?.[key] === "string" ? String(metadata[key]) : "";
   } catch {
     return "";
+  }
+}
+
+function readBillingConfigMetadataBooleanField(configText: string, key: string) {
+  try {
+    const parsed = JSON.parse(configText) as Record<string, unknown>;
+    const metadata =
+      parsed.metadata && typeof parsed.metadata === "object" && !Array.isArray(parsed.metadata)
+        ? (parsed.metadata as Record<string, unknown>)
+        : null;
+    return metadata?.[key] === true || metadata?.[key] === "true";
+  } catch {
+    return false;
   }
 }
 
@@ -1158,6 +1172,11 @@ function SupportedModelDetailsForm({
                 );
               }}
               options={[...capabilityOptions]}
+            />
+            <ActiveCheckbox
+              name="allowContinuousOperations"
+              defaultChecked={model.allowContinuousOperations}
+              label="允许连续操作（在 Playground 复用当前用户该模型下的历史图片）"
             />
           </div>
           <div className={activeTab === "pricing" ? "" : "hidden"}>
@@ -2010,6 +2029,7 @@ export function CreateSupportedModelButton({
     seoDescription: "",
     seoKeywords: "",
     modelType: "text-to-image",
+    allowContinuousOperations: false,
     modality: "image",
     capability: "image_generation",
     billingConfigText: defaultBillingTemplate,
@@ -2026,6 +2046,10 @@ export function CreateSupportedModelButton({
       seoDescription: readBillingConfigMetadataField(source.billingConfigText, "seoDescription"),
       seoKeywords: readBillingConfigMetadataField(source.billingConfigText, "seoKeywords"),
       modelType: readModelTypeFromBillingConfig(source.billingConfigText) || "text-to-image",
+      allowContinuousOperations: readBillingConfigMetadataBooleanField(
+        source.billingConfigText,
+        "allowContinuousOperations"
+      ),
       modality: source.modality,
       capability: source.capability ?? "image_generation",
       billingConfigText: source.billingConfigText || defaultBillingTemplate,
@@ -2106,6 +2130,12 @@ export function CreateSupportedModelButton({
           name="modelType"
           options={SUPPORTED_MODEL_TYPE_OPTIONS.map((item) => ({ value: item, label: item }))}
           defaultValue={draftValues.modelType}
+        />
+        <ActiveCheckbox
+          name="allowContinuousOperations"
+          defaultChecked={draftValues.allowContinuousOperations}
+          label="允许连续操作（在 Playground 复用当前用户该模型下的历史图片）"
+          disabled={false}
         />
         <FormSelect
           label="模态"

@@ -2050,12 +2050,24 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     const linkedProviderModels = providerModels.filter(
       (item) => item.supported_model_id === model.id
     );
+    const billingMetadata =
+      model.billing_config &&
+      typeof model.billing_config === "object" &&
+      !Array.isArray(model.billing_config) &&
+      model.billing_config.metadata &&
+      typeof model.billing_config.metadata === "object" &&
+      !Array.isArray(model.billing_config.metadata)
+        ? (model.billing_config.metadata as Record<string, unknown>)
+        : null;
 
     return {
       ...model,
       defaultUnitCost: Number(model.default_unit_cost ?? 0),
       billingConfigText: formatJson(model.billing_config),
       billingSummary: summarizeBilling(model.billing_config),
+      allowContinuousOperations:
+        billingMetadata?.allowContinuousOperations === true ||
+        billingMetadata?.allowContinuousOperations === "true",
       providerModelCount: linkedProviderModels.length,
       activeProviderModelCount: linkedProviderModels.filter((item) => item.active).length,
       createdLabel: formatRelativeTimestamp(model.created_at),
