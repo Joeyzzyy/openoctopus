@@ -135,6 +135,20 @@ function capabilityLabel(capability: string) {
   return capabilityMeta[capability as keyof typeof capabilityMeta]?.label ?? capability.replaceAll("_", " ");
 }
 
+function slugifyPathPart(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function buildModelTabHref(model: ModelDocRow, tab: "playground" | "api") {
+  const providerSlug = slugifyPathPart(model.providerName) || encodeURIComponent(model.providerName);
+  const modelSlug = slugifyPathPart(model.publicModel) || encodeURIComponent(model.publicModel);
+  return `/models/${providerSlug}/${modelSlug}?tab=${tab}`;
+}
+
 function formatPrice(model: ModelDocRow) {
   if (model.primaryPriceValue === null || !model.primaryPriceLabel) {
     return model.priceLabel || "Configured per model";
@@ -615,6 +629,20 @@ Steps:
               title="Models"
               description="Every request uses a public model slug. The live model catalog is sourced from active supported model configuration and grouped by capability."
             />
+            <div className="mb-5 flex flex-wrap gap-3">
+              <Link
+                href="/models?tab=playground"
+                className="inline-flex items-center rounded-full bg-[#0F172A] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#1E293B]"
+              >
+                Open model playgrounds
+              </Link>
+              <Link
+                href="/models?tab=api"
+                className="inline-flex items-center rounded-full border border-[#BAE6FD] bg-white px-4 py-2 text-sm font-medium text-[#0369A1] transition hover:bg-[#F0F9FF]"
+              >
+                Open model API docs
+              </Link>
+            </div>
             <div className="grid gap-4 md:grid-cols-3">
               {capabilitySummaries.map((item) => {
                 const Icon = item.icon;
@@ -651,12 +679,32 @@ Steps:
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   {featuredModels.map((model) => (
-                    <div key={model.id} className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+                    <div
+                      key={model.id}
+                      className="flex h-full flex-col rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-3"
+                    >
                       <p className="truncate text-[13px] font-semibold text-[#111827]">{model.displayName}</p>
                       <p className="mt-1 truncate font-mono text-[11px] text-[#6B7280]">{model.publicModel}</p>
+                      <p className="mt-2 text-[12px] leading-6 text-[#475569]">
+                        Open the live playground to test it, or jump straight into the model-specific API page.
+                      </p>
                       <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[#475569]">
                         <span className="rounded-md bg-white px-2 py-1">{capabilityLabel(model.capability)}</span>
                         <span className="rounded-md bg-white px-2 py-1">{formatPrice(model)}</span>
+                      </div>
+                      <div className="mt-auto pt-4 flex flex-wrap gap-2">
+                        <Link
+                          href={buildModelTabHref(model, "playground")}
+                          className="inline-flex items-center rounded-full bg-[#0F172A] px-3 py-1.5 text-[12px] font-medium text-white transition hover:bg-[#1E293B]"
+                        >
+                          Open playground
+                        </Link>
+                        <Link
+                          href={buildModelTabHref(model, "api")}
+                          className="inline-flex items-center rounded-full border border-[#BAE6FD] bg-white px-3 py-1.5 text-[12px] font-medium text-[#0369A1] transition hover:bg-[#F0F9FF]"
+                        >
+                          Open API docs
+                        </Link>
                       </div>
                     </div>
                   ))}

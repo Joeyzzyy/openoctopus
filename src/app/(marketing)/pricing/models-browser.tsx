@@ -1630,7 +1630,9 @@ export function ModelsBrowser({
     );
   }, [selectedModel]);
 
-  const [mainTab, setMainTab] = useState<"playground" | "api">("playground");
+  const [mainTab, setMainTab] = useState<"playground" | "api">(() =>
+    searchParams.get("tab") === "api" ? "api" : "playground"
+  );
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const [taskId, setTaskId] = useState<string | null>(null);
   const [playgroundError, setPlaygroundError] = useState<string | null>(null);
@@ -1724,15 +1726,33 @@ export function ModelsBrowser({
     if (!selectedModel || !selectedProvider) return;
     const providerSlug = slugifyPathPart(selectedProvider) || encodeURIComponent(selectedProvider);
     const modelSlug = slugifyPathPart(selectedModel.publicModel) || encodeURIComponent(selectedModel.publicModel);
-    const nextHref = `/models/${providerSlug}/${modelSlug}`;
-    if (pathname === nextHref) {
+    const nextParams = new URLSearchParams();
+    const prompt = searchParams.get("prompt")?.trim();
+    if (mainTab === "api") {
+      nextParams.set("tab", "api");
+    } else {
+      nextParams.set("tab", "playground");
+    }
+    if (prompt) {
+      nextParams.set("prompt", prompt);
+    }
+    const nextHref = `/models/${providerSlug}/${modelSlug}${nextParams.toString().length > 0 ? `?${nextParams.toString()}` : ""}`;
+    const currentHref = `${pathname}${searchParams.toString().length > 0 ? `?${searchParams.toString()}` : ""}`;
+    if (currentHref === nextHref) {
       setRouteSkeletonVisible(false);
       return;
     }
     startRouteTransition(() => {
       router.replace(nextHref, { scroll: false });
     });
-  }, [pathname, router, selectedModel, selectedProvider]);
+  }, [mainTab, pathname, router, searchParams, selectedModel, selectedProvider]);
+
+  useEffect(() => {
+    const nextTab = searchParams.get("tab") === "api" ? "api" : "playground";
+    if (nextTab !== mainTab) {
+      setMainTab(nextTab);
+    }
+  }, [mainTab, searchParams]);
 
   const handleMainTabChange = (tab: "playground" | "api") => {
     if (tab === mainTab) return;
@@ -3001,6 +3021,7 @@ export function ModelsBrowser({
     if (prompt && prompt.trim().length > 0) {
       params.set("prompt", prompt.trim());
     }
+    params.set("tab", "playground");
     const href = `/models/${providerSlug}/${modelSlug}${params.toString().length > 0 ? `?${params.toString()}` : ""}`;
     if (typeof window !== "undefined") {
       window.open(href, "_blank", "noopener,noreferrer");
