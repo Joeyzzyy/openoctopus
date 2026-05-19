@@ -13,6 +13,7 @@ const submitSchema = z.object({
     "/v1/images/generations",
     "/v1/images/edits",
     "/v1/images/recognitions",
+    "/v1/chat/completions",
     "/v1/videos/generations",
   ]),
   model: z.string().min(1),
@@ -68,6 +69,12 @@ export async function POST(request: Request) {
         model: parsed.model,
         input: parsed.input,
       };
+      if (parsed.endpoint === "/v1/chat/completions") {
+        const rawMessages = parsed.input.messages;
+        if (rawMessages !== undefined) {
+          payload.messages = rawMessages;
+        }
+      }
       if (parsed.prompt && parsed.prompt.trim().length > 0) {
         payload.prompt = parsed.prompt;
       }

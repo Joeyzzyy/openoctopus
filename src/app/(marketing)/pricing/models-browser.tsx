@@ -1215,6 +1215,12 @@ type PlaygroundVideoAsset = {
   mimeType?: string;
 };
 
+type ChatPlaygroundMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+  taskId?: string | null;
+};
+
 function extractImageAssets(output: unknown): PlaygroundImageAsset[] {
   if (!isRecord(output)) return [];
   const assets: PlaygroundImageAsset[] = [];
@@ -1429,6 +1435,8 @@ export function ModelsBrowser({
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
   const [playgroundUploads, setPlaygroundUploads] = useState<Record<string, PlaygroundUpload[]>>({});
+  const [chatComposer, setChatComposer] = useState("");
+  const [chatConversation, setChatConversation] = useState<ChatPlaygroundMessage[]>([]);
   const [playgroundHistoryImages, setPlaygroundHistoryImages] = useState<PlaygroundHistoryImage[]>([]);
   const [loadingHistoryImages, setLoadingHistoryImages] = useState(false);
   const [deletingHistoryRequestId, setDeletingHistoryRequestId] = useState<string | null>(null);
@@ -1451,6 +1459,8 @@ export function ModelsBrowser({
   useEffect(() => {
     setPlaygroundForm({});
     setPlaygroundUploads({});
+    setChatComposer("");
+    setChatConversation([]);
     setPlaygroundHistoryImages([]);
     setUploadingFields({});
   }, [effectiveModelSlug]);
@@ -1546,6 +1556,17 @@ export function ModelsBrowser({
         (field) => field.exposedToCustomer
       ),
     [selectedModel?.inputSchemaText]
+  );
+  const isChatModel = selectedModel?.capability === "text_generation";
+  const chatConfigFields = useMemo(
+    () =>
+      parsedFields.filter(
+        (field) =>
+          field.key !== "messages" &&
+          field.key !== "prompt" &&
+          !isUploadField(field)
+      ),
+    [parsedFields]
   );
   const supportsContinuousOperations =
     selectedModel?.allowContinuousOperations === true &&
@@ -1764,9 +1785,13 @@ export function ModelsBrowser({
     const prefillPrompt = searchParams.get("prompt")?.trim();
     if (!prefillPrompt) return;
     const hasPromptField = parsedFields.some((field) => field.key === "prompt");
+    if (isChatModel) {
+      setChatComposer(prefillPrompt);
+      return;
+    }
     if (!hasPromptField) return;
     setPlaygroundForm((current) => ({ ...current, prompt: prefillPrompt }));
-  }, [parsedFields, searchParams]);
+  }, [isChatModel, parsedFields, searchParams]);
 
   const inferEndpoint = (capability: string | null | undefined) =>
     capability === "image_edit"
@@ -1936,6 +1961,9 @@ export function ModelsBrowser({
 
     const nextValidationErrors: Record<string, string> = {};
     for (const field of parsedFields) {
+      if (isChatModel && field.key === "messages") {
+        continue;
+      }
       if (isUploadField(field)) {
         const uploadCount = (playgroundUploads[field.key] ?? []).length;
         if (field.required && uploadCount === 0) {
@@ -1967,6 +1995,208 @@ export function ModelsBrowser({
     try {
       const inputPayload: Record<string, unknown> = {};
       let promptValue: string | undefined;
+
+      if (isChatModel) {
+        const composerText = chatComposer.trim();
+        if (composerText.length === 0) {
+          setValidationErrors({ messages: "Message is required." });
+          setTaskStatus("idle");
+          return;
+        }
+
+        for (const field of chatConfigFields) {
+          const raw = playgroundForm[field.key];
+          if ((raw ?? "").trim().length === 0) continue;
+          if (field.type === "number") {
+            const num = Number(raw);
+            if (!Number.isNaN(num)) inputPayload[field.key] = num;
+            continue;
+          }
+          if (field.type === "boolean") {
+            inputPayload[field.key] = raw === "true";
+            continue;
+          }
+          if (field.type === "array") {
+            const trimmed = raw.trim();
+            if (trimmed.startsWith("[")) {
+              try {
+                const parsedArray = JSON.parse(trimmed);
+                if (Array.isArray(parsedArray)) {
+                  inputPayload[field.key] = parsedArray;
+                  continue;
+                }
+              } catch {
+                // Fall through to simple splitting below.
+              }
+            }
+            inputPayload[field.key] = trimmed
+              .split(/[\n,]/)
+              .map((item) => item.trim())
+              .filter(Boolean);
+            continue;
+          }
+          inputPayload[field.key] = raw;
+        }
+
+        const systemPromptKey = chatConfigFields.find((field) => {
+          const key = field.key.trim().toLowerCase();
+          return key === "system_prompt" || key === "systemprompt" || key === "system";
+        })?.key;
+        const systemPromptValue =
+          typeof systemPromptKey === "string" ? playgroundForm[systemPromptKey]?.trim() ?? "" : "";
+        const outgoingMessages: ChatPlaygroundMessage[] = [
+          ...(systemPromptValue
+            ? [{ role: "system" as const, content: systemPromptValue }]
+            : []),
+          ...chatConversation.map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+          { role: "user", content: composerText },
+        ];
+        inputPayload.messages = outgoingMessages.map((message) => ({
+          role: message.role,
+          content: message.content,
+        }));
+
+        const submitRes = await fetch("/api/playground", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: "submit",
+            endpoint: inferEndpoint(selectedModel.capability),
+            model: selectedModel.publicModel,
+            input: inputPayload,
+          }),
+        });
+
+        const submitJson = (await submitRes.json()) as {
+          id?: string;
+          status?: string;
+          error?: { message?: string; code?: string } | string;
+          upstreamStatus?: number;
+          upstreamBody?: unknown;
+          apiBase?: string;
+          requestUrl?: string;
+        };
+
+        if (!submitRes.ok || !submitJson.id) {
+          const errorCode =
+            submitJson.error && typeof submitJson.error === "object" && !Array.isArray(submitJson.error)
+              ? submitJson.error.code
+              : "";
+          if (submitRes.status === 401 || errorCode === "unauthorized") {
+            setTaskStatus("idle");
+            setAuthRequiredModalOpen(true);
+            return;
+          }
+          if (submitRes.status === 402 || errorCode === "insufficient_balance") {
+            setTaskStatus("idle");
+            setTopUpRequiredModalOpen(true);
+            return;
+          }
+          const browserProxyUrl =
+            typeof window !== "undefined"
+              ? `${window.location.origin}/api/playground`
+              : "/api/playground";
+          const inferredEndpoint = inferEndpoint(selectedModel.capability);
+          const inferredApiBase =
+            typeof submitJson.apiBase === "string" && submitJson.apiBase.length > 0
+              ? submitJson.apiBase
+              : PUBLIC_API_BASE_URL;
+          const inferredRequestUrl =
+            typeof submitJson.requestUrl === "string" && submitJson.requestUrl.length > 0
+              ? submitJson.requestUrl
+              : `${inferredApiBase}${inferredEndpoint}`;
+          capturedErrorDetail = {
+            stage: "submit",
+            chain: {
+              browserToProxy: {
+                method: "POST",
+                url: browserProxyUrl,
+              },
+              proxyToGateway: {
+                method: "POST",
+                apiBase: inferredApiBase,
+                requestUrl: inferredRequestUrl,
+              },
+            },
+            request: {
+              endpoint: inferredEndpoint,
+              model: selectedModel.publicModel,
+              prompt: "",
+              hasPromptField: false,
+              input: inputPayload,
+            },
+            submitHttpStatus: submitRes.status,
+            response: submitJson,
+          };
+          throw new Error(formatPlaygroundError(submitJson));
+        }
+
+        setTaskId(submitJson.id);
+        setTaskStatus("queued");
+
+        const startedAt = Date.now();
+        while (Date.now() - startedAt < PLAYGROUND_POLL_TIMEOUT_MS) {
+          await new Promise((resolve) => setTimeout(resolve, PLAYGROUND_POLL_INTERVAL_MS));
+          const statusRes = await fetch("/api/playground", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              action: "status",
+              taskId: submitJson.id,
+            }),
+          });
+          const statusJson = (await statusRes.json()) as {
+            status?: string;
+            output_payload?: unknown;
+            error?: { message?: string; code?: string } | string;
+            error_code?: string;
+            error_message?: string;
+          };
+          if (!statusRes.ok) {
+            throw new Error(formatPlaygroundError(statusJson));
+          }
+
+          const status = String(statusJson.status ?? "").toLowerCase();
+          if (status === "queued") {
+            setTaskStatus("queued");
+            continue;
+          }
+          if (status === "processing" || status === "submitted") {
+            setTaskStatus("processing");
+            continue;
+          }
+          if (status === "succeeded") {
+            const nextOutput = statusJson.output_payload ?? statusJson;
+            const assistantText =
+              extractTextOutput(nextOutput) ?? formatDetailText(nextOutput);
+            setTaskStatus("succeeded");
+            setPlaygroundOutput(nextOutput);
+            setChatConversation((current) => [
+              ...current,
+              { role: "user", content: composerText, taskId: submitJson.id },
+              { role: "assistant", content: assistantText, taskId: submitJson.id },
+            ]);
+            setChatComposer("");
+            return;
+          }
+          if (status === "failed" || status === "cancelled") {
+            setTaskStatus("failed");
+            capturedErrorDetail = statusJson;
+            throw new Error(formatPlaygroundError(statusJson));
+          }
+        }
+
+        setTaskStatus("failed");
+        setPlaygroundError("Playground request timeout, please retry.");
+        setPlaygroundErrorDetail({
+          stage: "poll",
+          taskId: submitJson.id,
+        });
+        return;
+      }
 
       for (const field of parsedFields) {
         if (isUploadField(field)) {
@@ -2377,7 +2607,199 @@ export function ModelsBrowser({
           </div>
         </div>
         <div className="relative min-w-0">
-        {mainTab === "playground" ? (
+        {mainTab === "playground" && isChatModel ? (
+          <section className="rounded-xl border border-black/[0.08] bg-white p-3 shadow-sm sm:rounded-2xl sm:p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-semibold text-black">Chat Playground</h2>
+                <p className="mt-1 text-xs text-black/55">
+                  Send multi-turn messages in a single session. Conversation stays local to this page.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium ${taskStatusClass(taskStatus)}`}
+                >
+                  Status: {taskStatusLabel(taskStatus)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChatConversation([]);
+                    setChatComposer("");
+                    setPlaygroundOutput(null);
+                    setTaskId(null);
+                    setTaskStatus("idle");
+                    setPlaygroundError(null);
+                    setPlaygroundErrorDetail(null);
+                  }}
+                  className="h-8 rounded-md border border-black/[0.12] bg-white px-3 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                >
+                  Clear chat
+                </button>
+              </div>
+            </div>
+            <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
+              <div className="mb-3 flex min-h-[360px] flex-col gap-3 overflow-y-auto rounded-lg border border-black/[0.06] bg-white p-3 sm:min-h-[420px]">
+                {chatConversation.length === 0 ? (
+                  <div className="flex flex-1 items-center justify-center text-center text-sm text-black/45">
+                    Start the conversation below. Each reply will be appended into this temporary local session.
+                  </div>
+                ) : (
+                  chatConversation.map((message, index) => (
+                    <div
+                      key={`${message.role}-${index}-${message.taskId ?? "local"}`}
+                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-6 ${
+                          message.role === "user"
+                            ? "bg-[#1F8A4C] text-white"
+                            : message.role === "system"
+                              ? "border border-[#E9D8A6] bg-[#FFF8E1] text-black/75"
+                              : "border border-black/[0.08] bg-[#F7FAFC] text-black/80"
+                        }`}
+                      >
+                        <div className={`mb-1 text-[11px] font-medium ${message.role === "user" ? "text-white/80" : "text-black/45"}`}>
+                          {message.role === "user" ? "You" : message.role === "assistant" ? "Assistant" : "System"}
+                        </div>
+                        <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {playgroundError ? (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {playgroundError}
+                  </div>
+                ) : null}
+              </div>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-black/[0.06] bg-white px-3 py-2">
+                <div className="min-w-0 text-xs text-black/55">
+                  <span className="mr-1 text-black/35">Task</span>
+                  {taskId ? (
+                    <code className="break-all font-mono text-[11px] text-black/70">{taskId}</code>
+                  ) : (
+                    <span className="text-black/35">Waiting for request</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {playgroundTextOutput ? (
+                    <button
+                      type="button"
+                      onClick={copyTextOutput}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                    >
+                      {textOutputCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                      {textOutputCopied ? "Copied" : "Copy reply"}
+                    </button>
+                  ) : null}
+                  {playgroundOutput ? (
+                    <button
+                      type="button"
+                      onClick={() => setResultModalOpen(true)}
+                      className="inline-flex h-8 items-center rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                    >
+                      Result JSON
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              <textarea
+                disabled={isSubmitting || !selectedModel}
+                value={chatComposer}
+                onChange={(event) => {
+                  setChatComposer(event.target.value);
+                  setValidationErrors((current) => {
+                    const next = { ...current };
+                    delete next.messages;
+                    return next;
+                  });
+                }}
+                className={`min-h-[120px] w-full rounded-xl border bg-white px-3 py-3 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03] ${
+                  validationErrors.messages ? "border-[#D94A38]" : "border-black/[0.1]"
+                }`}
+                placeholder="Write your next message..."
+              />
+              {validationErrors.messages ? (
+                <p className="mt-1 text-[11px] text-[#B54432]">{validationErrors.messages}</p>
+              ) : null}
+              {chatConfigFields.length > 0 ? (
+                <div className="mt-3 grid gap-3 rounded-xl border border-black/[0.06] bg-[#FAFAFA] p-3 sm:grid-cols-2">
+                  {chatConfigFields.map((field) => (
+                    <label key={field.key} className="block">
+                      <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.5px] text-black/55">
+                        {field.label}
+                      </span>
+                      {field.type === "boolean" ? (
+                        <select
+                          disabled={isSubmitting}
+                          value={playgroundForm[field.key] ?? "false"}
+                          onChange={(event) =>
+                            setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
+                          }
+                          className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:bg-black/[0.03]"
+                        >
+                          <option value="true">true</option>
+                          <option value="false">false</option>
+                        </select>
+                      ) : isSliderNumberField(field) ? (
+                        <select
+                          disabled={isSubmitting}
+                          value={playgroundForm[field.key] ?? buildNumberSelectOptions(field)[0] ?? String(field.minimum)}
+                          onChange={(event) =>
+                            setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
+                          }
+                          className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:bg-black/[0.03]"
+                        >
+                          {buildNumberSelectOptions(field).map((value) => (
+                            <option key={value} value={value}>
+                              {value}
+                            </option>
+                          ))}
+                        </select>
+                      ) : field.type === "array" ? (
+                        <textarea
+                          disabled={isSubmitting}
+                          value={playgroundForm[field.key] ?? ""}
+                          onChange={(event) =>
+                            setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
+                          }
+                          className="min-h-[88px] w-full rounded-md border border-black/[0.1] bg-white px-3 py-2 font-mono text-xs text-black/80 disabled:bg-black/[0.03]"
+                          placeholder="One value per line, comma-separated, or a JSON array"
+                        />
+                      ) : (
+                        <input
+                          disabled={isSubmitting}
+                          type={field.type === "number" ? "number" : "text"}
+                          min={field.type === "number" ? field.minimum : undefined}
+                          max={field.type === "number" ? field.maximum : undefined}
+                          step={field.type === "number" ? field.step ?? "any" : undefined}
+                          value={playgroundForm[field.key] ?? ""}
+                          onChange={(event) =>
+                            setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
+                          }
+                          className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:bg-black/[0.03]"
+                          placeholder={field.type === "number" ? "0" : `Enter ${field.label}`}
+                        />
+                      )}
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  disabled={isSubmitting || !selectedModel}
+                  onClick={submitPlayground}
+                  className="h-11 w-full rounded-md bg-[#1F8A4C] px-4 text-sm font-medium text-white transition-colors hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-45 sm:h-10 sm:w-auto"
+                >
+                  {isSubmitting ? "Sending..." : `Send${priceTag ? ` ${priceTag}` : ""}`}
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : mainTab === "playground" ? (
           <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
             <section className="rounded-lg border border-black/[0.08] bg-white p-3 sm:rounded-xl sm:p-4">
               <h3 className="mb-3 text-sm font-medium text-black">Input</h3>

@@ -45,6 +45,14 @@ function fillMustacheTemplate(input: string, values: Record<string, unknown>) {
   });
 }
 
+function getExactMustacheValue(input: string, values: Record<string, unknown>) {
+  const match = input.match(/^\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}$/);
+  if (!match?.[1]) {
+    return undefined;
+  }
+  return values[match[1]];
+}
+
 function readString(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim().length > 0 ? value : fallback;
 }
@@ -55,6 +63,10 @@ function isNonEmptyString(value: unknown): value is string {
 
 function renderTemplateValue(value: unknown, variables: Record<string, unknown>): unknown {
   if (typeof value === "string") {
+    const exactValue = getExactMustacheValue(value, variables);
+    if (exactValue !== undefined) {
+      return exactValue;
+    }
     return fillMustacheTemplate(value, variables);
   }
   if (Array.isArray(value)) {
