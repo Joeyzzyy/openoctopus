@@ -220,15 +220,20 @@ export function ExplorePanel({
                         </div>
                       )}
                     </div>
-                    <div className="flex flex-1 flex-col justify-between space-y-1.5 p-3">
-                      <div className="space-y-1.5">
+                    <div className="flex min-w-0 flex-1 flex-col justify-between space-y-1.5 p-3">
+                      <div className="min-w-0 space-y-1.5">
                         <p className="text-[10px] uppercase tracking-[0.8px] text-black/45">{category}</p>
                         <h3 className="line-clamp-1 text-sm font-semibold text-black">{model.displayName}</h3>
                         <p className="line-clamp-2 text-xs leading-5 text-black/60">
                           {model.modelDescription || labels.noDescription}
                         </p>
                       </div>
-                      <p className="text-xs font-medium text-[#0369A1]">{model.priceLabel || labels.pricingUnavailable}</p>
+                      <p
+                        title={model.priceLabel || labels.pricingUnavailable}
+                        className="block w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-[#0369A1]"
+                      >
+                        {model.priceLabel || labels.pricingUnavailable}
+                      </p>
                     </div>
                   </div>
                 </a>
