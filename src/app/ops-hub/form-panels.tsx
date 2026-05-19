@@ -276,36 +276,43 @@ function normalizeEnumValues(values: string[]) {
   );
 }
 
+function getFieldLeafName(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return "";
+  const segments = trimmed.split(".").map((part) => part.trim()).filter(Boolean);
+  return segments[segments.length - 1] ?? trimmed;
+}
+
 function isResolutionFieldName(value: string) {
-  return value.trim().toLowerCase() === "resolution";
+  return getFieldLeafName(value) === "resolution";
 }
 
 function isSizeFieldName(value: string) {
-  return value.trim().toLowerCase() === "size";
+  return getFieldLeafName(value) === "size";
 }
 
 function isQualityFieldName(value: string) {
-  return value.trim().toLowerCase() === "quality";
+  return getFieldLeafName(value) === "quality";
 }
 
 function isDurationFieldName(value: string) {
-  return value.trim().toLowerCase() === "duration";
+  return getFieldLeafName(value) === "duration";
 }
 
 function isDetailLevelFieldName(value: string) {
-  return value.trim().toLowerCase() === "detail_level";
+  return getFieldLeafName(value) === "detail_level";
 }
 
 function isOutputFormatFieldName(value: string) {
-  return value.trim().toLowerCase() === "output_format";
+  return getFieldLeafName(value) === "output_format";
 }
 
 function isBackgroundFieldName(value: string) {
-  return value.trim().toLowerCase() === "background";
+  return getFieldLeafName(value) === "background";
 }
 
 function defaultEnumValuesForKnownInputField(fieldName: string) {
-  const normalized = fieldName.trim().toLowerCase();
+  const normalized = getFieldLeafName(fieldName);
   if (normalized === "resolution") {
     return RESOLUTION_CANDIDATES;
   }

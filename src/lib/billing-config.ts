@@ -3,6 +3,24 @@ import { z } from "zod/v4";
 const currencySchema = z.string().trim().min(3).max(8).default("USD");
 const positivePriceSchema = z.coerce.number().positive().max(1000000);
 
+function addTokenPricingConflictIssue(
+  ctx: z.core.$RefinementCtx<unknown>,
+  inputTokenPrice: number | undefined,
+  inputCacheHitTokenPrice: number | undefined,
+  inputCacheMissTokenPrice: number | undefined
+) {
+  if (
+    inputTokenPrice !== undefined &&
+    (inputCacheHitTokenPrice !== undefined || inputCacheMissTokenPrice !== undefined)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        "Standard input token pricing cannot be combined with cache hit/miss input token pricing",
+    });
+  }
+}
+
 const perRequestBillingSchema = z.object({
   billingMode: z.literal("per_request"),
   currency: currencySchema,
@@ -47,6 +65,12 @@ const perMillionTokensBillingSchema = z.object({
       message: "At least one token billing charge is required",
     });
   }
+  addTokenPricingConflictIssue(
+    ctx,
+    value.inputCostPerMillion,
+    value.inputCacheHitCostPerMillion,
+    value.inputCacheMissCostPerMillion
+  );
 });
 
 const hybridChargesSchema = z
@@ -95,6 +119,12 @@ const hybridBillingSchema = z
         message: "At least one billing charge or parameter price is required",
       });
     }
+    addTokenPricingConflictIssue(
+      ctx,
+      value.charges.inputTextTokensPerMillion,
+      value.charges.inputTextCacheHitTokensPerMillion,
+      value.charges.inputTextCacheMissTokensPerMillion
+    );
   });
 
 export const billingConfigSchema = z.union([

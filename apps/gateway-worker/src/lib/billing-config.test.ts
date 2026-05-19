@@ -319,3 +319,19 @@ test("charges cache hit, cache miss, and output tokens separately when configure
   assert.ok(Math.abs(resolution.components.outputTextTokens - 0.174) < 1e-12);
   assert.ok(Math.abs(resolution.total - 0.43645) < 1e-12);
 });
+
+test("rejects billing configs that combine standard input token pricing with cache-aware input token pricing", () => {
+  assert.throws(
+    () =>
+      parseBillingConfig({
+        billingMode: "hybrid",
+        currency: "USD",
+        charges: {
+          inputTextTokensPerMillion: 0.14,
+          inputTextCacheHitTokensPerMillion: 0.003625,
+          inputTextCacheMissTokensPerMillion: 0.435,
+        },
+      }),
+    /cannot be combined/i
+  );
+});

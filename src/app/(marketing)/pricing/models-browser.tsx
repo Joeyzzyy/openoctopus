@@ -1,7 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
+import type { PointerEvent as ReactPointerEvent, ReactNode, SyntheticEvent } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, CircleHelp, Copy, Download, X } from "lucide-react";
 import type { GatewayErrorDocRow, ModelDocRow } from "../models/data";
@@ -41,6 +41,13 @@ type PreviewImageState = {
   url: string;
   name: string;
   mimeType?: string;
+};
+
+type MaskEditorState = {
+  fieldKey: string;
+  fieldLabel: string;
+  sourceFieldLabel: string;
+  sourceUpload: PlaygroundUpload;
 };
 
 type UploadFieldKind = "image" | "video" | "audio";
@@ -944,54 +951,114 @@ function isResolutionField(key: string) {
   return key.trim().toLowerCase() === "resolution";
 }
 
+function splitFieldPath(key: string) {
+  return key
+    .split(".")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function getFieldLeafKey(key: string) {
+  const segments = splitFieldPath(key);
+  return (segments[segments.length - 1] ?? key).trim().toLowerCase();
+}
+
+function setNestedValue(target: Record<string, unknown>, path: string, value: unknown) {
+  const segments = splitFieldPath(path);
+  if (segments.length === 0) return;
+  if (segments.length === 1) {
+    target[segments[0]] = value;
+    return;
+  }
+
+  let current: Record<string, unknown> = target;
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    const segment = segments[index];
+    const existing = current[segment];
+    if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+      current[segment] = {};
+    }
+    current = current[segment] as Record<string, unknown>;
+  }
+
+  current[segments[segments.length - 1]] = value;
+}
+
 function isImageUploadField(field: JsonSchemaField) {
   const key = field.key.trim().toLowerCase();
+  const leafKey = getFieldLeafKey(field.key);
   if (field.type === "boolean") return false;
-  if (["num_images", "number_of_images", "image_count", "n_images"].includes(key)) return false;
+  if (["num_images", "number_of_images", "image_count", "n_images"].includes(leafKey)) return false;
   return (
-    key === "images" ||
-    key === "image" ||
-    key === "face_image" ||
-    key === "source_image" ||
-    key === "target_image" ||
-    key === "input_image" ||
-    key === "reference_image" ||
-    key === "init_image" ||
-    key === "mask_image" ||
-    key.endsWith("_image") ||
-    key.endsWith("_images")
+    leafKey === "images" ||
+    leafKey === "image" ||
+    leafKey === "face_image" ||
+    leafKey === "source_image" ||
+    leafKey === "target_image" ||
+    leafKey === "input_image" ||
+    leafKey === "reference_image" ||
+    leafKey === "init_image" ||
+    leafKey === "mask_image" ||
+    leafKey === "image_url" ||
+    leafKey === "reference_url" ||
+    leafKey === "mask_url" ||
+    leafKey.endsWith("_image") ||
+    leafKey.endsWith("_images") ||
+    key.endsWith(".image_url") ||
+    key.endsWith(".reference_url") ||
+    key.endsWith(".mask_url")
   );
 }
 
+function isMaskUploadField(field: JsonSchemaField) {
+  const leafKey = getFieldLeafKey(field.key);
+  return leafKey === "mask" || leafKey === "mask_image" || leafKey === "mask_url";
+}
+
+function isReferenceImageUploadField(field: JsonSchemaField) {
+  const leafKey = getFieldLeafKey(field.key);
+  return leafKey === "reference_image" || leafKey === "reference_url";
+}
+
+function isEditableBaseImageField(field: JsonSchemaField) {
+  if (!isImageUploadField(field)) return false;
+  if (isMaskUploadField(field) || isReferenceImageUploadField(field) || isFaceImageField(field)) {
+    return false;
+  }
+  return true;
+}
+
 function isVideoUploadField(field: JsonSchemaField) {
-  const key = field.key.trim().toLowerCase();
+  const leafKey = getFieldLeafKey(field.key);
   if (field.type === "boolean") return false;
   return (
-    key === "video" ||
-    key === "videos" ||
-    key === "reference_video" ||
-    key === "reference_videos" ||
-    key === "source_video" ||
-    key === "input_video" ||
-    key === "target_video" ||
-    key.endsWith("_video") ||
-    key.endsWith("_videos")
+    leafKey === "video" ||
+    leafKey === "videos" ||
+    leafKey === "reference_video" ||
+    leafKey === "reference_videos" ||
+    leafKey === "source_video" ||
+    leafKey === "input_video" ||
+    leafKey === "target_video" ||
+    leafKey === "video_url" ||
+    leafKey.endsWith("_video") ||
+    leafKey.endsWith("_videos")
   );
 }
 
 function isAudioUploadField(field: JsonSchemaField) {
-  const key = field.key.trim().toLowerCase();
+  const leafKey = getFieldLeafKey(field.key);
   if (field.type === "boolean") return false;
   return (
-    key === "audio" ||
-    key === "audios" ||
-    key === "reference_audio" ||
-    key === "reference_audios" ||
-    key === "source_audio" ||
-    key === "input_audio" ||
-    key === "target_audio" ||
-    key.endsWith("_audio") ||
-    key.endsWith("_audios")
+    leafKey === "audio" ||
+    leafKey === "audios" ||
+    leafKey === "reference_audio" ||
+    leafKey === "reference_audios" ||
+    leafKey === "source_audio" ||
+    leafKey === "input_audio" ||
+    leafKey === "target_audio" ||
+    leafKey === "audio_url" ||
+    leafKey.endsWith("_audio") ||
+    leafKey.endsWith("_audios")
   );
 }
 
@@ -1589,8 +1656,15 @@ export function ModelsBrowser({
   const [deletingHistoryRequestId, setDeletingHistoryRequestId] = useState<string | null>(null);
   const [historyDeleteTarget, setHistoryDeleteTarget] = useState<PlaygroundHistoryImage | null>(null);
   const [previewImage, setPreviewImage] = useState<PreviewImageState | null>(null);
+  const [maskEditorState, setMaskEditorState] = useState<MaskEditorState | null>(null);
+  const [maskEditorBrushSize, setMaskEditorBrushSize] = useState(28);
+  const [maskEditorError, setMaskEditorError] = useState<string | null>(null);
+  const [maskEditorSaving, setMaskEditorSaving] = useState(false);
   const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const maskDrawingRef = useRef(false);
+  const maskLastPointRef = useRef<{ x: number; y: number } | null>(null);
   const playgroundImageAssets = useMemo(
     () => extractImageAssets(playgroundOutput),
     [playgroundOutput]
@@ -1609,6 +1683,8 @@ export function ModelsBrowser({
     setChatComposer("");
     setChatConversation([]);
     setPlaygroundHistoryImages([]);
+    setMaskEditorState(null);
+    setMaskEditorError(null);
     setUploadingFields({});
   }, [effectiveModelSlug]);
   const handleProviderChange = (nextProvider: string) => {
@@ -2095,6 +2171,187 @@ export function ModelsBrowser({
     });
   };
 
+  const resolveMaskSourceForField = (field: JsonSchemaField) => {
+    if (!isMaskUploadField(field)) return null;
+    const fieldPrefix = splitFieldPath(field.key).slice(0, -1).join(".").toLowerCase();
+    const rankedCandidates = parsedFields
+      .filter((candidate) => isEditableBaseImageField(candidate) && (playgroundUploads[candidate.key] ?? []).length > 0)
+      .map((candidate) => {
+        const candidatePrefix = splitFieldPath(candidate.key).slice(0, -1).join(".").toLowerCase();
+        const leafKey = getFieldLeafKey(candidate.key);
+        let score = 0;
+        if (candidatePrefix === fieldPrefix) score += 20;
+        if (leafKey === "image_url") score += 10;
+        else if (leafKey === "image") score += 9;
+        else if (leafKey === "images") score += 8;
+        else if (leafKey === "source_image" || leafKey === "input_image" || leafKey === "init_image") score += 7;
+        else if (leafKey === "target_image") score += 5;
+        else score += 1;
+        return { candidate, score };
+      })
+      .sort((left, right) => right.score - left.score);
+
+    const sourceField = rankedCandidates[0]?.candidate;
+    const sourceUpload = sourceField ? playgroundUploads[sourceField.key]?.[0] : null;
+    if (!sourceField || !sourceUpload) return null;
+    return { sourceField, sourceUpload };
+  };
+
+  const resetMaskCanvas = () => {
+    const canvas = maskCanvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const drawMaskPoint = (x: number, y: number, continueStroke: boolean) => {
+    const canvas = maskCanvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.save();
+    context.strokeStyle = "#FFFFFF";
+    context.fillStyle = "#FFFFFF";
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.lineWidth = maskEditorBrushSize;
+    if (continueStroke && maskLastPointRef.current) {
+      context.beginPath();
+      context.moveTo(maskLastPointRef.current.x, maskLastPointRef.current.y);
+      context.lineTo(x, y);
+      context.stroke();
+    } else {
+      context.beginPath();
+      context.arc(x, y, Math.max(2, maskEditorBrushSize / 2), 0, Math.PI * 2);
+      context.fill();
+    }
+    context.restore();
+    maskLastPointRef.current = { x, y };
+  };
+
+  const getMaskPointerPosition = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    const canvas = maskCanvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    return {
+      x: ((event.clientX - rect.left) / rect.width) * canvas.width,
+      y: ((event.clientY - rect.top) / rect.height) * canvas.height,
+    };
+  };
+
+  const handleMaskPointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+    const point = getMaskPointerPosition(event);
+    if (!point) return;
+    maskDrawingRef.current = true;
+    maskLastPointRef.current = null;
+    drawMaskPoint(point.x, point.y, false);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleMaskPointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (!maskDrawingRef.current) return;
+    event.preventDefault();
+    const point = getMaskPointerPosition(event);
+    if (!point) return;
+    drawMaskPoint(point.x, point.y, true);
+  };
+
+  const endMaskStroke = () => {
+    maskDrawingRef.current = false;
+    maskLastPointRef.current = null;
+  };
+
+  const handleMaskEditorImageLoad = (event: SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget;
+    const canvas = maskCanvasRef.current;
+    if (!canvas) return;
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    resetMaskCanvas();
+  };
+
+  const saveMaskDrawing = async () => {
+    if (!maskEditorState) return;
+    const canvas = maskCanvasRef.current;
+    if (!canvas || canvas.width === 0 || canvas.height === 0) {
+      setMaskEditorError("Mask canvas is not ready yet.");
+      return;
+    }
+
+    setMaskEditorSaving(true);
+    setMaskEditorError(null);
+
+    try {
+      const exportCanvas = document.createElement("canvas");
+      exportCanvas.width = canvas.width;
+      exportCanvas.height = canvas.height;
+      const exportContext = exportCanvas.getContext("2d");
+      if (!exportContext) {
+        throw new Error("Failed to prepare mask export.");
+      }
+      exportContext.fillStyle = "#000000";
+      exportContext.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+      exportContext.drawImage(canvas, 0, 0);
+
+      const blob = await new Promise<Blob | null>((resolve) => {
+        exportCanvas.toBlob(resolve, "image/png");
+      });
+      if (!blob) {
+        throw new Error("Failed to export mask image.");
+      }
+
+      const formData = new FormData();
+      formData.set("field", maskEditorState.fieldKey);
+      formData.set(
+        "file",
+        new File([blob], `mask-${Date.now()}.png`, {
+          type: "image/png",
+        })
+      );
+
+      const response = await fetch("/api/playground/uploads", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        url?: string;
+        mimeType?: string;
+        name?: string;
+        size?: number;
+        error?: { message?: string };
+      };
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error?.message ?? "Failed to upload mask image.");
+      }
+
+      setPlaygroundUploads((current) => ({
+        ...current,
+        [maskEditorState.fieldKey]: [
+          {
+            url: payload.url!,
+            name: payload.name || "Generated mask",
+            mimeType: payload.mimeType || "image/png",
+            size: typeof payload.size === "number" ? payload.size : blob.size,
+          },
+        ],
+      }));
+      setValidationErrors((current) => {
+        const next = { ...current };
+        delete next[maskEditorState.fieldKey];
+        return next;
+      });
+      setMaskEditorState(null);
+      setMaskEditorError(null);
+    } catch (error) {
+      setMaskEditorError(error instanceof Error ? error.message : "Failed to save mask.");
+    } finally {
+      setMaskEditorSaving(false);
+    }
+  };
+
   const submitPlayground = async () => {
     if (!selectedModel) return;
     setPlaygroundError(null);
@@ -2128,7 +2385,7 @@ export function ModelsBrowser({
       if (field.required && value.length === 0) {
         nextValidationErrors[field.key] = `${field.label} is required.`;
       }
-      if (field.key === "prompt" && value.length === 0) {
+      if (getFieldLeafKey(field.key) === "prompt" && value.length === 0) {
         nextValidationErrors[field.key] = "Prompt is required.";
       }
     }
@@ -2172,11 +2429,11 @@ export function ModelsBrowser({
           if ((raw ?? "").trim().length === 0) continue;
           if (field.type === "number") {
             const num = Number(raw);
-            if (!Number.isNaN(num)) inputPayload[field.key] = num;
+            if (!Number.isNaN(num)) setNestedValue(inputPayload, field.key, num);
             continue;
           }
           if (field.type === "boolean") {
-            inputPayload[field.key] = raw === "true";
+            setNestedValue(inputPayload, field.key, raw === "true");
             continue;
           }
           if (field.type === "array") {
@@ -2185,20 +2442,24 @@ export function ModelsBrowser({
               try {
                 const parsedArray = JSON.parse(trimmed);
                 if (Array.isArray(parsedArray)) {
-                  inputPayload[field.key] = parsedArray;
+                  setNestedValue(inputPayload, field.key, parsedArray);
                   continue;
                 }
               } catch {
                 // Fall through to simple splitting below.
               }
             }
-            inputPayload[field.key] = trimmed
-              .split(/[\n,]/)
-              .map((item) => item.trim())
-              .filter(Boolean);
+            setNestedValue(
+              inputPayload,
+              field.key,
+              trimmed
+                .split(/[\n,]/)
+                .map((item) => item.trim())
+                .filter(Boolean)
+            );
             continue;
           }
-          inputPayload[field.key] = raw;
+          setNestedValue(inputPayload, field.key, raw);
         }
 
         const systemPromptKey = chatConfigFields.find((field) => {
@@ -2405,25 +2666,29 @@ export function ModelsBrowser({
         if (isUploadField(field)) {
           const uploads = playgroundUploads[field.key] ?? [];
           if (uploads.length > 0) {
-            inputPayload[field.key] = isMultipleUploadField(field)
-              ? uploads.map((item) => item.url)
-              : uploads[0]?.url;
+            setNestedValue(
+              inputPayload,
+              field.key,
+              isMultipleUploadField(field)
+                ? uploads.map((item) => item.url)
+                : uploads[0]?.url
+            );
           }
           continue;
         }
         const raw = playgroundForm[field.key];
         if ((raw ?? "").trim().length === 0) continue;
-        if (field.key === "prompt") {
+        if (getFieldLeafKey(field.key) === "prompt") {
           promptValue = raw;
           continue;
         }
         if (field.type === "number") {
           const num = Number(raw);
-          if (!Number.isNaN(num)) inputPayload[field.key] = num;
+          if (!Number.isNaN(num)) setNestedValue(inputPayload, field.key, num);
           continue;
         }
         if (field.type === "boolean") {
-          inputPayload[field.key] = raw === "true";
+          setNestedValue(inputPayload, field.key, raw === "true");
           continue;
         }
         if (field.type === "array") {
@@ -2432,20 +2697,24 @@ export function ModelsBrowser({
             try {
               const parsedArray = JSON.parse(trimmed);
               if (Array.isArray(parsedArray)) {
-                inputPayload[field.key] = parsedArray;
+                setNestedValue(inputPayload, field.key, parsedArray);
                 continue;
               }
             } catch {
               // Fall through to simple splitting below.
             }
           }
-          inputPayload[field.key] = trimmed
-            .split(/[\n,]/)
-            .map((item) => item.trim())
-            .filter(Boolean);
+          setNestedValue(
+            inputPayload,
+            field.key,
+            trimmed
+              .split(/[\n,]/)
+              .map((item) => item.trim())
+              .filter(Boolean)
+          );
           continue;
         }
-        inputPayload[field.key] = raw;
+        setNestedValue(inputPayload, field.key, raw);
       }
 
       const submitRes = await fetch("/api/playground", {
@@ -3003,7 +3272,7 @@ export function ModelsBrowser({
                       onClick={submitPlayground}
                       className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[linear-gradient(135deg,#1F8A4C_0%,#176D3D_100%)] px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(31,138,76,0.26)] transition-transform hover:-translate-y-[1px] hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
                     >
-                      {isSubmitting ? "Sending..." : `Send${priceTag ? ` ${priceTag}` : ""}`}
+                      {isSubmitting ? "Sending..." : "Send"}
                     </button>
                   </div>
                   {validationErrors.messages ? (
@@ -3053,6 +3322,52 @@ export function ModelsBrowser({
                           <p className="mt-2 text-[11px] leading-5 text-black/45">
                             {appendUploadLimitText(getUploadHelpText(uploadKind), field)}
                           </p>
+                          {uploadKind === "image" && isMaskUploadField(field) ? (
+                            (() => {
+                              const maskSource = resolveMaskSourceForField(field);
+                              return (
+                                <div className="mt-3 rounded-md border border-dashed border-[#D6E4FF] bg-[#F8FBFF] p-2.5">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-[11px] font-medium text-black/70">
+                                        Draw mask area
+                                      </p>
+                                      <p className="mt-1 text-[11px] leading-5 text-black/45">
+                                        Paint white on the background image. White area means the region to generate or repair.
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      disabled={isSubmitting || uploadingFields[field.key] || !maskSource}
+                                      onClick={() => {
+                                        if (!maskSource) return;
+                                        setMaskEditorError(null);
+                                        setMaskEditorBrushSize(28);
+                                        setMaskEditorState({
+                                          fieldKey: field.key,
+                                          fieldLabel: field.label,
+                                          sourceFieldLabel: maskSource.sourceField.label,
+                                          sourceUpload: maskSource.sourceUpload,
+                                        });
+                                      }}
+                                      className="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-[#BAE6FD] bg-white px-3 text-[11px] font-medium text-black/70 hover:bg-[#E0F2FE] disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      Draw mask
+                                    </button>
+                                  </div>
+                                  {!maskSource ? (
+                                    <p className="mt-2 text-[11px] leading-5 text-black/45">
+                                      Upload the background image first, then you can draw the mask here.
+                                    </p>
+                                  ) : (
+                                    <p className="mt-2 text-[11px] leading-5 text-black/45">
+                                      Base image: {maskSource.sourceField.label}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })()
+                          ) : null}
                           {uploadingFields[field.key] ? (
                             <p className="mt-2 text-[11px] text-black/55">Uploading...</p>
                           ) : null}
@@ -3633,6 +3948,89 @@ export function ModelsBrowser({
                 className="max-h-[70vh] w-auto max-w-full object-contain"
               />
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {maskEditorState ? (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-5xl rounded-xl border border-black/[0.1] bg-white p-4 shadow-2xl">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h4 className="truncate text-sm font-semibold text-black">{maskEditorState.fieldLabel}</h4>
+                <p className="mt-1 text-xs text-black/55">
+                  Paint white where the model should generate or repair. Black area will stay unchanged.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-2 rounded border border-black/[0.08] bg-[#FAFAFA] px-3 py-1.5 text-xs text-black/65">
+                  <span>Brush</span>
+                  <input
+                    type="range"
+                    min="8"
+                    max="96"
+                    step="2"
+                    value={maskEditorBrushSize}
+                    onChange={(event) => setMaskEditorBrushSize(Number(event.target.value))}
+                    className="w-24 accent-black"
+                  />
+                  <span>{maskEditorBrushSize}px</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={resetMaskCanvas}
+                  disabled={maskEditorSaving}
+                  className="h-8 rounded border border-black/[0.12] px-3 text-xs font-medium text-black/70 hover:bg-black/[0.03] disabled:opacity-50"
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMaskEditorState(null)}
+                  disabled={maskEditorSaving}
+                  className="h-8 rounded border border-black/[0.12] px-3 text-xs font-medium text-black/70 hover:bg-black/[0.03] disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveMaskDrawing()}
+                  disabled={maskEditorSaving}
+                  className="h-8 rounded border border-[#BAE6FD] bg-[#E0F2FE] px-3 text-xs font-medium text-black/80 hover:bg-[#D0EBFF] disabled:opacity-50"
+                >
+                  {maskEditorSaving ? "Saving..." : "Use mask"}
+                </button>
+              </div>
+            </div>
+            <div className="rounded-lg bg-[#F7F7F7] p-3">
+              <div className="flex max-h-[72vh] items-center justify-center overflow-auto">
+                <div className="relative inline-block max-w-full">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={buildDisplayImageUrl(maskEditorState.sourceUpload.url)}
+                    alt={maskEditorState.sourceFieldLabel}
+                    onLoad={handleMaskEditorImageLoad}
+                    className="block max-h-[68vh] w-auto max-w-full object-contain"
+                  />
+                  <canvas
+                    ref={maskCanvasRef}
+                    onPointerDown={handleMaskPointerDown}
+                    onPointerMove={handleMaskPointerMove}
+                    onPointerUp={endMaskStroke}
+                    onPointerLeave={endMaskStroke}
+                    onPointerCancel={endMaskStroke}
+                    className="absolute inset-0 h-full w-full cursor-crosshair touch-none"
+                  />
+                </div>
+              </div>
+            </div>
+            {maskEditorError ? (
+              <p className="mt-3 text-xs text-[#B42318]">{maskEditorError}</p>
+            ) : (
+              <p className="mt-3 text-xs text-black/55">
+                Source image: {maskEditorState.sourceFieldLabel}
+              </p>
+            )}
           </div>
         </div>
       ) : null}
