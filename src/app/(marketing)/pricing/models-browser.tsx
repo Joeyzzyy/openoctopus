@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, CircleHelp, Copy, Download, X } from "lucide-react";
 import type { GatewayErrorDocRow, ModelDocRow } from "../models/data";
@@ -962,6 +962,64 @@ function formatUploadSize(size: number) {
   return `${Math.max(1, Math.round(size / 1024))} KB`;
 }
 
+function ModelContentSkeleton() {
+  const block = (className: string) => <div className={`animate-pulse rounded bg-black/[0.06] ${className}`} />;
+
+  return (
+    <div className="space-y-4">
+      <section className="min-w-0 max-w-full rounded-xl border border-black/[0.08] bg-white p-2 shadow-sm sm:rounded-2xl sm:p-3">
+        <div className="mb-3 rounded-lg border border-black/[0.08] bg-[#F6F8FB] p-1">
+          <div className="grid grid-cols-2 gap-1">
+            {block("h-10 rounded-md")}
+            {block("h-10 rounded-md")}
+          </div>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
+          <section className="rounded-lg border border-black/[0.08] bg-white p-3 sm:rounded-xl sm:p-4">
+            {block("mb-3 h-5 w-16")}
+            <div className="space-y-3">
+              <div>
+                {block("mb-2 h-3 w-20")}
+                {block("h-12 w-full")}
+              </div>
+              <div>
+                {block("mb-2 h-3 w-24")}
+                {block("h-28 w-full")}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {block("h-12 w-full")}
+                {block("h-12 w-full")}
+              </div>
+              {block("h-11 w-full")}
+            </div>
+          </section>
+          <section className="rounded-lg border border-black/[0.08] bg-[#FAFAFA] p-3 sm:rounded-xl sm:p-4">
+            <div className="flex items-center justify-between gap-3">
+              {block("h-5 w-16")}
+              {block("h-7 w-28")}
+            </div>
+            {block("mt-3 min-h-[280px] w-full")}
+          </section>
+        </div>
+      </section>
+      <section className="rounded-xl border border-black/[0.08] bg-white p-3 shadow-sm sm:rounded-2xl sm:p-4">
+        {block("mb-3 h-5 w-24")}
+        <div className="flex gap-2 overflow-hidden">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="h-24 w-24 shrink-0 animate-pulse rounded-md bg-black/[0.06]" />
+          ))}
+        </div>
+      </section>
+      <section className="rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm">
+        {block("h-4 w-24")}
+        {block("mt-3 h-8 w-full max-w-2xl")}
+        {block("mt-2 h-4 w-full max-w-4xl")}
+        {block("mt-4 h-40 w-full")}
+      </section>
+    </div>
+  );
+}
+
 function formatUsd(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -1361,6 +1419,8 @@ export function ModelsBrowser({
   const [resultModalOpen, setResultModalOpen] = useState(false);
   const [authRequiredModalOpen, setAuthRequiredModalOpen] = useState(false);
   const [topUpRequiredModalOpen, setTopUpRequiredModalOpen] = useState(false);
+  const [isRouteSkeletonVisible, setRouteSkeletonVisible] = useState(false);
+  const [, startRouteTransition] = useTransition();
   const [resultCopied, setResultCopied] = useState(false);
   const [textOutputCopied, setTextOutputCopied] = useState(false);
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
@@ -1389,12 +1449,14 @@ export function ModelsBrowser({
     setUploadingFields({});
   }, [effectiveModelSlug]);
   const handleProviderChange = (nextProvider: string) => {
+    setRouteSkeletonVisible(true);
     setSelectedProvider(nextProvider);
     const nextRows = rowsByProvider.find(([provider]) => provider === nextProvider)?.[1] ?? [];
     setSelectedModelSlug(nextRows[0]?.publicModel ?? null);
   };
 
   const handleModelChange = (nextModelSlug: string | null) => {
+    setRouteSkeletonVisible(true);
     setSelectedModelSlug(nextModelSlug);
   };
 
@@ -1424,8 +1486,13 @@ export function ModelsBrowser({
     const providerSlug = slugifyPathPart(selectedProvider) || encodeURIComponent(selectedProvider);
     const modelSlug = slugifyPathPart(selectedModel.publicModel) || encodeURIComponent(selectedModel.publicModel);
     const nextHref = `/models/${providerSlug}/${modelSlug}`;
-    if (pathname === nextHref) return;
-    router.replace(nextHref, { scroll: false });
+    if (pathname === nextHref) {
+      setRouteSkeletonVisible(false);
+      return;
+    }
+    startRouteTransition(() => {
+      router.replace(nextHref, { scroll: false });
+    });
   }, [pathname, router, selectedModel, selectedProvider]);
 
   const handleMainTabChange = (tab: "playground" | "api") => {
@@ -1536,9 +1603,10 @@ export function ModelsBrowser({
       0
     );
     if (tiers.length === 0) {
-      return booleanSurchargeTotal > 0
-        ? `${selectedModel.priceLabel || "Pricing unavailable"} + ${formatUsd(booleanSurchargeTotal)} add-ons`
-        : selectedModel.priceLabel || "";
+      if (selectedModel.primaryPriceValue !== null) {
+        return formatUsd(selectedModel.primaryPriceValue + booleanSurchargeTotal);
+      }
+      return selectedModel.priceLabel || "";
     }
     const resolutionField = parsedFields.find((field) => isResolutionField(field.key));
     const qualityField = parsedFields.find((field) => field.key.trim().toLowerCase() === "quality");
@@ -1570,10 +1638,7 @@ export function ModelsBrowser({
       readPositiveNumber(playgroundForm.n) ??
       1;
     const total = tier.price * imageCount + booleanSurchargeTotal;
-    const addOnLabel = booleanSurchargeTotal > 0 ? ` + ${formatUsd(booleanSurchargeTotal)} add-ons` : "";
-    return imageCount > 1
-      ? `${formatUsd(total)} total · ${formatUsd(tier.price)} / image${addOnLabel}`
-      : `${formatUsd(total)} total · ${formatUsd(tier.price)} / image${addOnLabel}`;
+    return formatUsd(total);
   }, [parsedFields, playgroundForm, playgroundUploads, selectedModel]);
 
   useEffect(() => {
@@ -2173,11 +2238,11 @@ export function ModelsBrowser({
           <div className="rounded-xl border border-[#BAE6FD] bg-[linear-gradient(135deg,#E0F2FE_0%,#FFFDFC_55%,#E0F2FE_100%)] p-3 sm:rounded-2xl sm:p-3.5">
             <div className="grid gap-2.5 sm:gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
               <label className="block">
-                <span className="mb-1 block text-[11px] font-medium tracking-[0.2px] text-black/50">Vendor</span>
+                <span className="mb-1.5 block text-[14px] font-semibold tracking-[0.18px] text-black/60">Vendor</span>
                 <select
                   value={selectedProvider}
                   onChange={(event) => handleProviderChange(event.target.value)}
-                  className="h-9 w-full appearance-none rounded-md border border-transparent bg-white/55 px-2.5 text-sm text-black/80 outline-none transition-colors hover:bg-white/70 focus:bg-white/85"
+                  className="h-11 w-full appearance-none rounded-md border border-transparent bg-white/55 px-3.5 text-[16px] font-semibold text-black/90 outline-none transition-colors hover:bg-white/70 focus:bg-white/85"
                 >
                   {selectableProviderOptions.map((provider) => (
                     <option key={provider} value={provider}>
@@ -2187,11 +2252,11 @@ export function ModelsBrowser({
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-[11px] font-medium tracking-[0.2px] text-black/50">Model</span>
+                <span className="mb-1.5 block text-[14px] font-semibold tracking-[0.18px] text-black/60">Model</span>
                 <select
                   value={effectiveModelSlug ?? visibleRows[0]?.publicModel ?? ""}
                   onChange={(event) => handleModelChange(event.target.value || null)}
-                  className="h-9 w-full appearance-none rounded-md border border-transparent bg-white/55 px-2.5 text-sm font-semibold text-black/90 outline-none transition-colors hover:bg-white/70 focus:bg-white/85"
+                  className="h-11 w-full appearance-none rounded-md border border-transparent bg-white/55 px-3.5 text-[16px] font-semibold text-black/95 outline-none transition-colors hover:bg-white/70 focus:bg-white/85"
                 >
                   {modelsByCapability.map(([capability, models]) => (
                     <optgroup key={capability} label={capability}>
@@ -2205,28 +2270,45 @@ export function ModelsBrowser({
                 </select>
               </label>
             </div>
-            <p className="mt-2 text-[13px] leading-5 text-black/68 sm:mt-1.5 sm:leading-5.5">
-              {selectedModel.modelDescription || "This model does not have a detailed description yet."}
-            </p>
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              <span className="inline-flex rounded-full border border-[#BAE6FD] bg-white/80 px-3 py-1 text-xs font-medium text-[#0369A1]">
-                {selectedModel.providerName}
-              </span>
-              <span className="inline-flex rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
-                {capabilityTag}
-              </span>
-              <span className="inline-flex max-w-full rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
-                <span className="truncate">
-                {selectedModel.publicModel}
-                </span>
-              </span>
-            </div>
+            {isRouteSkeletonVisible ? (
+              <div className="mt-2.5 animate-pulse space-y-3">
+                <div className="h-5 w-full max-w-3xl rounded bg-black/[0.06]" />
+                <div className="flex flex-wrap gap-1.5">
+                  <div className="h-7 w-24 rounded-full bg-black/[0.06]" />
+                  <div className="h-7 w-28 rounded-full bg-black/[0.06]" />
+                  <div className="h-7 w-48 rounded-full bg-black/[0.06]" />
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="mt-2 text-[13px] leading-5 text-black/68 sm:mt-1.5 sm:leading-5.5">
+                  {selectedModel.modelDescription || "This model does not have a detailed description yet."}
+                </p>
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  <span className="inline-flex rounded-full border border-[#BAE6FD] bg-white/80 px-3 py-1 text-xs font-medium text-[#0369A1]">
+                    {selectedModel.providerName}
+                  </span>
+                  <span className="inline-flex rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
+                    {capabilityTag}
+                  </span>
+                  <span className="inline-flex max-w-full rounded-full border border-black/[0.08] bg-white/80 px-3 py-1 text-xs text-black/70">
+                    <span className="truncate">
+                    {selectedModel.publicModel}
+                    </span>
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         ) : null}
       </div>
 
       <div className="relative min-w-0 max-w-full">
         <div className="min-w-0 space-y-4">
+      {isRouteSkeletonVisible ? (
+        <ModelContentSkeleton />
+      ) : (
+        <>
       <section className="min-w-0 max-w-full rounded-xl border border-black/[0.08] bg-white p-2 shadow-sm sm:rounded-2xl sm:p-3">
         <div className="mb-3 rounded-lg border border-black/[0.08] bg-[#F6F8FB] p-1">
           <div className="grid grid-cols-2 gap-1">
@@ -2556,7 +2638,7 @@ export function ModelsBrowser({
                   onClick={submitPlayground}
                   className="h-11 w-full rounded-md bg-[#1F8A4C] px-4 text-sm font-medium text-white transition-colors hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-45 sm:h-10 sm:w-auto"
                 >
-                  {isSubmitting ? "Generating..." : `Generate ${priceTag ? `(${priceTag})` : ""}`}
+                  {isSubmitting ? "Generating..." : `Generate${priceTag ? ` ${priceTag}` : ""}`}
                 </button>
               </div>
             </section>
@@ -2793,6 +2875,8 @@ export function ModelsBrowser({
           <p className="mt-1 text-sm text-black/55">Supplemental model documentation has not been added yet.</p>
         </section>
       ) : null}
+        </>
+      )}
         </div>
       </div>
 
