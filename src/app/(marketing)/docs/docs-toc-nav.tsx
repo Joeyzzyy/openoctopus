@@ -10,17 +10,16 @@ type TocSection = {
 
 export function DocsTocNav({ sections }: { sections: readonly TocSection[] }) {
   const defaultId = sections[0]?.id ?? "";
-  const [activeId, setActiveId] = useState(defaultId);
+  const [activeId, setActiveId] = useState(() => {
+    if (typeof window === "undefined") return defaultId;
+    const fromHash = window.location.hash.replace("#", "");
+    return sections.some((section) => section.id === fromHash) ? fromHash : defaultId;
+  });
 
   const sectionIds = useMemo(() => sections.map((section) => section.id), [sections]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-
-    const fromHash = window.location.hash.replace("#", "");
-    if (fromHash && sectionIds.includes(fromHash)) {
-      setActiveId(fromHash);
-    }
 
     const resolveActiveSection = () => {
       const sectionsWithTop = sectionIds
@@ -65,7 +64,7 @@ export function DocsTocNav({ sections }: { sections: readonly TocSection[] }) {
   }, [sectionIds]);
 
   return (
-    <nav className="mt-4 space-y-1">
+    <nav className="mt-4 space-y-1.5">
       {sections.map((section) => (
         <a
           key={section.id}
@@ -81,10 +80,10 @@ export function DocsTocNav({ sections }: { sections: readonly TocSection[] }) {
             window.history.replaceState(null, "", `#${section.id}`);
           }}
           className={cn(
-            "block rounded-lg px-3 py-2 text-sm transition-colors",
+            "block rounded-xl border px-3 py-2.5 text-sm transition-all",
             activeId === section.id
-              ? "bg-black text-white"
-              : "text-black/62 hover:bg-black/[0.03] hover:text-black"
+              ? "border-[#BAE6FD] bg-[#E0F2FE] font-medium text-[#0F172A] shadow-sm"
+              : "border-transparent text-black/62 hover:border-black/[0.06] hover:bg-black/[0.02] hover:text-black"
           )}
         >
           {section.label}

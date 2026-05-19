@@ -21,6 +21,7 @@ export async function MarketingHeader({
   const headerNavItems = [
     { label: copy.nav.explore, href: "/dashboard?view=explore" },
     { label: copy.nav.pricing, href: "/pricing" },
+    { label: copy.nav.docs, href: "/docs" },
     { label: copy.nav.learnMore, href: "/resource" },
   ];
 

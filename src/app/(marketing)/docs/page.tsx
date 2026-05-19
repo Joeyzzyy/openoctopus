@@ -164,7 +164,7 @@ function buildCapabilitySummaries(models: ModelDocRow[]) {
 
 function CodeBlock({ children }: { children: string }) {
   return (
-    <pre className="overflow-x-auto rounded-lg border border-black/[0.08] bg-[#0F172A] p-4 text-[12px] leading-6 text-[#E5E7EB]">
+    <pre className="overflow-x-auto rounded-2xl border border-[#0F172A]/85 bg-[linear-gradient(180deg,#0F172A_0%,#111827_100%)] p-5 text-[12px] leading-6 text-[#E5E7EB] shadow-[0_22px_50px_rgba(15,23,42,0.18)]">
       <code>{children}</code>
     </pre>
   );
@@ -180,12 +180,12 @@ function SectionHeader({
   description: string;
 }) {
   return (
-    <div className="mb-5">
-      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#0369A1]">
+    <div className="mb-6">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0284C7]">
         {eyebrow}
       </p>
-      <h2 className="mt-2 text-2xl font-semibold text-[#111827]">{title}</h2>
-      <p className="mt-2 text-[15px] leading-7 text-[#475569]">{description}</p>
+      <h2 className="mt-3 text-[28px] font-semibold tracking-[-0.02em] text-[#0F172A]">{title}</h2>
+      <p className="mt-3 max-w-3xl text-[15px] leading-7 text-[#475569]">{description}</p>
     </div>
   );
 }
@@ -200,14 +200,53 @@ function InfoCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-black/[0.08] bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-black/[0.08] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
       <div className="flex items-center gap-2">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-[#E0F2FE] text-[#0369A1]">
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#E0F2FE] text-[#0369A1]">
           <Icon className="h-4 w-4" />
         </span>
         <h3 className="text-[15px] font-semibold text-[#111827]">{title}</h3>
       </div>
       <div className="mt-3 text-sm leading-6 text-[#475569]">{children}</div>
+    </div>
+  );
+}
+
+function DocsSection({
+  id,
+  children,
+  className = "",
+}: {
+  id?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      id={id}
+      className={`rounded-[28px] border border-black/[0.07] bg-white px-6 py-7 shadow-[0_14px_36px_rgba(15,23,42,0.045)] md:px-8 ${className}`}
+    >
+      {children}
+    </section>
+  );
+}
+
+function ScenarioCard({
+  title,
+  description,
+  prompt,
+}: {
+  title: string;
+  description: string;
+  prompt: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-black/[0.08] bg-white p-5">
+      <h4 className="text-[16px] font-semibold text-[#111827]">{title}</h4>
+      <p className="mt-2 text-sm leading-7 text-[#475569]">{description}</p>
+      <div className="mt-4">
+        <CodeBlock>{prompt}</CodeBlock>
+      </div>
     </div>
   );
 }
@@ -230,11 +269,11 @@ export default async function DocsPage() {
   const initialModel = modelDocRows[0]?.publicModel ?? null;
 
   return (
-    <main className="bg-[#FCFCFA] text-[#111827]">
+    <main className="bg-[radial-gradient(circle_at_top_left,#EFF8FF_0%,#FCFCFA_28%,#FCFCFA_100%)] text-[#111827]">
       <div className="mx-auto grid max-w-7xl gap-8 px-6 py-10 md:px-8 lg:grid-cols-[240px_minmax(0,1fr)] lg:py-14">
           <aside className="hidden lg:block">
             <div className="sticky top-24">
-              <div className="rounded-lg border border-black/[0.08] bg-white p-3 shadow-sm">
+              <div className="rounded-[24px] border border-black/[0.08] bg-white/95 p-4 shadow-[0_16px_38px_rgba(15,23,42,0.08)] backdrop-blur">
                 <div className="flex items-center gap-2 px-2 text-[13px] font-semibold text-[#111827]">
                   <BookOpen className="h-4 w-4 text-[#0369A1]" />
                   Documentation
@@ -245,101 +284,99 @@ export default async function DocsPage() {
           </aside>
 
           <div className="min-w-0 space-y-12">
-            <section id="introduction" className="border-b border-black/[0.06] bg-white">
-            <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#111827]">
-              <BookOpen className="h-4 w-4 text-[#38BDF8]" />
-              OpenOctopus Docs
-            </Link>
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#0369A1]">
-              Documentation
-            </p>
-            <h1 className="mt-4 max-w-3xl text-4xl font-semibold text-[#111827] md:text-6xl">
-              Build with OpenOctopus
-            </h1>
-            <p className="mt-5 max-w-3xl text-[17px] leading-8 text-[#475569]">
-              OpenOctopus provides an official CLI plus authenticated REST APIs for image generation, image editing,
-              chat completions, video generation, model discovery, async task polling, and generated asset delivery.
-            </p>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href={destination}
-                className="inline-flex h-10 items-center justify-center rounded-md bg-[#111827] px-4 text-sm font-medium text-white transition-colors hover:bg-[#0B1220]"
-              >
-                {destinationLabel}
+            <section id="introduction" className="rounded-[32px] border border-black/[0.06] bg-white px-6 py-8 shadow-[0_18px_42px_rgba(15,23,42,0.06)] md:px-8">
+              <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#111827]">
+                <BookOpen className="h-4 w-4 text-[#38BDF8]" />
+                OpenOctopus Docs
               </Link>
-              <Link
-                href="/models"
-                className="inline-flex h-10 items-center justify-center rounded-md border border-black/[0.08] bg-white px-4 text-sm font-medium text-[#111827] shadow-sm transition-colors hover:bg-[#F9FAFB]"
-              >
-                Browse models
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </div>
+              <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.14em] text-[#0369A1]">
+                Documentation
+              </p>
+              <h1 className="mt-4 max-w-3xl text-4xl font-semibold text-[#111827] md:text-6xl">
+                Build with OpenOctopus
+              </h1>
+              <p className="mt-5 max-w-3xl text-[17px] leading-8 text-[#475569]">
+                OpenOctopus provides an official CLI plus authenticated REST APIs for image generation, image editing,
+                chat completions, video generation, model discovery, async task polling, and generated asset delivery.
+              </p>
 
-            <div className="mt-9 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-4">
-                <p className="text-[12px] text-[#6B7280]">Public base URL</p>
-                <p className="mt-2 break-all font-mono text-[13px] text-[#111827]">{PUBLIC_API_BASE_URL}</p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  href={destination}
+                  className="inline-flex h-10 items-center justify-center rounded-md bg-[#111827] px-4 text-sm font-medium text-white transition-colors hover:bg-[#0B1220]"
+                >
+                  {destinationLabel}
+                </Link>
+                <Link
+                  href="/models"
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-black/[0.08] bg-white px-4 text-sm font-medium text-[#111827] shadow-sm transition-colors hover:bg-[#F9FAFB]"
+                >
+                  Browse models
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
               </div>
-              <div className="rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-4">
-                <p className="text-[12px] text-[#6B7280]">Supported models</p>
-                <p className="mt-2 text-2xl font-semibold text-[#111827]">
-                  {modelDocRows.length > 0 ? modelDocRows.length : "Live catalog"}
-                </p>
-              </div>
-              <div className="rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-4">
-                <p className="text-[12px] text-[#6B7280]">API mode</p>
-                <p className="mt-2 text-2xl font-semibold text-[#111827]">Async polling</p>
-              </div>
-            </div>
 
-            <div className="mt-8 grid gap-3 md:grid-cols-3">
-              <InfoCard icon={Image} title="Image generation">
-                Create images with public model slugs through <code>/v1/images/generations</code>.
-              </InfoCard>
-              <InfoCard icon={Sparkles} title="Image editing">
-                Edit one or more input images through <code>/v1/images/edits</code>.
-              </InfoCard>
-              <InfoCard icon={Code2} title="CLI and async jobs">
-                Authenticate once, run models from the terminal, and wait for async tasks or fetch results later.
-              </InfoCard>
-            </div>
+              <div className="mt-9 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4">
+                  <p className="text-[12px] text-[#6B7280]">Public base URL</p>
+                  <p className="mt-2 break-all font-mono text-[13px] text-[#111827]">{PUBLIC_API_BASE_URL}</p>
+                </div>
+                <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4">
+                  <p className="text-[12px] text-[#6B7280]">Supported models</p>
+                  <p className="mt-2 text-2xl font-semibold text-[#111827]">
+                    {modelDocRows.length > 0 ? modelDocRows.length : "Live catalog"}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4">
+                  <p className="text-[12px] text-[#6B7280]">API mode</p>
+                  <p className="mt-2 text-2xl font-semibold text-[#111827]">Async polling</p>
+                </div>
+              </div>
+
+              <div className="mt-8 grid gap-3 md:grid-cols-3">
+                <InfoCard icon={Image} title="Image generation">
+                  Create images with public model slugs through <code>/v1/images/generations</code>.
+                </InfoCard>
+                <InfoCard icon={Sparkles} title="Image editing">
+                  Edit one or more input images through <code>/v1/images/edits</code>.
+                </InfoCard>
+                <InfoCard icon={Code2} title="CLI and async jobs">
+                  Authenticate once, run models from the terminal, and wait for async tasks or fetch results later.
+                </InfoCard>
+              </div>
             </section>
 
-          <section id="quick-start">
+          <DocsSection id="quick-start">
             <SectionHeader
               eyebrow="Getting Started"
               title="Quick start"
-              description="Create an API key in the dashboard, send a generation request, then poll the returned task ID until the task reaches a terminal status."
+              description="If you are new here, use this order: create an API key, send one request, then keep checking the task until it finishes. You do not need to understand every endpoint before getting started."
             />
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+            <div className="space-y-4">
+              {[
+                "Put your API key in the Authorization header on every request.",
+                "Choose one public model slug and send a request to the matching endpoint.",
+                "If the model runs asynchronously, poll the returned task ID until it finishes.",
+                "When the task succeeds, read the final image, video, or text from the output payload.",
+              ].map((item) => (
+                <div key={item} className="flex gap-3 rounded-2xl border border-black/[0.08] bg-[#FCFCFA] px-4 py-3 text-sm leading-7 text-[#475569]">
+                  <CheckCircle2 className="mt-1 h-4 w-4 flex-none text-[#15803D]" />
+                  <span>{item}</span>
+                </div>
+              ))}
               <div>
                 <CodeBlock>{buildImageGenerationCurl()}</CodeBlock>
               </div>
-              <div className="space-y-3">
-                {[
-                  "Use Authorization: Bearer ooq_your_api_key on every API request.",
-                  "Submit requests with a public model slug and optional input object.",
-                  "Poll /v1/tasks/:id until status is succeeded, failed, or cancelled.",
-                  "Read generated URLs from output_payload.assets[].url.",
-                ].map((item) => (
-                  <div key={item} className="flex gap-3 rounded-lg border border-black/[0.08] bg-white p-3 text-sm text-[#475569]">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-[#15803D]" />
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
             </div>
-          </section>
+          </DocsSection>
 
-          <section id="authentication">
+          <DocsSection id="authentication">
             <SectionHeader
               eyebrow="Authentication"
               title="API authentication"
               description="OpenOctopus API keys are workspace scoped. Create production, development, or service keys in the dashboard and send them as bearer tokens."
             />
-            <div className="grid gap-4 md:grid-cols-2">
+	              <div className="grid gap-4 md:grid-cols-2">
               <InfoCard icon={KeyRound} title="Bearer token">
                 <p>Include this header on model submission and task polling requests:</p>
                 <div className="mt-3 rounded-md bg-[#F6F8FB] px-3 py-2 font-mono text-[12px] text-[#111827]">
@@ -351,9 +388,9 @@ export default async function DocsPage() {
                 a billing error before a provider task is created.
               </InfoCard>
             </div>
-          </section>
+          </DocsSection>
 
-          <section id="web-dashboard">
+          <DocsSection id="web-dashboard">
             <SectionHeader
               eyebrow="Ways to Use"
               title="Web dashboard and playground"
@@ -370,63 +407,30 @@ export default async function DocsPage() {
                 Inspect task status, costs, generated outputs, and model usage in your workspace dashboard.
               </InfoCard>
             </div>
-          </section>
+          </DocsSection>
 
-          <section id="cli">
+          <DocsSection id="cli">
             <SectionHeader
               eyebrow="Ways to Use"
               title="Official CLI"
-              description="The OpenOctopus CLI discovers the live model manifest at runtime, so newly published models and input parameters work without shipping a new CLI release."
+              description="If you prefer the terminal, the CLI is the easiest starting point. It can discover live models, run jobs, wait for results, and even upload your local files automatically."
             />
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(280px,0.95fr)]">
-              <div className="space-y-4">
-                <CodeBlock>{`npm i -g @openoctopus/cli
+            <div className="space-y-6">
+              <InfoCard icon={PlayCircle} title="Start here">
+                <p>
+                  Install the CLI, log in once, and check that it can see your account. After that, you can search
+                  models, inspect inputs, and run jobs from the same terminal.
+                </p>
+              </InfoCard>
 
+              <CodeBlock>{`npm i -g @openoctopus/cli
 ooct auth login
 ooct auth status
 ooct models
 ooct models search image
-ooct models inspect openoctopus/google/imagen-4
+ooct models inspect openoctopus/google/imagen-4`}</CodeBlock>
 
-ooct run openoctopus/image-captioner-molmo2 \\
-  --image ./input.png \\
-  --detail-level low
-
-ooct run openoctopus/bytedance/seedance-2.0/text-to-video \\
-  --prompt "a cinematic octopus swimming through a neon underwater city" \\
-  --reference-images ./ref.png,https://example.com/ref-2.png \\
-  --reference-videos ./ref.mp4 \\
-  --reference-audios ./ref.mp3 \\
-  --duration 5 \\
-  --resolution 720p
-
-ooct run openoctopus/deepseek-v4-pro \\
-  --prompt "Summarize async polling in 3 bullets"
-
-ooct task get task_id
-ooct task wait task_id
-ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
-
-                <div className="rounded-lg border border-black/[0.08] bg-white p-4 shadow-sm">
-                  <h3 className="text-[15px] font-semibold text-[#111827]">Recommended workflow</h3>
-                  <div className="mt-3 grid gap-2 text-sm leading-6 text-[#475569]">
-                    {[
-                      "Install the CLI, then authenticate once with `ooct auth login` or set OPENOCTOPUS_API_KEY.",
-                      "Discover live models with `ooct models`, `ooct models search`, and `ooct models inspect`.",
-                      "Submit jobs with `ooct run <model>` and pass model-specific flags from the live manifest.",
-                      "Use `ooct task get` or `ooct task wait` for asynchronous jobs.",
-                      "Use `ooct uploads create <file>` when you want a reusable uploaded asset URL ahead of submission.",
-                    ].map((item) => (
-                      <div key={item} className="flex gap-3 rounded-md bg-[#F6F8FB] px-3 py-2">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-[#15803D]" />
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
                 <InfoCard icon={FileCode2} title="Supported commands">
                   <ul className="space-y-2 font-mono text-[12px] text-[#111827]">
                     <li>ooct auth login</li>
@@ -444,42 +448,142 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
                   </ul>
                 </InfoCard>
 
-                <InfoCard icon={Layers3} title="Dynamic model flags">
-                  <p>
-                    The CLI reads <code>/v1/model-manifest</code> at runtime and maps input schema parameters to flags.
-                    For example, <code>reference_images</code> becomes <code>--reference-images</code>.
-                  </p>
-                </InfoCard>
-
-                <InfoCard icon={Sparkles} title="Local files and uploaded URLs">
-                  <p>
-                    File-like inputs accept either local file paths or existing <code>http(s)</code> URLs. Local image,
-                    video, and audio files are uploaded automatically before the request is submitted.
-                  </p>
-                  <div className="mt-3 rounded-md bg-[#F6F8FB] px-3 py-2 font-mono text-[12px] text-[#111827]">
-                    --reference-images ./shot.png,https://example.com/style.png
-                  </div>
-                </InfoCard>
-
-                <InfoCard icon={ShieldAlert} title="Useful flags">
-                  <ul className="space-y-2 text-sm leading-6 text-[#475569]">
-                    <li><code>--json</code> prints machine-readable task and model output.</li>
-                    <li><code>--no-wait</code> returns immediately after submit with the task ID.</li>
-                    <li><code>--output &lt;path&gt;</code> downloads the first returned asset to a local file.</li>
-                    <li><code>--api-base &lt;url&gt;</code> overrides the configured API base for the current command.</li>
+                <InfoCard icon={ShieldAlert} title="Good to know">
+                  <ul className="space-y-3 text-sm leading-7 text-[#475569]">
+                    <li>The CLI reads live model definitions from OpenOctopus, so the available flags come from the real model manifest.</li>
+                    <li>Local image, video, and audio files can be passed directly. The CLI uploads them for you automatically.</li>
+                    <li><code>--json</code> prints raw output. <code>--no-wait</code> returns only the task ID. <code>--output</code> saves the first result locally.</li>
                   </ul>
-                </InfoCard>
+	                </InfoCard>
+	              </div>
+	            </div>
+
+	            <div className="mt-6 rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-5">
+              <h3 className="text-[16px] font-semibold text-[#111827]">
+                Use OpenOctopus CLI from Cursor, OpenCode, or other AI coding assistants
+              </h3>
+              <p className="mt-2 text-sm leading-7 text-[#475569]">
+                If you want an AI assistant to operate OpenOctopus for you, tell it one simple rule first:
+                use the <code>ooct</code> CLI, inspect live models before guessing, and wait for async tasks unless you say otherwise.
+              </p>
+
+              <div className="mt-5 space-y-5">
+                <ScenarioCard
+                  title="General instruction template"
+                  description="Use this when you want Cursor, OpenCode, or another coding assistant to work with OpenOctopus in a safe and repeatable way."
+                  prompt={`Use the OpenOctopus CLI instead of calling the REST API directly.
+
+Rules:
+- First run: ooct auth status
+- If needed, inspect models with: ooct models or ooct models search <query>
+- Before using a model, inspect it with: ooct models inspect <model>
+- Prefer local file paths when I provide files; the CLI can upload them automatically
+- For async models, use ooct task wait unless I explicitly ask for --no-wait
+- If a request fails, show me the exact CLI command and the returned error`}
+                />
+
+                <ScenarioCard
+                  title="Scenario: let the assistant choose an image model for you"
+                  description="Use this when you do not know which image model to pick and want the assistant to search, compare, and recommend before running anything."
+                  prompt={`Use OpenOctopus CLI to help me choose a model for high-quality product photography.
+
+Steps:
+1. Run ooct models search image
+2. Inspect the most relevant candidates
+3. Recommend 2 to 3 models with short tradeoffs
+4. After I choose one, run it with my prompt
+
+Do not guess model names. Use the live manifest.`}
+                />
+
+                <ScenarioCard
+                  title="Scenario: generate an image from a prompt"
+                  description="Use this when you already know what you want to create, and you want the assistant to pick the right text-to-image model, run it, and save the result."
+                  prompt={`Use OpenOctopus CLI to generate an image for me.
+
+Prompt:
+"A cinematic octopus walking through a neon rainy alley, ultra detailed, realistic lighting"
+
+Requirements:
+- Use ooct models search and ooct models inspect first if the model is not specified
+- Then run ooct run with the best matching text-to-image model
+- Wait for the task to finish
+- Save the first output locally with --output ./octopus.png
+- Show me the exact command you used`}
+                />
+
+                <ScenarioCard
+                  title="Scenario: edit an image with local files"
+                  description="Use this when you already have a base image, a reference image, and maybe a mask image on your machine. The assistant should use the local files directly."
+                  prompt={`Use OpenOctopus CLI to edit my image with local assets.
+
+Requirements:
+- Use local file paths, not manual upload steps
+- The CLI should upload them automatically
+- First inspect the selected model to confirm the required flags
+- Then run the model and wait for the final result
+
+Files:
+- base image: ./input/product.png
+- reference image: ./input/style.png
+- mask image: ./input/mask.png`}
+                />
+
+                <ScenarioCard
+                  title="Scenario: generate video with reference assets"
+                  description="Use this when you want the assistant to handle a longer video-generation command with image, video, or audio references and wait for the final result."
+                  prompt={`Use OpenOctopus CLI to create a video with reference assets.
+
+Steps:
+1. Inspect the specified video model
+2. Run it with:
+   - my prompt
+   - local reference image
+   - local reference video
+   - local reference audio
+3. Wait for the task to finish
+4. Save the first output locally
+
+Prefer ooct task wait for polling.`}
+                />
+
+                <ScenarioCard
+                  title="Scenario: use chat models from the terminal"
+                  description="Use this when you want the assistant to run a chat model quickly and return only the final text, without extra explanation."
+                  prompt={`Use OpenOctopus CLI to run a chat model for me.
+
+Task:
+- Check auth status
+- Inspect the chat model
+- Run it with my prompt
+- Return the final text output only
+
+Prompt:
+"Summarize async polling for AI generation APIs in 5 bullets."`}
+                />
+
+                <ScenarioCard
+                  title="Scenario: upload first, then reuse the returned URL"
+                  description="Use this when you want the assistant to upload a file once, keep the returned URL, and reuse that URL in a later run command."
+                  prompt={`Use OpenOctopus CLI to upload my local file first, then reuse the uploaded URL in a later command.
+
+Steps:
+1. Run ooct uploads create ./mask.png --field input.mask_url
+2. Capture the returned URL
+3. Use that URL in the next ooct run command
+4. Show me both commands and the returned task ID`}
+                />
               </div>
             </div>
-          </section>
+          </DocsSection>
 
-          <section id="rest-api">
+          <DocsSection id="rest-api">
             <SectionHeader
               eyebrow="REST API"
               title="Supported endpoints"
               description="These are the public API surfaces implemented by the gateway today. Unsupported SDKs, webhooks, streaming, and training flows are intentionally not documented here."
             />
-            <div className="overflow-x-auto rounded-lg border border-black/[0.08] bg-white shadow-sm">
+            <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
               <table className="min-w-[720px] text-left text-sm">
                 <thead className="border-b border-black/[0.08] bg-[#F6F8FB] text-[11px] uppercase tracking-[0.1em] text-[#6B7280]">
                   <tr>
@@ -503,9 +607,9 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
                 </tbody>
               </table>
             </div>
-          </section>
+          </DocsSection>
 
-          <section id="models">
+          <DocsSection id="models">
             <SectionHeader
               eyebrow="Core Concepts"
               title="Models"
@@ -515,7 +619,7 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
               {capabilitySummaries.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <div key={item.capability} className="rounded-lg border border-black/[0.08] bg-white p-4 shadow-sm">
+                  <div key={item.capability} className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4">
                     <div className="flex items-center justify-between gap-3">
                       <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-[#E0F2FE] text-[#0369A1]">
                         <Icon className="h-4 w-4" />
@@ -532,7 +636,7 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
             </div>
 
             {featuredModels.length > 0 ? (
-              <div className="mt-6 rounded-lg border border-black/[0.08] bg-white p-4 shadow-sm">
+              <div className="mt-6 rounded-2xl border border-black/[0.08] bg-white p-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="text-[15px] font-semibold text-[#111827]">Model library</h3>
@@ -547,7 +651,7 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   {featuredModels.map((model) => (
-                    <div key={model.id} className="rounded-lg border border-black/[0.08] bg-[#FCFCFA] p-3">
+                    <div key={model.id} className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-3">
                       <p className="truncate text-[13px] font-semibold text-[#111827]">{model.displayName}</p>
                       <p className="mt-1 truncate font-mono text-[11px] text-[#6B7280]">{model.publicModel}</p>
                       <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[#475569]">
@@ -559,9 +663,9 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
                 </div>
               </div>
             ) : null}
-          </section>
+          </DocsSection>
 
-          <section id="tasks">
+          <DocsSection id="tasks">
             <SectionHeader
               eyebrow="Core Concepts"
               title="Tasks and polling"
@@ -569,7 +673,7 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
             />
             <div className="grid gap-4 lg:grid-cols-2">
               <CodeBlock>{buildTaskStatusCurl()}</CodeBlock>
-              <div className="rounded-lg border border-black/[0.08] bg-white p-4 text-sm leading-6 text-[#475569] shadow-sm">
+              <div className="rounded-2xl border border-black/[0.08] bg-[#FCFCFA] p-4 text-sm leading-6 text-[#475569]">
                 <p className="font-semibold text-[#111827]">Task statuses</p>
                 <div className="mt-3 grid gap-2">
                   {["queued", "processing", "succeeded", "failed", "cancelled"].map((status) => (
@@ -581,9 +685,9 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
                 </div>
               </div>
             </div>
-          </section>
+          </DocsSection>
 
-          <section id="files">
+          <DocsSection id="files">
             <SectionHeader
               eyebrow="Core Concepts"
               title="Generated files"
@@ -602,9 +706,9 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
     ]
   }
 }`}</CodeBlock>
-          </section>
+          </DocsSection>
 
-          <section id="billing">
+          <DocsSection id="billing">
             <SectionHeader
               eyebrow="Pricing & Billing"
               title="Wallet billing"
@@ -621,15 +725,15 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
                 Usage events, request history, and billing ledger entries are available from the dashboard.
               </InfoCard>
             </div>
-          </section>
+          </DocsSection>
 
-          <section id="errors">
+          <DocsSection id="errors">
             <SectionHeader
               eyebrow="Help"
               title="Error codes"
               description="API errors use a stable public error object with code, message, and retryable fields. Retry only when retryable is true."
             />
-            <div className="overflow-x-auto rounded-lg border border-black/[0.08] bg-white shadow-sm">
+            <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
               <table className="min-w-[720px] text-left text-sm">
                 <thead className="border-b border-black/[0.08] bg-[#F6F8FB] text-[11px] uppercase tracking-[0.1em] text-[#6B7280]">
                   <tr>
@@ -675,9 +779,9 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
                 </tbody>
               </table>
             </div>
-          </section>
+          </DocsSection>
 
-          <section id="support">
+          <DocsSection id="support">
             <SectionHeader
               eyebrow="Support"
               title="Need help?"
@@ -709,9 +813,9 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
                 </p>
               </Link>
             </div>
-          </section>
+          </DocsSection>
 
-          <section>
+          <DocsSection>
             <SectionHeader
               eyebrow="API Reference"
               title="Interactive model API docs"
@@ -722,7 +826,7 @@ ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
               initialModel={initialModel}
               gatewayErrorDocs={gatewayErrorDocs}
             />
-          </section>
+          </DocsSection>
         </div>
       </div>
     </main>
