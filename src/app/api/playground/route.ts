@@ -30,6 +30,70 @@ function resolveGatewayBaseUrl() {
   return process.env.OPENOCTOPUS_API_BASE_URL?.trim() || PUBLIC_API_BASE_URL;
 }
 
+const INTEGER_INPUT_PARAM_KEYS = new Set([
+  "max_tokens",
+  "max_output_tokens",
+  "seed",
+  "n",
+  "num_images",
+  "top_k",
+]);
+
+const NUMBER_INPUT_PARAM_KEYS = new Set([
+  "temperature",
+  "top_p",
+  "presence_penalty",
+  "frequency_penalty",
+]);
+
+function sanitizePlaygroundInputValue(key: string | null, value: unknown): unknown {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+
+    if (key && INTEGER_INPUT_PARAM_KEYS.has(key) && /^-?\d+$/.test(trimmed)) {
+      const parsed = Number.parseInt(trimmed, 10);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+
+    if (key && NUMBER_INPUT_PARAM_KEYS.has(key) && /^-?\d+(?:\.\d+)?$/.test(trimmed)) {
+      const parsed = Number(trimmed);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizePlaygroundInputValue(null, item))
+      .filter((item) => item !== undefined);
+  }
+
+  if (typeof value === "object") {
+    const next: Record<string, unknown> = {};
+    for (const [entryKey, entryValue] of Object.entries(value as Record<string, unknown>)) {
+      const sanitized = sanitizePlaygroundInputValue(entryKey, entryValue);
+      if (sanitized !== undefined) {
+        next[entryKey] = sanitized;
+      }
+    }
+    return next;
+  }
+
+  return value;
+}
+
+function sanitizePlaygroundInput(input: Record<string, unknown>) {
+  return (sanitizePlaygroundInputValue(null, input) as Record<string, unknown>) ?? {};
+}
+
 function sanitizePlaygroundOutputPayload(outputPayload: unknown) {
   if (!outputPayload || typeof outputPayload !== "object" || Array.isArray(outputPayload)) {
     return outputPayload;
@@ -65,12 +129,13 @@ export async function POST(request: Request) {
     const apiBase = resolveGatewayBaseUrl();
 
     if (parsed.action === "submit") {
+      const sanitizedInput = sanitizePlaygroundInput(parsed.input);
       const payload: Record<string, unknown> = {
         model: parsed.model,
-        input: parsed.input,
+        input: sanitizedInput,
       };
       if (parsed.endpoint === "/v1/chat/completions") {
-        const rawMessages = parsed.input.messages;
+        const rawMessages = sanitizedInput.messages;
         if (rawMessages !== undefined) {
           payload.messages = rawMessages;
         }

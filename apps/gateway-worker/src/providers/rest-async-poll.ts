@@ -48,9 +48,73 @@ function fillMustacheTemplate(input: string, values: Record<string, unknown>) {
 function getExactMustacheValue(input: string, values: Record<string, unknown>) {
   const match = input.match(/^\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}$/);
   if (!match?.[1]) {
+    return { matched: false as const, value: undefined };
+  }
+  return { matched: true as const, value: values[match[1]] };
+}
+
+const INTEGER_TEMPLATE_PARAM_KEYS = new Set([
+  "max_tokens",
+  "max_output_tokens",
+  "seed",
+  "n",
+  "num_images",
+  "top_k",
+]);
+
+const NUMBER_TEMPLATE_PARAM_KEYS = new Set([
+  "temperature",
+  "top_p",
+  "presence_penalty",
+  "frequency_penalty",
+]);
+
+function sanitizeRenderedTemplateValue(key: string | null, value: unknown): unknown {
+  if (value === null || value === undefined) {
     return undefined;
   }
-  return values[match[1]];
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+
+    if (key && INTEGER_TEMPLATE_PARAM_KEYS.has(key) && /^-?\d+$/.test(trimmed)) {
+      const parsed = Number.parseInt(trimmed, 10);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+
+    if (key && NUMBER_TEMPLATE_PARAM_KEYS.has(key) && /^-?\d+(?:\.\d+)?$/.test(trimmed)) {
+      const parsed = Number(trimmed);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizeRenderedTemplateValue(null, item))
+      .filter((item) => item !== undefined);
+  }
+
+  if (value && typeof value === "object") {
+    const output = {};
+    for (const [childKey, childValue] of Object.entries(value)) {
+      const sanitized = sanitizeRenderedTemplateValue(childKey, childValue);
+      if (sanitized !== undefined) {
+        output[childKey] = sanitized;
+      }
+    }
+    return output;
+  }
+
+  return value;
+}
+
+function sanitizeRenderedTemplateRecord(value: Record<string, unknown>) {
+  return (sanitizeRenderedTemplateValue(null, value) as Record<string, unknown>) ?? {};
 }
 
 function readString(value: unknown, fallback: string) {
@@ -63,9 +127,9 @@ function isNonEmptyString(value: unknown): value is string {
 
 function renderTemplateValue(value: unknown, variables: Record<string, unknown>): unknown {
   if (typeof value === "string") {
-    const exactValue = getExactMustacheValue(value, variables);
-    if (exactValue !== undefined) {
-      return exactValue;
+    const exactMatch = getExactMustacheValue(value, variables);
+    if (exactMatch.matched) {
+      return exactMatch.value;
     }
     return fillMustacheTemplate(value, variables);
   }
@@ -272,12 +336,14 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
       ...input.input,
     };
     const body = submitBodyTemplate
-      ? (renderTemplateValue(submitBodyTemplate, templateVariables) as Record<string, unknown>)
-      : {
+      ? sanitizeRenderedTemplateRecord(
+          renderTemplateValue(submitBodyTemplate, templateVariables) as Record<string, unknown>
+        )
+      : sanitizeRenderedTemplateRecord({
           model: input.upstreamModelSlug,
           prompt: input.prompt,
           ...input.input,
-        };
+        });
 
     const { data } = await postJson<Record<string, unknown>>(submitUrl.toString(), {
       headers: auth.headers,

@@ -155,6 +155,64 @@ const chatMessageSchema = z.object({
   name: z.string().optional(),
 });
 
+const INTEGER_INPUT_PARAM_KEYS = new Set([
+  "max_tokens",
+  "max_output_tokens",
+  "seed",
+  "n",
+  "num_images",
+  "top_k",
+]);
+
+const NUMBER_INPUT_PARAM_KEYS = new Set([
+  "temperature",
+  "top_p",
+  "presence_penalty",
+  "frequency_penalty",
+]);
+
+function sanitizeInputValue(key: string | null, value: unknown): unknown {
+  if (value === null || value === undefined) return undefined;
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+
+    if (key && INTEGER_INPUT_PARAM_KEYS.has(key) && /^-?\d+$/.test(trimmed)) {
+      const parsed = Number.parseInt(trimmed, 10);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+
+    if (key && NUMBER_INPUT_PARAM_KEYS.has(key) && /^-?\d+(?:\.\d+)?$/.test(trimmed)) {
+      const parsed = Number(trimmed);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeInputValue(null, item)).filter((item) => item !== undefined);
+  }
+
+  if (typeof value === "object") {
+    const next: Record<string, unknown> = {};
+    for (const [entryKey, entryValue] of Object.entries(value as Record<string, unknown>)) {
+      const sanitized = sanitizeInputValue(entryKey, entryValue);
+      if (sanitized !== undefined) {
+        next[entryKey] = sanitized;
+      }
+    }
+    return next;
+  }
+
+  return value;
+}
+
+function sanitizeInputRecord(input: Record<string, unknown>) {
+  return (sanitizeInputValue(null, input) as Record<string, unknown>) ?? {};
+}
+
 function normalizeChatMessagesValue(value: unknown): unknown {
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -435,9 +493,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         ? request.headers["x-openoctopus-request-source"]
         : "";
     const requestSource = sourceHeader === "playground" ? "playground" : "api";
-    const normalizedInput: Record<string, unknown> = {
-      ...parsed.input,
-    };
+    const normalizedInput: Record<string, unknown> = sanitizeInputRecord(parsed.input);
     const normalizedMessages =
       parsed.messages ??
       (Array.isArray(normalizeChatMessagesValue(parsed.input.messages))

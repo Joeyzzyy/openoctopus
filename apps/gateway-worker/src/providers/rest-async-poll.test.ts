@@ -238,3 +238,66 @@ test("submit preserves array values for exact mustache template placeholders", a
     }
   );
 });
+
+test("submit omits optional exact mustache placeholders when values are missing", async () => {
+  const adapter = new RestAsyncPollAdapter();
+
+  await withJsonServer(
+    (_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify({
+          id: "chatcmpl-456",
+          choices: [
+            {
+              message: {
+                content: "hello again",
+              },
+            },
+          ],
+        })
+      );
+    },
+    async (baseUrl, captured) => {
+      const result = await adapter.submit({
+        requestId: "00000000-0000-4000-8000-000000000004",
+        capability: "text_generation",
+        publicModelSlug: "openoctopus/deepseek-v4-pro",
+        upstreamModelSlug: "deepseek-v4-pro",
+        input: {
+          messages: [{ role: "user", content: "follow-up" }],
+        },
+        provider: {
+          slug: "rest-async-poll-v1",
+          baseUrl,
+          secret: "ds-key",
+          config: {
+            executionConfig: {
+              mode: "sync",
+              authType: "bearer",
+              authHeaderName: "Authorization",
+              authHeaderPrefix: "Bearer",
+              submitPath: "/chat/completions",
+              taskIdPath: "id",
+              resultTextPath: "choices.0.message.content",
+              submitBodyTemplate: {
+                model: "{{upstreamModel}}",
+                messages: "{{messages}}",
+                max_tokens: "{{max_tokens}}",
+                temperature: "{{temperature}}",
+                stream: false,
+              },
+            },
+          },
+        },
+      });
+
+      assert.equal(result.mode, "sync");
+      assert.deepEqual(captured[0]?.body, {
+        model: "deepseek-v4-pro",
+        messages: [{ role: "user", content: "follow-up" }],
+        stream: false,
+      });
+    }
+  );
+});

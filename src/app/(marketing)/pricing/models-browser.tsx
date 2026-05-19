@@ -1219,6 +1219,8 @@ type ChatPlaygroundMessage = {
   role: "user" | "assistant" | "system";
   content: string;
   taskId?: string | null;
+  localId?: string;
+  pending?: boolean;
 };
 
 function extractImageAssets(output: unknown): PlaygroundImageAsset[] {
@@ -1958,6 +1960,8 @@ export function ModelsBrowser({
     setPlaygroundOutput(null);
     setTaskId(null);
     setTaskStatus("idle");
+    let optimisticAssistantId: string | null = null;
+    let optimisticUserId: string | null = null;
 
     const nextValidationErrors: Record<string, string> = {};
     for (const field of parsedFields) {
@@ -2003,6 +2007,20 @@ export function ModelsBrowser({
           setTaskStatus("idle");
           return;
         }
+        optimisticUserId = `chat-user-${Date.now()}`;
+        optimisticAssistantId = `chat-assistant-${Date.now()}`;
+
+        setChatConversation((current) => [
+          ...current,
+          { role: "user", content: composerText, localId: optimisticUserId },
+          {
+            role: "assistant",
+            content: "thinking...",
+            localId: optimisticAssistantId,
+            pending: true,
+          },
+        ]);
+        setChatComposer("");
 
         for (const field of chatConfigFields) {
           const raw = playgroundForm[field.key];
@@ -2088,11 +2106,17 @@ export function ModelsBrowser({
           if (submitRes.status === 401 || errorCode === "unauthorized") {
             setTaskStatus("idle");
             setAuthRequiredModalOpen(true);
+            setChatConversation((current) =>
+              current.filter((message) => message.localId !== optimisticAssistantId)
+            );
             return;
           }
           if (submitRes.status === 402 || errorCode === "insufficient_balance") {
             setTaskStatus("idle");
             setTopUpRequiredModalOpen(true);
+            setChatConversation((current) =>
+              current.filter((message) => message.localId !== optimisticAssistantId)
+            );
             return;
           }
           const browserProxyUrl =
@@ -2174,22 +2198,56 @@ export function ModelsBrowser({
               extractTextOutput(nextOutput) ?? formatDetailText(nextOutput);
             setTaskStatus("succeeded");
             setPlaygroundOutput(nextOutput);
-            setChatConversation((current) => [
-              ...current,
-              { role: "user", content: composerText, taskId: submitJson.id },
-              { role: "assistant", content: assistantText, taskId: submitJson.id },
-            ]);
-            setChatComposer("");
+            setChatConversation((current) =>
+              current.map((message) => {
+                if (message.localId === optimisticUserId) {
+                  return { ...message, taskId: submitJson.id };
+                }
+                if (message.localId === optimisticAssistantId) {
+                  return {
+                    ...message,
+                    content: assistantText,
+                    taskId: submitJson.id,
+                    pending: false,
+                  };
+                }
+                return message;
+              })
+            );
             return;
           }
           if (status === "failed" || status === "cancelled") {
             setTaskStatus("failed");
             capturedErrorDetail = statusJson;
+            setChatConversation((current) =>
+              current.map((message) =>
+                message.localId === optimisticAssistantId
+                  ? {
+                      ...message,
+                      content: "Request failed.",
+                      pending: false,
+                      taskId: submitJson.id,
+                    }
+                  : message
+              )
+            );
             throw new Error(formatPlaygroundError(statusJson));
           }
         }
 
         setTaskStatus("failed");
+        setChatConversation((current) =>
+          current.map((message) =>
+            message.localId === optimisticAssistantId
+              ? {
+                  ...message,
+                  content: "Request timed out.",
+                  pending: false,
+                  taskId: submitJson.id,
+                }
+              : message
+          )
+        );
         setPlaygroundError("Playground request timeout, please retry.");
         setPlaygroundErrorDetail({
           stage: "poll",
@@ -2419,6 +2477,19 @@ export function ModelsBrowser({
       });
     } catch (error) {
       setTaskStatus("failed");
+      if (optimisticAssistantId) {
+        setChatConversation((current) =>
+          current.map((message) =>
+            message.localId === optimisticAssistantId
+              ? {
+                  ...message,
+                  content: error instanceof Error ? error.message : "Submit failed",
+                  pending: false,
+                }
+              : message
+          )
+        );
+      }
       setPlaygroundError(error instanceof Error ? error.message : "Submit failed");
       setPlaygroundErrorDetail(
         capturedErrorDetail ?? {
@@ -2608,87 +2679,29 @@ export function ModelsBrowser({
         </div>
         <div className="relative min-w-0">
         {mainTab === "playground" && isChatModel ? (
-          <section className="rounded-xl border border-black/[0.08] bg-white p-3 shadow-sm sm:rounded-2xl sm:p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h2 className="text-base font-semibold text-black">Chat Playground</h2>
-                <p className="mt-1 text-xs text-black/55">
-                  Send multi-turn messages in a single session. Conversation stays local to this page.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium ${taskStatusClass(taskStatus)}`}
-                >
-                  Status: {taskStatusLabel(taskStatus)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setChatConversation([]);
-                    setChatComposer("");
-                    setPlaygroundOutput(null);
-                    setTaskId(null);
-                    setTaskStatus("idle");
-                    setPlaygroundError(null);
-                    setPlaygroundErrorDetail(null);
-                  }}
-                  className="h-8 rounded-md border border-black/[0.12] bg-white px-3 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
-                >
-                  Clear chat
-                </button>
-              </div>
-            </div>
-            <div className="rounded-xl border border-black/[0.08] bg-[#FCFCFA] p-3">
-              <div className="mb-3 flex min-h-[360px] flex-col gap-3 overflow-y-auto rounded-lg border border-black/[0.06] bg-white p-3 sm:min-h-[420px]">
-                {chatConversation.length === 0 ? (
-                  <div className="flex flex-1 items-center justify-center text-center text-sm text-black/45">
-                    Start the conversation below. Each reply will be appended into this temporary local session.
+          <section className="overflow-hidden rounded-2xl border border-[#D7E4F5] bg-[linear-gradient(180deg,#F8FBFF_0%,#F3F7FC_100%)] shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+            <div className="border-b border-[#D7E4F5] bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.96))] px-4 py-4 sm:px-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[#BAE6FD] bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0369A1] shadow-sm">
+                    <span className="inline-flex size-2 rounded-full bg-[#0EA5E9]" />
+                    Live chat playground
                   </div>
-                ) : (
-                  chatConversation.map((message, index) => (
-                    <div
-                      key={`${message.role}-${index}-${message.taskId ?? "local"}`}
-                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-6 ${
-                          message.role === "user"
-                            ? "bg-[#1F8A4C] text-white"
-                            : message.role === "system"
-                              ? "border border-[#E9D8A6] bg-[#FFF8E1] text-black/75"
-                              : "border border-black/[0.08] bg-[#F7FAFC] text-black/80"
-                        }`}
-                      >
-                        <div className={`mb-1 text-[11px] font-medium ${message.role === "user" ? "text-white/80" : "text-black/45"}`}>
-                          {message.role === "user" ? "You" : message.role === "assistant" ? "Assistant" : "System"}
-                        </div>
-                        <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                      </div>
-                    </div>
-                  ))
-                )}
-                {playgroundError ? (
-                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                    {playgroundError}
-                  </div>
-                ) : null}
-              </div>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-black/[0.06] bg-white px-3 py-2">
-                <div className="min-w-0 text-xs text-black/55">
-                  <span className="mr-1 text-black/35">Task</span>
-                  {taskId ? (
-                    <code className="break-all font-mono text-[11px] text-black/70">{taskId}</code>
-                  ) : (
-                    <span className="text-black/35">Waiting for request</span>
-                  )}
+                  <h2 className="mt-3 text-lg font-semibold tracking-tight text-[#0F172A]">Talk to {selectedModel.displayName}</h2>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <div className="min-w-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm">
+                    {taskId ? (
+                      <code className="break-all font-mono text-[11px] text-slate-700">{taskId}</code>
+                    ) : (
+                      <span className="text-slate-400">Waiting for request</span>
+                    )}
+                  </div>
                   {playgroundTextOutput ? (
                     <button
                       type="button"
                       onClick={copyTextOutput}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
                     >
                       {textOutputCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                       {textOutputCopied ? "Copied" : "Copy reply"}
@@ -2698,104 +2711,146 @@ export function ModelsBrowser({
                     <button
                       type="button"
                       onClick={() => setResultModalOpen(true)}
-                      className="inline-flex h-8 items-center rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                      className="inline-flex h-9 items-center rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
                     >
                       Result JSON
                     </button>
                   ) : null}
+                  <span className={`inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium shadow-sm ${taskStatusClass(taskStatus)}`}>
+                    Status: {taskStatusLabel(taskStatus)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChatConversation([]);
+                      setChatComposer("");
+                      setPlaygroundOutput(null);
+                      setTaskId(null);
+                      setTaskStatus("idle");
+                      setPlaygroundError(null);
+                      setPlaygroundErrorDetail(null);
+                    }}
+                    className="h-9 rounded-full border border-slate-200 bg-white px-4 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                  >
+                    Clear chat
+                  </button>
                 </div>
               </div>
-              <textarea
-                disabled={isSubmitting || !selectedModel}
-                value={chatComposer}
-                onChange={(event) => {
-                  setChatComposer(event.target.value);
-                  setValidationErrors((current) => {
-                    const next = { ...current };
-                    delete next.messages;
-                    return next;
-                  });
-                }}
-                className={`min-h-[120px] w-full rounded-xl border bg-white px-3 py-3 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03] ${
-                  validationErrors.messages ? "border-[#D94A38]" : "border-black/[0.1]"
-                }`}
-                placeholder="Write your next message..."
-              />
-              {validationErrors.messages ? (
-                <p className="mt-1 text-[11px] text-[#B54432]">{validationErrors.messages}</p>
-              ) : null}
-              {chatConfigFields.length > 0 ? (
-                <div className="mt-3 grid gap-3 rounded-xl border border-black/[0.06] bg-[#FAFAFA] p-3 sm:grid-cols-2">
-                  {chatConfigFields.map((field) => (
-                    <label key={field.key} className="block">
-                      <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.5px] text-black/55">
-                        {field.label}
-                      </span>
-                      {field.type === "boolean" ? (
-                        <select
-                          disabled={isSubmitting}
-                          value={playgroundForm[field.key] ?? "false"}
-                          onChange={(event) =>
-                            setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
-                          }
-                          className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:bg-black/[0.03]"
-                        >
-                          <option value="true">true</option>
-                          <option value="false">false</option>
-                        </select>
-                      ) : isSliderNumberField(field) ? (
-                        <select
-                          disabled={isSubmitting}
-                          value={playgroundForm[field.key] ?? buildNumberSelectOptions(field)[0] ?? String(field.minimum)}
-                          onChange={(event) =>
-                            setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
-                          }
-                          className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:bg-black/[0.03]"
-                        >
-                          {buildNumberSelectOptions(field).map((value) => (
-                            <option key={value} value={value}>
-                              {value}
-                            </option>
-                          ))}
-                        </select>
-                      ) : field.type === "array" ? (
-                        <textarea
-                          disabled={isSubmitting}
-                          value={playgroundForm[field.key] ?? ""}
-                          onChange={(event) =>
-                            setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
-                          }
-                          className="min-h-[88px] w-full rounded-md border border-black/[0.1] bg-white px-3 py-2 font-mono text-xs text-black/80 disabled:bg-black/[0.03]"
-                          placeholder="One value per line, comma-separated, or a JSON array"
-                        />
-                      ) : (
-                        <input
-                          disabled={isSubmitting}
-                          type={field.type === "number" ? "number" : "text"}
-                          min={field.type === "number" ? field.minimum : undefined}
-                          max={field.type === "number" ? field.maximum : undefined}
-                          step={field.type === "number" ? field.step ?? "any" : undefined}
-                          value={playgroundForm[field.key] ?? ""}
-                          onChange={(event) =>
-                            setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
-                          }
-                          className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:bg-black/[0.03]"
-                          placeholder={field.type === "number" ? "0" : `Enter ${field.label}`}
-                        />
-                      )}
-                    </label>
-                  ))}
+            </div>
+
+            <div className="p-4 sm:p-5">
+              <div className="min-w-0 rounded-[22px] border border-[#DCE7F3] bg-white/92 p-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] backdrop-blur sm:p-4">
+                <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Conversation</p>
+                    <p className="mt-1 text-xs text-slate-500">Responses append to this temporary thread.</p>
+                  </div>
+                  <div className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-600">
+                    {chatConversation.length} message{chatConversation.length === 1 ? "" : "s"}
+                  </div>
                 </div>
-              ) : null}
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <button
-                  type="button"
-                  disabled={isSubmitting || !selectedModel}
-                  onClick={submitPlayground}
-                  className="h-11 w-full rounded-md bg-[#1F8A4C] px-4 text-sm font-medium text-white transition-colors hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-45 sm:h-10 sm:w-auto"
-                >
-                  {isSubmitting ? "Sending..." : `Send${priceTag ? ` ${priceTag}` : ""}`}
-                </button>
+
+                <div className="mb-3 flex min-h-[380px] flex-col gap-3 overflow-y-auto rounded-[20px] border border-slate-200 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] p-3 shadow-inner sm:min-h-[440px] sm:p-4">
+                  {chatConversation.length === 0 ? (
+                    <div className="flex-1" />
+                  ) : (
+                    chatConversation.map((message, index) => {
+                      const isUser = message.role === "user";
+                      const isAssistant = message.role === "assistant";
+                      return (
+                        <div
+                          key={`${message.role}-${index}-${message.taskId ?? "local"}`}
+                          className={`flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}
+                        >
+                          {!isUser ? (
+                            <div
+                              className={`mt-1 flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-2xl border shadow-sm ${
+                                isAssistant
+                                  ? "border-[#BAE6FD] bg-white"
+                                  : "border-[#FCD34D] bg-[#FFF8E1]"
+                              }`}
+                            >
+                              {isAssistant ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src="/logo.png"
+                                  alt="OpenOctopus"
+                                  className="size-6 object-contain"
+                                />
+                              ) : (
+                                <span className="text-[11px] font-semibold text-[#92400E]">S</span>
+                              )}
+                            </div>
+                          ) : null}
+                          <div className={`min-w-0 max-w-[86%] ${isUser ? "items-end" : "items-start"} flex flex-col`}>
+                            <div
+                              className={`w-full px-1 py-1 text-sm leading-7 ${
+                                isUser ? "text-slate-800" : isAssistant ? "text-slate-800" : "text-slate-700"
+                              }`}
+                            >
+                              {isAssistant && message.pending ? (
+                                <span className="bg-[linear-gradient(90deg,#64748B_0%,#0F172A_50%,#64748B_100%)] bg-[length:200%_100%] bg-clip-text text-sm font-medium text-transparent animate-pulse">
+                                  thinking...
+                                </span>
+                              ) : (
+                                <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                  {playgroundError ? (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
+                      {playgroundError}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="rounded-[22px] border border-[#DCE7F3] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] p-3 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+                  <textarea
+                    disabled={isSubmitting || !selectedModel}
+                    value={chatComposer}
+                    onChange={(event) => {
+                      setChatComposer(event.target.value);
+                      setValidationErrors((current) => {
+                        const next = { ...current };
+                        delete next.messages;
+                        return next;
+                      });
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" || event.shiftKey) return;
+                      event.preventDefault();
+                      if (isSubmitting || !selectedModel) return;
+                      void submitPlayground();
+                    }}
+                    className={`min-h-[132px] w-full rounded-[18px] border bg-white px-4 py-3 text-sm leading-7 text-slate-800 shadow-inner outline-none transition-colors disabled:cursor-not-allowed disabled:bg-slate-100 ${
+                      validationErrors.messages
+                        ? "border-[#D94A38] focus:border-[#D94A38]"
+                        : "border-slate-200 focus:border-[#38BDF8]"
+                    }`}
+                    placeholder="Write your next message..."
+                  />
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                      <span>{chatComposer.trim().length} chars</span>
+                      <span>Shift + Enter for line break</span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isSubmitting || !selectedModel}
+                      onClick={submitPlayground}
+                      className="inline-flex h-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#1F8A4C_0%,#176D3D_100%)] px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(31,138,76,0.26)] transition-transform hover:-translate-y-[1px] hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      {isSubmitting ? "Sending..." : `Send${priceTag ? ` ${priceTag}` : ""}`}
+                    </button>
+                  </div>
+                  {validationErrors.messages ? (
+                    <p className="mt-2 text-[11px] text-[#B54432]">{validationErrors.messages}</p>
+                  ) : null}
+                </div>
               </div>
             </div>
           </section>
