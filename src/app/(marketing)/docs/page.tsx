@@ -35,58 +35,14 @@ import { DocsTocNav } from "./docs-toc-nav";
 export const metadata = {
   title: "Documentation — OpenOctopus",
   description:
-    "OpenOctopus developer documentation for API authentication, supported endpoints, model catalog, task polling, billing, and error handling.",
+    "OpenOctopus developer documentation for CLI usage, API authentication, supported endpoints, model catalog, task polling, billing, and error handling.",
 };
-
-const sidebarGroups = [
-  {
-    title: "Getting Started",
-    items: [
-      { label: "Introduction", href: "#introduction" },
-      { label: "Quick Start", href: "#quick-start" },
-      { label: "API Authentication", href: "#authentication" },
-    ],
-  },
-  {
-    title: "Ways to Use",
-    items: [
-      { label: "Web Dashboard", href: "#web-dashboard" },
-      { label: "REST API", href: "#rest-api" },
-      { label: "Playground", href: "#web-dashboard" },
-    ],
-  },
-  {
-    title: "Core Concepts",
-    items: [
-      { label: "Models", href: "#models" },
-      { label: "Tasks", href: "#tasks" },
-      { label: "Generated Files", href: "#files" },
-    ],
-  },
-  {
-    title: "API Reference",
-    items: [
-      { label: "List Models", href: "#list-models" },
-      { label: "Generate Images", href: "#generate-images" },
-      { label: "Edit Images", href: "#edit-images" },
-      { label: "Generate Videos", href: "#generate-videos" },
-      { label: "Get Task Result", href: "#get-task" },
-    ],
-  },
-  {
-    title: "Operations",
-    items: [
-      { label: "Pricing & Billing", href: "#billing" },
-      { label: "Error Codes", href: "#errors" },
-      { label: "Support", href: "#support" },
-    ],
-  },
-] as const;
 
 const pageSections = [
   { id: "introduction", label: "Introduction" },
   { id: "quick-start", label: "Quick Start" },
   { id: "authentication", label: "Authentication" },
+  { id: "cli", label: "CLI" },
   { id: "rest-api", label: "REST API" },
   { id: "models", label: "Models" },
   { id: "tasks", label: "Tasks" },
@@ -113,6 +69,12 @@ const endpointRows = [
     path: "/v1/images/edits",
     label: "Submit an image edit request with input image URLs.",
     anchor: "edit-images",
+  },
+  {
+    method: "POST",
+    path: "/v1/chat/completions",
+    label: "Submit a chat completion request for text-generation models.",
+    anchor: "chat-completions",
   },
   {
     method: "POST",
@@ -269,38 +231,25 @@ export default async function DocsPage() {
 
   return (
     <main className="bg-[#FCFCFA] text-[#111827]">
-      <section id="introduction" className="border-b border-black/[0.06] bg-white">
-        <div className="mx-auto grid max-w-7xl gap-8 px-6 py-10 md:px-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:py-14">
-          <div className="hidden lg:block">
+      <div className="mx-auto grid max-w-7xl gap-8 px-6 py-10 md:px-8 lg:grid-cols-[240px_minmax(0,1fr)] lg:py-14">
+          <aside className="hidden lg:block">
             <div className="sticky top-24">
-              <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#111827]">
-                <BookOpen className="h-4 w-4 text-[#38BDF8]" />
-                OpenOctopus Docs
-              </Link>
-              <nav className="mt-6 space-y-5">
-                {sidebarGroups.map((group) => (
-                  <div key={group.title}>
-                    <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
-                      {group.title}
-                    </p>
-                    <div className="mt-2 space-y-1">
-                      {group.items.map((item) => (
-                        <a
-                          key={item.href}
-                          href={item.href}
-                          className="block rounded-md px-2 py-1.5 text-[13px] text-[#475569] transition-colors hover:bg-black/[0.03] hover:text-[#111827]"
-                        >
-                          {item.label}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </nav>
+              <div className="rounded-lg border border-black/[0.08] bg-white p-3 shadow-sm">
+                <div className="flex items-center gap-2 px-2 text-[13px] font-semibold text-[#111827]">
+                  <BookOpen className="h-4 w-4 text-[#0369A1]" />
+                  Documentation
+                </div>
+                <DocsTocNav sections={pageSections} />
+              </div>
             </div>
-          </div>
+          </aside>
 
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-12">
+            <section id="introduction" className="border-b border-black/[0.06] bg-white">
+            <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#111827]">
+              <BookOpen className="h-4 w-4 text-[#38BDF8]" />
+              OpenOctopus Docs
+            </Link>
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#0369A1]">
               Documentation
             </p>
@@ -308,8 +257,8 @@ export default async function DocsPage() {
               Build with OpenOctopus
             </h1>
             <p className="mt-5 max-w-3xl text-[17px] leading-8 text-[#475569]">
-              OpenOctopus provides authenticated REST APIs for image generation, image editing, video generation,
-              model discovery, async task polling, and generated asset delivery.
+              OpenOctopus provides an official CLI plus authenticated REST APIs for image generation, image editing,
+              chat completions, video generation, model discovery, async task polling, and generated asset delivery.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
@@ -352,16 +301,12 @@ export default async function DocsPage() {
               <InfoCard icon={Sparkles} title="Image editing">
                 Edit one or more input images through <code>/v1/images/edits</code>.
               </InfoCard>
-              <InfoCard icon={Video} title="Video generation">
-                Submit video jobs through <code>/v1/videos/generations</code> and poll the task.
+              <InfoCard icon={Code2} title="CLI and async jobs">
+                Authenticate once, run models from the terminal, and wait for async tasks or fetch results later.
               </InfoCard>
             </div>
-          </div>
-        </div>
-      </section>
+            </section>
 
-      <div className="mx-auto grid max-w-7xl gap-8 px-6 py-10 md:px-8 lg:grid-cols-[minmax(0,1fr)_220px]">
-        <div className="min-w-0 space-y-12">
           <section id="quick-start">
             <SectionHeader
               eyebrow="Getting Started"
@@ -424,6 +369,107 @@ export default async function DocsPage() {
               <InfoCard icon={ListChecks} title="Request history">
                 Inspect task status, costs, generated outputs, and model usage in your workspace dashboard.
               </InfoCard>
+            </div>
+          </section>
+
+          <section id="cli">
+            <SectionHeader
+              eyebrow="Ways to Use"
+              title="Official CLI"
+              description="The OpenOctopus CLI discovers the live model manifest at runtime, so newly published models and input parameters work without shipping a new CLI release."
+            />
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(280px,0.95fr)]">
+              <div className="space-y-4">
+                <CodeBlock>{`npm i -g @openoctopus/cli
+
+ooct auth login
+ooct auth status
+ooct models
+ooct models search image
+ooct models inspect openoctopus/google/imagen-4
+
+ooct run openoctopus/image-captioner-molmo2 \\
+  --image ./input.png \\
+  --detail-level low
+
+ooct run openoctopus/bytedance/seedance-2.0/text-to-video \\
+  --prompt "a cinematic octopus swimming through a neon underwater city" \\
+  --reference-images ./ref.png,https://example.com/ref-2.png \\
+  --reference-videos ./ref.mp4 \\
+  --reference-audios ./ref.mp3 \\
+  --duration 5 \\
+  --resolution 720p
+
+ooct run openoctopus/deepseek-v4-pro \\
+  --prompt "Summarize async polling in 3 bullets"
+
+ooct task get task_id
+ooct task wait task_id
+ooct uploads create ./mask.png --field input.mask_url`}</CodeBlock>
+
+                <div className="rounded-lg border border-black/[0.08] bg-white p-4 shadow-sm">
+                  <h3 className="text-[15px] font-semibold text-[#111827]">Recommended workflow</h3>
+                  <div className="mt-3 grid gap-2 text-sm leading-6 text-[#475569]">
+                    {[
+                      "Install the CLI, then authenticate once with `ooct auth login` or set OPENOCTOPUS_API_KEY.",
+                      "Discover live models with `ooct models`, `ooct models search`, and `ooct models inspect`.",
+                      "Submit jobs with `ooct run <model>` and pass model-specific flags from the live manifest.",
+                      "Use `ooct task get` or `ooct task wait` for asynchronous jobs.",
+                      "Use `ooct uploads create <file>` when you want a reusable uploaded asset URL ahead of submission.",
+                    ].map((item) => (
+                      <div key={item} className="flex gap-3 rounded-md bg-[#F6F8FB] px-3 py-2">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-[#15803D]" />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <InfoCard icon={FileCode2} title="Supported commands">
+                  <ul className="space-y-2 font-mono text-[12px] text-[#111827]">
+                    <li>ooct auth login</li>
+                    <li>ooct auth logout</li>
+                    <li>ooct auth status</li>
+                    <li>ooct config get</li>
+                    <li>ooct config set api-base &lt;url&gt;</li>
+                    <li>ooct models</li>
+                    <li>ooct models search &lt;query&gt;</li>
+                    <li>ooct models inspect &lt;model&gt;</li>
+                    <li>ooct run &lt;model&gt; [dynamic flags]</li>
+                    <li>ooct task get &lt;task_id&gt;</li>
+                    <li>ooct task wait &lt;task_id&gt;</li>
+                    <li>ooct uploads create &lt;file&gt; [--field name]</li>
+                  </ul>
+                </InfoCard>
+
+                <InfoCard icon={Layers3} title="Dynamic model flags">
+                  <p>
+                    The CLI reads <code>/v1/model-manifest</code> at runtime and maps input schema parameters to flags.
+                    For example, <code>reference_images</code> becomes <code>--reference-images</code>.
+                  </p>
+                </InfoCard>
+
+                <InfoCard icon={Sparkles} title="Local files and uploaded URLs">
+                  <p>
+                    File-like inputs accept either local file paths or existing <code>http(s)</code> URLs. Local image,
+                    video, and audio files are uploaded automatically before the request is submitted.
+                  </p>
+                  <div className="mt-3 rounded-md bg-[#F6F8FB] px-3 py-2 font-mono text-[12px] text-[#111827]">
+                    --reference-images ./shot.png,https://example.com/style.png
+                  </div>
+                </InfoCard>
+
+                <InfoCard icon={ShieldAlert} title="Useful flags">
+                  <ul className="space-y-2 text-sm leading-6 text-[#475569]">
+                    <li><code>--json</code> prints machine-readable task and model output.</li>
+                    <li><code>--no-wait</code> returns immediately after submit with the task ID.</li>
+                    <li><code>--output &lt;path&gt;</code> downloads the first returned asset to a local file.</li>
+                    <li><code>--api-base &lt;url&gt;</code> overrides the configured API base for the current command.</li>
+                  </ul>
+                </InfoCard>
+              </div>
             </div>
           </section>
 
@@ -678,18 +724,6 @@ export default async function DocsPage() {
             />
           </section>
         </div>
-
-        <aside className="hidden lg:block">
-          <div className="sticky top-24">
-            <div className="rounded-lg border border-black/[0.08] bg-white p-3 shadow-sm">
-              <div className="flex items-center gap-2 px-2 text-[13px] font-semibold text-[#111827]">
-                <ShieldAlert className="h-4 w-4 text-[#0369A1]" />
-                On This Page
-              </div>
-              <DocsTocNav sections={pageSections} />
-            </div>
-          </div>
-        </aside>
       </div>
     </main>
   );
