@@ -100,7 +100,7 @@ function sanitizeRenderedTemplateValue(key: string | null, value: unknown): unkn
   }
 
   if (value && typeof value === "object") {
-    const output = {};
+    const output: Record<string, unknown> = {};
     for (const [childKey, childValue] of Object.entries(value)) {
       const sanitized = sanitizeRenderedTemplateValue(childKey, childValue);
       if (sanitized !== undefined) {
