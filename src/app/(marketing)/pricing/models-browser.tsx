@@ -873,6 +873,10 @@ function canUseHistoryImageForField(field: JsonSchemaField) {
   return !["faceimage", "maskimage"].includes(normalized);
 }
 
+function isSingleBaseImageSlotField(field: JsonSchemaField) {
+  return normalizeImageFieldKey(field.key) === "images";
+}
+
 function pickPlaygroundExampleForField(
   field: JsonSchemaField,
   examples: ModelDocRow["playgroundInputExamples"]
@@ -898,6 +902,9 @@ function isMultipleUploadField(field: JsonSchemaField) {
 }
 
 function getUploadLimit(field: JsonSchemaField) {
+  if (isSingleBaseImageSlotField(field)) {
+    return 1;
+  }
   const configuredMaxItems =
     typeof field.maxItems === "number" && Number.isFinite(field.maxItems)
       ? Math.max(1, Math.floor(field.maxItems))
@@ -1775,10 +1782,11 @@ export function ModelsBrowser({
     const selectedFiles = Array.from(files ?? []);
     if (selectedFiles.length === 0) return;
     const uploadLimit = getUploadLimit(field);
+    const isSingleBaseSlot = isSingleBaseImageSlotField(field);
 
     if (uploadLimit !== null) {
       const existingCount = playgroundUploads[field.key]?.length ?? 0;
-      const allowedRemaining = Math.max(0, uploadLimit - existingCount);
+      const allowedRemaining = isSingleBaseSlot ? uploadLimit : Math.max(0, uploadLimit - existingCount);
       if (allowedRemaining <= 0) {
         setValidationErrors((current) => ({
           ...current,
@@ -1832,7 +1840,9 @@ export function ModelsBrowser({
 
       setPlaygroundUploads((current) => ({
         ...current,
-        [field.key]: isMultipleUploadField(field)
+        [field.key]: isSingleBaseSlot
+          ? uploaded.slice(0, 1)
+          : isMultipleUploadField(field)
           ? [...(current[field.key] ?? []), ...uploaded]
           : uploaded.slice(0, 1),
       }));
@@ -2359,7 +2369,11 @@ export function ModelsBrowser({
                             disabled={isSubmitting || uploadingFields[field.key]}
                             type="file"
                             accept={getUploadAccept(uploadKind)}
-                            multiple={isMultipleUploadField(field) && (getUploadLimit(field) ?? 2) > 1}
+                            multiple={
+                              !isSingleBaseImageSlotField(field) &&
+                              isMultipleUploadField(field) &&
+                              (getUploadLimit(field) ?? 2) > 1
+                            }
                             onChange={(event) => {
                               void uploadPlaygroundAssets(field, event.target.files);
                               event.target.value = "";
