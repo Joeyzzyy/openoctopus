@@ -2105,8 +2105,8 @@ export function ModelsBrowser({
     setPlaygroundOutput(null);
     setTaskId(null);
     setTaskStatus("idle");
-    let optimisticAssistantId: string | null = null;
-    let optimisticUserId: string | null = null;
+    let optimisticAssistantId: string | undefined;
+    let optimisticUserId: string | undefined;
 
     const nextValidationErrors: Record<string, string> = {};
     for (const field of parsedFields) {
