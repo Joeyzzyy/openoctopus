@@ -632,6 +632,7 @@ export default async function DashboardPage({
                                       buttonLabel={dashboardCopy.requests.viewPrompt}
                                       title={dashboardCopy.requests.promptDialogTitle}
                                       description={dashboardCopy.requests.promptDialogDescription}
+                                      closeLabel={dashboardCopy.requests.closePromptDialog}
                                     />
                                   ) : null}
                                 </td>
