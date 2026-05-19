@@ -150,7 +150,7 @@ export const i18n = {
         id: "ID",
         vendor: "Vendor",
         status: "Status",
-        latency: "Latency",
+        latency: "Duration",
         cost: "Cost",
         download: "Download",
         file: "File",

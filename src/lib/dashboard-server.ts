@@ -273,12 +273,11 @@ function formatCompactNumber(value: number | null | undefined) {
 }
 
 function formatTimestamp(value: string) {
-  return new Date(value).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return new Date(value).toLocaleDateString("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).replace(/-/g, ".");
 }
 
 async function fetchAnalyticsRequests(
