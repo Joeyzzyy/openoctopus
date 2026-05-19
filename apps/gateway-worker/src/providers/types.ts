@@ -1,4 +1,9 @@
-export type Capability = "image_generation" | "image_edit" | "image_recognition" | "video_generation";
+export type Capability =
+  | "image_generation"
+  | "image_edit"
+  | "image_recognition"
+  | "text_generation"
+  | "video_generation";
 
 export type ProviderRuntimeContext = {
   slug: string;

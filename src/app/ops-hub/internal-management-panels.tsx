@@ -56,7 +56,7 @@ type SupportedModelSummary = {
   model_slug: string;
   display_name: string;
   modality: "image" | "video" | "audio" | "text";
-  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
+  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
   active: boolean;
   createdLabel: string;
   billingConfigText: string;
@@ -106,7 +106,7 @@ function normalizeCapabilityForModality(
   }
 
   if (modality === "text") {
-    return "image_recognition";
+    return "text_generation";
   }
 
   if (modality === "image") {
@@ -124,7 +124,7 @@ function normalizeModalityForCapability(
     return "video";
   }
 
-  if (capability === "image_recognition" && modality === "text") {
+  if (capability === "text_generation") {
     return "text";
   }
 
@@ -178,7 +178,7 @@ type ProviderModelSummary = {
   supportedModelName: string;
   public_model_slug: string;
   upstream_model_slug: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
   active: boolean;
   pricingText: string;
   pricingSummary: string;
@@ -226,7 +226,7 @@ type RoutingRuleSummary = {
   id: string;
   supportedModelId: string | null;
   public_model_slug: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
   primary_provider_model_id: string;
   fallback_provider_model_id: string | null;
   route_strategy: string;
@@ -482,7 +482,7 @@ function readTemplateConfigDiagnostics(config: Record<string, unknown> | null) {
   const resultMimeType = typeof config?.resultMimeType === "string" ? config.resultMimeType.trim() : "";
   if (!submitPath) diagnostics.push("缺少 submitPath");
   if (!taskIdPath) diagnostics.push("缺少 taskIdPath");
-  if (capability === "image_recognition") {
+  if (capability === "image_recognition" || capability === "text_generation") {
     if (!resultTextPath) diagnostics.push("缺少 resultTextPath");
   } else if (!resultUrlPath) {
     diagnostics.push("缺少 resultUrlPath");
@@ -1369,6 +1369,7 @@ export function PublicModelsPanel({
     if (value === "image_generation") return "图片生成";
     if (value === "image_edit") return "图片编辑";
     if (value === "image_recognition") return "图片识别";
+    if (value === "text_generation") return "对话生成";
     if (value === "video_generation") return "视频生成";
     return "未设置";
   };
@@ -3199,7 +3200,7 @@ export function ModelsPanel({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex h-6 items-center rounded-md border border-[#BAE6FD] bg-[#E0F2FE] px-2 text-[11px] text-[#0369A1]">
-                    {item.capability === "image_generation" ? "图片生成" : item.capability === "image_edit" ? "图片编辑" : item.capability === "image_recognition" ? "图片识别" : "视频生成"}
+                    {item.capability === "image_generation" ? "图片生成" : item.capability === "image_edit" ? "图片编辑" : item.capability === "image_recognition" ? "图片识别" : item.capability === "text_generation" ? "对话生成" : "视频生成"}
                   </span>
                   <span className="text-sm font-medium text-black">{item.providerName}</span>
                 </div>

@@ -242,8 +242,29 @@ export function normalizeVideoOutputPayload(outputPayload: unknown) {
   };
 }
 
+export function normalizeTextOutputPayload(outputPayload: unknown) {
+  const output = isRecord(outputPayload) ? outputPayload : {};
+  const raw = isRecord(output.raw) ? output.raw : null;
+  const text =
+    typeof output.text === "string" && output.text.trim().length > 0
+      ? output.text
+      : typeof readPath(raw, ["text"]) === "string"
+        ? (readPath(raw, ["text"]) as string)
+        : typeof readPath(raw, ["message", "content"]) === "string"
+          ? (readPath(raw, ["message", "content"]) as string)
+          : typeof readPath(raw, ["choices", "0", "message", "content"]) === "string"
+            ? (readPath(raw, ["choices", "0", "message", "content"]) as string)
+            : null;
+
+  return {
+    format: "openoctopus.text.output.v1",
+    raw: output.raw ?? null,
+    ...(text ? { text, message: { role: "assistant", content: text } } : {}),
+  };
+}
+
 export function normalizeOutputPayloadByCapability(input: {
-  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
   outputPayload: unknown;
 }) {
   if (input.capability === "image_generation" || input.capability === "image_edit") {
@@ -251,6 +272,9 @@ export function normalizeOutputPayloadByCapability(input: {
   }
   if (input.capability === "video_generation") {
     return normalizeVideoOutputPayload(input.outputPayload);
+  }
+  if (input.capability === "text_generation") {
+    return normalizeTextOutputPayload(input.outputPayload);
   }
   return input.outputPayload;
 }

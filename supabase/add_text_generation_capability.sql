@@ -1,4 +1,4 @@
-alter type public.request_capability add value if not exists 'image_recognition';
+alter type public.request_capability add value if not exists 'text_generation';
 
 do $$
 begin

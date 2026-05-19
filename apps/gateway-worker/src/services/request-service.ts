@@ -24,11 +24,13 @@ export type UnifiedRequestInput = {
     | "/v1/images/generations"
     | "/v1/images/edits"
     | "/v1/images/recognitions"
+    | "/v1/chat/completions"
     | "/v1/videos/generations";
-  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
   requestSource?: "api" | "playground";
   model: string;
   prompt?: string;
+  messages?: Array<Record<string, unknown>>;
   input: Record<string, unknown>;
 };
 
@@ -362,6 +364,7 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     input_payload: input.input,
     normalized_params: {
       prompt: input.prompt ?? null,
+      messages: input.messages ?? null,
     },
     request_source: input.requestSource ?? "api",
     status: "queued",

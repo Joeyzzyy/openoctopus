@@ -16,7 +16,7 @@ begin
   if not exists (
     select 1 from pg_type where typname = 'request_capability'
   ) then
-    create type public.request_capability as enum ('image_generation', 'image_edit', 'image_recognition', 'video_generation');
+    create type public.request_capability as enum ('image_generation', 'image_edit', 'image_recognition', 'text_generation', 'video_generation');
   end if;
 
   if not exists (
@@ -44,6 +44,7 @@ add column if not exists capability public.request_capability;
 update public.supported_models
 set capability = case
   when modality = 'image' then 'image_generation'::public.request_capability
+  when modality = 'text' then 'text_generation'::public.request_capability
   when modality = 'video' then 'video_generation'::public.request_capability
   else null
 end

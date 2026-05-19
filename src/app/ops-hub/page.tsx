@@ -105,6 +105,7 @@ const capabilityOptions = [
   { value: "image_generation", label: "图片生成" },
   { value: "image_edit", label: "图片编辑" },
   { value: "image_recognition", label: "图片识别" },
+  { value: "text_generation", label: "对话生成" },
   { value: "video_generation", label: "视频生成" },
 ] as const;
 
@@ -800,7 +801,9 @@ export default async function InternalPage({
           ? internalCopy.options.imageEdit
           : option.value === "image_recognition"
             ? internalCopy.options.imageRecognition
-            : internalCopy.options.videoGeneration,
+            : option.value === "text_generation"
+              ? "对话生成"
+              : internalCopy.options.videoGeneration,
   }));
   const displayProviderStatusOptions = providerStatusOptions.map((option) => ({
     ...option,

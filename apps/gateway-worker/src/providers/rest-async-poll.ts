@@ -122,7 +122,7 @@ function buildAssetFromResult(
   requestId?: string,
   capability?: Capability
 ) {
-  if (capability === "image_recognition") {
+  if (capability === "image_recognition" || capability === "text_generation") {
     return null;
   }
 
@@ -179,7 +179,7 @@ function buildTextFromResult(
   cfg: Record<string, unknown>,
   capability?: Capability
 ) {
-  if (capability !== "image_recognition") {
+  if (capability !== "image_recognition" && capability !== "text_generation") {
     return null;
   }
 

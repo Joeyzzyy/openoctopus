@@ -149,6 +149,56 @@ export const videoRequestSchema = z.object({
   validateReferenceUrlFields(value.input, context);
 });
 
+const chatMessageSchema = z.object({
+  role: z.string().min(1),
+  content: z.union([z.string(), z.array(z.unknown())]),
+  name: z.string().optional(),
+});
+
+function normalizeChatMessagesValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    if (trimmed.startsWith("[")) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        return [{ role: "user", content: trimmed }];
+      }
+    }
+    return [{ role: "user", content: trimmed }];
+  }
+
+  if (Array.isArray(value)) {
+    if (value.every((item) => typeof item === "string")) {
+      return value.map((item) => ({ role: "user", content: item }));
+    }
+    return value;
+  }
+
+  return value;
+}
+
+export const chatRequestSchema = z.object({
+  model: z.string().min(1),
+  prompt: z.string().min(1).optional(),
+  messages: z.preprocess(normalizeChatMessagesValue, z.array(chatMessageSchema).optional()),
+  input: z.record(z.string(), z.unknown()).default({}),
+}).superRefine((value, context) => {
+  const hasPrompt = Boolean(value.prompt?.trim());
+  const normalizedInputMessages = normalizeChatMessagesValue(value.input.messages);
+  const hasMessages =
+    (Array.isArray(value.messages) && value.messages.length > 0) ||
+    (Array.isArray(normalizedInputMessages) && normalizedInputMessages.length > 0);
+  if (!hasPrompt && !hasMessages) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["messages"],
+      message: "prompt or messages is required",
+    });
+  }
+});
+
 export async function registerTaskRoutes(app: FastifyInstance) {
   const sendRequestError = (reply: { code: (statusCode: number) => { send: (body: unknown) => unknown } }, error: unknown) => {
     if (error instanceof RequestValidationError) {
@@ -365,6 +415,65 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         endpoint: queued.endpoint,
         prompt: parsed.prompt,
         input: parsed.input,
+      });
+
+      return reply.code(202).send({
+        id: queued.requestId,
+        status: "queued",
+      });
+    } catch (error) {
+      return sendRequestError(reply, error);
+    }
+  });
+
+  app.post("/v1/chat/completions", async (request, reply) => {
+    const parsed = chatRequestSchema.parse(request.body);
+    const authHeader = request.headers.authorization;
+    const apiKey = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
+    const sourceHeader =
+      typeof request.headers["x-openoctopus-request-source"] === "string"
+        ? request.headers["x-openoctopus-request-source"]
+        : "";
+    const requestSource = sourceHeader === "playground" ? "playground" : "api";
+    const normalizedInput: Record<string, unknown> = {
+      ...parsed.input,
+    };
+    const normalizedMessages =
+      parsed.messages ??
+      (Array.isArray(normalizeChatMessagesValue(parsed.input.messages))
+        ? (normalizeChatMessagesValue(parsed.input.messages) as Array<Record<string, unknown>>)
+        : undefined);
+    if (normalizedMessages && normalizedInput.messages === undefined) {
+      normalizedInput.messages = normalizedMessages;
+    }
+
+    try {
+      const queued = await createQueuedRequest({
+        apiKey,
+        endpoint: "/v1/chat/completions",
+        capability: "text_generation",
+        requestSource,
+        model: parsed.model,
+        prompt: parsed.prompt,
+        messages: normalizedMessages,
+        input: normalizedInput,
+      });
+
+      await enqueueInferenceJob({
+        requestId: queued.requestId,
+        workspaceId: queued.workspaceId,
+        apiKeyId: queued.apiKeyId,
+        providerModelId: queued.providerModelId,
+        credentialId: queued.credentialId,
+        providerSlug: queued.providerSlug,
+        providerBaseUrl: queued.providerBaseUrl,
+        providerConfig: queued.providerConfig,
+        capability: "text_generation",
+        publicModelSlug: parsed.model,
+        upstreamModelSlug: queued.upstreamModelSlug,
+        endpoint: queued.endpoint,
+        prompt: parsed.prompt,
+        input: normalizedInput,
       });
 
       return reply.code(202).send({

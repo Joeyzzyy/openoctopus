@@ -30,7 +30,7 @@ type SupportedModelRow = {
   model_slug: string;
   display_name: string;
   modality: "image" | "video" | "audio" | "text";
-  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
+  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
   billing_config: Record<string, unknown> | null;
   unit_label: string;
   default_unit_cost: number;
@@ -90,7 +90,7 @@ type ProviderModelRow = {
   supported_model_id: string | null;
   public_model_slug: string;
   upstream_model_slug: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
   active: boolean;
   pricing: Record<string, unknown> | null;
   input_schema: Record<string, unknown> | null;
@@ -115,7 +115,7 @@ type ProviderModelShowcaseAssetRow = {
 type RoutingRuleRow = {
   id: string;
   workspace_id: string | null;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
   public_model_slug: string;
   primary_provider_model_id: string;
   fallback_provider_model_id: string | null;

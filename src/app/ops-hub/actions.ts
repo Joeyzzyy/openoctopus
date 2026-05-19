@@ -21,6 +21,7 @@ const capabilitySchema = z.enum([
   "image_generation",
   "image_edit",
   "image_recognition",
+  "text_generation",
   "video_generation",
 ]);
 const modalitySchema = z.enum(["image", "video", "audio", "text"]);
@@ -2072,7 +2073,7 @@ export async function createSupportedModel(formData: FormData) {
   const invalidCapabilityForModality =
     (parsed.modality === "image" &&
       !["image_generation", "image_edit", "image_recognition"].includes(parsed.capability)) ||
-    (parsed.modality === "text" && parsed.capability !== "image_recognition") ||
+    (parsed.modality === "text" && parsed.capability !== "text_generation") ||
     (parsed.modality === "video" && parsed.capability !== "video_generation");
 
   if (invalidCapabilityForModality) {
@@ -2264,7 +2265,7 @@ export async function updateSupportedModelDetails(formData: FormData) {
   const invalidCapabilityForModality =
     (parsed.modality === "image" &&
       !["image_generation", "image_edit", "image_recognition"].includes(parsed.capability)) ||
-    (parsed.modality === "text" && parsed.capability !== "image_recognition") ||
+    (parsed.modality === "text" && parsed.capability !== "text_generation") ||
     (parsed.modality === "video" && parsed.capability !== "video_generation");
 
   if (invalidCapabilityForModality) {

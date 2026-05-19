@@ -12,6 +12,7 @@ import {
   Layers3,
   ListChecks,
   MonitorPlay,
+  MessageSquareText,
   PlayCircle,
   ShieldAlert,
   Sparkles,
@@ -143,6 +144,11 @@ const capabilityMeta = {
     label: "Image editing",
     endpoint: "/v1/images/edits",
     icon: Sparkles,
+  },
+  text_generation: {
+    label: "Chat completions",
+    endpoint: "/v1/chat/completions",
+    icon: MessageSquareText,
   },
   video_generation: {
     label: "Video generation",

@@ -37,6 +37,12 @@ type PlaygroundHistoryImage = {
   requestId: string;
 };
 
+type PreviewImageState = {
+  url: string;
+  name: string;
+  mimeType?: string;
+};
+
 type UploadFieldKind = "image" | "video" | "audio";
 
 type TaskStatus =
@@ -902,9 +908,6 @@ function isMultipleUploadField(field: JsonSchemaField) {
 }
 
 function getUploadLimit(field: JsonSchemaField) {
-  if (isSingleBaseImageSlotField(field)) {
-    return 1;
-  }
   const configuredMaxItems =
     typeof field.maxItems === "number" && Number.isFinite(field.maxItems)
       ? Math.max(1, Math.floor(field.maxItems))
@@ -960,13 +963,6 @@ function buildNumberSelectOptions(field: JsonSchemaField) {
     if (options.length >= 200) break;
   }
   return options.length > 0 ? options : [String(field.minimum)];
-}
-
-function formatUploadSize(size: number) {
-  if (size >= 1024 * 1024) {
-    return `${(size / 1024 / 1024).toFixed(1)} MB`;
-  }
-  return `${Math.max(1, Math.round(size / 1024))} KB`;
 }
 
 function ModelContentSkeleton() {
@@ -1435,6 +1431,9 @@ export function ModelsBrowser({
   const [playgroundUploads, setPlaygroundUploads] = useState<Record<string, PlaygroundUpload[]>>({});
   const [playgroundHistoryImages, setPlaygroundHistoryImages] = useState<PlaygroundHistoryImage[]>([]);
   const [loadingHistoryImages, setLoadingHistoryImages] = useState(false);
+  const [deletingHistoryRequestId, setDeletingHistoryRequestId] = useState<string | null>(null);
+  const [historyDeleteTarget, setHistoryDeleteTarget] = useState<PlaygroundHistoryImage | null>(null);
+  const [previewImage, setPreviewImage] = useState<PreviewImageState | null>(null);
   const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const playgroundImageAssets = useMemo(
@@ -1774,9 +1773,11 @@ export function ModelsBrowser({
       ? "/v1/images/edits"
       : capability === "image_recognition"
         ? "/v1/images/recognitions"
-      : capability?.includes("video")
-        ? "/v1/videos/generations"
-        : "/v1/images/generations";
+        : capability === "text_generation"
+          ? "/v1/chat/completions"
+        : capability?.includes("video")
+          ? "/v1/videos/generations"
+          : "/v1/images/generations";
 
   const uploadPlaygroundAssets = async (field: JsonSchemaField, files: FileList | null) => {
     const selectedFiles = Array.from(files ?? []);
@@ -1861,6 +1862,43 @@ export function ModelsBrowser({
       ...current,
       [fieldKey]: (current[fieldKey] ?? []).filter((_, itemIndex) => itemIndex !== index),
     }));
+  };
+
+  const deleteHistoryImage = async () => {
+    if (!historyDeleteTarget) return;
+    setDeletingHistoryRequestId(historyDeleteTarget.requestId);
+    try {
+      const response = await fetch("/api/playground/history-images", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ requestId: historyDeleteTarget.requestId }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: { message?: string };
+      };
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "Failed to delete history image");
+      }
+      setPlaygroundHistoryImages((current) =>
+        current.filter((item) => item.requestId !== historyDeleteTarget.requestId)
+      );
+      setPlaygroundUploads((current) => {
+        const next: Record<string, PlaygroundUpload[]> = { ...current };
+        for (const field of parsedFields.filter((field) => canUseHistoryImageForField(field))) {
+          const uploads = next[field.key] ?? [];
+          next[field.key] = uploads.filter((upload) => upload.url !== historyDeleteTarget.url);
+        }
+        return next;
+      });
+      setHistoryDeleteTarget(null);
+    } catch (error) {
+      setValidationErrors((current) => ({
+        ...current,
+        images: error instanceof Error ? error.message : "Failed to delete history image",
+      }));
+    } finally {
+      setDeletingHistoryRequestId(null);
+    }
   };
 
   const applyHistoryImageToField = (field: JsonSchemaField, image: PlaygroundHistoryImage) => {
@@ -2369,11 +2407,7 @@ export function ModelsBrowser({
                             disabled={isSubmitting || uploadingFields[field.key]}
                             type="file"
                             accept={getUploadAccept(uploadKind)}
-                            multiple={
-                              !isSingleBaseImageSlotField(field) &&
-                              isMultipleUploadField(field) &&
-                              (getUploadLimit(field) ?? 2) > 1
-                            }
+                            multiple={isMultipleUploadField(field) && (getUploadLimit(field) ?? 2) > 1}
                             onChange={(event) => {
                               void uploadPlaygroundAssets(field, event.target.files);
                               event.target.value = "";
@@ -2408,11 +2442,22 @@ export function ModelsBrowser({
                                     const selected = (playgroundUploads[field.key] ?? []).some(
                                       (upload) => upload.url === historyImage.url
                                     );
+                                    const isDeleting = deletingHistoryRequestId === historyImage.requestId;
                                     return (
                                       <div
                                         key={`${field.key}-${historyImage.url}`}
-                                        className="w-28 shrink-0 rounded-md border border-[#DDF4FF] bg-white p-1.5"
+                                        className="relative w-28 shrink-0 rounded-md border border-[#DDF4FF] bg-white p-1.5"
                                       >
+                                        <button
+                                          type="button"
+                                          disabled={isSubmitting || isDeleting}
+                                          onClick={() => setHistoryDeleteTarget(historyImage)}
+                                          className="absolute right-2 top-2 z-10 inline-flex size-5 items-center justify-center rounded-full border border-black/[0.08] bg-white/95 text-black/50 shadow-sm hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                                          aria-label="Delete history image"
+                                          title="Delete history image"
+                                        >
+                                          <X className="size-3" />
+                                        </button>
                                         <div className="overflow-hidden rounded bg-[#F7F7F7]">
                                           {/* eslint-disable-next-line @next/next/no-img-element */}
                                           <img
@@ -2424,7 +2469,7 @@ export function ModelsBrowser({
                                         <div className="mt-1.5">
                                           <button
                                             type="button"
-                                            disabled={isSubmitting || selected}
+                                            disabled={isSubmitting || selected || isDeleting}
                                             onClick={() => applyHistoryImageToField(field, historyImage)}
                                             className="inline-flex h-7 w-full items-center justify-center whitespace-nowrap rounded-md border border-[#BAE6FD] bg-white px-2 text-[11px] font-medium text-black/70 hover:bg-[#E0F2FE] disabled:cursor-not-allowed disabled:opacity-50"
                                           >
@@ -2460,47 +2505,40 @@ export function ModelsBrowser({
                                   >
                                     <X className="size-3.5" />
                                   </button>
-                                  <div className="overflow-hidden rounded bg-white">
-                                    {upload.mimeType.startsWith("video/") ? (
+                                  {upload.mimeType.startsWith("image/") ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setPreviewImage({
+                                          url: upload.url,
+                                          name: upload.name,
+                                          mimeType: upload.mimeType,
+                                        })
+                                      }
+                                      className="block w-full overflow-hidden rounded bg-white"
+                                    >
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img
+                                        src={buildDisplayImageUrl(upload.url)}
+                                        alt={upload.name}
+                                        className="max-h-32 w-full object-contain"
+                                      />
+                                    </button>
+                                  ) : upload.mimeType.startsWith("video/") ? (
+                                    <div className="overflow-hidden rounded bg-white">
                                       <video
                                         src={buildDisplayImageUrl(upload.url)}
                                         controls
                                         className="max-h-48 w-full rounded bg-black object-contain"
                                       />
-                                    ) : upload.mimeType.startsWith("audio/") ? (
+                                    </div>
+                                  ) : upload.mimeType.startsWith("audio/") ? (
+                                    <div className="overflow-hidden rounded bg-white">
                                       <div className="p-3">
                                         <audio src={upload.url} controls className="w-full" />
                                       </div>
-                                    ) : (
-                                      <>
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                          src={buildDisplayImageUrl(upload.url)}
-                                          alt={upload.name}
-                                          className="max-h-32 w-full object-contain"
-                                        />
-                                      </>
-                                    )}
-                                  </div>
-                                  <div className="mt-2 min-w-0 pr-8">
-                                    <p className="truncate text-xs font-medium text-black/75">
-                                      {upload.name}
-                                    </p>
-                                    {(() => {
-                                      const example = selectedModel?.playgroundInputExamples.find(
-                                        (item) => item.imageUrl === upload.url
-                                      );
-                                      return example?.prompt ? (
-                                      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-black/45">
-                                        {example.prompt}
-                                      </p>
-                                      ) : null;
-                                    })()}
-                                    <p className="mt-1 text-[11px] text-black/45">
-                                      {upload.mimeType}
-                                      {upload.size > 0 ? ` · ${formatUploadSize(upload.size)}` : ""}
-                                    </p>
-                                  </div>
+                                    </div>
+                                  ) : null}
                                 </div>
                               ))}
                             </div>
@@ -2919,6 +2957,75 @@ export function ModelsBrowser({
             <pre className="max-h-[65vh] overflow-auto whitespace-pre-wrap break-all rounded-md border border-black/[0.08] bg-[#FAFAFA] p-3 text-xs text-black/80">
               {formatDetailText(playgroundErrorDetail)}
             </pre>
+          </div>
+        </div>
+      ) : null}
+
+      {previewImage ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-4xl rounded-xl border border-black/[0.1] bg-white p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h4 className="min-w-0 truncate text-sm font-semibold text-black">{previewImage.name}</h4>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    downloadImage(
+                      previewImage.url,
+                      previewImage.name || "base-image.png",
+                      previewImage.mimeType
+                    )
+                  }
+                  className="h-8 rounded border border-black/[0.12] px-3 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                >
+                  Download
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewImage(null)}
+                  className="h-8 rounded border border-black/[0.12] px-3 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="flex max-h-[75vh] items-center justify-center overflow-auto rounded-lg bg-[#F7F7F7] p-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={buildDisplayImageUrl(previewImage.url)}
+                alt={previewImage.name}
+                className="max-h-[70vh] w-auto max-w-full object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {historyDeleteTarget ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-md rounded-xl border border-black/[0.1] bg-white p-5 shadow-2xl">
+            <h4 className="text-base font-semibold text-black">Delete this history image?</h4>
+            <p className="mt-2 text-sm leading-6 text-black/60">
+              This will remove the generated image from your history and delete the related playground task record.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={deletingHistoryRequestId === historyDeleteTarget.requestId}
+                onClick={() => setHistoryDeleteTarget(null)}
+                className="h-9 rounded border border-black/[0.12] px-3 text-xs font-medium text-black/70 hover:bg-black/[0.03] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingHistoryRequestId === historyDeleteTarget.requestId}
+                onClick={() => void deleteHistoryImage()}
+                className="h-9 rounded border border-[#F2B8B5] bg-[#FEF2F2] px-3 text-xs font-medium text-[#B42318] hover:bg-[#FDE8E8] disabled:opacity-50"
+              >
+                {deletingHistoryRequestId === historyDeleteTarget.requestId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

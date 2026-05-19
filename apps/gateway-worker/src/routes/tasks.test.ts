@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  chatRequestSchema,
   imageRequestSchema,
   videoRequestSchema,
 } from "./tasks.js";
@@ -72,5 +73,61 @@ test("image request schema rejects invalid reference audio URLs only when provid
         },
       }),
     /reference_audios must be a usable HTTP\(S\) asset URL/
+  );
+});
+
+test("chat request schema accepts messages without prompt", () => {
+  const parsed = chatRequestSchema.parse({
+    model: "openoctopus/test-chat",
+    messages: [
+      {
+        role: "user",
+        content: "Summarize this API in one sentence.",
+      },
+    ],
+    input: {},
+  });
+
+  assert.equal(parsed.model, "openoctopus/test-chat");
+  assert.equal(parsed.messages?.length, 1);
+});
+
+test("chat request schema accepts messages nested under input for cli/playground compatibility", () => {
+  const parsed = chatRequestSchema.parse({
+    model: "openoctopus/test-chat",
+    input: {
+      messages: [
+        {
+          role: "user",
+          content: "Explain polling in one sentence.",
+        },
+      ],
+    },
+  });
+
+  assert.equal(Array.isArray(parsed.input.messages), true);
+});
+
+test("chat request schema coerces top-level plain string messages into a single user message", () => {
+  const parsed = chatRequestSchema.parse({
+    model: "openoctopus/test-chat",
+    messages: "123" as unknown as Array<{ role: string; content: string }>,
+    input: {},
+  });
+
+  const messages = parsed.messages as Array<{ role: string; content: string }>;
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0]?.role, "user");
+  assert.equal(messages[0]?.content, "123");
+});
+
+test("chat request schema requires prompt or messages", () => {
+  assert.throws(
+    () =>
+      chatRequestSchema.parse({
+        model: "openoctopus/test-chat",
+        input: {},
+      }),
+    /prompt or messages is required/
   );
 });

@@ -4,12 +4,13 @@ import { supabaseAdmin } from "../lib/supabase.js";
 function endpointForCapability(capability: string) {
   if (capability === "image_edit") return "/v1/images/edits";
   if (capability === "image_recognition") return "/v1/images/recognitions";
+  if (capability === "text_generation") return "/v1/chat/completions";
   if (capability === "video_generation") return "/v1/videos/generations";
   return "/v1/images/generations";
 }
 
 function outputTypeForCapability(capability: string) {
-  if (capability === "image_recognition") return "text";
+  if (capability === "image_recognition" || capability === "text_generation") return "text";
   if (capability === "video_generation") return "video";
   return "image";
 }

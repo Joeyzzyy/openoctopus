@@ -7,7 +7,7 @@ type SupportedModelRow = {
   provider: string;
   model_slug: string;
   display_name: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
+  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
   billing_config: unknown;
   active: boolean;
   created_at: string;

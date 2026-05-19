@@ -223,6 +223,18 @@ function schemaHasField(schema: Record<string, unknown>, fieldName: string) {
 }
 
 function buildPayload(model: string, capability: string, inputSchema: Record<string, unknown>) {
+  if (capability === "text_generation") {
+    return `{
+  "model": "${model}",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Write a concise summary of how OpenOctopus async tasks work."
+    }
+  ]
+}`;
+  }
+
   if (capability.includes("video")) {
     const inputLines = [
       '    "duration": 5,',
@@ -277,6 +289,7 @@ function sanitizeProviderInputSchemaForDocs(schema: Record<string, unknown>) {
 }
 
 function buildEndpoint(capability: string) {
+  if (capability === "text_generation") return "/v1/chat/completions";
   if (capability === "image_edit") return "/v1/images/edits";
   if (capability === "image_recognition") return "/v1/images/recognitions";
   return capability.includes("video") ? "/v1/videos/generations" : "/v1/images/generations";

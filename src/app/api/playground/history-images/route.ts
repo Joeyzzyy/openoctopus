@@ -8,6 +8,10 @@ const querySchema = z.object({
   model: z.string().trim().min(1),
 });
 
+const deleteSchema = z.object({
+  requestId: z.string().uuid(),
+});
+
 type HistoryImageAsset = {
   url: string;
   mimeType: string;
@@ -153,6 +157,37 @@ export async function GET(request: Request) {
     }
     return NextResponse.json(
       { error: { message: error instanceof Error ? error.message : "Failed to load history images" } },
+      { status: 400 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json();
+    const parsed = deleteSchema.parse(body);
+    const { workspaceId, userId } = await getAuthedWorkspaceForPlayground();
+    const supabase = createAdminClient();
+
+    const { error } = await supabase
+      .from("inference_requests")
+      .delete()
+      .eq("id", parsed.requestId)
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", userId)
+      .eq("request_source", "playground");
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Not authenticated") {
+      return NextResponse.json({ error: { message: "Authentication is required." } }, { status: 401 });
+    }
+    return NextResponse.json(
+      { error: { message: error instanceof Error ? error.message : "Failed to delete history image" } },
       { status: 400 }
     );
   }

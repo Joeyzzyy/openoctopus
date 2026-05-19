@@ -14,7 +14,7 @@ type SupportedModelOption = {
   id: string;
   modelSlug: string;
   displayName: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
+  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
   billingConfigText?: string;
 };
 
@@ -44,7 +44,7 @@ type ProviderModelOption = {
   supportedModelName: string;
   providerName: string;
   upstreamModelSlug: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "video_generation";
+  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
 };
 
 type BillingFormState = {
@@ -2083,6 +2083,7 @@ function capabilityLabel(value: SupportedModelOption["capability"]) {
   if (value === "image_generation") return "图片生成";
   if (value === "image_edit") return "图片编辑";
   if (value === "image_recognition") return "图片识别";
+  if (value === "text_generation") return "对话生成";
   if (value === "video_generation") return "视频生成";
   return "未知";
 }
@@ -2186,7 +2187,7 @@ function BooleanSurchargeTable({
 }: {
   values: Record<string, string>;
   onChange: (key: string, value?: string) => void;
-  capability?: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
+  capability?: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
 }) {
   const candidates = Array.from(new Set([...BOOLEAN_SURCHARGE_CANDIDATES, ...Object.keys(values)]));
   const labelForCandidate = (candidate: string) => {
@@ -2267,7 +2268,7 @@ export function BillingConfigEditor({
 }: {
   name?: string;
   initialValue?: string;
-  capability?: "image_generation" | "image_edit" | "image_recognition" | "video_generation" | null;
+  capability?: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
   componentHint?: string;
   generatedLabel?: string;
 }) {
@@ -2773,7 +2774,9 @@ export function CreateProviderModelForm({
   const templateIsAsync =
     executionTemplate === "rest-async-poll-v1" || executionTemplate === "upload-async-poll-v1";
   const isAsyncMode = executionConfigState.mode === "async" || (executionConfigState.mode === "auto" && templateIsAsync);
-  const isImageRecognitionModel = selectedSupportedModel?.capability === "image_recognition";
+  const isTextOutputModel =
+    selectedSupportedModel?.capability === "image_recognition" ||
+    selectedSupportedModel?.capability === "text_generation";
   const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("ai-autofill");
   void defaultActive;
   const [selectedCoverFileName, setSelectedCoverFileName] = useState("");
@@ -2931,12 +2934,12 @@ export function CreateProviderModelForm({
           nextRootTab ??= "manage";
           nextActiveTab ??= "basic";
         }
-        if (isImageRecognitionModel && !executionConfigState.resultTextPath.trim()) {
+        if (isTextOutputModel && !executionConfigState.resultTextPath.trim()) {
           missing.push("resultTextPath");
           nextRootTab ??= "manage";
           nextActiveTab ??= "basic";
         }
-        if (!isImageRecognitionModel && !executionConfigState.resultUrlPath.trim()) {
+        if (!isTextOutputModel && !executionConfigState.resultUrlPath.trim()) {
           missing.push("resultUrlPath");
           nextRootTab ??= "manage";
           nextActiveTab ??= "basic";
@@ -3576,13 +3579,13 @@ export function CreateProviderModelForm({
                       resultUrlPath: event.target.value,
                     }))
                   }
-                  required={!isImageRecognitionModel}
+                  required={!isTextOutputModel}
                   disabled={disabled}
                   className={formInputClassName}
                   placeholder="例如 data.outputs.0 / response.outputUrl"
                 />
               </label>
-              {isImageRecognitionModel ? (
+              {isTextOutputModel ? (
                 <label className="block md:col-span-2">
                   <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">文本结果字段路径（JSON path）resultTextPath</span>
                   <input
@@ -3600,7 +3603,7 @@ export function CreateProviderModelForm({
                   />
                 </label>
               ) : null}
-              {isImageRecognitionModel ? null : (
+              {isTextOutputModel ? null : (
                 <>
                   <label className="block">
                     <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">结果值类型</span>
