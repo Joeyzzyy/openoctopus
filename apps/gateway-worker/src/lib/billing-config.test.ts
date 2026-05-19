@@ -283,3 +283,39 @@ test("supports named combination pricing with reference videos and audio dimensi
   });
   assert.equal(withReferenceVideosAndAudio.components.perVideo, 1.1);
 });
+
+test("charges cache hit, cache miss, and output tokens separately when configured", () => {
+  const config = parseBillingConfig({
+    billingMode: "hybrid",
+    currency: "USD",
+    charges: {
+      inputTextCacheHitTokensPerMillion: 0.003625,
+      inputTextCacheMissTokensPerMillion: 0.435,
+      outputTextTokensPerMillion: 0.87,
+    },
+  });
+
+  const resolution = resolveBillingBreakdown({
+    config,
+    providerRaw: {
+      usage: {
+        prompt_tokens: 1_000_000,
+        completion_tokens: 200_000,
+      },
+      usageMetadata: {
+        promptTokensDetails: {
+          cachedTokens: 400_000,
+        },
+      },
+    },
+  });
+
+  assert.equal(resolution.metrics.inputTokens, 1_000_000);
+  assert.equal(resolution.metrics.inputCacheHitTokens, 400_000);
+  assert.equal(resolution.metrics.inputCacheMissTokens, 600_000);
+  assert.equal(resolution.metrics.outputTokens, 200_000);
+  assert.ok(Math.abs(resolution.components.inputTextCacheHitTokens - 0.00145) < 1e-12);
+  assert.ok(Math.abs(resolution.components.inputTextCacheMissTokens - 0.261) < 1e-12);
+  assert.ok(Math.abs(resolution.components.outputTextTokens - 0.174) < 1e-12);
+  assert.ok(Math.abs(resolution.total - 0.43645) < 1e-12);
+});

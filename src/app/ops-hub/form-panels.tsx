@@ -50,18 +50,23 @@ type ProviderModelOption = {
 type BillingFormState = {
   currency: string;
   outputPriceMode: string;
+  inputPriceMode: string;
   chargePerRequest: boolean;
   chargePerImage: boolean;
   chargePerVideo: boolean;
   chargePerSecond: boolean;
   chargeCombinationPrices: boolean;
   chargeInputTokens: boolean;
+  chargeInputCacheHitTokens: boolean;
+  chargeInputCacheMissTokens: boolean;
   chargeOutputTokens: boolean;
   costPerRequest: string;
   costPerImage: string;
   costPerVideo: string;
   costPerSecond: string;
   inputCostPerMillion: string;
+  inputCacheHitCostPerMillion: string;
+  inputCacheMissCostPerMillion: string;
   outputCostPerMillion: string;
   resolutionMultipliersJson: string;
   qualityMultipliersJson: string;
@@ -1324,18 +1329,23 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
   const fallback: BillingFormState = {
     currency: "USD",
     outputPriceMode: "per_image",
+    inputPriceMode: "input_tokens",
     chargePerRequest: false,
     chargePerImage: true,
     chargePerVideo: false,
     chargePerSecond: false,
     chargeCombinationPrices: false,
     chargeInputTokens: false,
+    chargeInputCacheHitTokens: false,
+    chargeInputCacheMissTokens: false,
     chargeOutputTokens: false,
     costPerRequest: "0.04",
     costPerImage: "0.04",
     costPerVideo: "0.8",
     costPerSecond: "0.05",
     inputCostPerMillion: "0.5",
+    inputCacheHitCostPerMillion: "0.003625",
+    inputCacheMissCostPerMillion: "0.435",
     outputCostPerMillion: "1.5",
     resolutionMultipliersJson: "{}",
     qualityMultipliersJson: "{}",
@@ -1345,12 +1355,15 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
   const emptyState = {
     ...fallback,
     outputPriceMode: "none",
+    inputPriceMode: "none",
     chargePerRequest: false,
     chargePerImage: false,
     chargePerVideo: false,
     chargePerSecond: false,
     chargeCombinationPrices: false,
     chargeInputTokens: false,
+    chargeInputCacheHitTokens: false,
+    chargeInputCacheMissTokens: false,
     chargeOutputTokens: false,
   };
   const hasPositiveCharge = (value: unknown) =>
@@ -1394,6 +1407,11 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
       return {
         ...fallback,
         currency: typeof parsed.currency === "string" ? parsed.currency : fallback.currency,
+        inputPriceMode: hasPositiveCharge(charges.inputTextCacheHitTokensPerMillion) || hasPositiveCharge(charges.inputTextCacheMissTokensPerMillion)
+          ? "input_tokens_cache_split"
+          : hasPositiveCharge(charges.inputTextTokensPerMillion)
+            ? "input_tokens"
+            : "none",
         outputPriceMode: hasCombinationPrices
           ? resolutionPrices
             ? "resolution_multiplier"
@@ -1423,6 +1441,8 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
         chargePerSecond: !hasCombinationPrices && hasPositiveCharge(charges.perSecond),
         chargeCombinationPrices: hasCombinationPrices || hasResolutionMultipliers || hasQualityMultipliers,
         chargeInputTokens: hasPositiveCharge(charges.inputTextTokensPerMillion),
+        chargeInputCacheHitTokens: hasPositiveCharge(charges.inputTextCacheHitTokensPerMillion),
+        chargeInputCacheMissTokens: hasPositiveCharge(charges.inputTextCacheMissTokensPerMillion),
         chargeOutputTokens: !hasCombinationPrices && hasPositiveCharge(charges.outputTextTokensPerMillion),
         costPerRequest: String(charges.perRequest ?? fallback.costPerRequest),
         costPerImage: String(charges.perImage ?? fallback.costPerImage),
@@ -1430,6 +1450,12 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
         costPerSecond: String(charges.perSecond ?? fallback.costPerSecond),
         inputCostPerMillion: String(
           charges.inputTextTokensPerMillion ?? fallback.inputCostPerMillion
+        ),
+        inputCacheHitCostPerMillion: String(
+          charges.inputTextCacheHitTokensPerMillion ?? fallback.inputCacheHitCostPerMillion
+        ),
+        inputCacheMissCostPerMillion: String(
+          charges.inputTextCacheMissTokensPerMillion ?? fallback.inputCacheMissCostPerMillion
         ),
         outputCostPerMillion: String(
           charges.outputTextTokensPerMillion ?? fallback.outputCostPerMillion
@@ -1457,6 +1483,13 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     return {
       ...fallback,
       currency: typeof parsed.currency === "string" ? parsed.currency : fallback.currency,
+      inputPriceMode:
+        parsed.billingMode === "per_million_tokens" &&
+        (hasPositiveCharge(parsed.inputCacheHitCostPerMillion) || hasPositiveCharge(parsed.inputCacheMissCostPerMillion))
+          ? "input_tokens_cache_split"
+          : parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.inputCostPerMillion)
+            ? "input_tokens"
+            : "none",
       outputPriceMode:
         parsed.billingMode === "per_image"
           ? "per_image"
@@ -1473,12 +1506,16 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
       chargePerSecond: parsed.billingMode === "per_second" && hasPositiveCharge(parsed.costPerSecond ?? parsed.costPerUnit),
       chargeCombinationPrices: fallback.chargeCombinationPrices,
       chargeInputTokens: parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.inputCostPerMillion),
+      chargeInputCacheHitTokens: parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.inputCacheHitCostPerMillion),
+      chargeInputCacheMissTokens: parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.inputCacheMissCostPerMillion),
       chargeOutputTokens: parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.outputCostPerMillion),
       costPerRequest: String(parsed.costPerRequest ?? parsed.costPerUnit ?? fallback.costPerRequest),
       costPerImage: String(parsed.costPerImage ?? parsed.costPerUnit ?? fallback.costPerImage),
       costPerVideo: String(parsed.costPerVideo ?? parsed.costPerUnit ?? fallback.costPerVideo),
       costPerSecond: String(parsed.costPerSecond ?? parsed.costPerUnit ?? fallback.costPerSecond),
       inputCostPerMillion: String(parsed.inputCostPerMillion ?? fallback.inputCostPerMillion),
+      inputCacheHitCostPerMillion: String(parsed.inputCacheHitCostPerMillion ?? fallback.inputCacheHitCostPerMillion),
+      inputCacheMissCostPerMillion: String(parsed.inputCacheMissCostPerMillion ?? fallback.inputCacheMissCostPerMillion),
       outputCostPerMillion: String(parsed.outputCostPerMillion ?? fallback.outputCostPerMillion),
       resolutionMultipliersJson: fallback.resolutionMultipliersJson,
       qualityMultipliersJson: fallback.qualityMultipliersJson,
@@ -1740,6 +1777,12 @@ function buildBillingConfigValue(state: BillingFormState) {
   }
   if (state.chargeInputTokens) {
     charges.inputTextTokensPerMillion = Number(state.inputCostPerMillion);
+  }
+  if (state.chargeInputCacheHitTokens) {
+    charges.inputTextCacheHitTokensPerMillion = Number(state.inputCacheHitCostPerMillion);
+  }
+  if (state.chargeInputCacheMissTokens) {
+    charges.inputTextCacheMissTokensPerMillion = Number(state.inputCacheMissCostPerMillion);
   }
   if (state.chargeOutputTokens) {
     charges.outputTextTokensPerMillion = Number(state.outputCostPerMillion);
@@ -2284,9 +2327,11 @@ export function BillingConfigEditor({
   const combinationPricingVariant = detectCombinationPricingVariant(combinationPriceMap);
   const isVideoPricingEditor =
     capability === "video_generation" || combinationPricingVariant === "video";
-  const inputMethod = state.chargeInputTokens
-    ? "input_tokens"
-    : "none";
+  const inputMethod = state.chargeInputCacheHitTokens || state.chargeInputCacheMissTokens
+    ? state.inputPriceMode || "input_tokens_cache_split"
+    : state.chargeInputTokens
+      ? "input_tokens"
+      : "none";
   const outputMethod = state.chargeOutputTokens
     ? state.outputPriceMode || "output_tokens"
     : state.chargeCombinationPrices
@@ -2304,7 +2349,10 @@ export function BillingConfigEditor({
   const applyInputMethod = (method: string) => {
     setState((current) => ({
       ...current,
+      inputPriceMode: method,
       chargeInputTokens: method === "input_tokens",
+      chargeInputCacheHitTokens: method === "input_tokens_cache_split",
+      chargeInputCacheMissTokens: method === "input_tokens_cache_split",
     }));
   };
 
@@ -2396,6 +2444,7 @@ export function BillingConfigEditor({
               >
                 <option value="none">不计费</option>
                 <option value="input_tokens">按输入 Token（每百万）</option>
+                <option value="input_tokens_cache_split">按输入 Token（区分缓存命中 / 未命中）</option>
               </select>
             </div>
             <div className="rounded-lg border border-[#BAE6FD] bg-white p-2.5">
@@ -2438,6 +2487,20 @@ export function BillingConfigEditor({
             label="输入成本金额（每百万输入 Token）"
             value={state.inputCostPerMillion}
             onChange={(value) => setState((current) => ({ ...current, inputCostPerMillion: value }))}
+          />
+        ) : null}
+        {inputMethod === "input_tokens_cache_split" ? (
+          <BillingNumberField
+            label="输入成本金额（每百万输入 Token，缓存命中）"
+            value={state.inputCacheHitCostPerMillion}
+            onChange={(value) => setState((current) => ({ ...current, inputCacheHitCostPerMillion: value }))}
+          />
+        ) : null}
+        {inputMethod === "input_tokens_cache_split" ? (
+          <BillingNumberField
+            label="输入成本金额（每百万输入 Token，缓存未命中）"
+            value={state.inputCacheMissCostPerMillion}
+            onChange={(value) => setState((current) => ({ ...current, inputCacheMissCostPerMillion: value }))}
           />
         ) : null}
         {outputMethod === "per_image" ? (

@@ -30,8 +30,23 @@ const perSecondBillingSchema = z.object({
 const perMillionTokensBillingSchema = z.object({
   billingMode: z.literal("per_million_tokens"),
   currency: currencySchema,
-  inputCostPerMillion: positivePriceSchema,
-  outputCostPerMillion: positivePriceSchema,
+  inputCostPerMillion: positivePriceSchema.optional(),
+  inputCacheHitCostPerMillion: positivePriceSchema.optional(),
+  inputCacheMissCostPerMillion: positivePriceSchema.optional(),
+  outputCostPerMillion: positivePriceSchema.optional(),
+}).superRefine((value, ctx) => {
+  const hasCharge = [
+    value.inputCostPerMillion,
+    value.inputCacheHitCostPerMillion,
+    value.inputCacheMissCostPerMillion,
+    value.outputCostPerMillion,
+  ].some((item) => item !== undefined);
+  if (!hasCharge) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "At least one token billing charge is required",
+    });
+  }
 });
 
 const hybridChargesSchema = z
@@ -41,6 +56,8 @@ const hybridChargesSchema = z
     perVideo: positivePriceSchema.optional(),
     perSecond: positivePriceSchema.optional(),
     inputTextTokensPerMillion: positivePriceSchema.optional(),
+    inputTextCacheHitTokensPerMillion: positivePriceSchema.optional(),
+    inputTextCacheMissTokensPerMillion: positivePriceSchema.optional(),
     outputTextTokensPerMillion: positivePriceSchema.optional(),
   })
   .default({});
@@ -98,6 +115,8 @@ export type BillingUsageMetrics = {
   videoCount: number;
   durationSeconds: number;
   inputTokens: number;
+  inputCacheHitTokens: number;
+  inputCacheMissTokens: number;
   outputTokens: number;
 };
 
@@ -110,6 +129,8 @@ export type BillingResolution = {
     perVideo: number;
     perSecond: number;
     inputTextTokens: number;
+    inputTextCacheHitTokens: number;
+    inputTextCacheMissTokens: number;
     outputTextTokens: number;
     booleanSurcharges: number;
   };
@@ -370,24 +391,62 @@ function resolveTokenUsage(
   output: Record<string, unknown> | null,
   raw: Record<string, unknown> | null
 ) {
-  const usageMetadata =
-    asRecord(raw?.usageMetadata) ??
-    asRecord(raw?.usage_metadata) ??
-    asRecord(output?.usageMetadata) ??
-    asRecord(output?.usage_metadata);
+  const usageMetadata = {
+    ...(asRecord(output?.usage) ?? {}),
+    ...(asRecord(output?.usage_metadata) ?? {}),
+    ...(asRecord(output?.usageMetadata) ?? {}),
+    ...(asRecord(raw?.usage) ?? {}),
+    ...(asRecord(raw?.usage_metadata) ?? {}),
+    ...(asRecord(raw?.usageMetadata) ?? {}),
+  };
 
   const inputTokens =
     getNestedNumber(usageMetadata, ["promptTokenCount"]) ??
     getNestedNumber(usageMetadata, ["prompt_token_count"]) ??
+    getNestedNumber(usageMetadata, ["prompt_tokens"]) ??
     getNestedNumber(usageMetadata, ["inputTokens"]) ??
     getNestedNumber(usageMetadata, ["input_tokens"]) ??
     readNumericCandidate(input?.inputTokens) ??
     readNumericCandidate(input?.promptTokens) ??
     0;
 
+  const inputCacheHitTokens =
+    getNestedNumber(usageMetadata, ["promptTokensDetails", "cachedTokens"]) ??
+    getNestedNumber(usageMetadata, ["prompt_tokens_details", "cached_tokens"]) ??
+    getNestedNumber(usageMetadata, ["cachedInputTokens"]) ??
+    getNestedNumber(usageMetadata, ["cached_input_tokens"]) ??
+    getNestedNumber(usageMetadata, ["inputCachedTokens"]) ??
+    getNestedNumber(usageMetadata, ["input_cached_tokens"]) ??
+    getNestedNumber(usageMetadata, ["cacheReadInputTokens"]) ??
+    getNestedNumber(usageMetadata, ["cache_read_input_tokens"]) ??
+    getNestedNumber(usageMetadata, ["cacheHitInputTokens"]) ??
+    getNestedNumber(usageMetadata, ["cache_hit_input_tokens"]) ??
+    readNumericCandidate(input?.cachedInputTokens) ??
+    readNumericCandidate(input?.cached_input_tokens) ??
+    0;
+
+  const explicitInputCacheMissTokens =
+    getNestedNumber(usageMetadata, ["uncachedInputTokens"]) ??
+    getNestedNumber(usageMetadata, ["uncached_input_tokens"]) ??
+    getNestedNumber(usageMetadata, ["inputUncachedTokens"]) ??
+    getNestedNumber(usageMetadata, ["input_uncached_tokens"]) ??
+    getNestedNumber(usageMetadata, ["cacheMissInputTokens"]) ??
+    getNestedNumber(usageMetadata, ["cache_miss_input_tokens"]) ??
+    getNestedNumber(usageMetadata, ["inputCacheMissTokens"]) ??
+    getNestedNumber(usageMetadata, ["input_cache_miss_tokens"]) ??
+    getNestedNumber(usageMetadata, ["cacheCreationInputTokens"]) ??
+    getNestedNumber(usageMetadata, ["cache_creation_input_tokens"]) ??
+    readNumericCandidate(input?.uncachedInputTokens) ??
+    readNumericCandidate(input?.uncached_input_tokens);
+
+  const inputCacheMissTokens =
+    explicitInputCacheMissTokens ??
+    Math.max(inputTokens - inputCacheHitTokens, 0);
+
   const outputTokens =
     getNestedNumber(usageMetadata, ["candidatesTokenCount"]) ??
     getNestedNumber(usageMetadata, ["candidates_token_count"]) ??
+    getNestedNumber(usageMetadata, ["completion_tokens"]) ??
     getNestedNumber(usageMetadata, ["outputTokens"]) ??
     getNestedNumber(usageMetadata, ["output_tokens"]) ??
     readNumericCandidate(output?.outputTokens) ??
@@ -395,7 +454,7 @@ function resolveTokenUsage(
     readNumericCandidate(input?.completionTokens) ??
     0;
 
-  return { inputTokens, outputTokens };
+  return { inputTokens, inputCacheHitTokens, inputCacheMissTokens, outputTokens };
 }
 
 function applyLegacyBillingAliases(value: unknown) {
@@ -475,6 +534,8 @@ export function normalizeBillingConfig(config: BillingConfig): HybridBillingConf
         currency: config.currency,
         charges: {
           inputTextTokensPerMillion: config.inputCostPerMillion,
+          inputTextCacheHitTokensPerMillion: config.inputCacheHitCostPerMillion,
+          inputTextCacheMissTokensPerMillion: config.inputCacheMissCostPerMillion,
           outputTextTokensPerMillion: config.outputCostPerMillion,
         },
       };
@@ -529,11 +590,18 @@ export function deriveLegacyBillingFields(config: BillingConfig) {
     };
   }
 
-  if (charges.inputTextTokensPerMillion || charges.outputTextTokensPerMillion) {
+  if (
+    charges.inputTextTokensPerMillion ||
+    charges.inputTextCacheHitTokensPerMillion ||
+    charges.inputTextCacheMissTokensPerMillion ||
+    charges.outputTextTokensPerMillion
+  ) {
     return {
       unitLabel: "1M tokens",
       defaultUnitCost:
         (charges.inputTextTokensPerMillion ?? 0) +
+        (charges.inputTextCacheHitTokensPerMillion ?? 0) +
+        (charges.inputTextCacheMissTokensPerMillion ?? 0) +
         (charges.outputTextTokensPerMillion ?? 0),
     };
   }
@@ -593,6 +661,12 @@ export function summarizeBillingConfig(config: BillingConfig) {
   if (charges.inputTextTokensPerMillion) {
     parts.push(`每百万输入 Token ${charges.inputTextTokensPerMillion}`);
   }
+  if (charges.inputTextCacheHitTokensPerMillion) {
+    parts.push(`每百万输入 Token（缓存命中）${charges.inputTextCacheHitTokensPerMillion}`);
+  }
+  if (charges.inputTextCacheMissTokensPerMillion) {
+    parts.push(`每百万输入 Token（缓存未命中）${charges.inputTextCacheMissTokensPerMillion}`);
+  }
   if (charges.outputTextTokensPerMillion) {
     parts.push(`每百万输出 Token ${charges.outputTextTokensPerMillion}`);
   }
@@ -622,6 +696,8 @@ export function resolveBillingMetrics(input: {
       (generatedImageCount > 0 ? 0 : resolveRequestedAssetCount(requestInput, "video")),
     durationSeconds: resolveDurationSeconds(requestInput, output, providerRaw),
     inputTokens: tokens.inputTokens,
+    inputCacheHitTokens: tokens.inputCacheHitTokens,
+    inputCacheMissTokens: tokens.inputCacheMissTokens,
     outputTokens: tokens.outputTokens,
   };
 }
@@ -799,6 +875,12 @@ export function resolveBillingBreakdown(input: {
     perSecond: metrics.durationSeconds * (config.charges.perSecond ?? 0),
     inputTextTokens:
       (metrics.inputTokens / 1_000_000) * (config.charges.inputTextTokensPerMillion ?? 0),
+    inputTextCacheHitTokens:
+      (metrics.inputCacheHitTokens / 1_000_000) *
+      (config.charges.inputTextCacheHitTokensPerMillion ?? 0),
+    inputTextCacheMissTokens:
+      (metrics.inputCacheMissTokens / 1_000_000) *
+      (config.charges.inputTextCacheMissTokensPerMillion ?? 0),
     outputTextTokens:
       (metrics.outputTokens / 1_000_000) * (config.charges.outputTextTokensPerMillion ?? 0),
     booleanSurcharges,

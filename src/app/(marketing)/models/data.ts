@@ -335,6 +335,8 @@ function billingSummary(value: unknown) {
     if (tiers.length === 0 && charges.perVideo) parts.push(`per video ${charges.perVideo}`);
     if (charges.perSecond) parts.push(`per second ${charges.perSecond}`);
     if (charges.inputTextTokensPerMillion) parts.push(`per 1M input tokens ${charges.inputTextTokensPerMillion}`);
+    if (charges.inputTextCacheHitTokensPerMillion) parts.push(`per 1M input tokens (cache hit) ${charges.inputTextCacheHitTokensPerMillion}`);
+    if (charges.inputTextCacheMissTokensPerMillion) parts.push(`per 1M input tokens (cache miss) ${charges.inputTextCacheMissTokensPerMillion}`);
     if (charges.outputTextTokensPerMillion) parts.push(`per 1M output tokens ${charges.outputTextTokensPerMillion}`);
     if (booleanSurcharges.length > 0) parts.push(`${booleanSurcharges.length} optional add-ons`);
     return parts.some((part) => part.includes("$")) ? parts.join(" + ") : `${currency} ${parts.join(" + ")}`;
@@ -362,6 +364,12 @@ function readPrimaryPrice(value: unknown) {
     if (charges.perVideo) return { billingCurrency: currency, primaryPriceValue: charges.perVideo, primaryPriceLabel: "per video" };
     if (charges.perRequest) return { billingCurrency: currency, primaryPriceValue: charges.perRequest, primaryPriceLabel: "per request" };
     if (charges.perSecond) return { billingCurrency: currency, primaryPriceValue: charges.perSecond, primaryPriceLabel: "per second" };
+    if (charges.inputTextCacheMissTokensPerMillion) {
+      return { billingCurrency: currency, primaryPriceValue: charges.inputTextCacheMissTokensPerMillion, primaryPriceLabel: "per 1M input tokens (cache miss)" };
+    }
+    if (charges.inputTextCacheHitTokensPerMillion) {
+      return { billingCurrency: currency, primaryPriceValue: charges.inputTextCacheHitTokensPerMillion, primaryPriceLabel: "per 1M input tokens (cache hit)" };
+    }
     if (charges.inputTextTokensPerMillion) {
       return { billingCurrency: currency, primaryPriceValue: charges.inputTextTokensPerMillion, primaryPriceLabel: "per 1M input tokens" };
     }

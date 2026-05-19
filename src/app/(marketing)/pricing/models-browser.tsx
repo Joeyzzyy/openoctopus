@@ -623,6 +623,149 @@ function MarkdownReadme({
   );
 }
 
+function MarkdownChatMessage({
+  markdown,
+  messageId,
+  copiedCodeBlockId,
+  onCopyCodeBlock,
+}: {
+  markdown: string;
+  messageId: string;
+  copiedCodeBlockId: string | null;
+  onCopyCodeBlock: (codeBlockId: string, code: string) => void;
+}) {
+  const blocks = useMemo(() => parseMarkdownBlocks(markdown), [markdown]);
+
+  if (blocks.length === 0) {
+    return <div className="whitespace-pre-wrap break-words">{markdown}</div>;
+  }
+
+  return (
+    <div className="space-y-3 text-[15px] leading-7 text-slate-800">
+      {blocks.map((block, index) => {
+        if (block.type === "heading") {
+          if (block.level === 1) {
+            return (
+              <h2 key={index} className="text-2xl font-semibold tracking-tight text-slate-950">
+                {renderInlineMarkdown(block.text, `chat-heading-${index}`)}
+              </h2>
+            );
+          }
+          if (block.level === 2) {
+            return (
+              <h3 key={index} className="text-xl font-semibold tracking-tight text-slate-950">
+                {renderInlineMarkdown(block.text, `chat-heading-${index}`)}
+              </h3>
+            );
+          }
+          return (
+            <h4 key={index} className="text-lg font-semibold text-slate-900">
+              {renderInlineMarkdown(block.text, `chat-heading-${index}`)}
+            </h4>
+          );
+        }
+
+        if (block.type === "blockquote") {
+          return (
+            <blockquote
+              key={index}
+              className="border-l-2 border-slate-300 pl-4 italic text-slate-600"
+            >
+              {renderMultilineText(block.text, `chat-quote-${index}`)}
+            </blockquote>
+          );
+        }
+
+        if (block.type === "list") {
+          return (
+            <ul key={index} className="list-disc space-y-1 pl-5 marker:text-slate-500">
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex}>{renderInlineMarkdown(item, `chat-list-${index}-${itemIndex}`)}</li>
+              ))}
+            </ul>
+          );
+        }
+
+        if (block.type === "ordered-list") {
+          return (
+            <ol key={index} className="list-decimal space-y-1 pl-5 marker:text-slate-500">
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex}>{renderInlineMarkdown(item, `chat-olist-${index}-${itemIndex}`)}</li>
+              ))}
+            </ol>
+          );
+        }
+
+        if (block.type === "table") {
+          return (
+            <div key={index} className="overflow-x-auto rounded-lg border border-slate-200 bg-white/70">
+              <table className="min-w-full border-collapse text-left text-sm text-slate-700">
+                <thead className="bg-slate-50/90">
+                  <tr>
+                    {block.headers.map((header, headerIndex) => (
+                      <th
+                        key={headerIndex}
+                        className="border-b border-slate-200 px-3 py-2 font-semibold text-slate-900"
+                      >
+                        {renderInlineMarkdown(header, `chat-thead-${index}-${headerIndex}`)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {block.rows.map((row, rowIndex) => (
+                    <tr key={rowIndex} className="border-b border-slate-100 last:border-b-0">
+                      {row.map((cell, cellIndex) => (
+                        <td key={cellIndex} className="px-3 py-2 align-top">
+                          {renderInlineMarkdown(cell, `chat-tbody-${index}-${rowIndex}-${cellIndex}`)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        if (block.type === "code") {
+          const codeBlockId = `${messageId}-code-${index}`;
+          return (
+            <div key={index} className="overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
+              <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-white/45">
+                  {block.language || "code"}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onCopyCodeBlock(codeBlockId, block.code)}
+                  className="inline-flex h-7 items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 text-[11px] font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  {copiedCodeBlockId === codeBlockId ? (
+                    <Check className="size-3.5" />
+                  ) : (
+                    <Copy className="size-3.5" />
+                  )}
+                  {copiedCodeBlockId === codeBlockId ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <pre className="overflow-x-auto px-4 py-4 text-sm leading-6 text-slate-100">
+                <code>{block.code}</code>
+              </pre>
+            </div>
+          );
+        }
+
+        return (
+          <p key={index} className="text-[15px] leading-7 text-slate-800">
+            {renderMultilineText(block.text, `chat-paragraph-${index}`)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 function FieldHelpTooltip({
   label,
   description,
@@ -1434,6 +1577,8 @@ export function ModelsBrowser({
   const [, startRouteTransition] = useTransition();
   const [resultCopied, setResultCopied] = useState(false);
   const [textOutputCopied, setTextOutputCopied] = useState(false);
+  const [copiedChatMessageId, setCopiedChatMessageId] = useState<string | null>(null);
+  const [copiedCodeBlockId, setCopiedCodeBlockId] = useState<string | null>(null);
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
   const [playgroundUploads, setPlaygroundUploads] = useState<Record<string, PlaygroundUpload[]>>({});
@@ -2533,6 +2678,26 @@ export function ModelsBrowser({
     }
   };
 
+  const copyChatMessage = async (messageId: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedChatMessageId(messageId);
+      setTimeout(() => setCopiedChatMessageId((current) => (current === messageId ? null : current)), 1500);
+    } catch {
+      setCopiedChatMessageId(null);
+    }
+  };
+
+  const copyCodeBlock = async (codeBlockId: string, code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCodeBlockId(codeBlockId);
+      setTimeout(() => setCopiedCodeBlockId((current) => (current === codeBlockId ? null : current)), 1500);
+    } catch {
+      setCopiedCodeBlockId(null);
+    }
+  };
+
   const downloadImage = async (src: string, filename: string, mimeType?: string) => {
     try {
       const requestedFilename = replaceFileExtension(filename, imageExtensionFromMimeType(mimeType));
@@ -2679,88 +2844,54 @@ export function ModelsBrowser({
         </div>
         <div className="relative min-w-0">
         {mainTab === "playground" && isChatModel ? (
-          <section className="overflow-hidden rounded-2xl border border-[#D7E4F5] bg-[linear-gradient(180deg,#F8FBFF_0%,#F3F7FC_100%)] shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-            <div className="border-b border-[#D7E4F5] bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.96))] px-4 py-4 sm:px-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#BAE6FD] bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0369A1] shadow-sm">
-                    <span className="inline-flex size-2 rounded-full bg-[#0EA5E9]" />
-                    Live chat playground
-                  </div>
-                  <h2 className="mt-3 text-lg font-semibold tracking-tight text-[#0F172A]">Talk to {selectedModel.displayName}</h2>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="min-w-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm">
-                    {taskId ? (
-                      <code className="break-all font-mono text-[11px] text-slate-700">{taskId}</code>
-                    ) : (
-                      <span className="text-slate-400">Waiting for request</span>
-                    )}
-                  </div>
-                  {playgroundTextOutput ? (
-                    <button
-                      type="button"
-                      onClick={copyTextOutput}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
-                    >
-                      {textOutputCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                      {textOutputCopied ? "Copied" : "Copy reply"}
-                    </button>
-                  ) : null}
-                  {playgroundOutput ? (
-                    <button
-                      type="button"
-                      onClick={() => setResultModalOpen(true)}
-                      className="inline-flex h-9 items-center rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
-                    >
-                      Result JSON
-                    </button>
-                  ) : null}
-                  <span className={`inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium shadow-sm ${taskStatusClass(taskStatus)}`}>
-                    Status: {taskStatusLabel(taskStatus)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setChatConversation([]);
-                      setChatComposer("");
-                      setPlaygroundOutput(null);
-                      setTaskId(null);
-                      setTaskStatus("idle");
-                      setPlaygroundError(null);
-                      setPlaygroundErrorDetail(null);
-                    }}
-                    className="h-9 rounded-full border border-slate-200 bg-white px-4 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
-                  >
-                    Clear chat
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 sm:p-5">
+          <div>
+            <div className="px-1 py-2 sm:p-5">
               <div className="min-w-0 rounded-[22px] border border-[#DCE7F3] bg-white/92 p-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] backdrop-blur sm:p-4">
-                <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="mb-3 flex flex-col gap-3 border-b border-slate-100 pb-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">Conversation</p>
                     <p className="mt-1 text-xs text-slate-500">Responses append to this temporary thread.</p>
                   </div>
-                  <div className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-600">
-                    {chatConversation.length} message{chatConversation.length === 1 ? "" : "s"}
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChatConversation([]);
+                        setChatComposer("");
+                        setPlaygroundOutput(null);
+                        setTaskId(null);
+                        setTaskStatus("idle");
+                        setPlaygroundError(null);
+                        setPlaygroundErrorDetail(null);
+                      }}
+                      className="h-8 rounded-full border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                    >
+                      Clear chat
+                    </button>
+                    {playgroundOutput ? (
+                      <button
+                        type="button"
+                        onClick={() => setResultModalOpen(true)}
+                        className="inline-flex h-8 items-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                      >
+                        Result JSON
+                      </button>
+                    ) : null}
                   </div>
                 </div>
 
-                <div className="mb-3 flex min-h-[380px] flex-col gap-3 overflow-y-auto rounded-[20px] border border-slate-200 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] p-3 shadow-inner sm:min-h-[440px] sm:p-4">
+                <div className="mb-3 flex h-[420px] flex-col gap-3 overflow-y-auto rounded-[20px] border border-slate-200 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] p-3 shadow-inner sm:h-[520px] sm:p-4">
                   {chatConversation.length === 0 ? (
                     <div className="flex-1" />
                   ) : (
                     chatConversation.map((message, index) => {
                       const isUser = message.role === "user";
                       const isAssistant = message.role === "assistant";
+                      const messageId = message.localId ?? `${message.role}-${index}-${message.taskId ?? "local"}`;
                       return (
                         <div
-                          key={`${message.role}-${index}-${message.taskId ?? "local"}`}
-                          className={`flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}
+                          key={messageId}
+                          className={`flex gap-2 sm:gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}
                         >
                           {!isUser ? (
                             <div
@@ -2782,10 +2913,14 @@ export function ModelsBrowser({
                               )}
                             </div>
                           ) : null}
-                          <div className={`min-w-0 max-w-[86%] ${isUser ? "items-end" : "items-start"} flex flex-col`}>
+                          <div className={`min-w-0 max-w-[92%] sm:max-w-[86%] ${isUser ? "items-end" : "items-start"} flex flex-col`}>
                             <div
-                              className={`w-full px-1 py-1 text-sm leading-7 ${
-                                isUser ? "text-slate-800" : isAssistant ? "text-slate-800" : "text-slate-700"
+                              className={`w-full text-sm leading-7 ${
+                                isUser
+                                  ? "rounded-2xl bg-[#EAF6FF] px-4 py-3 text-slate-800"
+                                  : isAssistant
+                                    ? "px-1 py-1 text-slate-800"
+                                    : "px-1 py-1 text-slate-700"
                               }`}
                             >
                               {isAssistant && message.pending ? (
@@ -2793,9 +2928,34 @@ export function ModelsBrowser({
                                   thinking...
                                 </span>
                               ) : (
-                                <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                                isAssistant ? (
+                                  <MarkdownChatMessage
+                                    markdown={message.content}
+                                    messageId={messageId}
+                                    copiedCodeBlockId={copiedCodeBlockId}
+                                    onCopyCodeBlock={(codeBlockId, code) => {
+                                      void copyCodeBlock(codeBlockId, code);
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                                )
                               )}
                             </div>
+                            {!message.pending ? (
+                              <button
+                                type="button"
+                                onClick={() => void copyChatMessage(messageId, message.content)}
+                                className="mt-1 inline-flex h-7 items-center gap-1 self-end rounded-full px-2 text-[11px] text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Copy message"
+                              >
+                                {copiedChatMessageId === messageId ? (
+                                  <Check className="size-3.5" />
+                                ) : (
+                                  <Copy className="size-3.5" />
+                                )}
+                              </button>
+                            ) : null}
                           </div>
                         </div>
                       );
@@ -2835,14 +2995,13 @@ export function ModelsBrowser({
                   />
                   <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
-                      <span>{chatComposer.trim().length} chars</span>
                       <span>Shift + Enter for line break</span>
                     </div>
                     <button
                       type="button"
                       disabled={isSubmitting || !selectedModel}
                       onClick={submitPlayground}
-                      className="inline-flex h-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#1F8A4C_0%,#176D3D_100%)] px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(31,138,76,0.26)] transition-transform hover:-translate-y-[1px] hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-45"
+                      className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[linear-gradient(135deg,#1F8A4C_0%,#176D3D_100%)] px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(31,138,76,0.26)] transition-transform hover:-translate-y-[1px] hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
                     >
                       {isSubmitting ? "Sending..." : `Send${priceTag ? ` ${priceTag}` : ""}`}
                     </button>
@@ -2853,7 +3012,7 @@ export function ModelsBrowser({
                 </div>
               </div>
             </div>
-          </section>
+          </div>
         ) : mainTab === "playground" ? (
           <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
             <section className="rounded-lg border border-black/[0.08] bg-white p-3 sm:rounded-xl sm:p-4">
