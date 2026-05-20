@@ -6,6 +6,7 @@ import {
   sendGatewayError,
 } from "../lib/gateway-errors.js";
 import { postJson, postStream } from "../lib/http.js";
+import { sendFeishuFailureAlert } from "../lib/feishu-alert.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { normalizeOutputPayloadByCapability } from "../lib/image-output-contract.js";
 import { decryptProviderSecret } from "../lib/provider-secret-crypto.js";
@@ -879,11 +880,12 @@ export async function registerTaskRoutes(app: FastifyInstance) {
 
         if (upstreamResponse.status < 200 || upstreamResponse.status >= 300) {
           const errorText = Buffer.concat(responseChunks).toString("utf8");
+          const errorCode = "provider_submit_failed";
           await supabaseAdmin
             .from("inference_requests")
             .update({
               status: "failed",
-              error_code: "provider_submit_failed",
+              error_code: errorCode,
               error_message: errorText,
               completed_at: new Date().toISOString(),
             })
@@ -897,6 +899,19 @@ export async function registerTaskRoutes(app: FastifyInstance) {
             })
             .eq("request_id", resolved.requestId)
             .eq("attempt_no", 1);
+          await sendFeishuFailureAlert({
+            phase: "submit",
+            requestId: resolved.requestId,
+            workspaceId: resolved.workspaceId,
+            apiKeyId: resolved.apiKeyId,
+            capability: resolved.capability,
+            publicModelSlug: resolved.publicModelSlug,
+            providerSlug: resolved.providerSlug,
+            upstreamModelSlug: resolved.upstreamModelSlug,
+            endpoint: resolved.endpoint,
+            errorCode,
+            errorMessage: errorText,
+          });
           await recordRequestSettlement({
             requestId: resolved.requestId,
             workspaceId: resolved.workspaceId,
@@ -1073,11 +1088,13 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     } catch (error) {
       if (activeResolved) {
         const errorMessage = error instanceof Error ? error.message : "Unknown coding gateway error";
+        const errorCode =
+          error instanceof RequestValidationError ? error.code : "provider_submit_failed";
         await supabaseAdmin
           .from("inference_requests")
           .update({
             status: "failed",
-            error_code: "provider_submit_failed",
+            error_code: errorCode,
             error_message: errorMessage,
             completed_at: new Date().toISOString(),
           })
@@ -1090,6 +1107,19 @@ export async function registerTaskRoutes(app: FastifyInstance) {
           })
           .eq("request_id", activeResolved.requestId)
           .eq("attempt_no", 1);
+        await sendFeishuFailureAlert({
+          phase: "submit",
+          requestId: activeResolved.requestId,
+          workspaceId: activeResolved.workspaceId,
+          apiKeyId: activeResolved.apiKeyId,
+          capability: activeResolved.capability,
+          publicModelSlug: activeResolved.publicModelSlug,
+          providerSlug: activeResolved.providerSlug,
+          upstreamModelSlug: activeResolved.upstreamModelSlug,
+          endpoint: activeResolved.endpoint,
+          errorCode,
+          errorMessage,
+        });
         try {
           await recordRequestSettlement({
             requestId: activeResolved.requestId,
