@@ -77,6 +77,7 @@ type BillingFormState = {
 type ExecutionConfigFormState = {
   mode: string;
   messageFormat: string;
+  clientProtocol: string;
   authType: string;
   authHeaderName: string;
   authHeaderPrefix: string;
@@ -118,6 +119,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
     return {
       mode: "sync",
       messageFormat: "",
+      clientProtocol: "",
       submitPath: "/v1beta/models/{upstreamModel}:generateContent",
       pollPath: "",
       resultPath: "",
@@ -141,6 +143,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
     return {
       mode: "async",
       messageFormat: "",
+      clientProtocol: "",
       submitPath: "/v1/models/{upstreamModel}:generate",
       pollPath: "/v1/operations/{taskId}",
       resultPath: "",
@@ -154,6 +157,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
   return {
     mode: "async",
     messageFormat: "",
+    clientProtocol: "",
     submitPath: "/v1/models/{upstreamModel}:generate",
     pollPath: "/v1/operations/{taskId}",
     resultPath: "",
@@ -2029,6 +2033,7 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
   const fallback: ExecutionConfigFormState = {
     mode: "auto",
     messageFormat: "",
+    clientProtocol: "",
     authType: "bearer",
     authHeaderName: "Authorization",
     authHeaderPrefix: "Bearer",
@@ -2065,6 +2070,10 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
         typeof parsed.messageFormat === "string"
           ? parsed.messageFormat
           : fallback.messageFormat,
+      clientProtocol:
+        typeof parsed.clientProtocol === "string"
+          ? parsed.clientProtocol
+          : fallback.clientProtocol,
       authType:
         typeof parsed.authType === "string" && parsed.authType.trim().length > 0
           ? parsed.authType
@@ -2167,6 +2176,10 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
   const messageFormat = state.messageFormat.trim();
   if (messageFormat) {
     result.messageFormat = messageFormat;
+  }
+  const clientProtocol = state.clientProtocol.trim();
+  if (clientProtocol) {
+    result.clientProtocol = clientProtocol;
   }
   const taskIdPath = state.taskIdPath.trim();
   if (taskIdPath) {
@@ -3632,7 +3645,6 @@ export function CreateProviderModelForm({
                 <FieldHint help="只复制调用协议模板和路径映射，不会覆盖当前上游模型 slug、输入参数、输出参数或成本配置。" />
               </label>
               <label className="block">
-                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">API 调用格式配置</span>
                 <select
                   name="executionTemplate"
                   value={executionTemplate}
@@ -3892,6 +3904,23 @@ export function CreateProviderModelForm({
                     >
                       <option value="">默认 / 原样透传</option>
                       <option value="gemini-generate-content">Gemini generateContent</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">客户端协议 clientProtocol（可选）</span>
+                    <select
+                      value={executionConfigState.clientProtocol}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          clientProtocol: event.target.value,
+                        }))
+                      }
+                      disabled={disabled}
+                      className={formSelectClassName}
+                    >
+                      <option value="">默认 / 不启用 coding 直通</option>
+                      <option value="openai-chat">OpenAI Chat / Coding CLI</option>
                     </select>
                   </label>
                 </>

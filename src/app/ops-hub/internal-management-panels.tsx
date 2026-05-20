@@ -480,8 +480,11 @@ function readTemplateConfigDiagnostics(config: Record<string, unknown> | null) {
   const statusPath = typeof config?.statusPath === "string" ? config.statusPath.trim() : "";
   const resultValueType = typeof config?.resultValueType === "string" ? config.resultValueType.trim() : "";
   const resultMimeType = typeof config?.resultMimeType === "string" ? config.resultMimeType.trim() : "";
+  const mode = typeof config?.mode === "string" ? config.mode.trim() : "";
+  const isAsyncMode =
+    mode === "async" || mode === "async-poll" || mode === "rest-async-poll-v1" || Boolean(pollPath);
   if (!submitPath) diagnostics.push("缺少 submitPath");
-  if (!taskIdPath) diagnostics.push("缺少 taskIdPath");
+  if (isAsyncMode && !taskIdPath) diagnostics.push("缺少 taskIdPath");
   if (capability === "image_recognition" || capability === "text_generation") {
     if (!resultTextPath) diagnostics.push("缺少 resultTextPath");
   } else if (!resultUrlPath) {

@@ -84,10 +84,11 @@ function validateTemplateConfig(
 ) {
   const diagnostics: string[] = [];
   const resultValueType = readString(config.resultValueType);
+  const templateMode = detectTemplateMode(config);
   if (readString(config.submitPath).length === 0) {
     diagnostics.push("模板配置缺少 submitPath。");
   }
-  if (readString(config.taskIdPath).length === 0) {
+  if (templateMode === "async" && readString(config.taskIdPath).length === 0) {
     diagnostics.push("模板配置缺少 taskIdPath。");
   }
   if (capability === "image_recognition" || capability === "text_generation") {
@@ -97,8 +98,13 @@ function validateTemplateConfig(
   } else if (readString(config.resultUrlPath).length === 0) {
     diagnostics.push("模板配置缺少 resultUrlPath。");
   }
-  if (detectTemplateMode(config) === "async" && readString(config.pollPath).length === 0) {
+  if (templateMode === "async" && readString(config.pollPath).length === 0) {
     diagnostics.push("异步模板缺少 pollPath。");
+  }
+  if (capability === "text_generation" && readString(config.clientProtocol) === "openai-chat") {
+    if (templateMode !== "sync") {
+      diagnostics.push("coding 直通客户端协议目前只支持同步返回模式。");
+    }
   }
   if (resultValueType && resultValueType !== "url" && resultValueType !== "base64") {
     diagnostics.push("resultValueType 仅支持 url 或 base64。");

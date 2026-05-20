@@ -140,7 +140,7 @@ create table if not exists public.provider_models (
   pricing jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
-  unique (provider_id, upstream_model_slug)
+  unique (provider_id, supported_model_id, upstream_model_slug)
 );
 
 create table if not exists public.routing_rules (

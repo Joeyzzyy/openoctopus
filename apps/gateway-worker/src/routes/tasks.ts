@@ -5,8 +5,10 @@ import {
   resolveGatewayErrorDefinition,
   sendGatewayError,
 } from "../lib/gateway-errors.js";
+import { postJson, postStream } from "../lib/http.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { normalizeOutputPayloadByCapability } from "../lib/image-output-contract.js";
+import { decryptProviderSecret } from "../lib/provider-secret-crypto.js";
 
 function redactOutputPayloadRaw(outputPayload: unknown) {
   if (!outputPayload || typeof outputPayload !== "object" || Array.isArray(outputPayload)) {
@@ -53,8 +55,16 @@ import { enqueueInferenceJob } from "../queue/runner.js";
 import {
   authenticateApiKey,
   createQueuedRequest,
+  recordInferenceRequest,
   RequestValidationError,
+  resolveProviderSecret,
+  resolveRequestRuntime,
+  touchApiKeyLastUsed,
 } from "../services/request-service.js";
+import {
+  recordRequestSettlement,
+  resolveSettlementAmounts,
+} from "../services/billing-service.js";
 
 function isHttpUrl(candidate: string) {
   try {
@@ -211,6 +221,174 @@ function sanitizeInputValue(key: string | null, value: unknown): unknown {
 
 function sanitizeInputRecord(input: Record<string, unknown>) {
   return (sanitizeInputValue(null, input) as Record<string, unknown>) ?? {};
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function fillTemplate(input: string, values: Record<string, string>) {
+  return input.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key) => values[key] ?? "");
+}
+
+function buildAuthHeaders(config: Record<string, unknown>, secret: string) {
+  const authType = readString(config.authType || "bearer");
+  if (authType === "query") {
+    return {
+      headers: {} as Record<string, string>,
+      applyQuery(url: URL) {
+        url.searchParams.set(readString(config.authQueryParam) || "key", secret);
+      },
+    };
+  }
+  if (authType === "header") {
+    return {
+      headers: {
+        [readString(config.authHeaderName) || "x-api-key"]: secret,
+      },
+      applyQuery() {},
+    };
+  }
+  const headerName = readString(config.authHeaderName) || "Authorization";
+  const headerPrefix = readString(config.authHeaderPrefix || "Bearer");
+  return {
+    headers: {
+      [headerName]: headerPrefix ? `${headerPrefix} ${secret}` : secret,
+    },
+    applyQuery() {},
+  };
+}
+
+function buildSettlementBreakdown(input: {
+  customerCharge: number;
+  providerCost: number;
+  profit: number;
+  customerBreakdown?: Record<string, unknown>;
+  providerBreakdown?: Record<string, unknown>;
+}) {
+  return {
+    customerCharge: input.customerCharge,
+    providerCost: input.providerCost,
+    estimatedProfit: input.profit,
+    actualProfit: input.profit,
+    ...(input.customerBreakdown ? { customerBreakdown: input.customerBreakdown } : {}),
+    ...(input.providerBreakdown ? { providerBreakdown: input.providerBreakdown } : {}),
+  };
+}
+
+export const codingChatRequestSchema = z
+  .object({
+    model: z.string().min(1),
+    prompt: z.string().min(1).optional(),
+    messages: z.preprocess(normalizeChatMessagesValue, z.array(chatMessageSchema).optional()),
+    input: z.record(z.string(), z.unknown()).optional(),
+  })
+  .passthrough()
+  .superRefine((value, context) => {
+    const hasPrompt = Boolean(value.prompt?.trim());
+    const normalizedInputMessages = normalizeChatMessagesValue(value.input?.messages);
+    const hasMessages =
+      (Array.isArray(value.messages) && value.messages.length > 0) ||
+      (Array.isArray(normalizedInputMessages) && normalizedInputMessages.length > 0);
+    if (!hasPrompt && !hasMessages) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["messages"],
+        message: "prompt or messages is required",
+      });
+    }
+  });
+
+type OpenAiChatStreamSummary = {
+  upstreamRequestId: string | null;
+  model: string | null;
+  text: string;
+  reasoningText: string;
+  usage: Record<string, unknown> | null;
+  finishReason: string | null;
+  lastEvent: Record<string, unknown> | null;
+};
+
+function createOpenAiChatStreamSummary(): OpenAiChatStreamSummary {
+  return {
+    upstreamRequestId: null,
+    model: null,
+    text: "",
+    reasoningText: "",
+    usage: null,
+    finishReason: null,
+    lastEvent: null,
+  };
+}
+
+export function consumeOpenAiChatSseBuffer(
+  buffer: string,
+  summary: OpenAiChatStreamSummary
+) {
+  let remaining = buffer;
+
+  while (true) {
+    const boundaryIndex = remaining.indexOf("\n\n");
+    if (boundaryIndex < 0) {
+      break;
+    }
+
+    const rawEvent = remaining.slice(0, boundaryIndex);
+    remaining = remaining.slice(boundaryIndex + 2);
+
+    const payload = rawEvent
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart())
+      .join("\n");
+
+    if (!payload || payload === "[DONE]") {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(payload) as Record<string, unknown>;
+      summary.lastEvent = parsed;
+      summary.upstreamRequestId ||= typeof parsed.id === "string" ? parsed.id : null;
+      summary.model ||= typeof parsed.model === "string" ? parsed.model : null;
+      if (asRecord(parsed.usage)) {
+        summary.usage = asRecord(parsed.usage);
+      }
+      const choices = Array.isArray(parsed.choices) ? parsed.choices : [];
+      for (const choice of choices) {
+        const record = asRecord(choice);
+        const delta = asRecord(record?.delta);
+        const content = delta?.content;
+        const reasoningContent = delta?.reasoning_content;
+        if (typeof content === "string") {
+          summary.text += content;
+        }
+        if (typeof reasoningContent === "string") {
+          summary.reasoningText += reasoningContent;
+        }
+        if (typeof record?.finish_reason === "string") {
+          summary.finishReason = record.finish_reason;
+        }
+      }
+    } catch {
+      // Ignore malformed partial event payloads.
+    }
+  }
+
+  return remaining;
+}
+
+function extractOpenAiResponseText(response: Record<string, unknown>) {
+  const choices = Array.isArray(response.choices) ? response.choices : [];
+  const firstChoice = asRecord(choices[0]);
+  const message = asRecord(firstChoice?.message);
+  return typeof message?.content === "string" ? message.content : "";
 }
 
 function normalizeChatMessagesValue(value: unknown): unknown {
@@ -540,6 +718,413 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       return sendRequestError(reply, error);
     }
   });
+
+  const handleCodingChatCompletions = async (
+    request: { body: unknown; headers: Record<string, unknown> },
+    reply: {
+      code: (statusCode: number) => { send: (body: unknown) => unknown };
+      header: (name: string, value: string) => void;
+      hijack: () => void;
+      raw: import("node:http").ServerResponse;
+    }
+  ) => {
+    let activeResolved:
+      | Awaited<ReturnType<typeof resolveRequestRuntime>>
+      | null = null;
+    const parsed = codingChatRequestSchema.parse(request.body);
+    const authHeader =
+      typeof request.headers.authorization === "string" ? request.headers.authorization : "";
+    const apiKey = authHeader.replace(/^Bearer\s+/i, "") ?? "";
+    const sourceHeader =
+      typeof request.headers["x-openoctopus-request-source"] === "string"
+        ? request.headers["x-openoctopus-request-source"]
+        : "";
+    const requestSource = sourceHeader === "playground" ? "playground" : "api";
+    const rawBody = parsed as Record<string, unknown>;
+    const normalizedMessages =
+      parsed.messages ??
+      (Array.isArray(normalizeChatMessagesValue(parsed.input?.messages))
+        ? (normalizeChatMessagesValue(parsed.input?.messages) as Array<Record<string, unknown>>)
+        : undefined);
+    const topLevelInput = Object.fromEntries(
+      Object.entries(rawBody).filter(
+        ([key]) => !["model", "prompt", "messages", "input"].includes(key)
+      )
+    );
+    const normalizedInput = sanitizeInputRecord({
+      ...(asRecord(parsed.input) ?? {}),
+      ...topLevelInput,
+    });
+    if (normalizedMessages && normalizedInput.messages === undefined) {
+      normalizedInput.messages = normalizedMessages;
+    }
+
+    try {
+      const resolved = await resolveRequestRuntime({
+        apiKey,
+        endpoint: "/chat/completions",
+        capability: "text_generation",
+        requestSource,
+        model: parsed.model,
+        prompt: parsed.prompt,
+        messages: normalizedMessages,
+        input: normalizedInput,
+      });
+      activeResolved = resolved;
+
+      const executionConfig = asRecord(resolved.providerConfig.executionConfig) ?? {};
+      const clientProtocol = readString(executionConfig.clientProtocol);
+      if (clientProtocol !== "openai-chat") {
+        throw new RequestValidationError(
+          "This text model is not enabled for coding-agent passthrough.",
+          409,
+          "model_not_available"
+        );
+      }
+
+      const credentialRow = await resolveProviderSecret(resolved.credentialId);
+      const providerSecret = decryptProviderSecret({
+        ciphertext: credentialRow.secret_ciphertext!,
+        iv: credentialRow.secret_iv!,
+        authTag: credentialRow.secret_auth_tag!,
+      });
+
+      const baseUrl = resolved.providerBaseUrl;
+      if (!baseUrl) {
+        throw new RequestValidationError(
+          "Provider base URL is missing.",
+          409,
+          "provider_credential_unusable"
+        );
+      }
+
+      const submitPath = readString(executionConfig.submitPath);
+      if (!submitPath) {
+        throw new RequestValidationError(
+          "Provider submitPath is missing.",
+          409,
+          "provider_credential_unusable"
+        );
+      }
+
+      const upstreamUrl = new URL(
+        fillTemplate(submitPath, { upstreamModel: resolved.upstreamModelSlug }),
+        baseUrl
+      );
+      const authConfig = buildAuthHeaders(executionConfig, providerSecret);
+      authConfig.applyQuery(upstreamUrl);
+
+      const upstreamBody: Record<string, unknown> = {
+        ...rawBody,
+        model: resolved.upstreamModelSlug,
+      };
+
+      const startedAt = new Date().toISOString();
+      await recordInferenceRequest({
+        ...resolved,
+        status: "processing",
+        startedAt,
+      });
+      await touchApiKeyLastUsed(resolved.apiKeyId);
+
+      const { error: attemptInsertError } = await supabaseAdmin.from("provider_attempts").insert({
+        request_id: resolved.requestId,
+        provider_id: resolved.providerId,
+        provider_model_id: resolved.providerModelId,
+        attempt_no: 1,
+        status: "processing",
+        request_payload: {
+          publicModelSlug: resolved.publicModelSlug,
+          upstreamModelSlug: resolved.upstreamModelSlug,
+          prompt: parsed.prompt,
+          input: normalizedInput,
+          clientProtocol,
+        },
+      });
+
+      if (attemptInsertError) {
+        throw new Error(attemptInsertError.message);
+      }
+
+      if (rawBody.stream === true) {
+        const upstreamResponse = await postStream(upstreamUrl.toString(), {
+          headers: authConfig.headers,
+          body: upstreamBody,
+        });
+
+        reply.hijack();
+        reply.raw.writeHead(
+          upstreamResponse.status,
+          Object.fromEntries(
+            Object.entries(upstreamResponse.headers).filter(
+              (entry): entry is [string, string] => typeof entry[1] === "string"
+            )
+          )
+        );
+
+        const summary = createOpenAiChatStreamSummary();
+        let textBuffer = "";
+        const responseChunks: Buffer[] = [];
+
+        for await (const chunk of upstreamResponse.stream) {
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          responseChunks.push(buffer);
+          reply.raw.write(buffer);
+          textBuffer = consumeOpenAiChatSseBuffer(
+            textBuffer + buffer.toString("utf8"),
+            summary
+          );
+        }
+        reply.raw.end();
+
+        if (upstreamResponse.status < 200 || upstreamResponse.status >= 300) {
+          const errorText = Buffer.concat(responseChunks).toString("utf8");
+          await supabaseAdmin
+            .from("inference_requests")
+            .update({
+              status: "failed",
+              error_code: "provider_submit_failed",
+              error_message: errorText,
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", resolved.requestId);
+          await supabaseAdmin
+            .from("provider_attempts")
+            .update({
+              status: "failed",
+              error_message: errorText,
+              upstream_request_id: summary.upstreamRequestId,
+            })
+            .eq("request_id", resolved.requestId)
+            .eq("attempt_no", 1);
+          await recordRequestSettlement({
+            requestId: resolved.requestId,
+            workspaceId: resolved.workspaceId,
+            apiKeyId: resolved.apiKeyId,
+            publicModelSlug: resolved.publicModelSlug,
+            endpoint: resolved.endpoint,
+            customerCharge: 0,
+            providerCost: 0,
+            statusCode: upstreamResponse.status,
+            breakdown: buildSettlementBreakdown({
+              customerCharge: 0,
+              providerCost: 0,
+              profit: 0,
+            }),
+          });
+          return reply;
+        }
+
+        const normalizedOutput = normalizeOutputPayloadByCapability({
+          capability: "text_generation",
+          outputPayload: {
+            text: summary.text,
+            raw: {
+              id: summary.upstreamRequestId,
+              model: summary.model,
+              usage: summary.usage,
+              finish_reason: summary.finishReason,
+              reasoning_content: summary.reasoningText || undefined,
+            },
+          },
+        }) as Record<string, unknown>;
+
+        const settlement = await resolveSettlementAmounts({
+          providerModelId: resolved.providerModelId,
+          publicModelSlug: resolved.publicModelSlug,
+          requestInput: normalizedInput,
+          output: normalizedOutput,
+          providerRaw: asRecord(normalizedOutput.raw),
+        });
+
+        await supabaseAdmin
+          .from("inference_requests")
+          .update({
+            status: "succeeded",
+            output_payload: normalizedOutput,
+            actual_cost: settlement.customer.total,
+            actual_customer_charge: settlement.customer.total,
+            actual_provider_cost: settlement.provider.total,
+            actual_profit: settlement.actualProfit,
+            estimated_cost: settlement.customer.total,
+            estimated_customer_charge: settlement.customer.total,
+            estimated_provider_cost: settlement.provider.total,
+            estimated_profit: settlement.actualProfit,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", resolved.requestId);
+
+        await supabaseAdmin
+          .from("provider_attempts")
+          .update({
+            status: "succeeded",
+            upstream_request_id: summary.upstreamRequestId,
+            response_payload: normalizedOutput,
+          })
+          .eq("request_id", resolved.requestId)
+          .eq("attempt_no", 1);
+
+        await recordRequestSettlement({
+          requestId: resolved.requestId,
+          workspaceId: resolved.workspaceId,
+          apiKeyId: resolved.apiKeyId,
+          publicModelSlug: resolved.publicModelSlug,
+          endpoint: resolved.endpoint,
+          customerCharge: settlement.customer.total,
+          providerCost: settlement.provider.total,
+          statusCode: 200,
+          breakdown: buildSettlementBreakdown({
+            customerCharge: settlement.customer.total,
+            providerCost: settlement.provider.total,
+            profit: settlement.actualProfit,
+            customerBreakdown: {
+              currency: settlement.customer.currency,
+              components: settlement.customer.components,
+              metrics: settlement.customer.metrics,
+            },
+            providerBreakdown: {
+              currency: settlement.provider.currency,
+              components: settlement.provider.components,
+              metrics: settlement.provider.metrics,
+            },
+          }),
+        });
+
+        return reply;
+      }
+
+      const upstreamResponse = await postJson<Record<string, unknown>>(upstreamUrl.toString(), {
+        headers: authConfig.headers,
+        body: upstreamBody,
+      });
+
+      const text = extractOpenAiResponseText(upstreamResponse.data);
+      const normalizedOutput = normalizeOutputPayloadByCapability({
+        capability: "text_generation",
+        outputPayload: {
+          text,
+          raw: upstreamResponse.data,
+        },
+      }) as Record<string, unknown>;
+
+      const settlement = await resolveSettlementAmounts({
+        providerModelId: resolved.providerModelId,
+        publicModelSlug: resolved.publicModelSlug,
+        requestInput: normalizedInput,
+        output: normalizedOutput,
+        providerRaw: upstreamResponse.data,
+      });
+
+      await supabaseAdmin
+        .from("inference_requests")
+        .update({
+          status: "succeeded",
+          output_payload: normalizedOutput,
+          actual_cost: settlement.customer.total,
+          actual_customer_charge: settlement.customer.total,
+          actual_provider_cost: settlement.provider.total,
+          actual_profit: settlement.actualProfit,
+          estimated_cost: settlement.customer.total,
+          estimated_customer_charge: settlement.customer.total,
+          estimated_provider_cost: settlement.provider.total,
+          estimated_profit: settlement.actualProfit,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", resolved.requestId);
+
+      await supabaseAdmin
+        .from("provider_attempts")
+        .update({
+          status: "succeeded",
+          upstream_request_id:
+            typeof upstreamResponse.data.id === "string" ? upstreamResponse.data.id : null,
+          response_payload: normalizedOutput,
+        })
+        .eq("request_id", resolved.requestId)
+        .eq("attempt_no", 1);
+
+      await recordRequestSettlement({
+        requestId: resolved.requestId,
+        workspaceId: resolved.workspaceId,
+        apiKeyId: resolved.apiKeyId,
+        publicModelSlug: resolved.publicModelSlug,
+        endpoint: resolved.endpoint,
+        customerCharge: settlement.customer.total,
+        providerCost: settlement.provider.total,
+        statusCode: 200,
+        breakdown: buildSettlementBreakdown({
+          customerCharge: settlement.customer.total,
+          providerCost: settlement.provider.total,
+          profit: settlement.actualProfit,
+          customerBreakdown: {
+            currency: settlement.customer.currency,
+            components: settlement.customer.components,
+            metrics: settlement.customer.metrics,
+          },
+          providerBreakdown: {
+            currency: settlement.provider.currency,
+            components: settlement.provider.components,
+            metrics: settlement.provider.metrics,
+          },
+        }),
+      });
+
+      return reply.code(200).send(upstreamResponse.data);
+    } catch (error) {
+      if (activeResolved) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown coding gateway error";
+        await supabaseAdmin
+          .from("inference_requests")
+          .update({
+            status: "failed",
+            error_code: "provider_submit_failed",
+            error_message: errorMessage,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", activeResolved.requestId);
+        await supabaseAdmin
+          .from("provider_attempts")
+          .update({
+            status: "failed",
+            error_message: errorMessage,
+          })
+          .eq("request_id", activeResolved.requestId)
+          .eq("attempt_no", 1);
+        try {
+          await recordRequestSettlement({
+            requestId: activeResolved.requestId,
+            workspaceId: activeResolved.workspaceId,
+            apiKeyId: activeResolved.apiKeyId,
+            publicModelSlug: activeResolved.publicModelSlug,
+            endpoint: activeResolved.endpoint,
+            customerCharge: 0,
+            providerCost: 0,
+            statusCode: 500,
+            breakdown: buildSettlementBreakdown({
+              customerCharge: 0,
+              providerCost: 0,
+              profit: 0,
+            }),
+          });
+        } catch {
+          // Ignore settlement write failures on direct coding passthrough errors.
+        }
+      }
+      if (reply.raw.headersSent) {
+        return reply;
+      }
+      if (!(error instanceof RequestValidationError) && activeResolved) {
+        return sendGatewayError(reply, {
+          code: "provider_submit_failed",
+          statusCode: 502,
+        });
+      }
+      return sendRequestError(reply, error);
+    }
+  };
+
+  app.post("/chat/completions", handleCodingChatCompletions);
+  app.post("/v1/code/chat/completions", handleCodingChatCompletions);
 
   app.post("/v1/videos/generations", async (request, reply) => {
     const parsed = videoRequestSchema.parse(request.body);

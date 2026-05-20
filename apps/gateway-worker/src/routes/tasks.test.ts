@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   chatRequestSchema,
+  codingChatRequestSchema,
+  consumeOpenAiChatSseBuffer,
   imageRequestSchema,
   videoRequestSchema,
 } from "./tasks.js";
@@ -130,4 +132,56 @@ test("chat request schema requires prompt or messages", () => {
       }),
     /prompt or messages is required/
   );
+});
+
+test("coding chat request schema preserves extra top-level OpenAI-compatible fields", () => {
+  const parsed = codingChatRequestSchema.parse({
+    model: "openoctopus/deepcode-test",
+    messages: [
+      {
+        role: "user",
+        content: "hello",
+      },
+    ],
+    stream: true,
+    tools: [{ type: "function", function: { name: "bash" } }],
+    extra_body: { reasoning_effort: "max" },
+  }) as Record<string, unknown>;
+
+  assert.equal(parsed.model, "openoctopus/deepcode-test");
+  assert.equal(parsed.stream, true);
+  assert.equal(Array.isArray(parsed.tools), true);
+  assert.deepEqual(parsed.extra_body, { reasoning_effort: "max" });
+});
+
+test("coding chat stream parser aggregates assistant text and usage from SSE chunks", () => {
+  const summary = {
+    upstreamRequestId: null,
+    model: null,
+    text: "",
+    reasoningText: "",
+    usage: null,
+    finishReason: null,
+    lastEvent: null,
+  };
+
+  let buffer = "";
+  buffer = consumeOpenAiChatSseBuffer(
+    buffer +
+      'data: {"id":"abc","model":"deepseek-v4-pro","choices":[{"delta":{"reasoning_content":"Hello "}}]}\n\n' +
+      'data: {"id":"abc","model":"deepseek-v4-pro","choices":[{"delta":{"content":"world"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5}}\n\n' +
+      "data: [DONE]\n\n",
+    summary
+  );
+
+  assert.equal(buffer, "");
+  assert.equal(summary.upstreamRequestId, "abc");
+  assert.equal(summary.model, "deepseek-v4-pro");
+  assert.equal(summary.reasoningText, "Hello ");
+  assert.equal(summary.text, "world");
+  assert.equal(summary.finishReason, "stop");
+  assert.deepEqual(summary.usage, {
+    prompt_tokens: 10,
+    completion_tokens: 5,
+  });
 });

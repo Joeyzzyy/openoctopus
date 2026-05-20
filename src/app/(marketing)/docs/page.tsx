@@ -28,6 +28,7 @@ import {
   loadModelsPageData,
 } from "@/app/(marketing)/models/data";
 import { DocsTocNav } from "./docs-toc-nav";
+import { CopyCodeButton } from "./copy-code-button";
 
 export const metadata = {
   title: "Documentation — OpenOctopus",
@@ -39,6 +40,7 @@ const pageSections = [
   { id: "introduction", label: "Introduction" },
   { id: "authentication", label: "Authentication" },
   { id: "cli", label: "CLI" },
+  { id: "coding-agents", label: "Coding Agents" },
   { id: "rest-api", label: "REST API" },
   { id: "models", label: "Models" },
   { id: "tasks", label: "Tasks" },
@@ -172,9 +174,14 @@ function buildCapabilitySummaries(models: ModelDocRow[]) {
 
 function CodeBlock({ children }: { children: string }) {
   return (
-    <pre className="overflow-x-auto rounded-2xl border border-[#0F172A]/85 bg-[linear-gradient(180deg,#0F172A_0%,#111827_100%)] p-5 text-[12px] leading-6 text-[#E5E7EB] shadow-[0_22px_50px_rgba(15,23,42,0.18)]">
-      <code>{children}</code>
-    </pre>
+    <div className="relative">
+      <div className="absolute right-3 top-3 z-10">
+        <CopyCodeButton value={children} />
+      </div>
+      <pre className="overflow-x-auto rounded-2xl border border-[#0F172A]/85 bg-[linear-gradient(180deg,#0F172A_0%,#111827_100%)] p-5 pr-16 text-[12px] leading-6 text-[#E5E7EB] shadow-[0_22px_50px_rgba(15,23,42,0.18)]">
+        <code>{children}</code>
+      </pre>
+    </div>
   );
 }
 
@@ -550,6 +557,65 @@ Steps:
 3. Use that URL in the next ooct run command
 4. Show me both commands and the returned task ID`}
                 />
+              </div>
+            </div>
+          </DocsSection>
+
+          <DocsSection id="coding-agents">
+            <SectionHeader
+              eyebrow="Ways to Use"
+              title="Coding agents in the terminal"
+              description="To use Deep Code with OpenOctopus, you only need three values: your model slug, the gateway URL, and your OpenOctopus API key."
+            />
+
+            <div className="space-y-5">
+              <div className="rounded-2xl border border-black/[0.08] bg-[#F8FAFC] p-5">
+                <h4 className="text-[16px] font-semibold text-[#111827]">Step 1: Prepare these 3 values</h4>
+                <ul className="mt-3 space-y-2 text-sm leading-7 text-[#475569]">
+                  <li>1. `MODEL`: your coding model slug, for example `openoctopus/your-coding-model`</li>
+                  <li>2. `BASE_URL`: your gateway URL, for example `{PUBLIC_API_BASE_URL}`</li>
+                  <li>3. `API_KEY`: your OpenOctopus API key, for example `ooq_xxx`</li>
+                </ul>
+              </div>
+
+              <div className="rounded-2xl border border-black/[0.08] bg-white p-5">
+                <h4 className="text-[16px] font-semibold text-[#111827]">Step 2: Create the Deep Code config file</h4>
+                <p className="mt-2 text-sm leading-7 text-[#475569]">
+                  Copy this block into your terminal, then replace the three placeholder values with your own values.
+                </p>
+                <div className="mt-4">
+                  <CodeBlock>{`mkdir -p ~/.deepcode
+
+cat > ~/.deepcode/settings.json <<'EOF'
+{
+  "env": {
+    "MODEL": "openoctopus/your-coding-model",
+    "BASE_URL": "${PUBLIC_API_BASE_URL}",
+    "API_KEY": "ooq_your_openoctopus_key"
+  },
+  "thinkingEnabled": true,
+  "reasoningEffort": "max"
+}
+EOF`}</CodeBlock>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-black/[0.08] bg-white p-5">
+                <h4 className="text-[16px] font-semibold text-[#111827]">Step 3: Open any project and start Deep Code</h4>
+                <p className="mt-2 text-sm leading-7 text-[#475569]">
+                  Once the file is saved, open any project folder and run `deepcode`.
+                </p>
+                <div className="mt-4">
+                  <CodeBlock>{`cd /path/to/your/project
+deepcode`}</CodeBlock>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-black/[0.08] bg-[#F8FAFC] p-5">
+                <h4 className="text-[16px] font-semibold text-[#111827]">Step 4: Send the first message</h4>
+                <p className="mt-2 text-sm leading-7 text-[#475569]">
+                  After Deep Code opens, type a normal request such as `review this repo` or `help me fix this error` and press Enter.
+                </p>
               </div>
             </div>
           </DocsSection>

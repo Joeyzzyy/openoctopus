@@ -130,6 +130,61 @@ export function postJson<TResponse>(
   });
 }
 
+export function postStream(
+  url: string,
+  options: {
+    headers?: Record<string, string>;
+    body: Record<string, unknown>;
+  }
+): Promise<{
+  status: number;
+  headers: IncomingHttpHeaders;
+  stream: IncomingMessage;
+}> {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const payload = JSON.stringify(options.body);
+    const transport = target.protocol === "https:" ? https : http;
+
+    const req = transport.request(
+      {
+        protocol: target.protocol,
+        hostname: target.hostname,
+        port: target.port || undefined,
+        path: `${target.pathname}${target.search}`,
+        method: "POST",
+        family: 4,
+        timeout: REQUEST_TIMEOUT_MS,
+        agent: proxyAgent ?? undefined,
+        headers: {
+          accept: "*/*",
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(payload).toString(),
+          ...(options.headers ?? {}),
+        },
+      },
+      (res) => {
+        resolve({
+          status: res.statusCode ?? 500,
+          headers: res.headers,
+          stream: res,
+        });
+      }
+    );
+
+    req.on("timeout", () => {
+      req.destroy(new Error(`Upstream POST timed out after ${REQUEST_TIMEOUT_MS}ms`));
+    });
+
+    req.on("error", (error) => {
+      reject(error);
+    });
+
+    req.write(payload);
+    req.end();
+  });
+}
+
 export function getJson<TResponse>(
   url: string,
   options?: {

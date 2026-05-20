@@ -21,6 +21,8 @@ type ProviderCredentialRow = {
 export type UnifiedRequestInput = {
   apiKey: string;
   endpoint:
+    | "/chat/completions"
+    | "/v1/code/chat/completions"
     | "/v1/images/generations"
     | "/v1/images/edits"
     | "/v1/images/recognitions"
@@ -33,6 +35,53 @@ export type UnifiedRequestInput = {
   messages?: Array<Record<string, unknown>>;
   input: Record<string, unknown>;
 };
+
+export type ResolvedRequestRuntime = {
+  requestId: string;
+  workspaceId: string;
+  userId: string;
+  apiKeyId: string;
+  capability: UnifiedRequestInput["capability"];
+  providerId: string;
+  providerModelId: string;
+  credentialId: string;
+  providerSlug: string;
+  providerBaseUrl: string | null;
+  providerConfig: Record<string, unknown>;
+  upstreamModelSlug: string;
+  endpoint: UnifiedRequestInput["endpoint"];
+  publicModelSlug: string;
+  requestSource: "api" | "playground";
+  prompt?: string;
+  messages?: Array<Record<string, unknown>>;
+  input: Record<string, unknown>;
+};
+
+export async function resolveProviderSecret(credentialId: string) {
+  const { data: credentialRow, error: credentialError } = await supabaseAdmin
+    .from("provider_credentials")
+    .select("secret_ciphertext, secret_iv, secret_auth_tag")
+    .eq("id", credentialId)
+    .maybeSingle();
+
+  if (credentialError) {
+    throw new RequestValidationError(
+      "Failed to read provider credentials",
+      503,
+      "database_operation_failed"
+    );
+  }
+
+  if (!credentialRow?.secret_ciphertext || !credentialRow.secret_iv || !credentialRow.secret_auth_tag) {
+    throw new RequestValidationError(
+      "Provider credential secret is missing or not managed internally",
+      409,
+      "provider_credential_unavailable"
+    );
+  }
+
+  return credentialRow;
+}
 
 export class RequestValidationError extends Error {
   constructor(
@@ -137,7 +186,7 @@ async function resolveProviderAdapterSlug(slug: string) {
   return data?.adapter_slug ?? slug;
 }
 
-export async function createQueuedRequest(input: UnifiedRequestInput) {
+export async function resolveRequestRuntime(input: UnifiedRequestInput): Promise<ResolvedRequestRuntime> {
   const apiKeyRow = await authenticateApiKey(input.apiKey);
 
   const { data: walletRows, error: walletError } = await supabaseAdmin
@@ -351,50 +400,13 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
 
   const requestId = crypto.randomUUID();
 
-  const { error: insertError } = await supabaseAdmin.from("inference_requests").insert({
-    id: requestId,
-    workspace_id: apiKeyRow.workspace_id,
-    user_id: apiKeyRow.created_by,
-    api_key_id: apiKeyRow.id,
-    capability: input.capability,
-    public_model_slug: input.model,
-    provider_id: providerModelRow.provider_id,
-    endpoint: input.endpoint,
-    provider_model_id: routeRow.primary_provider_model_id,
-    input_payload: input.input,
-    normalized_params: {
-      prompt: input.prompt ?? null,
-      messages: input.messages ?? null,
-    },
-    request_source: input.requestSource ?? "api",
-    status: "queued",
-  });
-
-  if (insertError) {
-    throw new RequestValidationError(
-      "Failed to record queued request",
-      503,
-      "request_record_write_failed"
-    );
-  }
-
-  const { error: lastUsedError } = await supabaseAdmin
-    .from("api_keys")
-    .update({ last_used_at: new Date().toISOString() })
-    .eq("id", apiKeyRow.id);
-
-  if (lastUsedError) {
-    throw new RequestValidationError(
-      "Failed to update API key last_used_at",
-      503,
-      "api_key_touch_failed"
-    );
-  }
-
   return {
     requestId,
     workspaceId: apiKeyRow.workspace_id,
+    userId: apiKeyRow.created_by,
     apiKeyId: apiKeyRow.id,
+    capability: input.capability,
+    providerId: providerModelRow.provider_id,
     providerModelId: routeRow.primary_provider_model_id,
     credentialId: credential.id,
     providerSlug,
@@ -411,5 +423,86 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     upstreamModelSlug: providerModelRow.upstream_model_slug,
     endpoint: input.endpoint,
     publicModelSlug: input.model,
+    requestSource: input.requestSource ?? "api",
+    prompt: input.prompt,
+    messages: input.messages,
+    input: input.input,
+  };
+}
+
+export async function touchApiKeyLastUsed(apiKeyId: string) {
+  const { error } = await supabaseAdmin
+    .from("api_keys")
+    .update({ last_used_at: new Date().toISOString() })
+    .eq("id", apiKeyId);
+
+  if (error) {
+    throw new RequestValidationError(
+      "Failed to update API key last_used_at",
+      503,
+      "api_key_touch_failed"
+    );
+  }
+}
+
+export async function recordInferenceRequest(
+  input: ResolvedRequestRuntime & {
+    status: "queued" | "processing" | "succeeded" | "failed";
+    startedAt?: string | null;
+    completedAt?: string | null;
+  }
+) {
+  const { error: insertError } = await supabaseAdmin.from("inference_requests").insert({
+    id: input.requestId,
+    workspace_id: input.workspaceId,
+    user_id: input.userId,
+    api_key_id: input.apiKeyId,
+    capability: input.capability,
+    public_model_slug: input.publicModelSlug,
+    provider_id: input.providerId,
+    endpoint: input.endpoint,
+    provider_model_id: input.providerModelId,
+    input_payload: input.input,
+    normalized_params: {
+      prompt: input.prompt ?? null,
+      messages: input.messages ?? null,
+    },
+    request_source: input.requestSource,
+    status: input.status,
+    ...(input.startedAt ? { started_at: input.startedAt } : {}),
+    ...(input.completedAt ? { completed_at: input.completedAt } : {}),
+  });
+
+  if (insertError) {
+    throw new RequestValidationError(
+      "Failed to record request",
+      503,
+      "request_record_write_failed"
+    );
+  }
+}
+
+export async function createQueuedRequest(input: UnifiedRequestInput) {
+  const resolved = await resolveRequestRuntime(input);
+
+  await recordInferenceRequest({
+    ...resolved,
+    status: "queued",
+  });
+
+  await touchApiKeyLastUsed(resolved.apiKeyId);
+
+  return {
+    requestId: resolved.requestId,
+    workspaceId: resolved.workspaceId,
+    apiKeyId: resolved.apiKeyId,
+    providerModelId: resolved.providerModelId,
+    credentialId: resolved.credentialId,
+    providerSlug: resolved.providerSlug,
+    providerBaseUrl: resolved.providerBaseUrl,
+    providerConfig: resolved.providerConfig,
+    upstreamModelSlug: resolved.upstreamModelSlug,
+    endpoint: resolved.endpoint,
+    publicModelSlug: resolved.publicModelSlug,
   };
 }
