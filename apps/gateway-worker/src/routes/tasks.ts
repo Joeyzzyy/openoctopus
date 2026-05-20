@@ -166,6 +166,34 @@ const chatMessageSchema = z.object({
   name: z.string().optional(),
 });
 
+function normalizeOpenAiCompatibleMessages(messages: unknown) {
+  if (!Array.isArray(messages)) {
+    return messages;
+  }
+
+  return messages.map((message) => {
+    if (!message || typeof message !== "object" || Array.isArray(message)) {
+      return message;
+    }
+
+    const record = { ...(message as Record<string, unknown>) };
+
+    if (record.tool_call_id === undefined && typeof record.toolCallId === "string") {
+      record.tool_call_id = record.toolCallId;
+    }
+
+    if (record.tool_calls === undefined && Array.isArray(record.toolCalls)) {
+      record.tool_calls = record.toolCalls;
+    }
+
+    if (record.function_call === undefined && record.functionCall && typeof record.functionCall === "object") {
+      record.function_call = record.functionCall;
+    }
+
+    return record;
+  });
+}
+
 const INTEGER_INPUT_PARAM_KEYS = new Set([
   "max_tokens",
   "max_output_tokens",
@@ -819,6 +847,20 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         ...rawBody,
         model: resolved.upstreamModelSlug,
       };
+      if (Array.isArray(upstreamBody.messages)) {
+        upstreamBody.messages = normalizeOpenAiCompatibleMessages(upstreamBody.messages);
+      }
+      if (
+        upstreamBody.input &&
+        typeof upstreamBody.input === "object" &&
+        !Array.isArray(upstreamBody.input)
+      ) {
+        const inputRecord = { ...(upstreamBody.input as Record<string, unknown>) };
+        if (Array.isArray(inputRecord.messages)) {
+          inputRecord.messages = normalizeOpenAiCompatibleMessages(inputRecord.messages);
+        }
+        upstreamBody.input = inputRecord;
+      }
 
       const startedAt = new Date().toISOString();
       await recordInferenceRequest({
