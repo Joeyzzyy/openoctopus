@@ -477,6 +477,86 @@ const fallbackGatewayErrorDefinitions: Record<
     message: "The requested task could not be found.",
     retryable: false,
   },
+  file_not_found: {
+    code: "file_not_found",
+    message: "The requested generated file is not available.",
+    retryable: false,
+  },
+  provider_offline: {
+    code: "provider_offline",
+    message: "The selected model is temporarily unavailable. Please retry later.",
+    retryable: true,
+  },
+  provider_model_inactive: {
+    code: "provider_model_inactive",
+    message: "The selected model is temporarily unavailable. Please retry later.",
+    retryable: true,
+  },
+  provider_credential_missing: {
+    code: "provider_credential_missing",
+    message: "The service is temporarily unavailable for this model. Please retry later.",
+    retryable: true,
+  },
+  provider_credential_incomplete: {
+    code: "provider_credential_incomplete",
+    message: "The service is temporarily unavailable for this model. Please retry later.",
+    retryable: true,
+  },
+  provider_credential_unusable: {
+    code: "provider_credential_unusable",
+    message: "The service is temporarily unavailable for this model. Please retry later.",
+    retryable: true,
+  },
+  provider_credential_legacy: {
+    code: "provider_credential_legacy",
+    message: "The service is temporarily unavailable for this model. Please retry later.",
+    retryable: true,
+  },
+  provider_credential_unavailable: {
+    code: "provider_credential_unavailable",
+    message: "The service is temporarily unavailable for this model. Please retry later.",
+    retryable: true,
+  },
+  provider_credential_decrypt_failed: {
+    code: "provider_credential_decrypt_failed",
+    message: "The service is temporarily unavailable for this model. Please retry later.",
+    retryable: true,
+  },
+  model_billing_not_configured: {
+    code: "model_billing_not_configured",
+    message: "The selected model is temporarily unavailable. Please retry later.",
+    retryable: false,
+  },
+  provider_pricing_not_configured: {
+    code: "provider_pricing_not_configured",
+    message: "The selected model is temporarily unavailable. Please retry later.",
+    retryable: false,
+  },
+  database_operation_failed: {
+    code: "database_operation_failed",
+    message: "The service could not access required internal records. Please retry later.",
+    retryable: true,
+  },
+  billing_resolution_failed: {
+    code: "billing_resolution_failed",
+    message: "The selected model pricing could not be evaluated. Please retry later.",
+    retryable: true,
+  },
+  request_record_write_failed: {
+    code: "request_record_write_failed",
+    message: "The request could not be recorded internally. Please retry later.",
+    retryable: true,
+  },
+  api_key_touch_failed: {
+    code: "api_key_touch_failed",
+    message: "The request was accepted but internal key tracking failed. Please retry later.",
+    retryable: true,
+  },
+  queue_unavailable: {
+    code: "queue_unavailable",
+    message: "The internal job queue is temporarily unavailable. Please retry later.",
+    retryable: true,
+  },
   provider_submit_failed: {
     code: "provider_submit_failed",
     message: "The generation provider could not accept the request. Please retry shortly.",
@@ -504,6 +584,11 @@ const fallbackGatewayErrorDefinitions: Record<
   },
   upstream_result_missing: {
     code: "upstream_result_missing",
+    message: "The generation provider returned an incomplete result. Please retry shortly.",
+    retryable: true,
+  },
+  video_output_missing: {
+    code: "video_output_missing",
     message: "The generation provider returned an incomplete result. Please retry shortly.",
     retryable: true,
   },

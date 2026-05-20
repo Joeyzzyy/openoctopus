@@ -70,8 +70,8 @@ const tabs = [
   {
     key: "image-response-contracts",
     group: "static",
-    label: "图片返回结构约定",
-    description: "维护 Playground 与 API 两套图片返回结构约定。",
+    label: "返回结构约定",
+    description: "维护 Playground、API、CLI 在图片、视频、text、coding 下的真实返回约定。",
   },
   {
     key: "gateway-error-definitions",
