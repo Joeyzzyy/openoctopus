@@ -76,6 +76,7 @@ type BillingFormState = {
 
 type ExecutionConfigFormState = {
   mode: string;
+  messageFormat: string;
   authType: string;
   authHeaderName: string;
   authHeaderPrefix: string;
@@ -116,6 +117,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
   if (slug === "sync-json-v1") {
     return {
       mode: "sync",
+      messageFormat: "",
       submitPath: "/v1beta/models/{upstreamModel}:generateContent",
       pollPath: "",
       resultPath: "",
@@ -138,6 +140,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
   if (slug === "upload-async-poll-v1") {
     return {
       mode: "async",
+      messageFormat: "",
       submitPath: "/v1/models/{upstreamModel}:generate",
       pollPath: "/v1/operations/{taskId}",
       resultPath: "",
@@ -150,6 +153,7 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
   }
   return {
     mode: "async",
+    messageFormat: "",
     submitPath: "/v1/models/{upstreamModel}:generate",
     pollPath: "/v1/operations/{taskId}",
     resultPath: "",
@@ -432,6 +436,89 @@ function parseOptionalInteger(value: string) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+function inferSchemaFieldTypeFromJsonValue(value: unknown): SchemaFieldState["type"] {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (/^https?:\/\//i.test(trimmed)) return "url";
+    if (/^data:[^;]+;base64,/i.test(trimmed)) return "base64";
+    return "string";
+  }
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? "integer" : "number";
+  }
+  if (typeof value === "boolean") return "boolean";
+  if (Array.isArray(value)) return "array";
+  if (value && typeof value === "object") return "object";
+  return "string";
+}
+
+function buildSchemaFieldsFromJsonValue(
+  value: unknown,
+  keyName: "params" | "fields",
+  parentPath = ""
+): SchemaFieldState[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return [];
+  }
+
+  const rows: SchemaFieldState[] = [];
+  for (const [rawKey, childValue] of Object.entries(value as Record<string, unknown>)) {
+    const key = rawKey.trim();
+    if (!key) continue;
+    const fieldName = parentPath ? `${parentPath}.${key}` : key;
+
+    if (Array.isArray(childValue)) {
+      const firstItem = childValue.find((item) => item !== null && item !== undefined);
+      rows.push({
+        id: randomFieldId(),
+        name: fieldName,
+        type: "array",
+        required: false,
+        description: "",
+        example: JSON.stringify(childValue),
+        exposedToCustomer: true,
+        enumValues: keyName === "params" ? defaultEnumValuesForKnownInputField(fieldName) : [],
+        minimum: keyName === "params" && isDurationFieldName(fieldName) ? "1" : "",
+        maximum: keyName === "params" && isDurationFieldName(fieldName) ? "60" : "",
+        step: keyName === "params" && isDurationFieldName(fieldName) ? "1" : "",
+        maxItems: childValue.length > 0 ? String(childValue.length) : "",
+      });
+
+      if (firstItem && typeof firstItem === "object" && !Array.isArray(firstItem)) {
+        rows.push(...buildSchemaFieldsFromJsonValue(firstItem, keyName, `${fieldName}[]`));
+      }
+      continue;
+    }
+
+    if (childValue && typeof childValue === "object" && !Array.isArray(childValue)) {
+      rows.push(...buildSchemaFieldsFromJsonValue(childValue, keyName, fieldName));
+      continue;
+    }
+
+    rows.push({
+      id: randomFieldId(),
+      name: fieldName,
+      type: inferSchemaFieldTypeFromJsonValue(childValue),
+      required: false,
+      description: "",
+      example:
+        childValue === undefined || childValue === null
+          ? ""
+          : typeof childValue === "string"
+            ? childValue
+            : JSON.stringify(childValue),
+      exposedToCustomer: true,
+      enumValues: keyName === "params" ? defaultEnumValuesForKnownInputField(fieldName) : [],
+      minimum: keyName === "params" && isDurationFieldName(fieldName) ? "1" : "",
+      maximum: keyName === "params" && isDurationFieldName(fieldName) ? "60" : "",
+      step: keyName === "params" && isDurationFieldName(fieldName) ? "1" : "",
+      maxItems: "",
+    });
+  }
+
+  return rows;
+}
+
 function isReferenceAssetFieldName(value: string) {
   const normalized = value.trim().toLowerCase();
   return [
@@ -519,6 +606,8 @@ function SchemaFieldEditor({
   );
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [jsonImportOpen, setJsonImportOpen] = useState(false);
+  const [jsonImportText, setJsonImportText] = useState("");
   const [draft, setDraft] = useState<SchemaFieldState>({
     id: "",
     name: "",
@@ -644,6 +733,42 @@ function SchemaFieldEditor({
     setRows((current) => current.filter((row) => row.id !== id));
   };
 
+  const importRowsFromJson = () => {
+    const text = jsonImportText.trim();
+    if (!text) {
+      toast.error("请先粘贴 JSON");
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      const importedRows =
+        parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray((parsed as Record<string, unknown>)[keyName])
+          ? parseSchemaFieldsFromText(text, keyName)
+          : buildSchemaFieldsFromJsonValue(parsed, keyName);
+
+      if (importedRows.length === 0) {
+        toast.error("没有从 JSON 中识别到可导入的字段");
+        return;
+      }
+
+      setRows((current) => {
+        const byName = new Map(current.map((row) => [row.name, row]));
+        for (const row of importedRows) {
+          const previous = byName.get(row.name);
+          byName.set(row.name, previous ? { ...previous, ...row, id: previous.id } : row);
+        }
+        return Array.from(byName.values());
+      });
+
+      setJsonImportOpen(false);
+      setJsonImportText("");
+      toast.success(`已根据 JSON 自动添加 ${importedRows.length} 个字段`);
+    } catch {
+      toast.error("JSON 解析失败，请检查格式");
+    }
+  };
+
   const normalizedRows = rows
     .map((row) => ({
       name: row.name.trim(),
@@ -688,14 +813,24 @@ function SchemaFieldEditor({
       <input type="hidden" name={name} value={schemaValue} />
 
       <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={openCreateEditor}
-          disabled={disabled}
-          className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-[#E0F2FE] disabled:opacity-50"
-        >
-          添加字段
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={openCreateEditor}
+            disabled={disabled}
+            className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-[#E0F2FE] disabled:opacity-50"
+          >
+            添加字段
+          </button>
+          <button
+            type="button"
+            onClick={() => setJsonImportOpen(true)}
+            disabled={disabled}
+            className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-[#E0F2FE] disabled:opacity-50"
+          >
+            根据 JSON 自动添加
+          </button>
+        </div>
         <span className="text-[11px] text-black/45">{rows.length} 个字段</span>
       </div>
 
@@ -1229,6 +1364,63 @@ function SchemaFieldEditor({
                 className="h-8 rounded-md border border-black bg-black px-3 text-xs text-white hover:bg-black/90"
               >
                 保存字段
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {jsonImportOpen ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-2xl rounded-xl border border-[#BAE6FD] bg-white p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-black">根据 JSON 自动添加字段</h4>
+              <button
+                type="button"
+                onClick={() => {
+                  setJsonImportOpen(false);
+                  setJsonImportText("");
+                }}
+                className="h-7 rounded border border-black/[0.1] px-2 text-[11px] text-black/60 hover:bg-[#E0F2FE]"
+              >
+                关闭
+              </button>
+            </div>
+            <p className="text-xs leading-5 text-black/55">
+              粘贴请求或响应 JSON 示例后，系统会自动识别字段，并将嵌套对象展开成
+              <code className="mx-1 rounded bg-[#F3F4F6] px-1 py-0.5 text-[11px]">a.b.c</code>
+              形式的字段名。数组对象会额外识别成
+              <code className="mx-1 rounded bg-[#F3F4F6] px-1 py-0.5 text-[11px]">messages[].role</code>
+              这种结构。已存在的同名字段会被更新。
+            </p>
+            <textarea
+              value={jsonImportText}
+              onChange={(event) => setJsonImportText(event.target.value)}
+              className={`${formTextAreaClassName} mt-3 font-mono text-xs`}
+              rows={12}
+              placeholder={
+                keyName === "params"
+                  ? '{\n  "messages": [\n    { "role": "user", "content": "Hello" }\n  ],\n  "max_tokens": 512,\n  "temperature": 0.7\n}'
+                  : '{\n  "text": "Hello back",\n  "usage": {\n    "input_tokens": 12,\n    "output_tokens": 28\n  }\n}'
+              }
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setJsonImportOpen(false);
+                  setJsonImportText("");
+                }}
+                className="h-8 rounded-md border border-black/[0.1] bg-white px-3 text-xs text-black/72 hover:bg-[#E0F2FE]"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={importRowsFromJson}
+                className="h-8 rounded-md border border-black bg-black px-3 text-xs text-white hover:bg-black/90"
+              >
+                自动生成字段
               </button>
             </div>
           </div>
@@ -1836,6 +2028,7 @@ function buildBillingConfigValue(state: BillingFormState) {
 function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormState {
   const fallback: ExecutionConfigFormState = {
     mode: "auto",
+    messageFormat: "",
     authType: "bearer",
     authHeaderName: "Authorization",
     authHeaderPrefix: "Bearer",
@@ -1868,6 +2061,10 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
         typeof parsed.mode === "string" && parsed.mode.trim().length > 0
           ? parsed.mode
           : fallback.mode,
+      messageFormat:
+        typeof parsed.messageFormat === "string"
+          ? parsed.messageFormat
+          : fallback.messageFormat,
       authType:
         typeof parsed.authType === "string" && parsed.authType.trim().length > 0
           ? parsed.authType
@@ -1966,8 +2163,15 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
     resultValueType: state.resultValueType.trim(),
     resultMimeType: state.resultMimeType.trim(),
     submitPath: state.submitPath.trim(),
-    taskIdPath: state.taskIdPath.trim(),
   };
+  const messageFormat = state.messageFormat.trim();
+  if (messageFormat) {
+    result.messageFormat = messageFormat;
+  }
+  const taskIdPath = state.taskIdPath.trim();
+  if (taskIdPath) {
+    result.taskIdPath = taskIdPath;
+  }
   result.resultUrlPath = state.resultUrlPath.trim();
   const resultTextPath = (state.resultTextPath ?? "").trim();
   if (resultTextPath) {
@@ -2999,7 +3203,7 @@ export function CreateProviderModelForm({
           nextRootTab ??= "manage";
           nextActiveTab ??= "basic";
         }
-        if (!executionConfigState.taskIdPath.trim()) {
+        if (isAsyncMode && !executionConfigState.taskIdPath.trim()) {
           missing.push("taskIdPath");
           nextRootTab ??= "manage";
           nextActiveTab ??= "basic";
@@ -3580,7 +3784,7 @@ export function CreateProviderModelForm({
                       taskIdPath: event.target.value,
                     }))
                   }
-                  required
+                  required={isAsyncMode}
                   disabled={disabled}
                   className={formInputClassName}
                   placeholder="name"
@@ -3656,22 +3860,41 @@ export function CreateProviderModelForm({
                 />
               </label>
               {isTextOutputModel ? (
-                <label className="block md:col-span-2">
-                  <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">文本结果字段路径（JSON path）resultTextPath</span>
-                  <input
-                    value={executionConfigState.resultTextPath}
-                    onChange={(event) =>
-                      setExecutionConfigState((current) => ({
-                        ...current,
-                        resultTextPath: event.target.value,
-                      }))
-                    }
-                    required
-                    disabled={disabled}
-                    className={formInputClassName}
-                    placeholder="例如 data.outputs.0 / data.caption / data.text"
-                  />
-                </label>
+                <>
+                  <label className="block">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">文本结果字段路径（JSON path）resultTextPath</span>
+                    <input
+                      value={executionConfigState.resultTextPath}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          resultTextPath: event.target.value,
+                        }))
+                      }
+                      required
+                      disabled={disabled}
+                      className={formInputClassName}
+                      placeholder="例如 data.outputs.0 / data.caption / data.text"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">消息格式 messageFormat（可选）</span>
+                    <select
+                      value={executionConfigState.messageFormat}
+                      onChange={(event) =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          messageFormat: event.target.value,
+                        }))
+                      }
+                      disabled={disabled}
+                      className={formSelectClassName}
+                    >
+                      <option value="">默认 / 原样透传</option>
+                      <option value="gemini-generate-content">Gemini generateContent</option>
+                    </select>
+                  </label>
+                </>
               ) : null}
               {isTextOutputModel ? null : (
                 <>

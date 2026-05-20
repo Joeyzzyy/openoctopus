@@ -301,3 +301,139 @@ test("submit omits optional exact mustache placeholders when values are missing"
     }
   );
 });
+
+test("submit compiles OpenAI-style chat messages into Gemini generateContent payload", async () => {
+  const adapter = new RestAsyncPollAdapter();
+
+  await withJsonServer(
+    (_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: "Gemini says hi" }],
+              },
+            },
+          ],
+        })
+      );
+    },
+    async (baseUrl, captured) => {
+      const result = await adapter.submit({
+        requestId: "00000000-0000-4000-8000-000000000005",
+        capability: "text_generation",
+        publicModelSlug: "openoctopus/google/gemini-2.5-flash",
+        upstreamModelSlug: "gemini-2.5-flash",
+        input: {
+          messages: [
+            { role: "system", content: "You are concise." },
+            { role: "user", content: "Hello" },
+            { role: "assistant", content: "Hi there" },
+            { role: "user", content: "How does AI work?" },
+          ],
+          temperature: "0.8",
+          max_tokens: "512",
+        },
+        provider: {
+          slug: "rest-async-poll-v1",
+          baseUrl,
+          secret: "gemini-key",
+          config: {
+            executionConfig: {
+              mode: "sync",
+              authType: "header",
+              authHeaderName: "x-goog-api-key",
+              authHeaderPrefix: "",
+              submitPath: "/v1beta/models/{upstreamModel}:generateContent",
+              resultTextPath: "candidates.0.content.parts.0.text",
+              messageFormat: "gemini-generate-content",
+            },
+          },
+        },
+      });
+
+      assert.equal(result.mode, "sync");
+      assert.deepEqual(captured[0]?.body, {
+        model: "gemini-2.5-flash",
+        system_instruction: {
+          parts: [{ text: "You are concise." }],
+        },
+        contents: [
+          { role: "user", parts: [{ text: "Hello" }] },
+          { role: "model", parts: [{ text: "Hi there" }] },
+          { role: "user", parts: [{ text: "How does AI work?" }] },
+        ],
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 512,
+        },
+      });
+      assert.equal(captured[0]?.headers["x-goog-api-key"], "gemini-key");
+    }
+  );
+});
+
+test("submit exposes Gemini compiled contents and system_instruction to submitBodyTemplate", async () => {
+  const adapter = new RestAsyncPollAdapter();
+
+  await withJsonServer(
+    (_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: "Templated Gemini reply" }],
+              },
+            },
+          ],
+        })
+      );
+    },
+    async (baseUrl, captured) => {
+      const result = await adapter.submit({
+        requestId: "00000000-0000-4000-8000-000000000006",
+        capability: "text_generation",
+        publicModelSlug: "openoctopus/google/gemini-2.5-pro",
+        upstreamModelSlug: "gemini-2.5-pro",
+        input: {
+          messages: [
+            { role: "system", content: "Act like a tutor." },
+            { role: "user", content: "Explain transformers." },
+          ],
+        },
+        provider: {
+          slug: "rest-async-poll-v1",
+          baseUrl,
+          secret: "gemini-key",
+          config: {
+            executionConfig: {
+              mode: "sync",
+              authType: "header",
+              authHeaderName: "x-goog-api-key",
+              authHeaderPrefix: "",
+              submitPath: "/v1beta/models/{upstreamModel}:generateContent",
+              resultTextPath: "candidates.0.content.parts.0.text",
+              messageFormat: "gemini-generate-content",
+              submitBodyTemplate: {
+                contents: "{{contents}}",
+                system_instruction: "{{system_instruction}}",
+              },
+            },
+          },
+        },
+      });
+
+      assert.equal(result.mode, "sync");
+      assert.deepEqual(captured[0]?.body, {
+        contents: [{ role: "user", parts: [{ text: "Explain transformers." }] }],
+        system_instruction: {
+          parts: [{ text: "Act like a tutor." }],
+        },
+      });
+    }
+  );
+});

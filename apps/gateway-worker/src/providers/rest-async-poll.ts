@@ -125,6 +125,84 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+type ChatMessage = {
+  role: string;
+  content: string;
+};
+
+function normalizeChatMessages(input: SubmitRequestInput) {
+  const rawMessages = input.input.messages;
+  const messages: ChatMessage[] = [];
+
+  if (Array.isArray(rawMessages)) {
+    for (const item of rawMessages) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+      const record = item as Record<string, unknown>;
+      const role = typeof record.role === "string" ? record.role.trim() : "";
+      const contentValue = record.content;
+      const content =
+        typeof contentValue === "string"
+          ? contentValue.trim()
+          : Array.isArray(contentValue)
+            ? contentValue
+                .map((part) => (typeof part === "string" ? part.trim() : ""))
+                .filter(Boolean)
+                .join("\n\n")
+            : "";
+      if (!role || !content) continue;
+      messages.push({ role, content });
+    }
+  }
+
+  if (messages.length === 0 && isNonEmptyString(input.prompt)) {
+    messages.push({ role: "user", content: input.prompt.trim() });
+  }
+
+  return messages;
+}
+
+function buildGeminiGenerateContentPayload(input: SubmitRequestInput) {
+  const messages = normalizeChatMessages(input);
+  const systemInstructionParts = messages
+    .filter((message) => message.role === "system")
+    .map((message) => ({ text: message.content }));
+  const contents = messages
+    .filter((message) => message.role !== "system")
+    .map((message) => ({
+      role: message.role === "assistant" ? "model" : "user",
+      parts: [{ text: message.content }],
+    }));
+
+  const generationConfig: Record<string, unknown> = {};
+  const temperature = sanitizeRenderedTemplateValue(
+    "temperature",
+    input.input.temperature
+  );
+  const maxOutputTokens = sanitizeRenderedTemplateValue(
+    "max_output_tokens",
+    input.input.max_output_tokens ?? input.input.max_tokens
+  );
+
+  if (temperature !== undefined) {
+    generationConfig.temperature = temperature;
+  }
+  if (maxOutputTokens !== undefined) {
+    generationConfig.maxOutputTokens = maxOutputTokens;
+  }
+
+  return sanitizeRenderedTemplateRecord({
+    ...(systemInstructionParts.length > 0
+      ? {
+          system_instruction: {
+            parts: systemInstructionParts,
+          },
+        }
+      : {}),
+    contents,
+    ...(Object.keys(generationConfig).length > 0 ? { generationConfig } : {}),
+  });
+}
+
 function renderTemplateValue(value: unknown, variables: Record<string, unknown>): unknown {
   if (typeof value === "string") {
     const exactMatch = getExactMustacheValue(value, variables);
@@ -313,6 +391,7 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
   async submit(input: SubmitRequestInput): Promise<SubmitRequestResult> {
     const cfg = (input.provider.config?.executionConfig ?? {}) as Record<string, unknown>;
     const mode = readString(cfg.mode, "auto");
+    const messageFormat = readString(cfg.messageFormat, "");
     const submitPath = readString(cfg.submitPath, "/v1/tasks");
     const statusPath = typeof cfg.statusPath === "string" ? cfg.statusPath : undefined;
     const resolvedStatusPath = statusPath ?? "status";
@@ -327,18 +406,30 @@ export class RestAsyncPollAdapter implements ProviderAdapter {
     auth.applyQuery(submitUrl);
 
     const submitBodyTemplate = parseTemplateConfig(cfg.submitBodyTemplate);
+    const geminiPayload =
+      input.capability === "text_generation" && messageFormat === "gemini-generate-content"
+        ? buildGeminiGenerateContentPayload(input)
+        : null;
     const templateVariables: Record<string, unknown> = {
       prompt: input.prompt ?? "",
       upstreamModel: input.upstreamModelSlug,
       publicModel: input.publicModelSlug,
       capability: input.capability,
       requestId: input.requestId,
+      messages: normalizeChatMessages(input),
+      contents: geminiPayload?.contents,
+      system_instruction: geminiPayload?.system_instruction,
       ...input.input,
     };
     const body = submitBodyTemplate
       ? sanitizeRenderedTemplateRecord(
           renderTemplateValue(submitBodyTemplate, templateVariables) as Record<string, unknown>
         )
+      : geminiPayload
+        ? {
+            model: input.upstreamModelSlug,
+            ...geminiPayload,
+          }
       : sanitizeRenderedTemplateRecord({
           model: input.upstreamModelSlug,
           prompt: input.prompt,
