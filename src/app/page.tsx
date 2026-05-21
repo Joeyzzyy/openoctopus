@@ -1095,10 +1095,10 @@ function StartModeCard({
         </div>
         <Link
           href={href}
-          className="group inline-flex h-8 w-fit shrink-0 items-center justify-center gap-1 self-start whitespace-nowrap rounded-lg bg-[#111827] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0B1220] md:h-10 md:px-4 md:text-sm"
+          className="group inline-flex h-8 w-fit shrink-0 items-center justify-center gap-1 self-start whitespace-nowrap rounded-lg bg-[#BAE6FD] px-3 text-xs font-semibold text-[#111827] transition-colors hover:bg-[#7DD3FC] md:h-10 md:px-4 md:text-sm"
         >
           {cta}
-          <ChevronRight className="size-4 text-white/70 transition-transform group-hover:translate-x-0.5" />
+          <ChevronRight className="size-4 text-[#111827]/70 transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
     </div>
@@ -1143,7 +1143,6 @@ function PlaygroundModePreview({ copy }: { copy: ReturnType<typeof getI18n>["hom
               </div>
             ))}
           </div>
-          <div className="hidden h-9 rounded-lg bg-[#111827] md:block" />
         </div>
       </div>
     </div>
@@ -1152,24 +1151,24 @@ function PlaygroundModePreview({ copy }: { copy: ReturnType<typeof getI18n>["hom
 
 function ApiModePreview({ copy }: { copy: ReturnType<typeof getI18n>["home"] }) {
   return (
-    <div className="w-full max-w-md overflow-hidden rounded-xl border border-black/[0.08] bg-[#0B0D10] shadow-[0_18px_45px_rgba(17,24,39,0.16)]">
-      <div className="flex items-center justify-between border-b border-white/10 bg-[#111827] px-4 py-3">
-        <div className="flex gap-2 text-xs font-medium text-white/72">
-          <span className="rounded-md bg-white/10 px-2 py-1 text-white">OpenOctopus REST</span>
+    <div className="w-full max-w-md overflow-hidden rounded-xl border border-black/[0.08] bg-white shadow-[0_18px_45px_rgba(17,24,39,0.10)]">
+      <div className="flex items-center justify-between border-b border-black/[0.06] bg-[#F8FCFF] px-4 py-3">
+        <div className="flex gap-2 text-xs font-medium text-black/60">
+          <span className="rounded-md bg-[#E0F2FE] px-2 py-1 text-[#111827]">OpenOctopus REST</span>
           <span className="hidden rounded-md px-2 py-1 md:inline">{copy.asyncTask}</span>
         </div>
-        <span className="text-xs text-white/45">{copy.copy}</span>
+        <span className="text-xs text-black/40">{copy.copy}</span>
       </div>
-      <pre className="overflow-x-auto p-4 text-[10px] leading-5 text-[#E5E7EB] md:p-5 md:text-[12px] md:leading-6">
-        <code>{`curl -X POST https://api.openoctopus.com/v1/images/generations \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ooq_your_api_key" \\
-  -d '{
-    "model": "openoctopus/imagen-4",
-    "prompt": "A clean product hero image",
-    "input": {
-      "aspect_ratio": "1:1",
-      "output_format": "webp"
+      <pre className="overflow-x-auto bg-white p-4 text-[10px] leading-5 text-[#475569] md:p-5 md:text-[12px] md:leading-6">
+        <code>{`curl -X POST `}<span className="text-[#0284C7]">https://api.openoctopus.com/v1/images/generations</span>{` \\
+  -H `}<span className="text-[#0F172A]">{`"Content-Type: application/json"`}</span>{` \\
+  -H `}<span className="text-[#0F172A]">{`"Authorization: Bearer ooq_your_api_key"`}</span>{` \\
+  -d '`}{`{
+    `}<span className="text-[#7C3AED]">{`"model"`}</span>{`: `}<span className="text-[#B45309]">{`"openoctopus/imagen-4"`}</span>{`,
+    `}<span className="text-[#7C3AED]">{`"prompt"`}</span>{`: `}<span className="text-[#B45309]">{`"A clean product hero image"`}</span>{`,
+    `}<span className="text-[#7C3AED]">{`"input"`}</span>{`: {
+      `}<span className="text-[#7C3AED]">{`"aspect_ratio"`}</span>{`: `}<span className="text-[#B45309]">{`"1:1"`}</span>{`,
+      `}<span className="text-[#7C3AED]">{`"output_format"`}</span>{`: `}<span className="text-[#B45309]">{`"webp"`}</span>{`
     }
   }'`}</code>
       </pre>
@@ -1179,29 +1178,29 @@ function ApiModePreview({ copy }: { copy: ReturnType<typeof getI18n>["home"] }) 
 
 function CliModePreview() {
   return (
-    <div className="w-full max-w-md overflow-hidden rounded-xl border border-black/[0.08] bg-[#082F49] shadow-[0_18px_45px_rgba(8,47,73,0.18)]">
-      <div className="flex items-center justify-between border-b border-white/10 bg-[#0C4A6E] px-4 py-3">
-        <div className="flex items-center gap-2 text-xs font-medium text-white/72">
-          <span className="flex size-7 items-center justify-center rounded-md bg-white/10 text-white">
+    <div className="w-full max-w-md overflow-hidden rounded-xl border border-black/[0.08] bg-white shadow-[0_18px_45px_rgba(17,24,39,0.10)]">
+      <div className="flex items-center justify-between border-b border-black/[0.06] bg-[#F8FCFF] px-4 py-3">
+        <div className="flex items-center gap-2 text-xs font-medium text-black/60">
+          <span className="flex size-7 items-center justify-center rounded-md bg-[#E0F2FE] text-[#0369A1]">
             <Terminal className="size-4" />
           </span>
-          <span className="text-white">OpenOctopus CLI</span>
+          <span className="text-[#111827]">OpenOctopus CLI</span>
         </div>
-        <span className="rounded-md bg-[#38BDF8]/18 px-2 py-1 text-[10px] font-semibold text-[#BAE6FD]">
+        <span className="rounded-md bg-[#E0F2FE] px-2 py-1 text-[10px] font-semibold text-[#075985]">
           ooct
         </span>
       </div>
       <div className="space-y-3 p-4 md:space-y-4 md:p-5">
-        <pre className="overflow-x-auto rounded-lg border border-white/10 bg-black/24 p-3 text-[10px] leading-5 text-[#E0F2FE] md:p-4 md:text-[12px] md:leading-6">
-          <code>{`npm i -g @openoctopus/cli
-ooct auth login
-ooct run openoctopus/image-captioner-molmo2 \\
-  --image ./input.png \\
-  --detail-level low`}</code>
+        <pre className="overflow-x-auto rounded-lg border border-black/[0.06] bg-[#FCFEFF] p-3 text-[10px] leading-5 text-[#475569] md:p-4 md:text-[12px] md:leading-6">
+          <code><span className="text-[#0284C7]">npm</span>{` i -g `}<span className="text-[#B45309]">@openoctopus/cli</span>{`
+`}<span className="text-[#0284C7]">ooct</span>{` auth login
+`}<span className="text-[#0284C7]">ooct</span>{` run `}<span className="text-[#B45309]">openoctopus/image-captioner-molmo2</span>{` \\
+  --image `}<span className="text-[#0F172A]">./input.png</span>{` \\
+  --detail-level `}<span className="text-[#0F172A]">low</span></code>
         </pre>
-        <div className="rounded-lg border border-white/10 bg-white/[0.06] p-3">
+        <div className="rounded-lg border border-[#E0F2FE] bg-[#F8FCFF] p-3">
           <p className="text-[11px] font-semibold uppercase text-[#7DD3FC]">Output</p>
-          <p className="mt-2 text-sm leading-6 text-white/82">
+          <p className="mt-2 text-sm leading-6 text-black/72">
             A pixel art landscape with a magnifying glass highlighting a mountain scene.
           </p>
         </div>
