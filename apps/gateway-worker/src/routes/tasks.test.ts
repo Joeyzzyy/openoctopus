@@ -154,6 +154,47 @@ test("coding chat request schema preserves extra top-level OpenAI-compatible fie
   assert.deepEqual(parsed.extra_body, { reasoning_effort: "max" });
 });
 
+test("coding chat request schema preserves tool message compatibility fields", () => {
+  const parsed = codingChatRequestSchema.parse({
+    model: "openoctopus/deepcode-test",
+    messages: [
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "call_123",
+            type: "function",
+            function: {
+              name: "bash",
+              arguments: "{\"cmd\":\"ls\"}",
+            },
+          },
+        ],
+      },
+      {
+        role: "tool",
+        content: "ok",
+        toolCallId: "call_123",
+      },
+    ],
+  }) as {
+    messages: Array<Record<string, unknown>>;
+  };
+
+  assert.deepEqual(parsed.messages[0]?.toolCalls, [
+    {
+      id: "call_123",
+      type: "function",
+      function: {
+        name: "bash",
+        arguments: "{\"cmd\":\"ls\"}",
+      },
+    },
+  ]);
+  assert.equal(parsed.messages[1]?.toolCallId, "call_123");
+});
+
 test("coding chat stream parser aggregates assistant text and usage from SSE chunks", () => {
   const summary = {
     upstreamRequestId: null,

@@ -164,7 +164,7 @@ const chatMessageSchema = z.object({
   role: z.string().min(1),
   content: z.union([z.string(), z.array(z.unknown())]),
   name: z.string().optional(),
-});
+}).passthrough();
 
 function normalizeOpenAiCompatibleMessages(messages: unknown) {
   if (!Array.isArray(messages)) {
