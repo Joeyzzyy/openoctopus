@@ -15,9 +15,14 @@ type UserRequestRow = {
   apiKeyName: string;
   apiKeyPrefix: string;
   apiKeyEnvironment: string;
+  customerCharge?: number;
+  providerCost?: number;
+  profit?: number;
   customerChargeLabel: string;
   providerCostLabel: string;
   profitLabel: string;
+  requestCount?: number;
+  aggregationLabel?: string | null;
   createdLabel: string;
   completedLabel: string;
   created_at?: string;
@@ -437,6 +442,11 @@ export function RegisteredUsersTable({
                                       <p className="mt-2 truncate text-xs font-medium text-black">
                                         {request.public_model_slug}
                                       </p>
+                                      {request.requestCount && request.requestCount > 1 ? (
+                                        <p className="mt-1 text-[11px] font-medium text-[#0369A1]">
+                                          {request.aggregationLabel ?? `24h 汇总 · ${request.requestCount} 次`}
+                                        </p>
+                                      ) : null}
                                       <p className="mt-1 text-[11px] text-black/40">{request.capability}</p>
                                       <p className="mt-1 break-all font-mono text-[11px] text-black/35">
                                         {request.id}

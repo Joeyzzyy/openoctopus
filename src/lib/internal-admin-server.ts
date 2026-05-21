@@ -217,15 +217,28 @@ type InternalUserRequestSummary = {
   status: string;
   capability: string;
   public_model_slug: string;
+  workspace_id?: string | null;
+  api_key_id?: string | null;
   sourceLabel: string;
   apiKeyName: string;
   apiKeyPrefix: string;
   apiKeyEnvironment: string;
+  customerCharge?: number;
+  providerCost?: number;
+  profit?: number;
   customerChargeLabel: string;
   providerCostLabel: string;
   profitLabel: string;
+  requestCount?: number;
+  aggregationLabel?: string | null;
+  aggregateRequestIds?: string[];
+  aggregateLatestRequestId?: string;
+  aggregateLatestUpstreamRawText?: string;
+  aggregateLatestPackagedOutputText?: string;
   createdLabel: string;
   completedLabel: string;
+  created_at?: string;
+  completed_at?: string | null;
   error_code: string | null;
   error_message: string | null;
   upstreamRawText: string;
@@ -858,6 +871,127 @@ function summarizeInternalRequest(input: {
     startedLabel: formatRelativeTimestamp(request.started_at),
     completedLabel: formatRelativeTimestamp(request.completed_at),
   };
+}
+
+function shouldAggregateDeepcodeRequest(summary: InternalUserRequestSummary) {
+  return (
+    summary.status === "succeeded" &&
+    summary.capability === "text_generation" &&
+    summary.public_model_slug.toLowerCase().includes("deepcode")
+  );
+}
+
+function buildDeepcodeAggregationKey(summary: InternalUserRequestSummary) {
+  const bucket = typeof summary.created_at === "string" ? summary.created_at.slice(0, 10) : "unknown-day";
+  return [
+    bucket,
+    summary.workspace_id ?? "workspace",
+    summary.api_key_id ?? "api-key",
+    summary.sourceLabel,
+    summary.public_model_slug,
+  ].join("|");
+}
+
+function buildAggregatedRequestDebugText(input: {
+  bucket: string;
+  requestIds: string[];
+  latestRequestId: string;
+  latestPayloadText: string;
+  requestCount: number;
+  kind: "upstream" | "customer";
+}) {
+  return JSON.stringify(
+    {
+      aggregated: true,
+      aggregation: "deepcode-daily",
+      bucket: input.bucket,
+      requestCount: input.requestCount,
+      latestRequestId: input.latestRequestId,
+      requestIdsPreview: input.requestIds.slice(0, 20),
+      omittedRequestIds: Math.max(input.requestIds.length - 20, 0),
+      latestPayloadText: input.latestPayloadText,
+      kind: input.kind,
+    },
+    null,
+    2
+  );
+}
+
+function aggregateInternalUserRequests(rows: InternalUserRequestSummary[]) {
+  const aggregatedRows: InternalUserRequestSummary[] = [];
+  const aggregateIndexByKey = new Map<string, number>();
+
+  for (const row of rows) {
+    if (!shouldAggregateDeepcodeRequest(row)) {
+      aggregatedRows.push(row);
+      continue;
+    }
+
+    const key = buildDeepcodeAggregationKey(row);
+    const bucket = key.split("|")[0] ?? "unknown-day";
+    const existingIndex = aggregateIndexByKey.get(key);
+
+    if (existingIndex === undefined) {
+      const requestIds = [row.id];
+      aggregatedRows.push({
+        ...row,
+        requestCount: 1,
+        aggregationLabel: null,
+        aggregateRequestIds: requestIds,
+        aggregateLatestRequestId: row.id,
+        aggregateLatestUpstreamRawText: row.upstreamRawText,
+        aggregateLatestPackagedOutputText: row.packagedOutputText,
+      });
+      aggregateIndexByKey.set(key, aggregatedRows.length - 1);
+      continue;
+    }
+
+    const existing = aggregatedRows[existingIndex]!;
+    const requestIds = [...(existing.aggregateRequestIds ?? []), row.id];
+    const requestCount = (existing.requestCount ?? 1) + 1;
+    const customerCharge = Number(existing.customerCharge ?? 0) + Number(row.customerCharge ?? 0);
+    const providerCost = Number(existing.providerCost ?? 0) + Number(row.providerCost ?? 0);
+    const profit = Number(existing.profit ?? 0) + Number(row.profit ?? 0);
+    const latestRequestId = existing.aggregateLatestRequestId ?? existing.id;
+    const latestUpstreamRawText = existing.aggregateLatestUpstreamRawText ?? existing.upstreamRawText;
+    const latestPackagedOutputText =
+      existing.aggregateLatestPackagedOutputText ?? existing.packagedOutputText;
+
+    aggregatedRows[existingIndex] = {
+      ...existing,
+      id: `agg:${key}`,
+      customerCharge,
+      providerCost,
+      profit,
+      customerChargeLabel: formatCurrency(customerCharge),
+      providerCostLabel: formatCurrency(providerCost),
+      profitLabel: formatCurrency(profit),
+      requestCount,
+      aggregationLabel: `24h 汇总 · ${requestCount} 次`,
+      aggregateRequestIds: requestIds,
+      aggregateLatestRequestId: latestRequestId,
+      aggregateLatestUpstreamRawText: latestUpstreamRawText,
+      aggregateLatestPackagedOutputText: latestPackagedOutputText,
+      upstreamRawText: buildAggregatedRequestDebugText({
+        bucket,
+        requestIds,
+        latestRequestId,
+        latestPayloadText: latestUpstreamRawText,
+        requestCount,
+        kind: "upstream",
+      }),
+      packagedOutputText: buildAggregatedRequestDebugText({
+        bucket,
+        requestIds,
+        latestRequestId,
+        latestPayloadText: latestPackagedOutputText,
+        requestCount,
+        kind: "customer",
+      }),
+    };
+  }
+
+  return aggregatedRows;
 }
 
 async function fetchMonitoringRequests(
@@ -2331,55 +2465,87 @@ export async function getInternalUserRequests(input: {
     };
   }
 
-  const requestsResponse = await supabase
-    .from("inference_requests")
-    .select(
-      "id, workspace_id, user_id, api_key_id, request_source, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at",
-      { count: "exact" }
-    )
-    .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false })
-    .range(from, to);
+  const requests: RequestRow[] = [];
+  const requestBatchSize = 500;
+  for (let offset = 0; offset < 2000; offset += requestBatchSize) {
+    const requestsResponse = await supabase
+      .from("inference_requests")
+      .select(
+        "id, workspace_id, user_id, api_key_id, request_source, capability, public_model_slug, provider_id, provider_model_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, estimated_provider_cost, actual_provider_cost, estimated_profit, actual_profit, error_code, error_message, output_payload, created_at, started_at, completed_at"
+      )
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + requestBatchSize - 1);
 
-  if (requestsResponse.error) {
-    throw new Error(requestsResponse.error.message);
+    if (requestsResponse.error) {
+      throw new Error(requestsResponse.error.message);
+    }
+
+    const batch = (requestsResponse.data ?? []) as RequestRow[];
+    requests.push(...batch);
+    if (batch.length < requestBatchSize) {
+      break;
+    }
   }
 
-  const requests = (requestsResponse.data ?? []) as RequestRow[];
   const requestIds = requests.map((request) => request.id);
   const apiKeyIds = Array.from(
     new Set(requests.map((request) => request.api_key_id).filter((value): value is string => Boolean(value)))
   );
-  const [usageEventsResponse, attemptsResponse, apiKeysResponse] =
-    requestIds.length > 0
-      ? await Promise.all([
-          supabase
-            .from("usage_events")
-            .select("external_request_id, metadata")
-            .in("external_request_id", requestIds),
-          supabase
-            .from("provider_attempts")
-            .select(
-              "id, request_id, provider_id, provider_model_id, attempt_no, status, upstream_request_id, upstream_task_id, latency_ms, response_payload, error_message, created_at"
-            )
-            .in("request_id", requestIds)
-            .order("created_at", { ascending: false }),
-          apiKeyIds.length > 0
-            ? supabase
-                .from("api_keys")
-                .select("id, workspace_id, created_by, name, key_prefix, environment, status, created_at")
-                .in("id", apiKeyIds)
-            : Promise.resolve({ data: [], error: null }),
-        ])
-      : [
-          { data: [], error: null },
-          { data: [], error: null },
-          { data: [], error: null },
-        ];
+  const chunkArray = <T,>(items: T[], size: number) => {
+    const chunks: T[][] = [];
+    for (let index = 0; index < items.length; index += size) {
+      chunks.push(items.slice(index, index + size));
+    }
+    return chunks;
+  };
 
-  const usageEvents = (usageEventsResponse.error ? [] : usageEventsResponse.data ?? []) as UsageEventRow[];
-  const attempts = (attemptsResponse.error ? [] : attemptsResponse.data ?? []) as AttemptRow[];
-  const apiKeys = (apiKeysResponse.error ? [] : apiKeysResponse.data ?? []) as ApiKeyRow[];
+  const usageEventsResponses =
+    requestIds.length > 0
+      ? await Promise.all(
+          chunkArray(requestIds, 200).map((chunk) =>
+            supabase
+              .from("usage_events")
+              .select("external_request_id, metadata")
+              .in("external_request_id", chunk)
+          )
+        )
+      : [];
+  const attemptsResponses =
+    requestIds.length > 0
+      ? await Promise.all(
+          chunkArray(requestIds, 200).map((chunk) =>
+            supabase
+              .from("provider_attempts")
+              .select(
+                "id, request_id, provider_id, provider_model_id, attempt_no, status, upstream_request_id, upstream_task_id, latency_ms, response_payload, error_message, created_at"
+              )
+              .in("request_id", chunk)
+              .order("created_at", { ascending: false })
+          )
+        )
+      : [];
+  const apiKeysResponses =
+    apiKeyIds.length > 0
+      ? await Promise.all(
+          chunkArray(apiKeyIds, 200).map((chunk) =>
+            supabase
+              .from("api_keys")
+              .select("id, workspace_id, created_by, name, key_prefix, environment, status, created_at")
+              .in("id", chunk)
+          )
+        )
+      : [];
+
+  const usageEvents = usageEventsResponses.flatMap((response) =>
+    (response.error ? [] : response.data ?? []) as UsageEventRow[]
+  );
+  const attempts = attemptsResponses.flatMap((response) =>
+    (response.error ? [] : response.data ?? []) as AttemptRow[]
+  );
+  const apiKeys = apiKeysResponses.flatMap((response) =>
+    (response.error ? [] : response.data ?? []) as ApiKeyRow[]
+  );
   const usageEventByRequestId = new Map(
     usageEvents
       .filter((row) => row.external_request_id)
@@ -2392,21 +2558,24 @@ export async function getInternalUserRequests(input: {
     return map;
   }, new Map<string, AttemptRow[]>());
   const apiKeyById = new Map(apiKeys.map((apiKey) => [apiKey.id, apiKey]));
-
-  return {
-    rows: requests.map((request) =>
+  const summarizedRows = aggregateInternalUserRequests(
+    requests.map((request) =>
       summarizeInternalRequest({
         request,
         apiKey: request.api_key_id ? apiKeyById.get(request.api_key_id) ?? null : null,
         attempts: attemptsByRequestId.get(request.id) ?? [],
         usageEvent: usageEventByRequestId.get(request.id) ?? null,
       })
-    ),
+    )
+  );
+
+  return {
+    rows: summarizedRows.slice(from, to + 1),
     pagination: {
       page,
       pageSize,
-      totalCount: requestsResponse.count ?? requests.length,
-      totalPages: Math.max(1, Math.ceil((requestsResponse.count ?? requests.length) / pageSize)),
+      totalCount: summarizedRows.length,
+      totalPages: Math.max(1, Math.ceil(summarizedRows.length / pageSize)),
     },
   };
 }

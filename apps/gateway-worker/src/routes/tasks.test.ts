@@ -4,6 +4,7 @@ import {
   chatRequestSchema,
   codingChatRequestSchema,
   consumeOpenAiChatSseBuffer,
+  ensureOpenAiChatStreamOptions,
   imageRequestSchema,
   videoRequestSchema,
 } from "./tasks.js";
@@ -193,6 +194,21 @@ test("coding chat request schema preserves tool message compatibility fields", (
     },
   ]);
   assert.equal(parsed.messages[1]?.toolCallId, "call_123");
+});
+
+test("coding chat passthrough forces stream usage metadata", () => {
+  const normalized = ensureOpenAiChatStreamOptions({
+    model: "deepseek-v4-pro",
+    stream: true,
+    stream_options: {
+      foo: "bar",
+    },
+  });
+
+  assert.deepEqual(normalized.stream_options, {
+    foo: "bar",
+    include_usage: true,
+  });
 });
 
 test("coding chat stream parser aggregates assistant text and usage from SSE chunks", () => {

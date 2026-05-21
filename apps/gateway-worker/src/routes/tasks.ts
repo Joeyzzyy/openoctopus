@@ -194,6 +194,22 @@ function normalizeOpenAiCompatibleMessages(messages: unknown) {
   });
 }
 
+export function ensureOpenAiChatStreamOptions(body: Record<string, unknown>) {
+  if (body.stream !== true) {
+    return body;
+  }
+
+  const streamOptions = asRecord(body.stream_options) ?? asRecord(body.streamOptions) ?? {};
+
+  return {
+    ...body,
+    stream_options: {
+      ...streamOptions,
+      include_usage: true,
+    },
+  };
+}
+
 const INTEGER_INPUT_PARAM_KEYS = new Set([
   "max_tokens",
   "max_output_tokens",
@@ -843,7 +859,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       const authConfig = buildAuthHeaders(executionConfig, providerSecret);
       authConfig.applyQuery(upstreamUrl);
 
-      const upstreamBody: Record<string, unknown> = {
+      let upstreamBody: Record<string, unknown> = {
         ...rawBody,
         model: resolved.upstreamModelSlug,
       };
@@ -861,6 +877,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         }
         upstreamBody.input = inputRecord;
       }
+      upstreamBody = ensureOpenAiChatStreamOptions(upstreamBody);
 
       const startedAt = new Date().toISOString();
       await recordInferenceRequest({
