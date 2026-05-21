@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { EmailPasswordSignInForm } from "@/components/auth/EmailPasswordSignInForm";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { Logo } from "@/components/layout/Logo";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -21,75 +22,70 @@ export default async function LoginPage({
   const nextPath = getSafeNextPath(resolvedSearchParams.next);
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#FCFCFA] px-4">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#F8FCFF] px-4 py-10">
       <div
         aria-hidden="true"
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(circle at top, rgba(243, 226, 201, 0.56), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(252,252,250,1) 46%)",
+            "radial-gradient(circle at top left, rgba(186,230,253,0.78), transparent 28%), radial-gradient(circle at 80% 16%, rgba(125,211,252,0.34), transparent 22%), linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(248,252,255,1) 48%)",
         }}
       />
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-[360px] opacity-45"
+        className="absolute inset-x-0 top-0 h-[420px] opacity-50"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(17,24,39,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(17,24,39,0.035) 1px, transparent 1px)",
+            "linear-gradient(rgba(7,89,133,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(7,89,133,0.045) 1px, transparent 1px)",
           backgroundSize: "44px 44px",
           maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)",
         }}
       />
-      <div className="mx-auto w-full max-w-lg space-y-5">
-        <div className="relative rounded-2xl border border-black/[0.08] bg-white shadow-[0_18px_48px_rgba(17,24,39,0.06)]">
-          <div className="min-h-80 p-10 md:p-12">
-            <div className="mb-8 space-y-3 text-center">
-              <h1 className="text-2xl font-semibold tracking-[-0.05em] text-[#111827]">
-                Welcome
-              </h1>
-              <p className="text-sm text-[#6B7280]">
-                Sign in to continue to the dashboard
-              </p>
+      <div className="relative mx-auto w-full max-w-md">
+        <section className="rounded-[28px] border border-[#BAE6FD]/80 bg-white/94 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur sm:p-8">
+          <div className="mb-6 flex flex-col items-center text-center">
+            <Logo className="mb-2 scale-[1.28] text-[#0F172A] sm:scale-[1.4]" />
+          </div>
+
+          <div className="space-y-4">
+            <EmailPasswordSignInForm nextPath={nextPath} />
+
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-black/[0.08]" />
+              <span className="text-[11px] tracking-[0.06em] text-[#64748B]">Sign in Or Sign up with Google</span>
+              <div className="h-px flex-1 bg-black/[0.08]" />
             </div>
 
-            <div className="space-y-5">
-              <EmailPasswordSignInForm nextPath={nextPath} />
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-black/[0.08]" />
-                <span className="text-[11px] uppercase tracking-[0.8px] text-black/40">or</span>
-                <div className="h-px flex-1 bg-black/[0.08]" />
-              </div>
-              <GoogleSignInButton nextPath={nextPath} />
-            </div>
+            <GoogleSignInButton nextPath={nextPath} />
 
-            <p className="mt-8 text-center text-xs leading-5 text-[#6B7280]">
-              By signing in, you agree to our{" "}
+            <p className="text-center text-xs leading-5 text-[#64748B]">
+              <span className="block">By signing in, you agree to our</span>
               <Link
                 href="/static/terms"
-                className="text-[#111827] underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#111827]"
+                className="text-[#0F172A] underline decoration-[#7DD3FC] underline-offset-4 transition-colors hover:text-[#0284C7]"
               >
                 Terms of Service
               </Link>{" "}
-              and{" "}
+              <span className="text-[#64748B]">and</span>{" "}
               <Link
                 href="/static/privacy"
-                className="text-[#111827] underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#111827]"
+                className="text-[#0F172A] underline decoration-[#7DD3FC] underline-offset-4 transition-colors hover:text-[#0284C7]"
               >
                 Privacy Policy
               </Link>
               .
             </p>
           </div>
-        </div>
 
-        <div className="text-center">
-          <Link
-            href="/"
-            className="text-sm text-[#6B7280] transition-colors hover:text-[#111827]"
-          >
-            Back to home
-          </Link>
-        </div>
+          <div className="mt-6 border-t border-black/[0.06] pt-4 text-center">
+            <Link
+              href="/"
+              className="text-sm font-medium text-[#64748B] transition-colors hover:text-[#0F172A]"
+            >
+              Back to home
+            </Link>
+          </div>
+        </section>
       </div>
     </main>
   );

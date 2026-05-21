@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { AuthInlineAlert } from "@/components/auth/auth-inline-alert";
+import { getFriendlyAuthError } from "@/lib/auth-error";
 
 function GoogleIcon() {
   return (
@@ -34,7 +36,7 @@ export function GoogleSignInButton({
   nextPath?: string;
 }) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ title: string; message: string } | null>(null);
 
   async function handleGoogleLogin() {
     setLoading(true);
@@ -54,7 +56,9 @@ export function GoogleSignInButton({
         throw authError;
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Google sign-in failed");
+      setError(
+        getFriendlyAuthError(err instanceof Error ? err.message : "Google sign-in failed")
+      );
       setLoading(false);
     }
   }
@@ -66,15 +70,13 @@ export function GoogleSignInButton({
         onClick={handleGoogleLogin}
         disabled={loading}
         aria-label="Sign in with Google"
-        className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-black/[0.08] bg-[#FCFCFA] px-4 text-sm font-medium text-[#111827] shadow-sm transition-colors hover:bg-black/[0.03] hover:text-black disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex h-[52px] w-full cursor-pointer items-center justify-center gap-3 rounded-2xl border border-[#BAE6FD] bg-[linear-gradient(135deg,#FFFFFF,#F0F9FF)] px-5 text-sm font-semibold text-[#0F172A] shadow-[0_14px_35px_rgba(14,165,233,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#7DD3FC] hover:shadow-[0_18px_40px_rgba(14,165,233,0.16)] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <GoogleIcon />
-        {loading ? "Redirecting..." : "Sign in with Google"}
+        {loading ? "Redirecting to Google..." : "Continue with Gmail"}
       </button>
       {error ? (
-        <p className="text-center text-[11px] uppercase tracking-[0.8px] text-[#b43828]">
-          {error}
-        </p>
+        <AuthInlineAlert title={error.title} message={error.message} />
       ) : null}
     </div>
   );

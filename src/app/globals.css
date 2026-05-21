@@ -226,6 +226,36 @@
   }
 }
 
+@keyframes auth-logo-float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+@keyframes auth-glow-pulse {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.04);
+  }
+}
+
+@layer utilities {
+  .animate-auth-logo-float {
+    animation: auth-logo-float 7s ease-in-out infinite;
+  }
+
+  .animate-auth-glow-pulse {
+    animation: auth-glow-pulse 8s ease-in-out infinite;
+  }
+}
+
 @keyframes hero-orbit-logo-cycle {
   0%, 13% {
     left: 50%;

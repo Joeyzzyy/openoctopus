@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Eye, EyeOff } from "lucide-react";
+import { AuthInlineAlert } from "@/components/auth/auth-inline-alert";
+import { getFriendlyAuthError } from "@/lib/auth-error";
 
 export function EmailPasswordSignInForm({
   nextPath = "/dashboard",
@@ -12,7 +14,7 @@ export function EmailPasswordSignInForm({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -38,7 +40,9 @@ export function EmailPasswordSignInForm({
       router.replace(nextPath);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Email sign-in failed");
+      setError(
+        getFriendlyAuthError(err instanceof Error ? err.message : "Email sign-in failed")
+      );
       setLoading(false);
     }
   }
@@ -77,9 +81,7 @@ export function EmailPasswordSignInForm({
       </label>
 
       {error ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          {error}
-        </p>
+        <AuthInlineAlert title={error.title} message={error.message} />
       ) : null}
 
       <button
