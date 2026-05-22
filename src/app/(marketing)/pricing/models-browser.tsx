@@ -1766,9 +1766,7 @@ export function ModelsBrowser({
     );
   }, [selectedModel]);
 
-  const [mainTab, setMainTab] = useState<"playground" | "api">(() =>
-    searchParams.get("tab") === "api" ? "api" : "playground"
-  );
+  const mainTab: "playground" | "api" = searchParams.get("tab") === "api" ? "api" : "playground";
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const [taskId, setTaskId] = useState<string | null>(null);
   const [playgroundError, setPlaygroundError] = useState<string | null>(null);
@@ -1937,16 +1935,22 @@ export function ModelsBrowser({
     });
   }, [mainTab, pathname, router, searchParams, selectedModel, selectedProvider]);
 
-  useEffect(() => {
-    const nextTab = searchParams.get("tab") === "api" ? "api" : "playground";
-    if (nextTab !== mainTab) {
-      setMainTab(nextTab);
-    }
-  }, [mainTab, searchParams]);
-
   const handleMainTabChange = (tab: "playground" | "api") => {
     if (tab === mainTab) return;
-    setMainTab(tab);
+    if (!selectedModel || !selectedProvider) return;
+    const providerSlug = slugifyPathPart(selectedProvider) || encodeURIComponent(selectedProvider);
+    const modelSlug =
+      slugifyPathPart(selectedModel.publicModel) || encodeURIComponent(selectedModel.publicModel);
+    const params = new URLSearchParams();
+    params.set("tab", tab);
+    const prompt = searchParams.get("prompt")?.trim();
+    if (prompt) {
+      params.set("prompt", prompt);
+    }
+    router.replace(
+      `/models/${providerSlug}/${modelSlug}?${params.toString()}`,
+      { scroll: false }
+    );
   };
 
   const modelsByCapability = useMemo(() => {
