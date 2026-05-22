@@ -1386,7 +1386,7 @@ export function PublicModelsPanel({
   modelVendors?: ModelVendorSummary[];
   modelTypeOptions?: StaticModelTypeOptionSummary[];
   capabilityOptions: readonly CapabilityOption[];
-  headerAction?: ReactNode;
+  headerAction?: React.ReactNode;
 }) {
   const activeModelTypeFilter = modelTypeFilter;
   const activeStatusFilter = modelStatusFilter;
