@@ -28,6 +28,29 @@ type ProviderModelShowcaseAssetRow = {
   sort_order: number;
 };
 
+export type PlaygroundPromptComposerOption = {
+  value: string;
+  label: string;
+  promptBlock: string;
+  description?: string | null;
+};
+
+export type PlaygroundPromptComposerOptionGroup = {
+  key: string;
+  label: string;
+  type: "single_select";
+  required: boolean;
+  options: PlaygroundPromptComposerOption[];
+};
+
+export type PlaygroundPromptComposerConfig = {
+  version?: string | null;
+  mode?: string | null;
+  basePrompt: string[];
+  optionGroups: PlaygroundPromptComposerOptionGroup[];
+  negativePrompt?: string | null;
+};
+
 export type ModelDocRow = {
   id: string;
   publicModel: string;
@@ -48,6 +71,8 @@ export type ModelDocRow = {
   showcaseImageUrls: string[];
   showcaseImagePrompts: Array<string | null>;
   playgroundInputImageUrl: string | null;
+  playgroundDefaultPrompt: string | null;
+  promptComposer: PlaygroundPromptComposerConfig | null;
   playgroundInputPrompt: string | null;
   playgroundInputExamples: Array<{
     fieldKey: string | null;
@@ -673,6 +698,22 @@ export const loadModelsPageData = cache(async () => {
         .map((asset) => asset.alt_text ?? null),
       playgroundInputImageUrl:
         primaryPlaygroundInputAsset?.public_url ?? null,
+      playgroundDefaultPrompt:
+        executionConfig.playground &&
+        typeof executionConfig.playground === "object" &&
+        !Array.isArray(executionConfig.playground) &&
+        typeof (executionConfig.playground as Record<string, unknown>).defaultPrompt === "string"
+          ? ((executionConfig.playground as Record<string, unknown>).defaultPrompt as string)
+          : null,
+      promptComposer:
+        executionConfig.playground &&
+        typeof executionConfig.playground === "object" &&
+        !Array.isArray(executionConfig.playground) &&
+        (executionConfig.playground as Record<string, unknown>).promptComposer &&
+        typeof (executionConfig.playground as Record<string, unknown>).promptComposer === "object" &&
+        !Array.isArray((executionConfig.playground as Record<string, unknown>).promptComposer)
+          ? ((executionConfig.playground as Record<string, unknown>).promptComposer as PlaygroundPromptComposerConfig)
+          : null,
       playgroundInputPrompt:
         primaryPlaygroundInputAsset?.alt_text ?? null,
       playgroundInputExamples: playgroundInputAssets.map((asset) => ({

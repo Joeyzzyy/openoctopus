@@ -42,6 +42,25 @@ type ExecutionConfigPresetOption = {
   label: string;
   executionTemplate: string;
   executionConfigText: string;
+  supportedModelSlug?: string;
+  providerId?: string;
+  upstreamModelSlug?: string;
+  pricingText?: string;
+  inputSchemaText?: string;
+  outputSchemaText?: string;
+  active?: boolean;
+  showcaseCoverUrl?: string | null;
+  playgroundInputUrl?: string | null;
+  facePlaygroundInputUrl?: string | null;
+  showcaseGalleryUrls?: string[];
+  showcaseCoverPrompt?: string;
+  playgroundInputPrompt?: string;
+  facePlaygroundInputPrompt?: string;
+  showcaseGalleryPrompts?: string[];
+  showcaseCoverAssetId?: string;
+  playgroundInputAssetId?: string;
+  facePlaygroundInputAssetId?: string;
+  showcaseGalleryAssetIds?: string[];
 };
 type ProviderModelRootTab = "manage" | "source-doc";
 
@@ -107,12 +126,72 @@ type ExecutionConfigFormState = {
   resultUrlPath: string;
   resultTextPath: string;
   submitBodyTemplate: string;
+  playgroundDefaultPrompt: string;
+  playgroundPromptComposerJson: string;
   docRequestExampleJson: string;
   docSubmitResponseExampleJson: string;
   docNormalizedOutputExampleJson: string;
   docSourceUrl: string;
   docReadmeMarkdown: string;
 };
+
+const PLAYGROUND_PROMPT_COMPOSER_EXAMPLE = `{
+  "version": "v1",
+  "mode": "blocks",
+  "basePrompt": [
+    "Use the uploaded portrait as the identity reference and preserve facial identity.",
+    "{gender_block}",
+    "{team_style_block}",
+    "Calm natural sight not facing camera.",
+    "Restore a busy real garage scene, clear background staff without blur.",
+    "Photorealistic editorial motorsport photography, natural lighting, high detail, realistic proportions.",
+    "{negative_block}"
+  ],
+  "optionGroups": [
+    {
+      "key": "gender",
+      "label": "Gender",
+      "type": "single_select",
+      "required": true,
+      "options": [
+        {
+          "value": "female",
+          "label": "Female",
+          "promptBlock": "Create a realistic portrait of a female Formula 1 team staff member."
+        },
+        {
+          "value": "male",
+          "label": "Male",
+          "promptBlock": "Create a realistic portrait of a male Formula 1 team staff member."
+        }
+      ]
+    },
+    {
+      "key": "team_style",
+      "label": "Team Style",
+      "type": "single_select",
+      "required": true,
+      "options": [
+        {
+          "value": "mercedes",
+          "label": "Mercedes",
+          "promptBlock": "She wears standard silver teal Mercedes team suit, team cap and branded jacket, equipped with professional intercom headphones and a silver cross necklace."
+        }
+      ]
+    }
+  ],
+  "negativePrompt": "Avoid cartoon style, avoid face distortion, avoid extra foreground people, avoid blurry background, avoid inaccurate uniform details."
+}`;
+
+function tryFormatJsonString(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  try {
+    return JSON.stringify(JSON.parse(trimmed), null, 2);
+  } catch {
+    return value;
+  }
+}
 
 type SchemaFieldState = {
   id: string;
@@ -2109,6 +2188,8 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
     resultUrlPath: "response.outputUrl",
     resultTextPath: "",
     submitBodyTemplate: "",
+    playgroundDefaultPrompt: "",
+    playgroundPromptComposerJson: "",
     docRequestExampleJson: "",
     docSubmitResponseExampleJson: "",
     docNormalizedOutputExampleJson: "",
@@ -2195,6 +2276,22 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
               !Array.isArray(parsed.submitBodyTemplate)
             ? JSON.stringify(parsed.submitBodyTemplate, null, 2)
             : fallback.submitBodyTemplate,
+      playgroundDefaultPrompt:
+        parsed.playground &&
+        typeof parsed.playground === "object" &&
+        !Array.isArray(parsed.playground) &&
+        typeof (parsed.playground as Record<string, unknown>).defaultPrompt === "string"
+          ? ((parsed.playground as Record<string, unknown>).defaultPrompt as string)
+          : fallback.playgroundDefaultPrompt,
+      playgroundPromptComposerJson:
+        parsed.playground &&
+        typeof parsed.playground === "object" &&
+        !Array.isArray(parsed.playground) &&
+        (parsed.playground as Record<string, unknown>).promptComposer &&
+        typeof (parsed.playground as Record<string, unknown>).promptComposer === "object" &&
+        !Array.isArray((parsed.playground as Record<string, unknown>).promptComposer)
+          ? JSON.stringify((parsed.playground as Record<string, unknown>).promptComposer, null, 2)
+          : fallback.playgroundPromptComposerJson,
       docRequestExampleJson:
         parsed.doc && typeof parsed.doc === "object" && !Array.isArray(parsed.doc) && typeof (parsed.doc as Record<string, unknown>).requestExampleJson === "string"
           ? ((parsed.doc as Record<string, unknown>).requestExampleJson as string)
@@ -2265,6 +2362,25 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
     } catch {
       result.submitBodyTemplate = submitBodyTemplateText;
     }
+  }
+  const playgroundDefaultPrompt = state.playgroundDefaultPrompt.trim();
+  const playgroundPromptComposerText = state.playgroundPromptComposerJson.trim();
+  const playgroundConfig: Record<string, unknown> = {};
+  if (playgroundDefaultPrompt) {
+    playgroundConfig.defaultPrompt = playgroundDefaultPrompt;
+  }
+  if (playgroundPromptComposerText) {
+    try {
+      const parsedPromptComposer = JSON.parse(playgroundPromptComposerText) as unknown;
+      if (parsedPromptComposer && typeof parsedPromptComposer === "object" && !Array.isArray(parsedPromptComposer)) {
+        playgroundConfig.promptComposer = parsedPromptComposer;
+      }
+    } catch {
+      // Form validation blocks invalid JSON before submit; keep serialize path resilient.
+    }
+  }
+  if (Object.keys(playgroundConfig).length > 0) {
+    result.playground = playgroundConfig;
   }
   const doc: Record<string, unknown> = {
     sourceUrl: state.docSourceUrl.trim() || undefined,
@@ -3097,13 +3213,39 @@ export function CreateProviderModelForm({
     | "showcase-assets"
     | "cost";
   const fallbackSupportedModelId = supportedModels[0]?.id ?? "";
+  const [selectedPresetId, setSelectedPresetId] = useState("");
+  const selectedPreset = useMemo(
+    () => executionConfigPresets.find((item) => item.id === selectedPresetId) ?? null,
+    [executionConfigPresets, selectedPresetId]
+  );
+  const effectiveDefaultSupportedModelSlug = defaultSupportedModelSlug;
+  const effectiveDefaultProviderId = selectedPreset?.providerId ?? defaultProviderId;
+  const effectiveDefaultUpstreamModelSlug = selectedPreset?.upstreamModelSlug ?? defaultUpstreamModelSlug;
+  const effectiveDefaultPricing = selectedPreset?.pricingText ?? defaultPricing;
+  const effectiveDefaultInputSchema = selectedPreset?.inputSchemaText ?? defaultInputSchema;
+  const effectiveDefaultOutputSchema = selectedPreset?.outputSchemaText ?? defaultOutputSchema;
+  const effectiveDefaultExecutionTemplate = selectedPreset?.executionTemplate ?? defaultExecutionTemplate;
+  const effectiveDefaultExecutionConfig = selectedPreset?.executionConfigText ?? defaultExecutionConfig;
+  const effectiveDefaultActive = selectedPreset?.active ?? defaultActive;
+  const effectiveShowcaseCoverUrl = selectedPreset?.showcaseCoverUrl ?? defaultShowcaseCoverUrl;
+  const effectivePlaygroundInputUrl = selectedPreset?.playgroundInputUrl ?? defaultPlaygroundInputUrl;
+  const effectiveFacePlaygroundInputUrl = selectedPreset?.facePlaygroundInputUrl ?? defaultFacePlaygroundInputUrl;
+  const effectiveShowcaseGalleryUrls = selectedPreset?.showcaseGalleryUrls ?? defaultShowcaseGalleryUrls;
+  const effectiveShowcaseCoverPrompt = selectedPreset?.showcaseCoverPrompt ?? defaultShowcaseCoverPrompt;
+  const effectivePlaygroundInputPrompt = selectedPreset?.playgroundInputPrompt ?? defaultPlaygroundInputPrompt;
+  const effectiveFacePlaygroundInputPrompt = selectedPreset?.facePlaygroundInputPrompt ?? defaultFacePlaygroundInputPrompt;
+  const effectiveShowcaseGalleryPrompts = selectedPreset?.showcaseGalleryPrompts ?? defaultShowcaseGalleryPrompts;
+  const effectiveShowcaseCoverAssetId = selectedPreset?.showcaseCoverAssetId ?? defaultShowcaseCoverAssetId;
+  const effectivePlaygroundInputAssetId = selectedPreset?.playgroundInputAssetId ?? defaultPlaygroundInputAssetId;
+  const effectiveFacePlaygroundInputAssetId = selectedPreset?.facePlaygroundInputAssetId ?? defaultFacePlaygroundInputAssetId;
+  const effectiveShowcaseGalleryAssetIds = selectedPreset?.showcaseGalleryAssetIds ?? defaultShowcaseGalleryAssetIds;
   const templateSupportedModelId =
-    supportedModels.find((item) => item.modelSlug === defaultSupportedModelSlug)?.id ??
+    supportedModels.find((item) => item.modelSlug === effectiveDefaultSupportedModelSlug)?.id ??
     fallbackSupportedModelId;
   const [supportedModelId, setSupportedModelId] = useState(templateSupportedModelId);
   const [providerId, setProviderId] = useState(
-    defaultProviderId && providers.some((item) => item.id === defaultProviderId)
-      ? defaultProviderId
+    effectiveDefaultProviderId && providers.some((item) => item.id === effectiveDefaultProviderId)
+      ? effectiveDefaultProviderId
       : (providers[0]?.id ?? "")
   );
 
@@ -3111,8 +3253,8 @@ export function CreateProviderModelForm({
     setSupportedModelId(templateSupportedModelId);
   }, [templateSupportedModelId]);
   useEffect(() => {
-    if (defaultProviderId && providers.some((item) => item.id === defaultProviderId)) {
-      setProviderId(defaultProviderId);
+    if (effectiveDefaultProviderId && providers.some((item) => item.id === effectiveDefaultProviderId)) {
+      setProviderId(effectiveDefaultProviderId);
       return;
     }
     setProviderId((current) => {
@@ -3121,7 +3263,7 @@ export function CreateProviderModelForm({
       }
       return providers[0]?.id ?? "";
     });
-  }, [defaultProviderId, providers]);
+  }, [effectiveDefaultProviderId, providers]);
 
   const selectedSupportedModel =
     supportedModels.find((item) => item.id === supportedModelId) ?? null;
@@ -3129,23 +3271,22 @@ export function CreateProviderModelForm({
   const workerTemplateOptions =
     workerTemplates.length > 0
       ? workerTemplates
-      : [{ id: "fallback", displayName: "任务轮询（提交后查询）", slug: defaultExecutionTemplate }];
-  const [executionTemplate, setExecutionTemplate] = useState(defaultExecutionTemplate);
+      : [{ id: "fallback", displayName: "任务轮询（提交后查询）", slug: effectiveDefaultExecutionTemplate }];
+  const [executionTemplate, setExecutionTemplate] = useState(effectiveDefaultExecutionTemplate);
   const [rootTab, setRootTab] = useState<ProviderModelRootTab>("manage");
-  const [selectedPresetId, setSelectedPresetId] = useState("");
   const [executionConfigState, setExecutionConfigState] = useState(() =>
-    parseExecutionConfigState(defaultExecutionConfig)
+    parseExecutionConfigState(effectiveDefaultExecutionConfig)
   );
-  const [upstreamModelSlug, setUpstreamModelSlug] = useState(defaultUpstreamModelSlug ?? "");
+  const [upstreamModelSlug, setUpstreamModelSlug] = useState(effectiveDefaultUpstreamModelSlug ?? "");
   const [autofillSourceText, setAutofillSourceText] = useState("");
   const [autofillSummary, setAutofillSummary] = useState("");
   const [autofillPreviewJson, setAutofillPreviewJson] = useState("");
   const [autofillDebugRawOutput, setAutofillDebugRawOutput] = useState("");
   const [seedInputSchemaText, setSeedInputSchemaText] = useState("");
   const [seedOutputSchemaText, setSeedOutputSchemaText] = useState("");
-  const [seedPricingText, setSeedPricingText] = useState(defaultPricing ?? "");
-  const [currentInputSchemaText, setCurrentInputSchemaText] = useState(defaultInputSchema);
-  const [currentOutputSchemaText, setCurrentOutputSchemaText] = useState(defaultOutputSchema);
+  const [seedPricingText, setSeedPricingText] = useState(effectiveDefaultPricing ?? "");
+  const [currentInputSchemaText, setCurrentInputSchemaText] = useState(effectiveDefaultInputSchema);
+  const [currentOutputSchemaText, setCurrentOutputSchemaText] = useState(effectiveDefaultOutputSchema);
   const [isAutofilling, startAutofillTransition] = useTransition();
   const executionConfigValue = buildExecutionConfigValue(executionConfigState);
   const templateIsAsync =
@@ -3156,12 +3297,11 @@ export function CreateProviderModelForm({
     selectedSupportedModel?.capability === "text_generation";
   const isDocumentAnalysisModel = selectedSupportedModel?.capability === "document_analysis";
   const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("ai-autofill");
-  void defaultActive;
   const [selectedCoverFileName, setSelectedCoverFileName] = useState("");
   const [selectedPlaygroundInputFileName, setSelectedPlaygroundInputFileName] = useState("");
   const [selectedFacePlaygroundInputFileName, setSelectedFacePlaygroundInputFileName] = useState("");
   const [selectedGalleryFileNames, setSelectedGalleryFileNames] = useState<string[]>([]);
-  const galleryPromptPlaceholder = defaultShowcaseGalleryPrompts
+  const galleryPromptPlaceholder = effectiveShowcaseGalleryPrompts
     .map((prompt, index) => `${index + 1}. ${prompt}`)
     .join("\n");
   const sectionRefs = useRef<Record<ProviderModelFormTab, HTMLDivElement | null>>({
@@ -3191,26 +3331,25 @@ export function CreateProviderModelForm({
   );
 
   useEffect(() => {
-    setExecutionTemplate(defaultExecutionTemplate);
-    setSelectedPresetId("");
-    setExecutionConfigState(parseExecutionConfigState(defaultExecutionConfig));
-    setUpstreamModelSlug(defaultUpstreamModelSlug ?? "");
+    setExecutionTemplate(effectiveDefaultExecutionTemplate);
+    setExecutionConfigState(parseExecutionConfigState(effectiveDefaultExecutionConfig));
+    setUpstreamModelSlug(effectiveDefaultUpstreamModelSlug ?? "");
     setAutofillSourceText("");
     setAutofillSummary("");
     setAutofillPreviewJson("");
     setAutofillDebugRawOutput("");
     setSeedInputSchemaText("");
     setSeedOutputSchemaText("");
-    setSeedPricingText(defaultPricing ?? "");
-    setCurrentInputSchemaText(defaultInputSchema);
-    setCurrentOutputSchemaText(defaultOutputSchema);
+    setSeedPricingText(effectiveDefaultPricing ?? "");
+    setCurrentInputSchemaText(effectiveDefaultInputSchema);
+    setCurrentOutputSchemaText(effectiveDefaultOutputSchema);
   }, [
-    defaultExecutionConfig,
-    defaultExecutionTemplate,
-    defaultUpstreamModelSlug,
-    defaultPricing,
-    defaultInputSchema,
-    defaultOutputSchema,
+    effectiveDefaultExecutionConfig,
+    effectiveDefaultExecutionTemplate,
+    effectiveDefaultUpstreamModelSlug,
+    effectiveDefaultPricing,
+    effectiveDefaultInputSchema,
+    effectiveDefaultOutputSchema,
   ]);
 
   const runAutofillFromUrl = () => {
@@ -3341,6 +3480,21 @@ export function CreateProviderModelForm({
           nextRootTab ??= "manage";
           nextActiveTab ??= "cost";
         }
+        const playgroundPromptComposerText = executionConfigState.playgroundPromptComposerJson.trim();
+        if (playgroundPromptComposerText) {
+          try {
+            const parsed = JSON.parse(playgroundPromptComposerText) as unknown;
+            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+              missing.push("Playground 提示词选项配置 JSON 必须是对象");
+              nextRootTab ??= "manage";
+              nextActiveTab ??= "doc-examples";
+            }
+          } catch {
+            missing.push("Playground 提示词选项配置 JSON 格式无效");
+            nextRootTab ??= "manage";
+            nextActiveTab ??= "doc-examples";
+          }
+        }
 
         const inputWarnings = getSchemaRequiredWarnings(
           String(formData.get("inputSchema") ?? ""),
@@ -3399,15 +3553,15 @@ export function CreateProviderModelForm({
             value={
               seedPricingText && seedPricingText.trim()
                 ? seedPricingText
-                : defaultPricing && defaultPricing.trim()
-                  ? defaultPricing
+                : effectiveDefaultPricing && effectiveDefaultPricing.trim()
+                  ? effectiveDefaultPricing
                   : '{"billingMode":"hybrid","currency":"USD","charges":{}}'
             }
           />
           <input type="hidden" name="executionTemplate" value={executionTemplate} />
           <input type="hidden" name="executionConfig" value={executionConfigValue} />
-          <input type="hidden" name="inputSchema" value={currentInputSchemaText || defaultInputSchema} />
-          <input type="hidden" name="outputSchema" value={currentOutputSchemaText || defaultOutputSchema} />
+          <input type="hidden" name="inputSchema" value={currentInputSchemaText || effectiveDefaultInputSchema} />
+          <input type="hidden" name="outputSchema" value={currentOutputSchemaText || effectiveDefaultOutputSchema} />
         </>
       ) : null}
       <div className="mb-0.5 flex items-center gap-1">
@@ -3693,7 +3847,7 @@ export function CreateProviderModelForm({
             example="google/imagen4-fast"
           />
         </label>
-        <input type="hidden" name="active" value="true" />
+        <input type="hidden" name="active" value={effectiveDefaultActive ? "true" : "false"} />
         </div>
 
         <div
@@ -3714,17 +3868,14 @@ export function CreateProviderModelForm({
                     const nextPresetId = event.target.value;
                     setSelectedPresetId(nextPresetId);
                     if (!nextPresetId) return;
-                    const preset = executionConfigPresets.find((item) => item.id === nextPresetId);
-                    if (!preset) return;
-                    setExecutionTemplate(preset.executionTemplate);
-                    setExecutionConfigState(parseExecutionConfigState(preset.executionConfigText));
+                    if (!nextPresetId) return;
                   }}
                   disabled={disabled || executionConfigPresets.length === 0}
                   className={formSelectClassName}
                 >
                   <option value="">
                     {executionConfigPresets.length > 0
-                      ? "选择一个已配置模型并复制其调用协议"
+                      ? "选择一个已配置映射并复制全部信息"
                       : "暂无可复制的其他模型映射"}
                   </option>
                   {executionConfigPresets.map((item) => (
@@ -3733,7 +3884,7 @@ export function CreateProviderModelForm({
                     </option>
                   ))}
                 </select>
-                <FieldHint help="只复制调用协议模板和路径映射，不会覆盖当前上游模型 slug、输入参数、输出参数或成本配置。" />
+                <FieldHint help="会把基本信息、调用协议、输入输出参数、示例素材和供应商成本等已存配置一起带过来。" />
               </label>
               <label className="block">
                 <select
@@ -4083,7 +4234,7 @@ export function CreateProviderModelForm({
           </div>
           <BillingConfigEditor
             name="pricing"
-            initialValue={seedPricingText || defaultPricing}
+            initialValue={seedPricingText || effectiveDefaultPricing}
             capability={selectedSupportedModel?.capability ?? null}
             componentHint="按供应商真实结算方式填写内部进货成本。这里决定 provider cost，不影响用户售价。"
             generatedLabel="生成的供应商计费配置"
@@ -4102,7 +4253,7 @@ export function CreateProviderModelForm({
             <SchemaFieldEditor
               name="inputSchema"
               keyName="params"
-              defaultSchemaText={defaultInputSchema}
+              defaultSchemaText={effectiveDefaultInputSchema}
               seedSchemaText={seedInputSchemaText}
               includeRequired
               disabled={disabled}
@@ -4137,7 +4288,7 @@ export function CreateProviderModelForm({
             <SchemaFieldEditor
               name="outputSchema"
               keyName="fields"
-              defaultSchemaText={defaultOutputSchema}
+              defaultSchemaText={effectiveDefaultOutputSchema}
               seedSchemaText={seedOutputSchemaText}
               includeRequired={false}
               disabled={disabled}
@@ -4176,6 +4327,78 @@ export function CreateProviderModelForm({
               </button>
             </div>
             <div className="grid gap-3">
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">Playground 默认提示词</span>
+                <textarea
+                  value={executionConfigState.playgroundDefaultPrompt}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      playgroundDefaultPrompt: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={4}
+                  placeholder="a premium product photo on a clean studio background"
+                />
+                <FieldHint help="模型详情页 Playground 会优先使用这里的默认提示词；如果 URL 上带了 prompt 参数，则仍以 URL 参数为准。" />
+              </label>
+              <label className="block md:col-span-2">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="block text-[11px] tracking-[0.35px] text-black/60">Playground 提示词选项配置 JSON</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          playgroundPromptComposerJson: tryFormatJsonString(
+                            current.playgroundPromptComposerJson
+                          ),
+                        }))
+                      }
+                      className="inline-flex h-7 items-center rounded border border-[#7DD3FC]/45 bg-white px-2 text-[11px] text-black/70 hover:bg-[#E0F2FE]"
+                    >
+                      格式化 JSON
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExecutionConfigState((current) => ({
+                          ...current,
+                          playgroundPromptComposerJson: PLAYGROUND_PROMPT_COMPOSER_EXAMPLE,
+                        }))
+                      }
+                      className="inline-flex h-7 items-center rounded border border-[#7DD3FC]/45 bg-white px-2 text-[11px] text-black/70 hover:bg-[#E0F2FE]"
+                    >
+                      填入示例模板
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  value={executionConfigState.playgroundPromptComposerJson}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      playgroundPromptComposerJson: event.target.value,
+                    }))
+                  }
+                  onBlur={() =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      playgroundPromptComposerJson: tryFormatJsonString(
+                        current.playgroundPromptComposerJson
+                      ),
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={16}
+                  placeholder={PLAYGROUND_PROMPT_COMPOSER_EXAMPLE}
+                />
+                <FieldHint help="用于 Playground 渲染结构化选项并自动拼接 prompt。当前支持 single_select 选项组，模板里可使用 {group_key_block} 与 {negative_block} 占位符。" />
+              </label>
               <label className="block md:col-span-2">
                 <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">请求示例 JSON</span>
                 <textarea
@@ -4282,16 +4505,16 @@ export function CreateProviderModelForm({
                 <p className="text-xs font-medium text-black/80">封面图区域</p>
                 <span className="text-[11px] text-black/45">单张封面</span>
               </div>
-              {defaultShowcaseCoverUrl ? (
+              {effectiveShowcaseCoverUrl ? (
                 <div className="rounded-lg border border-[#BAE6FD] bg-white p-3">
                   <p className="mb-2 text-[11px] text-black/55">已上传封面</p>
-                  {defaultShowcaseCoverAssetId ? (
-                    <input type="hidden" name="existingShowcaseCoverAssetId" value={defaultShowcaseCoverAssetId} />
+                  {effectiveShowcaseCoverAssetId ? (
+                    <input type="hidden" name="existingShowcaseCoverAssetId" value={effectiveShowcaseCoverAssetId} />
                   ) : null}
                   <div className="grid gap-3 md:grid-cols-[132px_1fr]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={defaultShowcaseCoverUrl}
+                      src={effectiveShowcaseCoverUrl}
                       alt="Current model cover"
                       className="h-28 w-28 rounded-lg border border-[#BAE6FD] object-cover"
                     />
@@ -4300,7 +4523,7 @@ export function CreateProviderModelForm({
                         <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">封面提示词</span>
                         <textarea
                           name="existingShowcaseCoverPrompt"
-                          defaultValue={defaultShowcaseCoverPrompt}
+                          defaultValue={effectiveShowcaseCoverPrompt}
                           disabled={disabled}
                           className={formTextAreaClassName}
                           rows={4}
@@ -4350,16 +4573,16 @@ export function CreateProviderModelForm({
                 <p className="text-xs font-medium text-black/80">Playground 示例输入图</p>
                 <span className="text-[11px] text-black/45">图片编辑模型 demo 用</span>
               </div>
-              {defaultPlaygroundInputUrl ? (
+              {effectivePlaygroundInputUrl ? (
                 <div className="rounded-lg border border-[#BAE6FD] bg-white p-3">
                   <p className="mb-2 text-[11px] text-black/55">已上传示例输入图</p>
-                  {defaultPlaygroundInputAssetId ? (
-                    <input type="hidden" name="existingPlaygroundInputAssetId" value={defaultPlaygroundInputAssetId} />
+                  {effectivePlaygroundInputAssetId ? (
+                    <input type="hidden" name="existingPlaygroundInputAssetId" value={effectivePlaygroundInputAssetId} />
                   ) : null}
                   <div className="grid gap-3 md:grid-cols-[132px_1fr]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={defaultPlaygroundInputUrl}
+                      src={effectivePlaygroundInputUrl}
                       alt="Current playground input"
                       className="h-28 w-28 rounded-lg border border-[#BAE6FD] object-cover"
                     />
@@ -4368,7 +4591,7 @@ export function CreateProviderModelForm({
                         <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">示例说明</span>
                         <textarea
                           name="existingPlaygroundInputPrompt"
-                          defaultValue={defaultPlaygroundInputPrompt}
+                          defaultValue={effectivePlaygroundInputPrompt}
                           disabled={disabled}
                           className={formTextAreaClassName}
                           rows={4}
@@ -4417,16 +4640,16 @@ export function CreateProviderModelForm({
                   <p className="text-xs font-medium text-black/80">face_image 示例输入图</p>
                   <span className="text-[11px] text-black/45">搭配 face_image 字段自动填充</span>
                 </div>
-                {defaultFacePlaygroundInputUrl ? (
+                {effectiveFacePlaygroundInputUrl ? (
                   <div className="rounded-lg border border-[#BAE6FD] bg-[#F8FCFF] p-3">
                     <p className="mb-2 text-[11px] text-black/55">已上传 face_image 示例图</p>
-                    {defaultFacePlaygroundInputAssetId ? (
-                      <input type="hidden" name="existingFacePlaygroundInputAssetId" value={defaultFacePlaygroundInputAssetId} />
+                    {effectiveFacePlaygroundInputAssetId ? (
+                      <input type="hidden" name="existingFacePlaygroundInputAssetId" value={effectiveFacePlaygroundInputAssetId} />
                     ) : null}
                     <div className="grid gap-3 md:grid-cols-[132px_1fr]">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={defaultFacePlaygroundInputUrl}
+                        src={effectiveFacePlaygroundInputUrl}
                         alt="Current face_image playground input"
                         className="h-28 w-28 rounded-lg border border-[#BAE6FD] object-cover"
                       />
@@ -4435,7 +4658,7 @@ export function CreateProviderModelForm({
                           <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">face_image 示例说明</span>
                           <textarea
                             name="existingFacePlaygroundInputPrompt"
-                            defaultValue={defaultFacePlaygroundInputPrompt}
+                            defaultValue={effectiveFacePlaygroundInputPrompt}
                             disabled={disabled}
                             className={formTextAreaClassName}
                             rows={4}
@@ -4484,17 +4707,17 @@ export function CreateProviderModelForm({
             <section className="rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <p className="text-xs font-medium text-black/80">作品素材区域</p>
-                <span className="text-[11px] text-black/45">{defaultShowcaseGalleryUrls.length} 张已上传</span>
+                <span className="text-[11px] text-black/45">{effectiveShowcaseGalleryUrls.length} 张已上传</span>
               </div>
-              {defaultShowcaseGalleryUrls.length > 0 ? (
+              {effectiveShowcaseGalleryUrls.length > 0 ? (
                 <div className="space-y-2">
-                  {defaultShowcaseGalleryUrls.map((url, index) => (
+                  {effectiveShowcaseGalleryUrls.map((url, index) => (
                     <div key={url} className="rounded-lg border border-[#BAE6FD] bg-white p-3">
-                      {defaultShowcaseGalleryAssetIds[index] ? (
+                      {effectiveShowcaseGalleryAssetIds[index] ? (
                         <input
                           type="hidden"
                           name="existingShowcaseGalleryAssetIds"
-                          value={defaultShowcaseGalleryAssetIds[index]}
+                          value={effectiveShowcaseGalleryAssetIds[index]}
                         />
                       ) : null}
                       <p className="mb-2 text-[11px] text-black/45">作品图 {index + 1}</p>
@@ -4510,19 +4733,19 @@ export function CreateProviderModelForm({
                             <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">提示词</span>
                             <textarea
                               name="existingShowcaseGalleryPrompts"
-                              defaultValue={defaultShowcaseGalleryPrompts[index] ?? ""}
+                              defaultValue={effectiveShowcaseGalleryPrompts[index] ?? ""}
                               disabled={disabled}
                               className={formTextAreaClassName}
                               rows={3}
                               placeholder="给这张作品图补充或修改提示词"
                             />
                           </label>
-                          {defaultShowcaseGalleryAssetIds[index] ? (
+                          {effectiveShowcaseGalleryAssetIds[index] ? (
                             <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#B54432]">
                               <input
                                 type="checkbox"
                                 name="deleteShowcaseGalleryAssetIds"
-                                value={defaultShowcaseGalleryAssetIds[index]}
+                                value={effectiveShowcaseGalleryAssetIds[index]}
                                 className="size-3.5"
                               />
                               删除这张作品图

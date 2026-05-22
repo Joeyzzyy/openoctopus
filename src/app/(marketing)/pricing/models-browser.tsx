@@ -4,7 +4,11 @@ import type { PointerEvent as ReactPointerEvent, ReactNode, SyntheticEvent } fro
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, CircleHelp, Copy, Download, X } from "lucide-react";
-import type { GatewayErrorDocRow, ModelDocRow } from "../models/data";
+import type {
+  GatewayErrorDocRow,
+  ModelDocRow,
+  PlaygroundPromptComposerConfig,
+} from "../models/data";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
 
@@ -84,6 +88,8 @@ type TaskStatus =
   | "succeeded"
   | "failed";
 
+type PromptComposerSelectionMap = Record<string, string>;
+
 type MarkdownBlock =
   | { type: "heading"; level: 1 | 2 | 3; text: string }
   | { type: "blockquote"; text: string }
@@ -157,6 +163,43 @@ function formatPlaygroundError(payload: unknown) {
   return [code ? `[${code}]` : "", message, upstreamStatus ? `(status: ${upstreamStatus})` : "", upstreamBody ? `| upstream: ${upstreamBody}` : ""]
     .filter((part) => part.length > 0)
     .join(" ");
+}
+
+function buildPromptFromComposer(
+  composer: PlaygroundPromptComposerConfig | null,
+  defaultPrompt: string | null,
+  selectedValues: PromptComposerSelectionMap
+) {
+  if (!composer) return "";
+
+  const optionGroups = Array.isArray(composer.optionGroups) ? composer.optionGroups : [];
+  const sourceLines =
+    Array.isArray(composer.basePrompt) && composer.basePrompt.length > 0
+      ? composer.basePrompt
+      : [
+          "{default_prompt}",
+          ...optionGroups.map((group) => `{${group.key}_block}`),
+          "{negative_block}",
+        ];
+  const replacements = new Map<string, string>();
+  replacements.set("default_prompt", defaultPrompt?.trim() || "");
+  replacements.set("negative_block", composer.negativePrompt?.trim() || "");
+
+  for (const group of optionGroups) {
+    const selectedValue = selectedValues[group.key];
+    const selectedOption =
+      group.options.find((option) => option.value === selectedValue) ?? group.options[0] ?? null;
+    replacements.set(`${group.key}_block`, selectedOption?.promptBlock?.trim() || "");
+  }
+
+  return sourceLines
+    .map((line) =>
+      String(line ?? "")
+        .replace(/\{([a-zA-Z0-9_]+)\}/g, (_match, token) => replacements.get(token) ?? "")
+        .trim()
+    )
+    .filter((line) => line.length > 0)
+    .join("\n");
 }
 
 function formatDetailText(detail: unknown) {
@@ -1743,6 +1786,7 @@ export function ModelsBrowser({
   const [copiedCodeBlockId, setCopiedCodeBlockId] = useState<string | null>(null);
   const [playgroundOutput, setPlaygroundOutput] = useState<unknown>(null);
   const [playgroundForm, setPlaygroundForm] = useState<Record<string, string>>({});
+  const [selectedPromptOptions, setSelectedPromptOptions] = useState<PromptComposerSelectionMap>({});
   const [playgroundUploads, setPlaygroundUploads] = useState<Record<string, PlaygroundUpload[]>>({});
   const [chatComposer, setChatComposer] = useState("");
   const [chatConversation, setChatConversation] = useState<ChatPlaygroundMessage[]>([]);
@@ -1760,6 +1804,21 @@ export function ModelsBrowser({
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const maskDrawingRef = useRef(false);
   const maskLastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const promptComposer = selectedModel?.promptComposer ?? null;
+  const hasPromptComposer =
+    selectedModel?.capability !== "text_generation" &&
+    promptComposer !== null &&
+    Array.isArray(promptComposer.optionGroups) &&
+    promptComposer.optionGroups.length > 0;
+  const composedPrompt = useMemo(
+    () =>
+      buildPromptFromComposer(
+        promptComposer,
+        selectedModel?.playgroundDefaultPrompt ?? null,
+        selectedPromptOptions
+      ),
+    [promptComposer, selectedModel?.playgroundDefaultPrompt, selectedPromptOptions]
+  );
   const playgroundImageAssets = useMemo(
     () => extractImageAssets(playgroundOutput),
     [playgroundOutput]
@@ -1778,6 +1837,7 @@ export function ModelsBrowser({
   );
   useEffect(() => {
     setPlaygroundForm({});
+    setSelectedPromptOptions({});
     setPlaygroundUploads({});
     setChatComposer("");
     setChatConversation([]);
@@ -1786,6 +1846,39 @@ export function ModelsBrowser({
     setMaskEditorError(null);
     setUploadingFields({});
   }, [effectiveModelSlug]);
+  useEffect(() => {
+    if (!hasPromptComposer || !promptComposer) {
+      setSelectedPromptOptions({});
+      return;
+    }
+
+    setSelectedPromptOptions((current) => {
+      const next: PromptComposerSelectionMap = {};
+      let changed = false;
+      for (const group of promptComposer.optionGroups) {
+        const fallbackValue = group.options[0]?.value ?? "";
+        const existingValue = current[group.key];
+        const nextValue =
+          existingValue && group.options.some((option) => option.value === existingValue)
+            ? existingValue
+            : fallbackValue;
+        next[group.key] = nextValue;
+        if (current[group.key] !== nextValue) {
+          changed = true;
+        }
+      }
+      if (Object.keys(current).length !== Object.keys(next).length) {
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [hasPromptComposer, promptComposer, selectedModel?.publicModel]);
+  useEffect(() => {
+    if (!hasPromptComposer || !composedPrompt.trim()) return;
+    setPlaygroundForm((current) =>
+      current.prompt === composedPrompt ? current : { ...current, prompt: composedPrompt }
+    );
+  }, [composedPrompt, hasPromptComposer]);
   const handleProviderChange = (nextProvider: string) => {
     setRouteSkeletonVisible(true);
     setSelectedProvider(nextProvider);
@@ -1917,12 +2010,15 @@ export function ModelsBrowser({
     [isDocumentAnalysisModel, parsedFields]
   );
   const visiblePlaygroundFields = useMemo(() => {
-    if (!isDocumentAnalysisModel) return parsedFields;
-    return parsedFields.filter((field) => {
-      const leafKey = getFieldLeafKey(field.key);
-      return leafKey === "text" || leafKey === "file" || leafKey === "file_url" || leafKey === "document" || leafKey === "document_url";
-    });
-  }, [isDocumentAnalysisModel, parsedFields]);
+    const nextFields = !isDocumentAnalysisModel
+      ? parsedFields
+      : parsedFields.filter((field) => {
+          const leafKey = getFieldLeafKey(field.key);
+          return leafKey === "text" || leafKey === "file" || leafKey === "file_url" || leafKey === "document" || leafKey === "document_url";
+        });
+    if (!hasPromptComposer) return nextFields;
+    return nextFields.filter((field) => getFieldLeafKey(field.key) !== "prompt");
+  }, [hasPromptComposer, isDocumentAnalysisModel, parsedFields]);
   const chatConfigFields = useMemo(
     () =>
       parsedFields.filter(
@@ -2150,16 +2246,22 @@ export function ModelsBrowser({
   ]);
 
   useEffect(() => {
+    if (hasPromptComposer) return;
     const prefillPrompt = searchParams.get("prompt")?.trim();
-    if (!prefillPrompt) return;
     const hasPromptField = parsedFields.some((field) => field.key === "prompt");
+    const fallbackPrompt = selectedModel?.playgroundDefaultPrompt?.trim() || "";
+    const nextPrompt = prefillPrompt || fallbackPrompt;
+    if (!nextPrompt) return;
     if (isChatModel) {
-      setChatComposer(prefillPrompt);
+      setChatComposer(nextPrompt);
       return;
     }
     if (!hasPromptField) return;
-    setPlaygroundForm((current) => ({ ...current, prompt: prefillPrompt }));
-  }, [isChatModel, parsedFields, searchParams]);
+    setPlaygroundForm((current) => {
+      if (current.prompt?.trim()) return current;
+      return { ...current, prompt: nextPrompt };
+    });
+  }, [hasPromptComposer, isChatModel, parsedFields, searchParams, selectedModel?.playgroundDefaultPrompt]);
 
   useEffect(() => {
     if (!isDocumentAnalysisModel) return;
@@ -2528,6 +2630,9 @@ export function ModelsBrowser({
     let optimisticUserId: string | undefined;
 
     const nextValidationErrors: Record<string, string> = {};
+    if (hasPromptComposer && composedPrompt.trim().length === 0) {
+      nextValidationErrors.prompt = "Prompt options configuration did not produce a prompt.";
+    }
     for (const field of visiblePlaygroundFields) {
       if (isChatModel && field.key === "messages") {
         continue;
@@ -2908,6 +3013,9 @@ export function ModelsBrowser({
           continue;
         }
         setNestedValue(inputPayload, field.key, raw);
+      }
+      if (hasPromptComposer) {
+        promptValue = composedPrompt.trim();
       }
 
       const submitRes = await fetch("/api/playground", {
@@ -3481,7 +3589,7 @@ export function ModelsBrowser({
             <section className="rounded-lg border border-black/[0.08] bg-white p-3 sm:rounded-xl sm:p-4">
               <h3 className="mb-3 text-sm font-medium text-black">Input</h3>
               <div className="space-y-3">
-                {visiblePlaygroundFields.length === 0 ? (
+                {visiblePlaygroundFields.length === 0 && !hasPromptComposer ? (
                   <p className="text-sm text-black/55">
                     No structured input schema found. You can still submit with default empty input.
                   </p>
@@ -3510,6 +3618,64 @@ export function ModelsBrowser({
                             </button>
                           );
                         })}
+                      </div>
+                    </div>
+                  ) : null}
+                  {hasPromptComposer && promptComposer ? (
+                    <div className="rounded-md border border-[#BAE6FD] bg-[#F8FCFF] p-3">
+                      <div className="mb-3">
+                        <p className="text-xs font-medium text-black">Prompt options</p>
+                        <p className="mt-1 text-[11px] leading-5 text-black/55">
+                          Choose preset options below. Playground will generate the final prompt automatically.
+                        </p>
+                      </div>
+                      <div className="space-y-3">
+                        {promptComposer.optionGroups.map((group) => {
+                          const selectedValue = selectedPromptOptions[group.key] ?? group.options[0]?.value ?? "";
+                          const selectedOption =
+                            group.options.find((option) => option.value === selectedValue) ?? group.options[0] ?? null;
+                          return (
+                            <label key={group.key} className="block">
+                              <span className="mb-1 block text-xs text-black/65">
+                                {group.label || group.key}
+                                {group.required ? <span className="pl-1 text-red-500">*</span> : null}
+                              </span>
+                              <select
+                                disabled={isSubmitting}
+                                value={selectedValue}
+                                onChange={(event) =>
+                                  setSelectedPromptOptions((current) => ({
+                                    ...current,
+                                    [group.key]: event.target.value,
+                                  }))
+                                }
+                                className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03]"
+                              >
+                                {group.options.map((option) => (
+                                  <option key={`${group.key}-${option.value}`} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                              {selectedOption?.promptBlock ? (
+                                <p className="mt-1 text-[11px] leading-5 text-black/45">
+                                  {selectedOption.promptBlock}
+                                </p>
+                              ) : null}
+                            </label>
+                          );
+                        })}
+                        <label className="block">
+                          <span className="mb-1 block text-xs text-black/65">Generated prompt preview</span>
+                          <textarea
+                            readOnly
+                            value={composedPrompt}
+                            className="min-h-[150px] w-full rounded-md border border-black/[0.1] bg-white px-3 py-2 font-mono text-xs text-black/75"
+                          />
+                          {validationErrors.prompt ? (
+                            <p className="mt-1 text-[11px] text-[#D94A38]">{validationErrors.prompt}</p>
+                          ) : null}
+                        </label>
                       </div>
                     </div>
                   ) : null}
@@ -3901,9 +4067,9 @@ export function ModelsBrowser({
               </div>
             </section>
 
-            <section className="flex min-h-[300px] flex-col rounded-lg border border-black/[0.08] bg-[#FAFAFA] p-3 sm:min-h-[360px] sm:rounded-xl sm:p-4">
-              <div className="mb-3 rounded-lg border border-black/[0.06] bg-white px-3 py-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
+            <section className="flex min-h-[260px] flex-col rounded-lg border border-black/[0.08] bg-[#FAFAFA] p-3 sm:min-h-[320px] sm:rounded-xl sm:p-4">
+              <div className="mb-3 rounded-lg border border-black/[0.06] bg-white px-3 py-1.5">
+                <div className="flex min-h-8 flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-medium text-black">Output</h3>
                   <div className="flex flex-wrap items-center gap-2">
                     {playgroundOutput ? (
@@ -3922,7 +4088,7 @@ export function ModelsBrowser({
                     </span>
                   </div>
                 </div>
-                <div className="mt-2 flex flex-col gap-2 border-t border-black/[0.06] pt-2 sm:flex-row sm:items-center sm:justify-end">
+                <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                   <div className="flex flex-wrap items-center gap-2">
                     {playgroundImageAssets.length > 0 ? (
                       <button
@@ -3953,7 +4119,7 @@ export function ModelsBrowser({
                 </div>
               </div>
               {playgroundError ? (
-                <div className="flex min-h-[220px] flex-1 items-center sm:min-h-[280px]">
+                <div className="flex min-h-[180px] flex-1 items-center sm:min-h-[220px]">
                   <div className="w-full">
                     <p className="w-full whitespace-pre-wrap break-all rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                       {playgroundError}
@@ -3972,7 +4138,7 @@ export function ModelsBrowser({
                   </div>
                 </div>
               ) : isSubmitting ? (
-                <div className="flex min-h-[220px] flex-1 flex-col items-center justify-center rounded-md border border-black/[0.08] bg-white sm:min-h-[280px]">
+                <div className="flex min-h-[180px] flex-1 flex-col items-center justify-center rounded-md border border-black/[0.08] bg-white sm:min-h-[220px]">
                   <span className="inline-flex size-7 animate-spin rounded-full border-2 border-[#BAE6FD] border-t-[#38BDF8]" />
                   <p className="mt-3 text-sm font-medium text-black">Generating...</p>
                   <p className="mt-1 text-xs text-black/55">{taskStatusLabel(taskStatus)}</p>
@@ -4103,7 +4269,7 @@ export function ModelsBrowser({
                   ) : null}
                 </div>
               ) : (
-                <div className="flex min-h-[220px] flex-1 items-center justify-center rounded-md border border-black/[0.08] bg-white px-4 sm:min-h-[280px]">
+                <div className="flex min-h-[180px] flex-1 items-center justify-center rounded-md border border-black/[0.08] bg-white px-4 sm:min-h-[220px]">
                   <p className="text-center text-sm text-black/55">
                     {`Submit ${modelSlugTail} to preview result here.`}
                   </p>
