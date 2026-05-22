@@ -367,6 +367,7 @@ type InternalAdminDataOptions = {
   userSearch?: string | null;
   modelPage?: number;
   modelPageSize?: number;
+  modelSearch?: string | null;
   modelTypeFilter?: string | null;
   modelStatusFilter?: "all" | "active" | "inactive";
   internalAiUsagePage?: number;
@@ -1287,6 +1288,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const userSearch = options.userSearch?.trim() ?? "";
   const modelPageSize = Math.min(Math.max(options.modelPageSize ?? 10, 1), 50);
   const modelPage = Math.max(Math.floor(options.modelPage ?? 1), 1);
+  const modelSearch = options.modelSearch?.trim() ?? "";
   const modelTypeFilter = options.modelTypeFilter?.trim() ?? "all";
   const modelStatusFilter = options.modelStatusFilter ?? "all";
   const internalAiUsagePageSize = Math.min(Math.max(options.internalAiUsagePageSize ?? 10, 1), 50);
@@ -1346,6 +1348,12 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
               .order("created_at", { ascending: true });
             if (shouldPaginatePublicModels && modelStatusFilter !== "all") {
               query = query.eq("active", modelStatusFilter === "active");
+            }
+            if (shouldPaginatePublicModels && modelSearch) {
+              const escapedSearch = modelSearch.replace(/[%_,]/g, (char) => `\\${char}`);
+              query = query.or(
+                `display_name.ilike.%${escapedSearch}%,model_slug.ilike.%${escapedSearch}%`
+              );
             }
             if (shouldPaginatePublicModels && modelTypeFilter !== "all") {
               query = query.filter("billing_config->metadata->>modelType", "eq", modelTypeFilter);

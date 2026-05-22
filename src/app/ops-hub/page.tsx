@@ -886,6 +886,7 @@ export default async function InternalPage({
   const selectedModelPage = Number.isFinite(selectedModelPageRaw) && selectedModelPageRaw >= 1
     ? Math.floor(selectedModelPageRaw)
     : 1;
+  const selectedModelSearch = getSearchValue(resolvedSearchParams, "modelSearch") ?? "";
   const selectedModelType = getSearchValue(resolvedSearchParams, "modelType") ?? "all";
   const selectedModelStatusRaw = getSearchValue(resolvedSearchParams, "modelStatus") ?? "all";
   const selectedModelStatus =
@@ -911,7 +912,8 @@ export default async function InternalPage({
     userPageSize: 10,
     userSearch: selectedUserSearch,
     modelPage: selectedModelPage,
-    modelPageSize: 10,
+    modelPageSize: 15,
+    modelSearch: selectedModelSearch,
     modelTypeFilter: selectedModelType,
     modelStatusFilter: selectedModelStatus,
     internalAiUsagePage: selectedInternalAiUsagePage,
@@ -1059,22 +1061,14 @@ export default async function InternalPage({
               <section className="mb-6">
                 <SectionShell
                 id="public-models-panel"
-                title={internalCopy.sections.publicModels}
+                title=""
                 description=" "
-                headerRight={
-                  <div className="flex items-center gap-2">
-                    <CreateSupportedModelButton
-                      capabilityOptions={displayCapabilityOptions}
-                      modelTypeOptions={data.staticModelTypeOptions}
-                      modelVendors={data.modelVendors}
-                      models={data.supportedModels}
-                    />
-                  </div>
-                }
+                headerRight={null}
                 >
                 <PublicModelsPanel
                   models={data.supportedModels}
                   modelPagination={data.supportedModelPagination}
+                  modelSearch={selectedModelSearch}
                   modelTypeFilter={selectedModelType}
                   modelStatusFilter={selectedModelStatus}
                   providerModels={data.providerModels}
@@ -1084,6 +1078,14 @@ export default async function InternalPage({
                   modelVendors={data.modelVendors}
                   modelTypeOptions={data.staticModelTypeOptions}
                   capabilityOptions={displayCapabilityOptions}
+                  headerAction={
+                    <CreateSupportedModelButton
+                      capabilityOptions={displayCapabilityOptions}
+                      modelTypeOptions={data.staticModelTypeOptions}
+                      modelVendors={data.modelVendors}
+                      models={data.supportedModels}
+                    />
+                  }
                 />
                 </SectionShell>
               </section>

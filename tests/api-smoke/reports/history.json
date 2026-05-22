@@ -1,5 +1,1047 @@
 [
   {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "reference-only-anomaly-generation-baseline",
+    "caseId": "reference-only-anomaly-generation-baseline-basic",
+    "model": "openoctopus/reference-only-anomaly-generation-baseline",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/reference-only-anomaly-generation-baseline",
+      "input": {
+        "image_url": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/06882d5f-d093-44c5-a277-63c34c9cfe70/playground-input-1779003530279-1776786640458643012-6ubpclu4.png",
+        "reference_url": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/588ee0a8-692a-4a8b-8056-a455a227c6a9/playground-input-1779078881540-1767172504525281953-tnvfnljh.png",
+        "mask_url": "https://dummyimage.com/1024x1024/ffffff/ffffff.png",
+        "output_format": "png"
+      }
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T08:42:52.400Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "5799e6d8-d8d4-4342-b62a-20295e2400e9",
+    "finalStatus": "succeeded",
+    "assetCount": 1,
+    "submitResponse": {
+      "id": "5799e6d8-d8d4-4342-b62a-20295e2400e9",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/5799e6d8-d8d4-4342-b62a-20295e2400e9",
+    "taskResponse": {
+      "id": "5799e6d8-d8d4-4342-b62a-20295e2400e9",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "succeeded",
+      "capability": "image_generation",
+      "public_model_slug": "openoctopus/reference-only-anomaly-generation-baseline",
+      "output_payload": {
+        "format": "openoctopus.image.output.v1",
+        "assets": [
+          {
+            "id": "0",
+            "index": 0,
+            "type": "image",
+            "url": "/v1/files/5799e6d8-d8d4-4342-b62a-20295e2400e9/assets/0",
+            "mimeType": "image/png"
+          }
+        ]
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T08:42:57.456856+00:00",
+      "completed_at": "2026-05-22T08:43:34.948+00:00"
+    },
+    "completedAt": "2026-05-22T08:43:35.924Z",
+    "latencyMs": 43524
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "image-face-swap",
+    "caseId": "image-face-swap-basic",
+    "model": "openoctopus/image-face-swap",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/image-face-swap",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "image": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/9f04a680-41c4-48d5-bceb-06796066214e/playground-input-1779074527416-1752459923195240956-ohfc951y.jpg",
+        "face_image": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/9f04a680-41c4-48d5-bceb-06796066214e/gallery-1779074529509-0-1752459933783339486-bt840wsp.jpg",
+        "target_index": 0,
+        "output_format": "jpeg",
+        "enable_base64_output": false,
+        "enable_sync_mode": false
+      }
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T08:32:20.195Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "63c419bc-21c2-49b9-96cb-691972801cf8",
+    "finalStatus": "succeeded",
+    "assetCount": 1,
+    "submitResponse": {
+      "id": "63c419bc-21c2-49b9-96cb-691972801cf8",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/63c419bc-21c2-49b9-96cb-691972801cf8",
+    "taskResponse": {
+      "id": "63c419bc-21c2-49b9-96cb-691972801cf8",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "succeeded",
+      "capability": "image_generation",
+      "public_model_slug": "openoctopus/image-face-swap",
+      "output_payload": {
+        "format": "openoctopus.image.output.v1",
+        "assets": [
+          {
+            "id": "0",
+            "index": 0,
+            "type": "image",
+            "url": "/v1/files/63c419bc-21c2-49b9-96cb-691972801cf8/assets/0",
+            "mimeType": "image/jpeg"
+          }
+        ]
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T08:32:25.003329+00:00",
+      "completed_at": "2026-05-22T08:32:41.263+00:00"
+    },
+    "completedAt": "2026-05-22T08:32:43.168Z",
+    "latencyMs": 22973
+  },
+  {
+    "api": "POST /v1/chat/completions",
+    "script": "tests/api-smoke/scripts/chat.completions.mjs",
+    "suite": "gemini-3.5-flash",
+    "caseId": "gemini-3.5-flash-basic",
+    "model": "openoctopus/gemini-3.5-flash",
+    "endpoint": "/v1/chat/completions",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/chat/completions",
+    "requestPayload": {
+      "model": "openoctopus/gemini-3.5-flash",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Explain what an API smoke test checks in one short paragraph."
+        }
+      ],
+      "input": {
+        "temperature": 0.2,
+        "max_tokens": 120
+      }
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T08:04:49.460Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "ea5f64e9-5b05-46af-a06d-83d1a9850506",
+    "finalStatus": "succeeded",
+    "outputTextLength": 12,
+    "submitResponse": {
+      "id": "ea5f64e9-5b05-46af-a06d-83d1a9850506",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/ea5f64e9-5b05-46af-a06d-83d1a9850506",
+    "taskResponse": {
+      "id": "ea5f64e9-5b05-46af-a06d-83d1a9850506",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "succeeded",
+      "capability": "text_generation",
+      "public_model_slug": "openoctopus/gemini-3.5-flash",
+      "output_payload": {
+        "format": "openoctopus.text.output.v1",
+        "text": "An API smoke",
+        "message": {
+          "role": "assistant",
+          "content": "An API smoke"
+        }
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T08:04:51.982924+00:00",
+      "completed_at": "2026-05-22T08:04:56.091+00:00"
+    },
+    "completedAt": "2026-05-22T08:04:56.477Z",
+    "latencyMs": 7017
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "nano-banana-pro",
+    "caseId": "nano-banana-pro-basic",
+    "model": "openoctopus/nano-banana-pro",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/nano-banana-pro",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "output_format": "png",
+        "enable_sync_mode": false,
+        "enable_base64_output": false
+      }
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T08:03:08.141Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "1e8365e9-816a-4476-a2b3-b67035e862e9",
+    "finalStatus": "succeeded",
+    "assetCount": 1,
+    "submitResponse": {
+      "id": "1e8365e9-816a-4476-a2b3-b67035e862e9",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/1e8365e9-816a-4476-a2b3-b67035e862e9",
+    "taskResponse": {
+      "id": "1e8365e9-816a-4476-a2b3-b67035e862e9",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "succeeded",
+      "capability": "image_generation",
+      "public_model_slug": "openoctopus/nano-banana-pro",
+      "output_payload": {
+        "format": "openoctopus.image.output.v1",
+        "assets": [
+          {
+            "id": "0",
+            "index": 0,
+            "type": "image",
+            "url": "/v1/files/1e8365e9-816a-4476-a2b3-b67035e862e9/assets/0",
+            "mimeType": "image/png"
+          }
+        ]
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T08:03:15.928274+00:00",
+      "completed_at": "2026-05-22T08:04:25.093+00:00"
+    },
+    "completedAt": "2026-05-22T08:04:27.108Z",
+    "latencyMs": 78967
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "image-face-swap-pro",
+    "caseId": "image-face-swap-pro-basic",
+    "model": "openoctopus/image-face-swap-pro",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/image-face-swap-pro",
+      "prompt": "swap the face while preserving lighting and expression",
+      "input": {
+        "image": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/9f04a680-41c4-48d5-bceb-06796066214e/playground-input-1779074527416-1752459923195240956-ohfc951y.jpg",
+        "face_image": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/9f04a680-41c4-48d5-bceb-06796066214e/gallery-1779074529509-0-1752459933783339486-bt840wsp.jpg",
+        "output_format": "jpeg",
+        "enable_base64_output": false,
+        "enable_sync_mode": false
+      }
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T08:03:10.570Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "8c039b2f-7b7a-456e-bca9-0cd82814d233",
+    "finalStatus": "succeeded",
+    "assetCount": 1,
+    "submitResponse": {
+      "id": "8c039b2f-7b7a-456e-bca9-0cd82814d233",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/8c039b2f-7b7a-456e-bca9-0cd82814d233",
+    "taskResponse": {
+      "id": "8c039b2f-7b7a-456e-bca9-0cd82814d233",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "succeeded",
+      "capability": "image_generation",
+      "public_model_slug": "openoctopus/image-face-swap-pro",
+      "output_payload": {
+        "format": "openoctopus.image.output.v1",
+        "assets": [
+          {
+            "id": "0",
+            "index": 0,
+            "type": "image",
+            "url": "/v1/files/8c039b2f-7b7a-456e-bca9-0cd82814d233/assets/0",
+            "mimeType": "image/jpeg"
+          }
+        ]
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T08:03:13.725247+00:00",
+      "completed_at": "2026-05-22T08:03:54.347+00:00"
+    },
+    "completedAt": "2026-05-22T08:03:57.305Z",
+    "latencyMs": 46735
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "reference-only-anomaly-generation-baseline",
+    "caseId": "reference-only-anomaly-generation-baseline-basic",
+    "model": "openoctopus/reference-only-anomaly-generation-baseline",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/reference-only-anomaly-generation-baseline",
+      "input": {
+        "image_url": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/06882d5f-d093-44c5-a277-63c34c9cfe70/playground-input-1779003530279-1776786640458643012-6ubpclu4.png",
+        "reference_url": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/588ee0a8-692a-4a8b-8056-a455a227c6a9/playground-input-1779078881540-1767172504525281953-tnvfnljh.png",
+        "mask_url": "https://dummyimage.com/1024x1024/ffffff/ffffff.png",
+        "output_format": "png"
+      }
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T08:03:09.525Z",
+    "success": false,
+    "submitStatus": 202,
+    "taskId": "a4a89897-40bd-4736-9cd1-1467867f2869",
+    "submitResponse": {
+      "id": "a4a89897-40bd-4736-9cd1-1467867f2869",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/a4a89897-40bd-4736-9cd1-1467867f2869",
+    "taskResponse": {
+      "id": "a4a89897-40bd-4736-9cd1-1467867f2869",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "failed",
+      "capability": "image_generation",
+      "public_model_slug": "openoctopus/reference-only-anomaly-generation-baseline",
+      "output_payload": {},
+      "error_code": "provider_submit_failed",
+      "error_message": "The generation provider could not accept the request. Please retry shortly.",
+      "created_at": "2026-05-22T08:03:12.350637+00:00",
+      "completed_at": "2026-05-22T08:03:15.443+00:00",
+      "error": {
+        "code": "provider_submit_failed",
+        "message": "The generation provider could not accept the request. Please retry shortly.",
+        "retryable": true
+      }
+    },
+    "errorMessage": "The generation provider could not accept the request. Please retry shortly.",
+    "completedAt": "2026-05-22T08:03:28.713Z",
+    "latencyMs": 19188
+  },
+  {
+    "api": "POST /v1/chat/completions",
+    "script": "tests/api-smoke/scripts/chat.completions.mjs",
+    "suite": "gemini-3.5-flash",
+    "caseId": "gemini-3.5-flash-basic",
+    "model": "openoctopus/gemini-3.5-flash",
+    "endpoint": "/v1/chat/completions",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/chat/completions",
+    "requestPayload": {
+      "model": "openoctopus/gemini-3.5-flash",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Explain what an API smoke test checks in one short paragraph."
+        }
+      ],
+      "input": {
+        "temperature": 0.2,
+        "max_tokens": 120
+      }
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T08:03:06.140Z",
+    "success": false,
+    "submitStatus": 202,
+    "taskId": "243258d6-18ee-4655-906c-8b83ff6a6fb7",
+    "submitResponse": {
+      "id": "243258d6-18ee-4655-906c-8b83ff6a6fb7",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/243258d6-18ee-4655-906c-8b83ff6a6fb7",
+    "taskResponse": {
+      "id": "243258d6-18ee-4655-906c-8b83ff6a6fb7",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "succeeded",
+      "capability": "text_generation",
+      "public_model_slug": "openoctopus/gemini-3.5-flash",
+      "output_payload": {
+        "format": "openoctopus.text.output.v1",
+        "text": "An API smoke test",
+        "message": {
+          "role": "assistant",
+          "content": "An API smoke test"
+        }
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T08:03:08.980953+00:00",
+      "completed_at": "2026-05-22T08:03:20.021+00:00"
+    },
+    "errorMessage": "Expected at least 20 characters of output text, received 17",
+    "completedAt": "2026-05-22T08:03:21.129Z",
+    "latencyMs": 14989
+  },
+  {
+    "api": "POST /v1/documents/analyses",
+    "script": "tests/api-smoke/scripts/documents.analyses.mjs",
+    "suite": "ai-detection",
+    "caseId": "ai-detection-basic",
+    "model": "openoctopus/ai-detection",
+    "endpoint": "/v1/documents/analyses",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/documents/analyses",
+    "requestPayload": {
+      "model": "openoctopus/ai-detection",
+      "input": {
+        "text": "This sample is intentionally long enough to satisfy the Winston minimum length requirement while still being deterministic for smoke testing. It explains an API workflow in plain language, repeats the core idea a few times, and avoids local files so the test can run anywhere with only an API key. The purpose is to verify queueing, provider routing, polling, output normalization, and final score extraction across the full document analysis request lifecycle."
+      }
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T07:42:55.247Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "99b84b1e-43cf-4713-be4c-c9ccbb951ded",
+    "finalStatus": "succeeded",
+    "analysisStatus": "COMPLETED",
+    "humanScore": 0.49,
+    "readabilityScore": 26.2,
+    "submitResponse": {
+      "id": "99b84b1e-43cf-4713-be4c-c9ccbb951ded",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/99b84b1e-43cf-4713-be4c-c9ccbb951ded",
+    "taskResponse": {
+      "id": "99b84b1e-43cf-4713-be4c-c9ccbb951ded",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "succeeded",
+      "capability": "document_analysis",
+      "public_model_slug": "openoctopus/ai-detection",
+      "output_payload": {
+        "format": "openoctopus.document_analysis.output.v1",
+        "status": "COMPLETED",
+        "score": {
+          "input": "text",
+          "score": 0.49,
+          "version": "4.14",
+          "language": "en",
+          "sentences": [
+            {
+              "text": "This sample is intentionally long enough to satisfy the Winston minimum length requirement while still being deterministic for smoke testing.",
+              "score": 0,
+              "length": 141
+            },
+            {
+              "text": "It explains an API workflow in plain language, repeats the core idea a few times, and avoids local files so the test can run anywhere with only an API key.",
+              "score": 0,
+              "length": 156
+            },
+            {
+              "text": "The purpose is to verify queueing, provider routing, polling, output normalization, and final score extraction across the full document analysis request lifecycle.",
+              "score": 0,
+              "length": 164
+            }
+          ],
+          "human_score": 0.49,
+          "credits_used": 72,
+          "attack_detected": {
+            "homoglyph_attack": false,
+            "zero_width_space": false
+          },
+          "credits_remaining": 500799,
+          "readability_score": 26.2
+        }
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T07:42:57.870209+00:00",
+      "completed_at": "2026-05-22T07:43:01.057+00:00"
+    },
+    "completedAt": "2026-05-22T07:43:01.957Z",
+    "latencyMs": 6710
+  },
+  {
+    "api": "POST /v1/code/chat/completions",
+    "script": "tests/api-smoke/scripts/code.chat.completions.mjs",
+    "suite": "deepcode",
+    "caseId": "deepcode-stream-basic",
+    "model": "openoctopus/deepcode",
+    "endpoint": "/v1/code/chat/completions",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/code/chat/completions",
+    "requestPayload": {
+      "model": "openoctopus/deepcode",
+      "stream": true,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Reply with a single short sentence explaining what a smoke test is."
+        }
+      ]
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T07:42:45.586Z",
+    "success": true,
+    "submitStatus": 200,
+    "finalStatus": "stream_succeeded",
+    "outputTextLength": 158,
+    "submitResponse": {
+      "contentType": "text/event-stream; charset=utf-8",
+      "raw": "data: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":null,\"reasoning_content\":\"\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\"We\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" are\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" asked\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\":\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" \\\"\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\"Reply\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" with\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" a\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" single\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" short\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" sentence\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" explaining\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" what\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" a\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" smoke\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" test\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" is\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\".\\\"\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" So\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" I\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" need\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" to\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" craft\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" one\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" sentence\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" that\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" defines\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" a\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" smoke\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" test\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\",\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" likely\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" in\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" software\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" or\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" hardware\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" contexts\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\".\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" A\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" smoke\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" test\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" is\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" a\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" preliminary\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" test\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" to\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" check\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" the\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" basic\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" functionality\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" of\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" a\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" system\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\",\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" to\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" see\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" if\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" it\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\"'s\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" stable\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" enough\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" for\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" further\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" testing\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\".\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" I\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\"'ll\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" phrase\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" it\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\" succinct\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\"ly\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"reasoning_content\":\".\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"A\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" smoke\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" test\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" is\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" a\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" quick\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\",\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" preliminary\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" check\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" to\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" verify\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" that\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" the\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" most\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" critical\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" functions\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" of\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" a\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" system\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" work\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" correctly\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" before\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" proceeding\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" with\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" more\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" thorough\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" testing\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\".\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\ndata: {\"id\":\"670b4996-fd4b-450c-9e82-3bb3466f6695\",\"object\":\"chat.completion.chunk\",\"created\":1779435770,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":17,\"completion_tokens\":101,\"total_tokens\":118,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":72},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":17}}\n\ndata: [DONE]\n\n",
+      "usage": {
+        "prompt_tokens": 17,
+        "completion_tokens": 101,
+        "total_tokens": 118,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 72
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 17
+      }
+    },
+    "completedAt": "2026-05-22T07:42:54.983Z",
+    "latencyMs": 9397
+  },
+  {
+    "api": "POST /v1/chat/completions",
+    "script": "tests/api-smoke/scripts/chat.completions.mjs",
+    "suite": "deepseek-v4-pro",
+    "caseId": "deepseek-v4-pro-basic",
+    "model": "openoctopus/deepseek-v4-pro",
+    "endpoint": "/v1/chat/completions",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/chat/completions",
+    "requestPayload": {
+      "model": "openoctopus/deepseek-v4-pro",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Summarize async polling for AI generation APIs in exactly 3 concise bullet points."
+        }
+      ]
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T07:42:22.207Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "d72d00fa-dad4-41fd-9498-38988f122ea5",
+    "finalStatus": "succeeded",
+    "outputTextLength": 450,
+    "submitResponse": {
+      "id": "d72d00fa-dad4-41fd-9498-38988f122ea5",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/d72d00fa-dad4-41fd-9498-38988f122ea5",
+    "taskResponse": {
+      "id": "d72d00fa-dad4-41fd-9498-38988f122ea5",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "succeeded",
+      "capability": "text_generation",
+      "public_model_slug": "openoctopus/deepseek-v4-pro",
+      "output_payload": {
+        "format": "openoctopus.text.output.v1",
+        "text": "- Submit a generation request to receive a unique task ID, then repeatedly query a status endpoint to track progress until the result is ready.\n- Poll in a loop with a delay (often using exponential backoff) and handle intermediate states (e.g., queued, processing) and terminal states (completed, failed).\n- This pattern decouples client and server, allows long-running AI tasks without holding open connections, and improves scalability under load.",
+        "message": {
+          "role": "assistant",
+          "content": "- Submit a generation request to receive a unique task ID, then repeatedly query a status endpoint to track progress until the result is ready.\n- Poll in a loop with a delay (often using exponential backoff) and handle intermediate states (e.g., queued, processing) and terminal states (completed, failed).\n- This pattern decouples client and server, allows long-running AI tasks without holding open connections, and improves scalability under load."
+        }
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T07:42:25.150744+00:00",
+      "completed_at": "2026-05-22T07:42:43.942+00:00"
+    },
+    "completedAt": "2026-05-22T07:42:45.283Z",
+    "latencyMs": 23076
+  },
+  {
+    "api": "POST /v1/videos/generations",
+    "script": "tests/api-smoke/scripts/videos.generations.mjs",
+    "suite": "veo3-fast",
+    "caseId": "veo3-fast-basic",
+    "model": "openoctopus/google/veo3-fast",
+    "endpoint": "/v1/videos/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/videos/generations",
+    "requestPayload": {
+      "model": "openoctopus/google/veo3-fast",
+      "prompt": "a cinematic octopus swimming through a neon underwater city",
+      "input": {
+        "duration": 4,
+        "resolution": "720p"
+      }
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T07:39:34.180Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "9351a4bb-a7b6-4d88-83d5-7f5203c478fd",
+    "finalStatus": "succeeded",
+    "assetCount": 1,
+    "submitResponse": {
+      "id": "9351a4bb-a7b6-4d88-83d5-7f5203c478fd",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/9351a4bb-a7b6-4d88-83d5-7f5203c478fd",
+    "taskResponse": {
+      "id": "9351a4bb-a7b6-4d88-83d5-7f5203c478fd",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "succeeded",
+      "capability": "video_generation",
+      "public_model_slug": "openoctopus/google/veo3-fast",
+      "output_payload": {
+        "format": "openoctopus.video.output.v1",
+        "assets": [
+          {
+            "id": "0",
+            "index": 0,
+            "type": "video",
+            "url": "https://api.openoctopus.com/v1/files/9351a4bb-a7b6-4d88-83d5-7f5203c478fd/assets/0",
+            "mimeType": "video/mp4",
+            "durationSeconds": 4
+          }
+        ],
+        "durationSeconds": 4
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T07:39:37.994616+00:00",
+      "completed_at": "2026-05-22T07:40:43.239+00:00"
+    },
+    "completedAt": "2026-05-22T07:40:45.179Z",
+    "latencyMs": 70999
+  },
+  {
+    "api": "POST /v1/videos/generations",
+    "script": "tests/api-smoke/scripts/videos.generations.mjs",
+    "suite": "veo3-fast",
+    "caseId": "veo3-fast-omit-reference-assets",
+    "model": "openoctopus/google/veo3-fast",
+    "endpoint": "/v1/videos/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/videos/generations",
+    "requestPayload": {
+      "model": "openoctopus/google/veo3-fast",
+      "prompt": "a cinematic octopus swimming through a neon underwater city",
+      "input": {
+        "duration": 4,
+        "resolution": "720p"
+      }
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T07:40:45.179Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "c1928e41-bf59-48c0-9445-a94294c1bbcb",
+    "finalStatus": "succeeded",
+    "assetCount": 1,
+    "submitResponse": {
+      "id": "c1928e41-bf59-48c0-9445-a94294c1bbcb",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/c1928e41-bf59-48c0-9445-a94294c1bbcb",
+    "taskResponse": {
+      "id": "c1928e41-bf59-48c0-9445-a94294c1bbcb",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "succeeded",
+      "capability": "video_generation",
+      "public_model_slug": "openoctopus/google/veo3-fast",
+      "output_payload": {
+        "format": "openoctopus.video.output.v1",
+        "assets": [
+          {
+            "id": "0",
+            "index": 0,
+            "type": "video",
+            "url": "/v1/files/c1928e41-bf59-48c0-9445-a94294c1bbcb/assets/0",
+            "mimeType": "video/mp4",
+            "durationSeconds": 4
+          }
+        ],
+        "durationSeconds": 4
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T07:40:47.641422+00:00",
+      "completed_at": "2026-05-22T07:42:21.058+00:00"
+    },
+    "completedAt": "2026-05-22T07:42:21.941Z",
+    "latencyMs": 96762
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "imagen-4",
+    "caseId": "imagen-4-basic",
+    "model": "openoctopus/imagen-4",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/imagen-4",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "num_images": 1,
+        "enable_base64_output": false
+      }
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T07:38:20.020Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "1254d47c-613f-4faf-a957-517136cc470e",
+    "finalStatus": "succeeded",
+    "assetCount": 1,
+    "submitResponse": {
+      "id": "1254d47c-613f-4faf-a957-517136cc470e",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/1254d47c-613f-4faf-a957-517136cc470e",
+    "taskResponse": {
+      "id": "1254d47c-613f-4faf-a957-517136cc470e",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "succeeded",
+      "capability": "image_generation",
+      "public_model_slug": "openoctopus/imagen-4",
+      "output_payload": {
+        "format": "openoctopus.image.output.v1",
+        "assets": [
+          {
+            "id": "0",
+            "index": 0,
+            "type": "image",
+            "url": "/v1/files/1254d47c-613f-4faf-a957-517136cc470e/assets/0",
+            "mimeType": "image/png"
+          }
+        ]
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T07:38:23.228125+00:00",
+      "completed_at": "2026-05-22T07:38:58.873+00:00"
+    },
+    "completedAt": "2026-05-22T07:39:01.652Z",
+    "latencyMs": 41632
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "imagen-4",
+    "caseId": "imagen-4-omit-reference-assets",
+    "model": "openoctopus/imagen-4",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/imagen-4",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "num_images": 1,
+        "enable_base64_output": false
+      }
+    },
+    "keyPrefix": "ooq_apS...hwi8",
+    "startedAt": "2026-05-22T07:39:01.652Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "9f52e5c9-e588-4887-82e4-f3bf90a3f8d9",
+    "finalStatus": "succeeded",
+    "assetCount": 1,
+    "submitResponse": {
+      "id": "9f52e5c9-e588-4887-82e4-f3bf90a3f8d9",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/9f52e5c9-e588-4887-82e4-f3bf90a3f8d9",
+    "taskResponse": {
+      "id": "9f52e5c9-e588-4887-82e4-f3bf90a3f8d9",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "dc561a50-8bd8-450d-a814-ff59a58f122b",
+      "status": "succeeded",
+      "capability": "image_generation",
+      "public_model_slug": "openoctopus/imagen-4",
+      "output_payload": {
+        "format": "openoctopus.image.output.v1",
+        "assets": [
+          {
+            "id": "0",
+            "index": 0,
+            "type": "image",
+            "url": "/v1/files/9f52e5c9-e588-4887-82e4-f3bf90a3f8d9/assets/0",
+            "mimeType": "image/png"
+          }
+        ]
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T07:39:04.141214+00:00",
+      "completed_at": "2026-05-22T07:39:30.793+00:00"
+    },
+    "completedAt": "2026-05-22T07:39:33.898Z",
+    "latencyMs": 32246
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "imagen-4",
+    "caseId": "imagen-4-basic",
+    "model": "openoctopus/imagen-4",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/imagen-4",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "num_images": 1,
+        "enable_base64_output": false
+      }
+    },
+    "keyPrefix": "ooq_1go...1xe0",
+    "startedAt": "2026-05-22T07:31:27.781Z",
+    "success": true,
+    "submitStatus": 202,
+    "taskId": "5c307609-d38e-4cc4-ba65-87e7864bc039",
+    "finalStatus": "succeeded",
+    "assetCount": 1,
+    "submitResponse": {
+      "id": "5c307609-d38e-4cc4-ba65-87e7864bc039",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/5c307609-d38e-4cc4-ba65-87e7864bc039",
+    "taskResponse": {
+      "id": "5c307609-d38e-4cc4-ba65-87e7864bc039",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "b3873e90-fe72-4cb6-b6f0-a73e624548cd",
+      "status": "succeeded",
+      "capability": "image_generation",
+      "public_model_slug": "openoctopus/imagen-4",
+      "output_payload": {
+        "format": "openoctopus.image.output.v1",
+        "assets": [
+          {
+            "id": "0",
+            "index": 0,
+            "type": "image",
+            "url": "/v1/files/5c307609-d38e-4cc4-ba65-87e7864bc039/assets/0",
+            "mimeType": "image/png"
+          }
+        ]
+      },
+      "error_code": null,
+      "error_message": null,
+      "created_at": "2026-05-22T07:31:30.745955+00:00",
+      "completed_at": "2026-05-22T07:32:04.508+00:00"
+    },
+    "completedAt": "2026-05-22T07:32:05.102Z",
+    "latencyMs": 37321
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "imagen-4",
+    "caseId": "imagen-4-omit-reference-assets",
+    "model": "openoctopus/imagen-4",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/imagen-4",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "num_images": 1,
+        "enable_base64_output": false
+      }
+    },
+    "keyPrefix": "ooq_1go...1xe0",
+    "startedAt": "2026-05-22T07:32:05.102Z",
+    "success": false,
+    "submitStatus": 202,
+    "taskId": "efc68229-a314-4ffe-90a9-adab7f40e9ae",
+    "submitResponse": {
+      "id": "efc68229-a314-4ffe-90a9-adab7f40e9ae",
+      "status": "queued"
+    },
+    "pollUrl": "http://localhost:8080/v1/tasks/efc68229-a314-4ffe-90a9-adab7f40e9ae",
+    "taskResponse": {
+      "id": "efc68229-a314-4ffe-90a9-adab7f40e9ae",
+      "workspace_id": "e8f9ae95-9b5b-4894-a4e0-4443017b1606",
+      "api_key_id": "b3873e90-fe72-4cb6-b6f0-a73e624548cd",
+      "status": "failed",
+      "capability": "image_generation",
+      "public_model_slug": "openoctopus/imagen-4",
+      "output_payload": {},
+      "error_code": "upstream_result_missing",
+      "error_message": "The generation provider returned an incomplete result. Please retry shortly.",
+      "created_at": "2026-05-22T07:32:07.535242+00:00",
+      "completed_at": "2026-05-22T07:32:40.973+00:00",
+      "error": {
+        "code": "upstream_result_missing",
+        "message": "The generation provider returned an incomplete result. Please retry shortly.",
+        "retryable": true
+      }
+    },
+    "errorMessage": "The generation provider returned an incomplete result. Please retry shortly.",
+    "completedAt": "2026-05-22T07:32:42.221Z",
+    "latencyMs": 37119
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "imagen-4",
+    "caseId": "imagen-4-basic",
+    "model": "openoctopus/imagen-4",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/imagen-4",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "num_images": 1,
+        "enable_base64_output": false
+      }
+    },
+    "keyPrefix": "ooq_B90...Mopg",
+    "startedAt": "2026-05-22T07:24:35.778Z",
+    "success": false,
+    "submitStatus": 401,
+    "submitResponse": {
+      "error": {
+        "code": "invalid_api_key",
+        "message": "The API key is invalid or inactive.",
+        "retryable": false
+      }
+    },
+    "taskResponse": null,
+    "errorMessage": "The API key is invalid or inactive.",
+    "completedAt": "2026-05-22T07:24:36.606Z",
+    "latencyMs": 828
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "imagen-4",
+    "caseId": "imagen-4-omit-reference-assets",
+    "model": "openoctopus/imagen-4",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/imagen-4",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "num_images": 1,
+        "enable_base64_output": false
+      }
+    },
+    "keyPrefix": "ooq_B90...Mopg",
+    "startedAt": "2026-05-22T07:24:36.606Z",
+    "success": false,
+    "submitStatus": 401,
+    "submitResponse": {
+      "error": {
+        "code": "invalid_api_key",
+        "message": "The API key is invalid or inactive.",
+        "retryable": false
+      }
+    },
+    "taskResponse": null,
+    "errorMessage": "The API key is invalid or inactive.",
+    "completedAt": "2026-05-22T07:24:37.246Z",
+    "latencyMs": 640
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "imagen-4",
+    "caseId": "imagen-4-basic",
+    "model": "openoctopus/imagen-4",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/imagen-4",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "num_images": 1,
+        "enable_base64_output": false
+      }
+    },
+    "keyPrefix": "ooq_B90...Mopg",
+    "startedAt": "2026-05-22T07:03:07.847Z",
+    "success": false,
+    "submitResponse": null,
+    "taskResponse": null,
+    "errorMessage": "fetch failed",
+    "completedAt": "2026-05-22T07:03:07.886Z",
+    "latencyMs": 39
+  },
+  {
+    "api": "POST /v1/images/generations",
+    "script": "tests/api-smoke/scripts/images.generations.mjs",
+    "suite": "imagen-4",
+    "caseId": "imagen-4-omit-reference-assets",
+    "model": "openoctopus/imagen-4",
+    "endpoint": "/v1/images/generations",
+    "baseUrl": "http://localhost:8080",
+    "requestUrl": "http://localhost:8080/v1/images/generations",
+    "requestPayload": {
+      "model": "openoctopus/imagen-4",
+      "prompt": "a premium octopus mascot, orange and black, clean background",
+      "input": {
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+        "num_images": 1,
+        "enable_base64_output": false
+      }
+    },
+    "keyPrefix": "ooq_B90...Mopg",
+    "startedAt": "2026-05-22T07:03:07.886Z",
+    "success": false,
+    "submitResponse": null,
+    "taskResponse": null,
+    "errorMessage": "fetch failed",
+    "completedAt": "2026-05-22T07:03:07.888Z",
+    "latencyMs": 2
+  },
+  {
     "api": "POST /v1/videos/generations",
     "script": "tests/api-smoke/scripts/videos.generations.mjs",
     "suite": "seedance-2.0-text-to-video",

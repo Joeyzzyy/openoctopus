@@ -251,6 +251,41 @@ function stripFacePlaygroundPrompt(value: string | null) {
   return value.slice(FACE_PLAYGROUND_INPUT_MARKER.length).trim();
 }
 
+function buildProviderModelPreset(mapping: ProviderModelSummary) {
+  const coverAsset = mapping.showcaseAssets.find((asset) => asset.kind === "cover");
+  const playgroundInputAsset = mapping.showcaseAssets.find(isPrimaryPlaygroundInputAsset);
+  const facePlaygroundInputAsset = mapping.showcaseAssets.find(isFacePlaygroundInputAsset);
+  const galleryAssets = mapping.showcaseAssets.filter(
+    (asset) => asset.kind === "gallery" && !isFacePlaygroundInputAsset(asset)
+  );
+
+  return {
+    id: mapping.id,
+    label: `${mapping.supportedModelName} / ${mapping.providerName} / ${mapping.upstream_model_slug}`,
+    executionTemplate: mapping.executionTemplate,
+    executionConfigText: mapping.executionConfigText,
+    supportedModelSlug: mapping.public_model_slug,
+    providerId: mapping.provider_id,
+    upstreamModelSlug: mapping.upstream_model_slug,
+    pricingText: mapping.pricingText,
+    inputSchemaText: mapping.inputSchemaText,
+    outputSchemaText: mapping.outputSchemaText,
+    active: mapping.active,
+    showcaseCoverUrl: coverAsset?.publicUrl ?? null,
+    playgroundInputUrl: playgroundInputAsset?.publicUrl ?? null,
+    facePlaygroundInputUrl: facePlaygroundInputAsset?.publicUrl ?? null,
+    showcaseGalleryUrls: galleryAssets.map((asset) => asset.publicUrl),
+    showcaseCoverPrompt: coverAsset?.altText ?? "",
+    playgroundInputPrompt: playgroundInputAsset?.altText ?? "",
+    facePlaygroundInputPrompt: stripFacePlaygroundPrompt(facePlaygroundInputAsset?.altText ?? null),
+    showcaseGalleryPrompts: galleryAssets.map((asset) => asset.altText ?? ""),
+    showcaseCoverAssetId: coverAsset?.id,
+    playgroundInputAssetId: playgroundInputAsset?.id,
+    facePlaygroundInputAssetId: facePlaygroundInputAsset?.id,
+    showcaseGalleryAssetIds: galleryAssets.map((asset) => asset.id),
+  };
+}
+
 type RoutingRuleSummary = {
   id: string;
   supportedModelId: string | null;
@@ -1327,6 +1362,7 @@ function ActiveCheckbox({
 export function PublicModelsPanel({
   models,
   modelPagination,
+  modelSearch = "",
   modelTypeFilter = "all",
   modelStatusFilter = "all",
   providerModels = [],
@@ -1336,9 +1372,11 @@ export function PublicModelsPanel({
   modelVendors = [],
   modelTypeOptions = [],
   capabilityOptions,
+  headerAction,
 }: {
   models: SupportedModelSummary[];
   modelPagination?: PaginationSummary;
+  modelSearch?: string;
   modelTypeFilter?: string;
   modelStatusFilter?: "all" | "active" | "inactive";
   providerModels?: ProviderModelSummary[];
@@ -1348,9 +1386,11 @@ export function PublicModelsPanel({
   modelVendors?: ModelVendorSummary[];
   modelTypeOptions?: StaticModelTypeOptionSummary[];
   capabilityOptions: readonly CapabilityOption[];
+  headerAction?: ReactNode;
 }) {
   const activeModelTypeFilter = modelTypeFilter;
   const activeStatusFilter = modelStatusFilter;
+  const activeModelSearch = modelSearch.trim();
   const safeModelVendors = Array.isArray(modelVendors) ? modelVendors : [];
   const safeProviderModels = Array.isArray(providerModels) ? providerModels : [];
   const safeRoutingRules = Array.isArray(routingRules) ? routingRules : [];
@@ -1385,12 +1425,7 @@ export function PublicModelsPanel({
     capability: item.capability,
     billingConfigText: item.billingConfigText,
   }));
-  const executionConfigPresets = safeProviderModels.map((item) => ({
-    id: item.id,
-    label: `${item.supportedModelName} / ${item.providerName} / ${item.upstream_model_slug}`,
-    executionTemplate: item.executionTemplate,
-    executionConfigText: item.executionConfigText,
-  }));
+  const executionConfigPresets = safeProviderModels.map(buildProviderModelPreset);
   const providerModelsBySupportedModelId = safeProviderModels.reduce((map, item) => {
     if (!item.supported_model_id) {
       return map;
@@ -1472,74 +1507,81 @@ export function PublicModelsPanel({
     const params = new URLSearchParams();
     params.set("tab", "public-models");
     if ((input.page ?? 1) > 1) params.set("modelPage", String(input.page));
+    if (activeModelSearch) params.set("modelSearch", activeModelSearch);
     if (input.modelType && input.modelType !== "all") params.set("modelType", input.modelType);
     if (input.status && input.status !== "all") params.set("modelStatus", input.status);
     return `/ops-hub?${params.toString()}`;
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {models.length > 0 ? (
-        <div className="space-y-5">
-          <div className="rounded-xl border border-[#BAE6FD] bg-white p-3">
-            <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
-              <div>
-                <p className="mb-2 text-[11px] tracking-[0.25px] text-black/55">按类型筛选</p>
-                <div className="flex flex-wrap gap-2">
-                  {modelTypeFilterOptions.map((option) => {
-                    const active = activeModelTypeFilter === option.value;
-                    return (
-                      <a
-                        key={option.value}
-                        href={getModelHref({ page: 1, modelType: option.value, status: activeStatusFilter })}
-                        className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                          active
-                            ? "border-black bg-black text-white"
-                            : "border-[#7DD3FC]/45 bg-[#F8FCFF] text-black/70 hover:bg-[#E0F2FE]"
-                        }`}
-                      >
-                        {option.label}
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
-              <div>
-                <p className="mb-2 text-[11px] tracking-[0.25px] text-black/55">按状态筛选</p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { value: "all" as const, label: "全部状态" },
-                    { value: "active" as const, label: "已启用" },
-                    { value: "inactive" as const, label: "已停用" },
-                  ].map((option) => {
-                    const active = activeStatusFilter === option.value;
-                    return (
-                      <a
-                        key={option.value}
-                        href={getModelHref({ page: 1, modelType: activeModelTypeFilter, status: option.value })}
-                        className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                          active
-                            ? "border-black bg-black text-white"
-                            : "border-[#7DD3FC]/45 bg-[#F8FCFF] text-black/70 hover:bg-[#E0F2FE]"
-                        }`}
-                      >
-                        {option.label}
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+        <div className="space-y-4">
+          <div className="rounded-xl border border-[#BAE6FD] bg-white p-2.5">
+            <form method="get" action="/ops-hub" className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="tab" value="public-models" />
+              <label className="grid gap-1">
+                <span className="text-[11px] tracking-[0.25px] text-black/55">按名称搜索</span>
+                <input
+                  type="text"
+                  name="modelSearch"
+                  defaultValue={activeModelSearch}
+                  placeholder="搜索名称或 slug"
+                  className="h-9 min-w-[220px] rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75 placeholder:text-black/35"
+                />
+              </label>
+              <label className="grid gap-1">
+                <span className="text-[11px] tracking-[0.25px] text-black/55">按类型筛选</span>
+                <select
+                  name="modelType"
+                  defaultValue={activeModelTypeFilter}
+                  className="h-9 min-w-[180px] rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
+                >
+                  {modelTypeFilterOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1">
+                <span className="text-[11px] tracking-[0.25px] text-black/55">按状态筛选</span>
+                <select
+                  name="modelStatus"
+                  defaultValue={activeStatusFilter}
+                  className="h-9 min-w-[148px] rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
+                >
+                  <option value="all">全部状态</option>
+                  <option value="active">已启用</option>
+                  <option value="inactive">已停用</option>
+                </select>
+              </label>
+              <button
+                type="submit"
+                className="inline-flex h-9 items-center justify-center rounded-md border border-black/[0.12] bg-white px-3 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+              >
+                应用
+              </button>
+              {headerAction}
+              {(activeModelSearch || activeModelTypeFilter !== "all" || activeStatusFilter !== "all") ? (
+                <a
+                  href={getModelHref({ page: 1, modelType: "all", status: "all" })}
+                  className="inline-flex h-9 items-center justify-center rounded-md px-2 text-xs text-black/45 hover:text-black/70"
+                >
+                  重置
+                </a>
+              ) : null}
+            </form>
           </div>
           {visibleModelGroupsWithStatus.map((group) => (
-            <section key={group.category} className="rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="inline-flex rounded-full border border-[#BAE6FD] bg-white px-2.5 py-1 text-xs font-medium text-black/75">
+            <section key={group.category} className="rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-2.5">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="inline-flex rounded-full border border-[#BAE6FD] bg-white px-2 py-0.5 text-[11px] font-medium text-black/75">
                   {modelCategoryLabel(group.category)}
                 </span>
                 <span className="text-[11px] text-black/50">{group.models.length} models</span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-3">
           {group.models.map((model) => {
             const mappings = providerModelsBySupportedModelId.get(model.id) ?? [];
             const modelType = readModelTypeFromBillingConfig(model.billingConfigText);
@@ -1552,8 +1594,8 @@ export function PublicModelsPanel({
               null;
             const hasRouting = Boolean(activeRoutingRule?.primary_provider_model_id);
             return (
-              <section key={model.id} className="rounded-2xl border border-[#DDF4FF] bg-white p-3 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-2.5">
+              <section key={model.id} className="rounded-xl border border-[#DDF4FF] bg-white p-2.5 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <h3 className="text-sm font-semibold text-black">{model.display_name}</h3>
@@ -1563,7 +1605,7 @@ export function PublicModelsPanel({
                       {model.provider} · {modalityLabel(model.modality)} ·{" "}
                       {model.capability ? capabilityLabel(model.capability) : "-"}
                     </p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
                       {modelType ? (
                         <span className="rounded border border-black/[0.1] bg-[#F8FCFF] px-1.5 py-0.5 text-black/62">
                           类型：{modelType}
@@ -1576,7 +1618,7 @@ export function PublicModelsPanel({
                         {model.billingSummary}
                       </span>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <StatusPill
                         label={seoCoverage.isComplete ? "SEO complete" : `SEO ${seoCoverage.completedCount}/3`}
                         ok={seoCoverage.isComplete}
@@ -1686,7 +1728,7 @@ export function PublicModelsPanel({
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-lg border border-[#DDF4FF] bg-[#F8FCFF] p-3">
+                <div className="mt-3 rounded-lg border border-[#DDF4FF] bg-[#F8FCFF] p-2.5">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <p className="text-[11px] font-medium tracking-[0.25px] text-black/55">供应商供应模型列表</p>
                     <ManagementDialog
@@ -1727,12 +1769,12 @@ export function PublicModelsPanel({
                       <table className="min-w-[760px] w-full text-[11px]">
                         <thead>
                           <tr className="border-b border-[#DDF4FF] bg-[#F8FCFF] text-black/45">
-                            <th className="px-2 py-1.5 text-left font-medium">供应商</th>
-                            <th className="px-2 py-1.5 text-left font-medium">上游模型</th>
-                            <th className="px-2 py-1.5 text-left font-medium">内容状态</th>
-                            <th className="px-2 py-1.5 text-left font-medium">成本</th>
-                            <th className="px-2 py-1.5 text-left font-medium">状态</th>
-                            <th className="px-2 py-1.5 text-left font-medium">操作</th>
+                            <th className="px-2 py-1 text-left font-medium">供应商</th>
+                            <th className="px-2 py-1 text-left font-medium">上游模型</th>
+                            <th className="px-2 py-1 text-left font-medium">内容状态</th>
+                            <th className="px-2 py-1 text-left font-medium">成本</th>
+                            <th className="px-2 py-1 text-left font-medium">状态</th>
+                            <th className="px-2 py-1 text-left font-medium">操作</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1740,9 +1782,9 @@ export function PublicModelsPanel({
                             const contentCoverage = readProviderModelContentCoverage(mapping);
                             return (
                             <tr key={mapping.id} className="border-b border-black/[0.05] last:border-b-0">
-                              <td className="px-2 py-1.5 text-black/75">{mapping.providerName}</td>
-                              <td className="px-2 py-1.5 font-mono text-black/70">{mapping.upstream_model_slug}</td>
-                              <td className="px-2 py-1.5">
+                              <td className="px-2 py-1 text-black/75">{mapping.providerName}</td>
+                              <td className="px-2 py-1 font-mono text-black/70">{mapping.upstream_model_slug}</td>
+                              <td className="px-2 py-1">
                                 <div className="flex min-w-[210px] flex-wrap gap-1">
                                   <StatusPill label="封面" ok={contentCoverage.hasCover} />
                                   <StatusPill
@@ -1753,9 +1795,9 @@ export function PublicModelsPanel({
                                   <StatusPill label="README" ok={contentCoverage.hasReadme} />
                                 </div>
                               </td>
-                              <td className="px-2 py-1.5 text-black/70">{mapping.pricingSummary}</td>
-                              <td className="px-2 py-1.5 text-black/60">{mapping.active ? "已启用" : "未启用"}</td>
-                              <td className="px-2 py-1.5">
+                              <td className="px-2 py-1 text-black/70">{mapping.pricingSummary}</td>
+                              <td className="px-2 py-1 text-black/60">{mapping.active ? "已启用" : "未启用"}</td>
+                              <td className="px-2 py-1">
                                 <div className="flex items-center gap-2">
                                   <ManagementDialog
                                     trigger={<ModalButton tone="secondary">编辑</ModalButton>}
@@ -2285,12 +2327,7 @@ export function EconomicsPanel({
     name: item.name,
     slug: item.slug,
   }));
-  const executionConfigPresets = safeProviderModels.map((item) => ({
-    id: item.id,
-    label: `${item.supportedModelName} / ${item.providerName} / ${item.upstream_model_slug}`,
-    executionTemplate: item.executionTemplate,
-    executionConfigText: item.executionConfigText,
-  }));
+  const executionConfigPresets = safeProviderModels.map(buildProviderModelPreset);
 
   const rows = safeProviderModels
     .map((providerModel) => {
@@ -3351,12 +3388,7 @@ export function ModelsPanel({
     displayName: item.display_name,
     slug: item.slug,
   }));
-  const executionConfigPresets = providerModels.map((item) => ({
-    id: item.id,
-    label: `${item.supportedModelName} / ${item.providerName} / ${item.upstream_model_slug}`,
-    executionTemplate: item.executionTemplate,
-    executionConfigText: item.executionConfigText,
-  }));
+  const executionConfigPresets = providerModels.map(buildProviderModelPreset);
 
   return (
     <div className="space-y-4">
