@@ -1,0 +1,25 @@
+[
+  {
+    "id": "gemini-3.5-flash-basic",
+    "model": "openoctopus/gemini-3.5-flash",
+    "endpoint": "/v1/chat/completions",
+    "payload": {
+      "model": "openoctopus/gemini-3.5-flash",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Explain what an API smoke test checks in one short paragraph."
+        }
+      ],
+      "input": {
+        "temperature": 0.2,
+        "max_tokens": 120
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "textLengthMin": 10
+    }
+  }
+]

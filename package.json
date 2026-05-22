@@ -19,7 +19,10 @@
     "lint:web": "eslint",
     "smoke:images": "node tests/api-smoke/scripts/images.generations.mjs",
     "smoke:videos": "node tests/api-smoke/scripts/videos.generations.mjs",
-    "smoke:api": "npm run smoke:images"
+    "smoke:chat": "node tests/api-smoke/scripts/chat.completions.mjs",
+    "smoke:coding": "node tests/api-smoke/scripts/code.chat.completions.mjs",
+    "smoke:documents": "node tests/api-smoke/scripts/documents.analyses.mjs",
+    "smoke:api": "npm run smoke:images && npm run smoke:videos && npm run smoke:chat && npm run smoke:coding && npm run smoke:documents"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

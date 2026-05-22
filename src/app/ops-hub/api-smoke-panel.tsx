@@ -5,6 +5,11 @@ import { Check, Copy } from "lucide-react";
 import type { ApiSmokeRecord } from "@/lib/api-smoke-records";
 import { OpsHubRefreshButton } from "./refresh-button";
 
+type SmokeSupportedModel = {
+  model_slug: string;
+  display_name: string;
+};
+
 type SmokeAsset = {
   url: string;
   label: string;
@@ -254,7 +259,7 @@ function SmokeModal({
   );
 }
 
-function buildModelHealth(records: ApiSmokeRecord[]) {
+function buildModelHealth(records: ApiSmokeRecord[], supportedModels: SmokeSupportedModel[]) {
   const grouped = new Map<string, ApiSmokeRecord[]>();
   for (const record of records) {
     const list = grouped.get(record.model) ?? [];
@@ -262,12 +267,16 @@ function buildModelHealth(records: ApiSmokeRecord[]) {
     grouped.set(record.model, list);
   }
 
-  return Array.from(grouped.entries())
-    .map(([model, modelRecords]) => ({
-      model,
-      records: modelRecords.slice(0, 10),
-      latest: modelRecords[0] ?? null,
-    }))
+  return supportedModels
+    .map((supportedModel) => {
+      const modelRecords = grouped.get(supportedModel.model_slug) ?? [];
+      return {
+        model: supportedModel.model_slug,
+        displayName: supportedModel.display_name,
+        records: modelRecords.slice(0, 10),
+        latest: modelRecords[0] ?? null,
+      };
+    })
     .sort((a, b) => {
       const aTime = a.latest ? new Date(a.latest.completedAt).getTime() : 0;
       const bTime = b.latest ? new Date(b.latest.completedAt).getTime() : 0;
@@ -275,8 +284,14 @@ function buildModelHealth(records: ApiSmokeRecord[]) {
     });
 }
 
-function ModelHealthOverview({ records }: { records: ApiSmokeRecord[] }) {
-  const models = buildModelHealth(records);
+function ModelHealthOverview({
+  records,
+  supportedModels,
+}: {
+  records: ApiSmokeRecord[];
+  supportedModels: SmokeSupportedModel[];
+}) {
+  const models = buildModelHealth(records, supportedModels);
   if (models.length === 0) {
     return null;
   }
@@ -285,26 +300,40 @@ function ModelHealthOverview({ records }: { records: ApiSmokeRecord[] }) {
     <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
       {models.map((item) => {
         const passed = item.records.filter((record) => record.success).length;
+        const total = item.records.length;
+        const dotClassName =
+          total === 0
+            ? "bg-[#CBD5E1]"
+            : item.latest?.success === false
+              ? "bg-[#D64532]"
+              : "bg-[#20A35A]";
         return (
           <div key={item.model} className="rounded-lg border border-[#BAE6FD] bg-white px-3 py-2">
             <div className="flex items-start justify-between gap-3">
-              <p className="min-w-0 break-all font-mono text-[11px] font-medium text-black/70">
-                {item.model}
-              </p>
+              <div className="min-w-0">
+                <p className="min-w-0 break-all font-mono text-[11px] font-medium text-black/70">
+                  {item.model}
+                </p>
+                <p className="mt-0.5 text-[11px] text-black/42">{item.displayName}</p>
+              </div>
               <span className="shrink-0 text-[11px] text-black/45">
-                {passed}/{item.records.length}
+                {passed}/{total}
               </span>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {item.records.map((record, index) => (
-                <span
-                  key={`${record.completedAt}-${index}`}
-                  title={`${formatSmokeTimestamp(record.completedAt)} · ${record.success ? "通过" : "失败"}`}
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    record.success ? "bg-[#20A35A]" : "bg-[#D64532]"
-                  }`}
-                />
-              ))}
+              {total === 0 ? (
+                <span title="还没有 smoke 运行记录" className={`h-2.5 w-2.5 rounded-full ${dotClassName}`} />
+              ) : (
+                item.records.map((record, index) => (
+                  <span
+                    key={`${record.completedAt}-${index}`}
+                    title={`${formatSmokeTimestamp(record.completedAt)} · ${record.success ? "通过" : "失败"}`}
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      record.success ? "bg-[#20A35A]" : "bg-[#D64532]"
+                    }`}
+                  />
+                ))
+              )}
             </div>
           </div>
         );
@@ -313,20 +342,50 @@ function ModelHealthOverview({ records }: { records: ApiSmokeRecord[] }) {
   );
 }
 
-export function ApiSmokePanel({ records }: { records: ApiSmokeRecord[] }) {
+export function ApiSmokePanel({
+  records,
+  supportedModels,
+}: {
+  records: ApiSmokeRecord[];
+  supportedModels: SmokeSupportedModel[];
+}) {
   const [modal, setModal] = useState<ModalState>(null);
+  const [subTab, setSubTab] = useState<"summary" | "details">("summary");
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] p-3">
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 flex-1">
-            <ModelHealthOverview records={records} />
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: "summary" as const, label: "Smoke 概览" },
+              { value: "details" as const, label: "运行明细" },
+            ].map((tab) => {
+              const active = subTab === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => setSubTab(tab.value)}
+                  className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                    active
+                      ? "border-black bg-black text-white"
+                      : "border-[#7DD3FC]/45 bg-white text-black/70 hover:bg-[#E0F2FE]"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
           <OpsHubRefreshButton label="刷新结果" />
         </div>
 
-        {records.length > 0 ? (
+        {subTab === "summary" ? (
+          <ModelHealthOverview records={records} supportedModels={supportedModels} />
+        ) : null}
+
+        {subTab === "details" && records.length > 0 ? (
           <div className="overflow-x-auto rounded-xl border border-[#BAE6FD] bg-white">
             <table className="w-full min-w-[1120px] border-collapse text-left text-xs">
               <thead className="bg-[#F0F9FF] text-[11px] uppercase tracking-[0.35px] text-black/45">
@@ -401,14 +460,16 @@ export function ApiSmokePanel({ records }: { records: ApiSmokeRecord[] }) {
               </tbody>
             </table>
           </div>
-        ) : (
+        ) : null}
+
+        {subTab === "details" && records.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
             <p className="text-sm font-medium text-black">还没有 API smoke 记录</p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
               这里会显示本地脚本写入的连通性结果。
             </p>
           </div>
-        )}
+        ) : null}
       </div>
 
       <SmokeModal modal={modal} onClose={() => setModal(null)} />

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "image-face-swap-pro-basic",
+    "model": "openoctopus/image-face-swap-pro",
+    "endpoint": "/v1/images/generations",
+    "payload": {
+      "model": "openoctopus/image-face-swap-pro",
+      "prompt": "swap the face while preserving lighting and expression",
+      "input": {
+        "image": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/9f04a680-41c4-48d5-bceb-06796066214e/playground-input-1779074527416-1752459923195240956-ohfc951y.jpg",
+        "face_image": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/9f04a680-41c4-48d5-bceb-06796066214e/gallery-1779074529509-0-1752459933783339486-bt840wsp.jpg",
+        "output_format": "jpeg",
+        "enable_base64_output": false,
+        "enable_sync_mode": false
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "assetCountMin": 1
+    }
+  }
+]

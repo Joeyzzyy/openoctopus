@@ -1,0 +1,18 @@
+[
+  {
+    "id": "ai-detection-basic",
+    "model": "openoctopus/ai-detection",
+    "endpoint": "/v1/documents/analyses",
+    "payload": {
+      "model": "openoctopus/ai-detection",
+      "input": {
+        "text": "This sample is intentionally long enough to satisfy the Winston minimum length requirement while still being deterministic for smoke testing. It explains an API workflow in plain language, repeats the core idea a few times, and avoids local files so the test can run anywhere with only an API key. The purpose is to verify queueing, provider routing, polling, output normalization, and final score extraction across the full document analysis request lifecycle."
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "analysisStatus": "COMPLETED"
+    }
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "deepcode-stream-basic",
+    "model": "openoctopus/deepcode",
+    "endpoint": "/v1/code/chat/completions",
+    "payload": {
+      "model": "openoctopus/deepcode",
+      "stream": true,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Reply with a single short sentence explaining what a smoke test is."
+        }
+      ]
+    },
+    "expect": {
+      "submitStatus": 200,
+      "requireUsage": true,
+      "textLengthMin": 10
+    }
+  }
+]

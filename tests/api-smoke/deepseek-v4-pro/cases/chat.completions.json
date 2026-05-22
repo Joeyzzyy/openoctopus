@@ -1,0 +1,21 @@
+[
+  {
+    "id": "deepseek-v4-pro-basic",
+    "model": "openoctopus/deepseek-v4-pro",
+    "endpoint": "/v1/chat/completions",
+    "payload": {
+      "model": "openoctopus/deepseek-v4-pro",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Summarize async polling for AI generation APIs in exactly 3 concise bullet points."
+        }
+      ]
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "textLengthMin": 20
+    }
+  }
+]

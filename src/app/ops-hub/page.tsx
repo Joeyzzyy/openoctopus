@@ -1197,7 +1197,15 @@ export default async function InternalPage({
                 description=""
                 bare
               >
-                <ApiSmokePanel records={apiSmokeRecords} />
+                <ApiSmokePanel
+                  records={apiSmokeRecords}
+                  supportedModels={data.supportedModels
+                    .filter((model) => model.active)
+                    .map((model) => ({
+                      model_slug: model.model_slug,
+                      display_name: model.display_name,
+                    }))}
+                />
               </SectionShell>
             </section>
           ) : null}

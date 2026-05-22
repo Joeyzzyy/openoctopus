@@ -1,0 +1,21 @@
+[
+  {
+    "id": "reference-only-anomaly-generation-baseline-basic",
+    "model": "openoctopus/reference-only-anomaly-generation-baseline",
+    "endpoint": "/v1/images/generations",
+    "payload": {
+      "model": "openoctopus/reference-only-anomaly-generation-baseline",
+      "input": {
+        "image_url": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/06882d5f-d093-44c5-a277-63c34c9cfe70/playground-input-1779003530279-1776786640458643012-6ubpclu4.png",
+        "reference_url": "https://ltgdspivywdagkthgwzu.supabase.co/storage/v1/object/public/model-showcase-assets/provider-model-showcase/588ee0a8-692a-4a8b-8056-a455a227c6a9/playground-input-1779078881540-1767172504525281953-tnvfnljh.png",
+        "mask_url": "https://dummyimage.com/1024x1024/ffffff/ffffff.png",
+        "output_format": "png"
+      }
+    },
+    "expect": {
+      "submitStatus": 202,
+      "finalStatus": "succeeded",
+      "assetCountMin": 1
+    }
+  }
+]
