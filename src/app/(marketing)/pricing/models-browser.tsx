@@ -3335,9 +3335,9 @@ export function ModelsBrowser({
                       <button
                         type="button"
                         onClick={() => setResultModalOpen(true)}
-                        className="inline-flex h-8 items-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                        className="inline-flex h-8 items-center rounded-full px-2.5 text-[11px] font-medium text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                       >
-                        Result JSON
+                        Details
                       </button>
                     ) : null}
                   </div>
@@ -3905,21 +3905,24 @@ export function ModelsBrowser({
               <div className="mb-3 rounded-lg border border-black/[0.06] bg-white px-3 py-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-medium text-black">Output</h3>
-                  <span
-                    className={`inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium ${taskStatusClass(taskStatus)}`}
-                  >
-                    Status: {taskStatusLabel(taskStatus)}
-                  </span>
-                </div>
-                <div className="mt-2 flex flex-col gap-2 border-t border-black/[0.06] pt-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 text-xs text-black/55">
-                    <span className="mr-1 text-black/35">Task</span>
-                    {taskId ? (
-                      <code className="break-all font-mono text-[11px] text-black/70">{taskId}</code>
-                    ) : (
-                      <span className="text-black/35">Waiting for request</span>
-                    )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {playgroundOutput ? (
+                      <button
+                        type="button"
+                        onClick={() => setResultModalOpen(true)}
+                        className="inline-flex h-7 items-center rounded-md px-2 text-xs font-medium text-black/45 hover:bg-black/[0.03] hover:text-black/70"
+                      >
+                        Details
+                      </button>
+                    ) : null}
+                    <span
+                      className={`inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium ${taskStatusClass(taskStatus)}`}
+                    >
+                      Status: {taskStatusLabel(taskStatus)}
+                    </span>
                   </div>
+                </div>
+                <div className="mt-2 flex flex-col gap-2 border-t border-black/[0.06] pt-2 sm:flex-row sm:items-center sm:justify-end">
                   <div className="flex flex-wrap items-center gap-2">
                     {playgroundImageAssets.length > 0 ? (
                       <button
@@ -3945,15 +3948,6 @@ export function ModelsBrowser({
                         <Download className="size-3.5" />
                         <span>Download video</span>
                       </a>
-                    ) : null}
-                    {playgroundOutput ? (
-                      <button
-                        type="button"
-                        onClick={() => setResultModalOpen(true)}
-                        className="inline-flex h-8 items-center rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
-                      >
-                        Result JSON
-                      </button>
                     ) : null}
                   </div>
                 </div>
@@ -4401,7 +4395,15 @@ export function ModelsBrowser({
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">
           <div className="w-full max-w-2xl rounded-xl border border-black/[0.1] bg-white p-4 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-black">Result JSON</h4>
+              <div>
+                <h4 className="text-sm font-semibold text-black">Details</h4>
+                {taskId ? (
+                  <p className="mt-1 text-[11px] text-black/40">
+                    Task ID:
+                    <code className="ml-1 break-all font-mono text-black/55">{taskId}</code>
+                  </p>
+                ) : null}
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
