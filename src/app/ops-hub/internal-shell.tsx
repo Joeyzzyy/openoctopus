@@ -9,6 +9,7 @@ type InternalTabKey =
   | "model-vendors"
   | "economics"
   | "worker-templates"
+  | "model-type-options"
   | "gateway-error-definitions"
   | "image-response-contracts"
   | "api-smoke"

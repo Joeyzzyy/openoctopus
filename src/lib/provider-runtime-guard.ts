@@ -18,7 +18,14 @@ export type RuntimeCredential = {
 export type RuntimeSupportedModel = {
   id: string;
   model_slug: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation"
+    | null;
 };
 
 export type RuntimeProviderModel = {
@@ -26,7 +33,13 @@ export type RuntimeProviderModel = {
   provider_id: string;
   supported_model_id: string | null;
   upstream_model_slug: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
   active: boolean;
   execution_template?: string | null;
   execution_config?: Record<string, unknown> | null;
@@ -35,7 +48,13 @@ export type RuntimeProviderModel = {
 export type RuntimeRoutingRule = {
   id: string;
   public_model_slug: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
   primary_provider_model_id: string;
   fallback_provider_model_id: string | null;
   active: boolean;
@@ -95,6 +114,8 @@ function validateTemplateConfig(
     if (readString(config.resultTextPath).length === 0) {
       diagnostics.push("文本输出模型必须配置 resultTextPath 指向文本输出字段。");
     }
+  } else if (capability === "document_analysis") {
+    // Grammarly-style document analysis uses score/status objects instead of text or asset URLs.
   } else if (readString(config.resultUrlPath).length === 0) {
     diagnostics.push("模板配置缺少 resultUrlPath。");
   }

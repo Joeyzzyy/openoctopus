@@ -21,6 +21,7 @@ import {
   GatewayErrorDefinitionsPanel,
   CreateModelVendorButton,
   CreateSupportedModelButton,
+  ModelTypeOptionsPanel,
   ModelVendorsPanel,
   InternalModelAiUsageLogsPanel,
   ProvidersPanel,
@@ -68,6 +69,12 @@ const tabs = [
     description: "管理供应商模型调用格式模板。",
   },
   {
+    key: "model-type-options",
+    group: "static",
+    label: "模型类型选项",
+    description: "维护可售模型“类型”下拉与筛选使用的静态选项。",
+  },
+  {
     key: "image-response-contracts",
     group: "static",
     label: "返回结构约定",
@@ -105,6 +112,7 @@ const capabilityOptions = [
   { value: "image_generation", label: "图片生成" },
   { value: "image_edit", label: "图片编辑" },
   { value: "image_recognition", label: "图片识别" },
+  { value: "document_analysis", label: "文档分析" },
   { value: "text_generation", label: "对话生成" },
   { value: "video_generation", label: "视频生成" },
 ] as const;
@@ -801,6 +809,8 @@ export default async function InternalPage({
           ? internalCopy.options.imageEdit
           : option.value === "image_recognition"
             ? internalCopy.options.imageRecognition
+            : option.value === "document_analysis"
+              ? "文档分析"
             : option.value === "text_generation"
               ? "对话生成"
               : internalCopy.options.videoGeneration,
@@ -1055,6 +1065,7 @@ export default async function InternalPage({
                   <div className="flex items-center gap-2">
                     <CreateSupportedModelButton
                       capabilityOptions={displayCapabilityOptions}
+                      modelTypeOptions={data.staticModelTypeOptions}
                       modelVendors={data.modelVendors}
                       models={data.supportedModels}
                     />
@@ -1071,6 +1082,7 @@ export default async function InternalPage({
                   providers={data.providers}
                   workerTemplates={data.workerTemplates ?? []}
                   modelVendors={data.modelVendors}
+                  modelTypeOptions={data.staticModelTypeOptions}
                   capabilityOptions={displayCapabilityOptions}
                 />
                 </SectionShell>
@@ -1134,6 +1146,18 @@ export default async function InternalPage({
                   workerTemplates={data.workerTemplates ?? []}
                   providerModels={data.providerModels}
                 />
+              </SectionShell>
+            </>
+          ) : null}
+
+          {activeTab === "model-type-options" ? (
+            <>
+              <SectionShell
+                id="model-type-options-panel"
+                title=""
+                description={internalCopy.sections.modelTypeOptionsDescription}
+              >
+                <ModelTypeOptionsPanel modelTypeOptions={data.staticModelTypeOptions} />
               </SectionShell>
             </>
           ) : null}

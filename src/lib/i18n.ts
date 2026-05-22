@@ -292,6 +292,7 @@ export const i18n = {
         "internal-model-ai-usage-logs": "Internal AI usage",
         "api-smoke": "API connectivity",
         "worker-templates": "API call templates",
+        "model-type-options": "Model type options",
         "image-response-contracts": "Response contracts",
         "gateway-error-definitions": "Unified error codes",
         providers: "Provider management",
@@ -306,6 +307,8 @@ export const i18n = {
         imageContractsDescription:
           "Maintain the actual response contracts used by Playground, API, and CLI for image, video, text, and coding flows.",
         workerTemplates: "API call templates",
+        modelTypeOptions: "Model type options",
+        modelTypeOptionsDescription: " ",
         errorDefinitions: "Unified error codes",
         errorDefinitionsDescription:
           "Maintain outward-facing API error codes, HTTP status codes, user messages, and retry flags.",
@@ -639,6 +642,7 @@ export const i18n = {
         "internal-model-ai-usage-logs": "内部 AI 消费记录",
         "api-smoke": "API 连通性",
         "worker-templates": "API 调用格式配置",
+        "model-type-options": "模型类型选项",
         "image-response-contracts": "返回结构约定",
         "gateway-error-definitions": "统一错误码",
         providers: "供应商管理",
@@ -652,6 +656,8 @@ export const i18n = {
         imageContracts: "返回结构约定",
         imageContractsDescription: "维护 Playground、API、CLI 在图片、视频、text、coding 场景下实际使用的返回结构约定。",
         workerTemplates: "API 调用格式配置",
+        modelTypeOptions: "模型类型选项",
+        modelTypeOptionsDescription: " ",
         errorDefinitions: "统一错误码",
         errorDefinitionsDescription: "维护所有对外请求失败时返回的错误码、HTTP 状态码、用户文案与可重试标记。",
       },

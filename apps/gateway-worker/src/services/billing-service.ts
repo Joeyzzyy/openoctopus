@@ -41,6 +41,55 @@ function normalizeReportedAmount(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function extractMetricsFromBreakdown(breakdown: Record<string, unknown> | undefined) {
+  const directMetrics = asRecord(asRecord(breakdown?.customerBreakdown)?.metrics);
+  const nestedMetrics = asRecord(
+    asRecord(asRecord(breakdown?.economics)?.customer)?.metrics
+  );
+  return directMetrics ?? nestedMetrics;
+}
+
+function deriveUsageUnitsFromBreakdown(breakdown: Record<string, unknown> | undefined) {
+  const metrics = extractMetricsFromBreakdown(breakdown);
+
+  if (!metrics) {
+    return { inputUnits: 0, outputUnits: 0 };
+  }
+
+  const inputUnits =
+    readNumber(metrics.inputCharacters) ??
+    readNumber(metrics.inputTokens) ??
+    0;
+
+  const outputUnits =
+    readNumber(metrics.outputTokens) ??
+    readNumber(metrics.imageCount) ??
+    readNumber(metrics.videoCount) ??
+    readNumber(metrics.durationSeconds) ??
+    0;
+
+  return { inputUnits, outputUnits };
+}
+
 export async function validateProviderPricing(input: { providerModelId: string }) {
   const { data, error } = await supabaseAdmin
     .from("provider_models")
@@ -145,6 +194,8 @@ export async function recordRequestSettlement(input: RecordSettlementInput) {
     throw new Error(modelError.message);
   }
 
+  const usageUnits = deriveUsageUnitsFromBreakdown(input.breakdown);
+
   const { error } = await supabaseAdmin.rpc("record_request_settlement", {
     p_workspace_id: input.workspaceId,
     p_api_key_id: input.apiKeyId,
@@ -152,8 +203,8 @@ export async function recordRequestSettlement(input: RecordSettlementInput) {
     p_external_request_id: input.requestId,
     p_endpoint: input.endpoint,
     p_request_count: 1,
-    p_input_units: 0,
-    p_output_units: 0,
+    p_input_units: usageUnits.inputUnits,
+    p_output_units: usageUnits.outputUnits,
     p_customer_charge: input.customerCharge,
     p_provider_cost: input.providerCost,
     p_status_code: input.statusCode,

@@ -7,7 +7,14 @@ type SupportedModelRow = {
   provider: string;
   model_slug: string;
   display_name: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation"
+    | null;
   billing_config: unknown;
   active: boolean;
   created_at: string;
@@ -334,6 +341,9 @@ function billingSummary(value: unknown) {
     }
     if (tiers.length === 0 && charges.perVideo) parts.push(`per video ${charges.perVideo}`);
     if (charges.perSecond) parts.push(`per second ${charges.perSecond}`);
+    if (charges.inputTextCharactersPerThousand) {
+      parts.push(`per 1k characters ${charges.inputTextCharactersPerThousand}`);
+    }
     if (charges.inputTextTokensPerMillion) parts.push(`per 1M input tokens ${charges.inputTextTokensPerMillion}`);
     if (charges.inputTextCacheHitTokensPerMillion) parts.push(`per 1M input tokens (cache hit) ${charges.inputTextCacheHitTokensPerMillion}`);
     if (charges.inputTextCacheMissTokensPerMillion) parts.push(`per 1M input tokens (cache miss) ${charges.inputTextCacheMissTokensPerMillion}`);
@@ -364,6 +374,13 @@ function readPrimaryPrice(value: unknown) {
     if (charges.perVideo) return { billingCurrency: currency, primaryPriceValue: charges.perVideo, primaryPriceLabel: "per video" };
     if (charges.perRequest) return { billingCurrency: currency, primaryPriceValue: charges.perRequest, primaryPriceLabel: "per request" };
     if (charges.perSecond) return { billingCurrency: currency, primaryPriceValue: charges.perSecond, primaryPriceLabel: "per second" };
+    if (charges.inputTextCharactersPerThousand) {
+      return {
+        billingCurrency: currency,
+        primaryPriceValue: charges.inputTextCharactersPerThousand,
+        primaryPriceLabel: "per 1k characters",
+      };
+    }
     if (charges.inputTextCacheMissTokensPerMillion) {
       return { billingCurrency: currency, primaryPriceValue: charges.inputTextCacheMissTokensPerMillion, primaryPriceLabel: "per 1M input tokens (cache miss)" };
     }

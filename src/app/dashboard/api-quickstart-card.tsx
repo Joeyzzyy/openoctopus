@@ -223,6 +223,16 @@ function schemaHasField(schema: Record<string, unknown>, fieldName: string) {
 }
 
 function buildPayload(model: string, capability: string, inputSchema: Record<string, unknown>) {
+  if (capability === "document_analysis") {
+    return `{
+  "model": "${model}",
+  "input": {
+    "file_url": "https://example.com/sample-document.docx",
+    "filename": "sample-document.docx"
+  }
+}`;
+  }
+
   if (capability === "text_generation") {
     return `{
   "model": "${model}",
@@ -289,6 +299,7 @@ function sanitizeProviderInputSchemaForDocs(schema: Record<string, unknown>) {
 }
 
 function buildEndpoint(capability: string) {
+  if (capability === "document_analysis") return "/v1/documents/analyses";
   if (capability === "text_generation") return "/v1/chat/completions";
   if (capability === "image_edit") return "/v1/images/edits";
   if (capability === "image_recognition") return "/v1/images/recognitions";

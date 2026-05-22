@@ -18,7 +18,13 @@ type QueueMessage = {
   providerSlug: string;
   providerBaseUrl: string | null;
   providerConfig: Record<string, unknown> | null;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
   publicModelSlug: string;
   upstreamModelSlug: string;
   endpoint: string;
@@ -35,7 +41,13 @@ type PollingMessage = {
   providerSlug: string;
   providerBaseUrl: string | null;
   providerConfig: Record<string, unknown> | null;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
   publicModelSlug: string;
   upstreamModelSlug: string;
   endpoint: string;
@@ -223,7 +235,13 @@ function resolveVideoDurationSeconds(input: {
 }
 
 function withNormalizedVideoDuration(input: {
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
   requestInput?: Record<string, unknown> | null;
   output?: Record<string, unknown> | null;
   providerRaw?: Record<string, unknown> | null;
@@ -263,7 +281,13 @@ function withNormalizedVideoDuration(input: {
 }
 
 function withNormalizedOutput(input: {
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
   requestInput?: Record<string, unknown> | null;
   output?: Record<string, unknown> | null;
   providerRaw?: Record<string, unknown> | null;
@@ -1325,7 +1349,13 @@ type RecoveryAttemptRow = {
   inference_requests: {
     id: string;
     status: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
     public_model_slug: string;
     provider_id: string;
     provider_model_id: string;

@@ -45,6 +45,12 @@ const perSecondBillingSchema = z.object({
   costPerSecond: positivePriceSchema,
 });
 
+const perThousandCharactersBillingSchema = z.object({
+  billingMode: z.literal("per_thousand_characters"),
+  currency: currencySchema,
+  inputCostPerThousandCharacters: positivePriceSchema,
+});
+
 const perMillionTokensBillingSchema = z.object({
   billingMode: z.literal("per_million_tokens"),
   currency: currencySchema,
@@ -79,6 +85,7 @@ const hybridChargesSchema = z
     perImage: positivePriceSchema.optional(),
     perVideo: positivePriceSchema.optional(),
     perSecond: positivePriceSchema.optional(),
+    inputTextCharactersPerThousand: positivePriceSchema.optional(),
     inputTextTokensPerMillion: positivePriceSchema.optional(),
     inputTextCacheHitTokensPerMillion: positivePriceSchema.optional(),
     inputTextCacheMissTokensPerMillion: positivePriceSchema.optional(),
@@ -133,6 +140,7 @@ export const billingConfigSchema = z.union([
   perImageBillingSchema,
   perVideoBillingSchema,
   perSecondBillingSchema,
+  perThousandCharactersBillingSchema,
   perMillionTokensBillingSchema,
 ]);
 
@@ -144,6 +152,7 @@ export type BillingUsageMetrics = {
   imageCount: number;
   videoCount: number;
   durationSeconds: number;
+  inputCharacters: number;
   inputTokens: number;
   inputCacheHitTokens: number;
   inputCacheMissTokens: number;
@@ -158,6 +167,7 @@ export type BillingResolution = {
     perImage: number;
     perVideo: number;
     perSecond: number;
+    inputTextCharacters: number;
     inputTextTokens: number;
     inputTextCacheHitTokens: number;
     inputTextCacheMissTokens: number;
@@ -487,6 +497,74 @@ function resolveTokenUsage(
   return { inputTokens, inputCacheHitTokens, inputCacheMissTokens, outputTokens };
 }
 
+function countCharactersFromTextContent(value: unknown): number {
+  if (typeof value === "string") {
+    return value.length;
+  }
+
+  if (Array.isArray(value)) {
+    return value.reduce((sum, item) => sum + countCharactersFromTextContent(item), 0);
+  }
+
+  const record = asRecord(value);
+  if (!record) {
+    return 0;
+  }
+
+  let total = 0;
+  if (typeof record.text === "string") {
+    total += record.text.length;
+  }
+  if (typeof record.prompt === "string") {
+    total += record.prompt.length;
+  }
+  if (record.content !== undefined && typeof record.text !== "string") {
+    total += countCharactersFromTextContent(record.content);
+  }
+  if (Array.isArray(record.parts)) {
+    total += countCharactersFromTextContent(record.parts);
+  }
+  if (Array.isArray(record.messages)) {
+    total += countCharactersFromTextContent(record.messages);
+  }
+  if (Array.isArray(record.contents)) {
+    total += countCharactersFromTextContent(record.contents);
+  }
+
+  return total;
+}
+
+function resolveInputCharacterUsage(
+  input: Record<string, unknown> | null,
+  output: Record<string, unknown> | null,
+  raw: Record<string, unknown> | null
+) {
+  const usageMetadata = {
+    ...(asRecord(output?.usage) ?? {}),
+    ...(asRecord(output?.usage_metadata) ?? {}),
+    ...(asRecord(output?.usageMetadata) ?? {}),
+    ...(asRecord(raw?.usage) ?? {}),
+    ...(asRecord(raw?.usage_metadata) ?? {}),
+    ...(asRecord(raw?.usageMetadata) ?? {}),
+  };
+
+  return (
+    readNumericCandidate(input?.input_characters) ??
+    readNumericCandidate(input?.inputCharacters) ??
+    readNumericCandidate(input?.document_character_count) ??
+    readNumericCandidate(input?.documentCharacterCount) ??
+    getNestedNumber(usageMetadata, ["promptCharacters"]) ??
+    getNestedNumber(usageMetadata, ["prompt_characters"]) ??
+    getNestedNumber(usageMetadata, ["inputCharacters"]) ??
+    getNestedNumber(usageMetadata, ["input_characters"]) ??
+    getNestedNumber(usageMetadata, ["textCharacters"]) ??
+    getNestedNumber(usageMetadata, ["text_characters"]) ??
+    getNestedNumber(raw, ["request_character_count"]) ??
+    getNestedNumber(raw, ["requestCharacterCount"]) ??
+    countCharactersFromTextContent(input)
+  );
+}
+
 function applyLegacyBillingAliases(value: unknown) {
   const record = asRecord(value);
   if (!record) {
@@ -513,6 +591,13 @@ function applyLegacyBillingAliases(value: unknown) {
 
   if (billingMode === "per_second" && record.costPerSecond === undefined) {
     return { ...record, costPerSecond: costPerUnit };
+  }
+
+  if (
+    billingMode === "per_thousand_characters" &&
+    record.inputCostPerThousandCharacters === undefined
+  ) {
+    return { ...record, inputCostPerThousandCharacters: costPerUnit };
   }
 
   return value;
@@ -556,6 +641,14 @@ export function normalizeBillingConfig(config: BillingConfig): HybridBillingConf
         currency: config.currency,
         charges: {
           perSecond: config.costPerSecond,
+        },
+      };
+    case "per_thousand_characters":
+      return {
+        billingMode: "hybrid",
+        currency: config.currency,
+        charges: {
+          inputTextCharactersPerThousand: config.inputCostPerThousandCharacters,
         },
       };
     case "per_million_tokens":
@@ -617,6 +710,13 @@ export function deriveLegacyBillingFields(config: BillingConfig) {
     return {
       unitLabel: "second",
       defaultUnitCost: charges.perSecond,
+    };
+  }
+
+  if (charges.inputTextCharactersPerThousand) {
+    return {
+      unitLabel: "1k characters",
+      defaultUnitCost: charges.inputTextCharactersPerThousand,
     };
   }
 
@@ -688,6 +788,9 @@ export function summarizeBillingConfig(config: BillingConfig) {
   if (charges.perSecond) {
     parts.push(`每秒 ${charges.perSecond}`);
   }
+  if (charges.inputTextCharactersPerThousand) {
+    parts.push(`每千字符 ${charges.inputTextCharactersPerThousand}`);
+  }
   if (charges.inputTextTokensPerMillion) {
     parts.push(`每百万输入 Token ${charges.inputTextTokensPerMillion}`);
   }
@@ -725,6 +828,7 @@ export function resolveBillingMetrics(input: {
       generatedVideoCount ||
       (generatedImageCount > 0 ? 0 : resolveRequestedAssetCount(requestInput, "video")),
     durationSeconds: resolveDurationSeconds(requestInput, output, providerRaw),
+    inputCharacters: resolveInputCharacterUsage(requestInput, output, providerRaw),
     inputTokens: tokens.inputTokens,
     inputCacheHitTokens: tokens.inputCacheHitTokens,
     inputCacheMissTokens: tokens.inputCacheMissTokens,
@@ -903,6 +1007,8 @@ export function resolveBillingBreakdown(input: {
     perImage: metrics.imageCount * perImageUnitPrice,
     perVideo: metrics.videoCount * perVideoUnitPrice,
     perSecond: metrics.durationSeconds * (config.charges.perSecond ?? 0),
+    inputTextCharacters:
+      (metrics.inputCharacters / 1_000) * (config.charges.inputTextCharactersPerThousand ?? 0),
     inputTextTokens:
       (metrics.inputTokens / 1_000_000) * (config.charges.inputTextTokensPerMillion ?? 0),
     inputTextCacheHitTokens:

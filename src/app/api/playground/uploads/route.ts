@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import mammoth from "mammoth";
+import WordExtractor from "word-extractor";
 
 import { buildGatewayErrorResponse, isGatewayValidationError } from "@/lib/gateway-errors";
 import { getAuthedWorkspaceForPlayground } from "@/lib/playground-key-server";
@@ -25,11 +27,34 @@ const allowedMimeTypes = new Map([
   ["audio/aac", "aac"],
   ["audio/ogg", "ogg"],
   ["audio/webm", "webm"],
+  ["application/msword", "doc"],
+  ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"],
 ]);
 
 const uploadSchema = z.object({
   field: z.string().trim().min(1).default("images"),
 });
+
+async function extractDocumentCharacterInfo(file: File, buffer: Buffer) {
+  try {
+    if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      const result = await mammoth.extractRawText({ buffer });
+      const text = result.value.replace(/\s+/g, " ").trim();
+      return text ? { characterCount: text.length, extractionSource: "docx" } : null;
+    }
+
+    if (file.type === "application/msword") {
+      const extractor = new WordExtractor();
+      const extracted = await extractor.extract(buffer);
+      const text = extracted.getBody().replace(/\s+/g, " ").trim();
+      return text ? { characterCount: text.length, extractionSource: "doc" } : null;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
 
 export async function POST(request: Request) {
   try {
@@ -59,16 +84,17 @@ export async function POST(request: Request) {
           error: {
             ...response.payload.error,
             message:
-              "Upload must be a supported image, video, or audio file no larger than 100MB.",
+              "Upload must be a supported image, video, audio, or DOC/DOCX document no larger than 100MB.",
           },
         },
         { status: response.statusCode }
       );
     }
 
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const characterInfo = await extractDocumentCharacterInfo(file, buffer);
     const supabaseAdmin = createAdminClient();
     const storagePath = `playground-uploads/${workspaceId}/${parsed.field}/${randomUUID()}.${extension}`;
-    const buffer = Buffer.from(await file.arrayBuffer());
     const { error: uploadError } = await supabaseAdmin.storage
       .from(UPLOAD_BUCKET)
       .upload(storagePath, buffer, {
@@ -93,9 +119,15 @@ export async function POST(request: Request) {
       mimeType: file.type,
       name: file.name,
       size: file.size,
+      ...(characterInfo ? {
+        characterCount: characterInfo.characterCount,
+        extractionSource: characterInfo.extractionSource,
+      } : {}),
       expiresIn: SIGNED_URL_TTL_SECONDS,
     });
   } catch (error) {
+    console.error("[playground/uploads] upload failed", error);
+
     if (isGatewayValidationError(error)) {
       const response = await buildGatewayErrorResponse({
         code: "invalid_request",
@@ -116,6 +148,14 @@ export async function POST(request: Request) {
       code: "internal_error",
       statusCode: 500,
     });
-    return NextResponse.json(response.payload, { status: response.statusCode });
+    return NextResponse.json(
+      {
+        ...response.payload,
+        ...(process.env.NODE_ENV !== "production" && error instanceof Error
+          ? { debugMessage: error.message }
+          : {}),
+      },
+      { status: response.statusCode }
+    );
   }
 }

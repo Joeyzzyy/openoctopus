@@ -66,6 +66,28 @@ test("falls back to provider raw duration_seconds when output does not include d
   assert.equal(resolution.total, 6);
 });
 
+test("charges document analysis by input characters per thousand", () => {
+  const config = parseBillingConfig({
+    billingMode: "hybrid",
+    currency: "USD",
+    charges: {
+      inputTextCharactersPerThousand: 0.07,
+    },
+  });
+
+  const text = "a".repeat(1500);
+  const resolution = resolveBillingBreakdown({
+    config,
+    requestInput: {
+      text,
+    },
+  });
+
+  assert.equal(resolution.metrics.inputCharacters, 1500);
+  assert.equal(resolution.components.inputTextCharacters, 0.105);
+  assert.equal(resolution.total, 0.105);
+});
+
 test("charges image requests with resolution and quality combination prices", () => {
   const config = parseBillingConfig({
     billingMode: "hybrid",

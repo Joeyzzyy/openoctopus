@@ -160,6 +160,73 @@ export const videoRequestSchema = z.object({
   validateReferenceUrlFields(value.input, context);
 });
 
+export const documentAnalysisRequestSchema = z.object({
+  model: z.string().min(1),
+  prompt: z.string().optional(),
+  input: z.record(z.string(), z.unknown()).default({}),
+}).superRefine((value, context) => {
+  const rawText = typeof value.input.text === "string"
+    ? value.input.text
+    : typeof value.prompt === "string"
+      ? value.prompt
+      : "";
+  const rawFileUrl =
+    value.input.document ??
+    value.input.file ??
+    value.input.file_url ??
+    value.input.fileUrl ??
+    value.input.document_url ??
+    value.input.documentUrl;
+  const fileUrl = typeof rawFileUrl === "string" ? rawFileUrl.trim() : "";
+  const rawWebsiteUrl =
+    value.input.website ??
+    value.input.website_url ??
+    value.input.websiteUrl;
+  const websiteUrl = typeof rawWebsiteUrl === "string" ? rawWebsiteUrl.trim() : "";
+  const text = rawText.trim();
+
+  if (!text && !fileUrl && !websiteUrl) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["input"],
+      message: "one of input.text, input.file_url, or input.website is required",
+    });
+    return;
+  }
+
+  if (text && text.length < 300) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["input", "text"],
+      message: "input.text must be at least 300 characters",
+    });
+  }
+
+  if (text && text.length > 150000) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["input", "text"],
+      message: "input.text must not exceed 150000 characters",
+    });
+  }
+
+  if (fileUrl && !isHttpUrl(fileUrl)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["input", "file_url"],
+      message: "input.file_url must be a usable HTTP(S) document URL",
+    });
+  }
+
+  if (websiteUrl && !isHttpUrl(websiteUrl)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["input", "website"],
+      message: "input.website must be a usable HTTP(S) website URL",
+    });
+  }
+});
+
 const chatMessageSchema = z.object({
   role: z.string().min(1),
   content: z.union([z.string(), z.array(z.unknown())]),
@@ -691,6 +758,53 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         providerBaseUrl: queued.providerBaseUrl,
         providerConfig: queued.providerConfig,
         capability: "image_recognition",
+        publicModelSlug: parsed.model,
+        upstreamModelSlug: queued.upstreamModelSlug,
+        endpoint: queued.endpoint,
+        prompt: parsed.prompt,
+        input: parsed.input,
+      });
+
+      return reply.code(202).send({
+        id: queued.requestId,
+        status: "queued",
+      });
+    } catch (error) {
+      return sendRequestError(reply, error);
+    }
+  });
+
+  app.post("/v1/documents/analyses", async (request, reply) => {
+    const parsed = documentAnalysisRequestSchema.parse(request.body);
+    const authHeader = request.headers.authorization;
+    const apiKey = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
+    const sourceHeader =
+      typeof request.headers["x-openoctopus-request-source"] === "string"
+        ? request.headers["x-openoctopus-request-source"]
+        : "";
+    const requestSource = sourceHeader === "playground" ? "playground" : "api";
+
+    try {
+      const queued = await createQueuedRequest({
+        apiKey,
+        endpoint: "/v1/documents/analyses",
+        capability: "document_analysis",
+        requestSource,
+        model: parsed.model,
+        prompt: parsed.prompt,
+        input: parsed.input,
+      });
+
+      await enqueueInferenceJob({
+        requestId: queued.requestId,
+        workspaceId: queued.workspaceId,
+        apiKeyId: queued.apiKeyId,
+        providerModelId: queued.providerModelId,
+        credentialId: queued.credentialId,
+        providerSlug: queued.providerSlug,
+        providerBaseUrl: queued.providerBaseUrl,
+        providerConfig: queued.providerConfig,
+        capability: "document_analysis",
         publicModelSlug: parsed.model,
         upstreamModelSlug: queued.upstreamModelSlug,
         endpoint: queued.endpoint,

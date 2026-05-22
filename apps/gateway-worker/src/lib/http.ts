@@ -116,6 +116,84 @@ function requestJson<TResponse>(
   });
 }
 
+function requestBuffer(
+  url: string,
+  options: {
+    method: "GET" | "PUT";
+    headers?: Record<string, string>;
+    body?: Buffer;
+  }
+): Promise<{
+  status: number;
+  headers: IncomingHttpHeaders;
+  data: Buffer;
+}> {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const payload = options.body ?? null;
+    const transport = target.protocol === "https:" ? https : http;
+
+    const req = transport.request(
+      {
+        protocol: target.protocol,
+        hostname: target.hostname,
+        port: target.port || undefined,
+        path: `${target.pathname}${target.search}`,
+        method: options.method,
+        family: 4,
+        timeout: REQUEST_TIMEOUT_MS,
+        agent: proxyAgent ?? undefined,
+        headers: {
+          accept: "*/*",
+          ...(payload ? { "content-length": Buffer.byteLength(payload).toString() } : {}),
+          ...(options.headers ?? {}),
+        },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+
+        res.on("data", (chunk) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+
+        res.on("end", () => {
+          const status = res.statusCode ?? 500;
+          const data = Buffer.concat(chunks);
+          const target = redactUrl(url);
+          if (status < 200 || status >= 300) {
+            reject(
+              new Error(
+                `Upstream ${options.method} failed with ${status} (${target}) body=${truncateText(data.toString("utf8"))}`
+              )
+            );
+            return;
+          }
+
+          resolve({
+            status,
+            headers: res.headers,
+            data,
+          });
+        });
+      }
+    );
+
+    req.on("timeout", () => {
+      req.destroy(new Error(`Upstream ${options.method} timed out after ${REQUEST_TIMEOUT_MS}ms`));
+    });
+
+    req.on("error", (error) => {
+      reject(error);
+    });
+
+    if (payload) {
+      req.write(payload);
+    }
+
+    req.end();
+  });
+}
+
 export function postJson<TResponse>(
   url: string,
   options: {
@@ -194,6 +272,32 @@ export function getJson<TResponse>(
   return requestJson<TResponse>(url, {
     method: "GET",
     headers: options?.headers,
+  });
+}
+
+export function getBuffer(
+  url: string,
+  options?: {
+    headers?: Record<string, string>;
+  }
+) {
+  return requestBuffer(url, {
+    method: "GET",
+    headers: options?.headers,
+  });
+}
+
+export function putBuffer(
+  url: string,
+  options: {
+    headers?: Record<string, string>;
+    body: Buffer;
+  }
+) {
+  return requestBuffer(url, {
+    method: "PUT",
+    headers: options.headers,
+    body: options.body,
   });
 }
 

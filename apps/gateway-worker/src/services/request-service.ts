@@ -23,12 +23,19 @@ export type UnifiedRequestInput = {
   endpoint:
     | "/chat/completions"
     | "/v1/code/chat/completions"
+    | "/v1/documents/analyses"
     | "/v1/images/generations"
     | "/v1/images/edits"
     | "/v1/images/recognitions"
     | "/v1/chat/completions"
     | "/v1/videos/generations";
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
   requestSource?: "api" | "playground";
   model: string;
   prompt?: string;

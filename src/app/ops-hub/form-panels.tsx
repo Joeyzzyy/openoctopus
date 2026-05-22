@@ -14,7 +14,14 @@ type SupportedModelOption = {
   id: string;
   modelSlug: string;
   displayName: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation"
+    | null;
   billingConfigText?: string;
 };
 
@@ -44,13 +51,20 @@ type ProviderModelOption = {
   supportedModelName: string;
   providerName: string;
   upstreamModelSlug: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
 };
 
 type BillingFormState = {
   currency: string;
   outputPriceMode: string;
   inputPriceMode: string;
+  chargeInputCharacters: boolean;
   chargePerRequest: boolean;
   chargePerImage: boolean;
   chargePerVideo: boolean;
@@ -64,6 +78,7 @@ type BillingFormState = {
   costPerImage: string;
   costPerVideo: string;
   costPerSecond: string;
+  inputCostPerThousandCharacters: string;
   inputCostPerMillion: string;
   inputCacheHitCostPerMillion: string;
   inputCacheMissCostPerMillion: string;
@@ -154,6 +169,32 @@ function templateExecutionPreset(slug?: string): Partial<ExecutionConfigFormStat
       resultMimeType: "image/png",
     };
   }
+  if (slug === "winston-ai-detection-v1") {
+    return {
+      mode: "sync",
+      messageFormat: "",
+      clientProtocol: "",
+      submitPath: "/v2/ai-content-detection",
+      pollPath: "",
+      resultPath: "",
+      taskIdPath: "id",
+      statusPath: "",
+      resultUrlPath: "",
+      resultTextPath: "",
+      resultValueType: "url",
+      resultMimeType: "application/json",
+      authType: "bearer",
+      authHeaderName: "Authorization",
+      authHeaderPrefix: "Bearer",
+      authQueryParam: "key",
+      submitBodyTemplate: "",
+      docRequestExampleJson: "",
+      docSubmitResponseExampleJson: "",
+      docNormalizedOutputExampleJson: "",
+      docSourceUrl: "",
+      docReadmeMarkdown: "",
+    };
+  }
   return {
     mode: "async",
     messageFormat: "",
@@ -173,6 +214,7 @@ function executionTemplateLabelZh(slug: string) {
   if (slug === "rest-async-poll-v1") return "标准异步轮询";
   if (slug === "upload-async-poll-v1") return "上传后异步轮询";
   if (slug === "sync-json-v1") return "同步返回";
+  if (slug === "winston-ai-detection-v1") return "Winston AI Detection";
   return "自定义调用协议";
 }
 
@@ -1533,6 +1575,7 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     currency: "USD",
     outputPriceMode: "per_image",
     inputPriceMode: "input_tokens",
+    chargeInputCharacters: false,
     chargePerRequest: false,
     chargePerImage: true,
     chargePerVideo: false,
@@ -1546,6 +1589,7 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     costPerImage: "0.04",
     costPerVideo: "0.8",
     costPerSecond: "0.05",
+    inputCostPerThousandCharacters: "0.07",
     inputCostPerMillion: "0.5",
     inputCacheHitCostPerMillion: "0.003625",
     inputCacheMissCostPerMillion: "0.435",
@@ -1559,6 +1603,7 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     ...fallback,
     outputPriceMode: "none",
     inputPriceMode: "none",
+    chargeInputCharacters: false,
     chargePerRequest: false,
     chargePerImage: false,
     chargePerVideo: false,
@@ -1610,11 +1655,14 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
       return {
         ...fallback,
         currency: typeof parsed.currency === "string" ? parsed.currency : fallback.currency,
-        inputPriceMode: hasPositiveCharge(charges.inputTextCacheHitTokensPerMillion) || hasPositiveCharge(charges.inputTextCacheMissTokensPerMillion)
+        inputPriceMode: hasPositiveCharge(charges.inputTextCharactersPerThousand)
+          ? "input_characters"
+          : hasPositiveCharge(charges.inputTextCacheHitTokensPerMillion) || hasPositiveCharge(charges.inputTextCacheMissTokensPerMillion)
           ? "input_tokens_cache_split"
           : hasPositiveCharge(charges.inputTextTokensPerMillion)
             ? "input_tokens"
             : "none",
+        chargeInputCharacters: hasPositiveCharge(charges.inputTextCharactersPerThousand),
         outputPriceMode: hasCombinationPrices
           ? resolutionPrices
             ? "resolution_multiplier"
@@ -1651,6 +1699,9 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
         costPerImage: String(charges.perImage ?? fallback.costPerImage),
         costPerVideo: String(charges.perVideo ?? fallback.costPerVideo),
         costPerSecond: String(charges.perSecond ?? fallback.costPerSecond),
+        inputCostPerThousandCharacters: String(
+          charges.inputTextCharactersPerThousand ?? fallback.inputCostPerThousandCharacters
+        ),
         inputCostPerMillion: String(
           charges.inputTextTokensPerMillion ?? fallback.inputCostPerMillion
         ),
@@ -1686,13 +1737,17 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
     return {
       ...fallback,
       currency: typeof parsed.currency === "string" ? parsed.currency : fallback.currency,
-      inputPriceMode:
-        parsed.billingMode === "per_million_tokens" &&
+      inputPriceMode: parsed.billingMode === "per_thousand_characters"
+        ? "input_characters"
+        : parsed.billingMode === "per_million_tokens" &&
         (hasPositiveCharge(parsed.inputCacheHitCostPerMillion) || hasPositiveCharge(parsed.inputCacheMissCostPerMillion))
           ? "input_tokens_cache_split"
           : parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.inputCostPerMillion)
             ? "input_tokens"
             : "none",
+      chargeInputCharacters:
+        parsed.billingMode === "per_thousand_characters" &&
+        hasPositiveCharge(parsed.inputCostPerThousandCharacters),
       outputPriceMode:
         parsed.billingMode === "per_image"
           ? "per_image"
@@ -1708,6 +1763,9 @@ function parseBillingFormState(initialValue?: string): BillingFormState {
       chargePerVideo: parsed.billingMode === "per_video" && hasPositiveCharge(parsed.costPerVideo ?? parsed.costPerUnit),
       chargePerSecond: parsed.billingMode === "per_second" && hasPositiveCharge(parsed.costPerSecond ?? parsed.costPerUnit),
       chargeCombinationPrices: fallback.chargeCombinationPrices,
+      inputCostPerThousandCharacters: String(
+        parsed.inputCostPerThousandCharacters ?? fallback.inputCostPerThousandCharacters
+      ),
       chargeInputTokens: parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.inputCostPerMillion),
       chargeInputCacheHitTokens: parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.inputCacheHitCostPerMillion),
       chargeInputCacheMissTokens: parsed.billingMode === "per_million_tokens" && hasPositiveCharge(parsed.inputCacheMissCostPerMillion),
@@ -1977,6 +2035,9 @@ function buildBillingConfigValue(state: BillingFormState) {
   }
   if (state.chargePerSecond) {
     charges.perSecond = Number(state.costPerSecond);
+  }
+  if (state.chargeInputCharacters) {
+    charges.inputTextCharactersPerThousand = Number(state.inputCostPerThousandCharacters);
   }
   if (state.chargeInputTokens) {
     charges.inputTextTokensPerMillion = Number(state.inputCostPerMillion);
@@ -2350,6 +2411,7 @@ function capabilityLabel(value: SupportedModelOption["capability"]) {
   if (value === "image_generation") return "图片生成";
   if (value === "image_edit") return "图片编辑";
   if (value === "image_recognition") return "图片识别";
+  if (value === "document_analysis") return "文档分析";
   if (value === "text_generation") return "对话生成";
   if (value === "video_generation") return "视频生成";
   return "未知";
@@ -2454,7 +2516,14 @@ function BooleanSurchargeTable({
 }: {
   values: Record<string, string>;
   onChange: (key: string, value?: string) => void;
-  capability?: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
+  capability?:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation"
+    | null;
 }) {
   const candidates = Array.from(new Set([...BOOLEAN_SURCHARGE_CANDIDATES, ...Object.keys(values)]));
   const labelForCandidate = (candidate: string) => {
@@ -2535,7 +2604,14 @@ export function BillingConfigEditor({
 }: {
   name?: string;
   initialValue?: string;
-  capability?: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
+  capability?:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation"
+    | null;
   componentHint?: string;
   generatedLabel?: string;
 }) {
@@ -2553,6 +2629,8 @@ export function BillingConfigEditor({
     capability === "video_generation" || combinationPricingVariant === "video";
   const inputMethod = state.chargeInputCacheHitTokens || state.chargeInputCacheMissTokens
     ? state.inputPriceMode || "input_tokens_cache_split"
+    : state.chargeInputCharacters
+      ? state.inputPriceMode || "input_characters"
     : state.chargeInputTokens
       ? "input_tokens"
       : "none";
@@ -2574,6 +2652,7 @@ export function BillingConfigEditor({
     setState((current) => ({
       ...current,
       inputPriceMode: method,
+      chargeInputCharacters: method === "input_characters",
       chargeInputTokens: method === "input_tokens",
       chargeInputCacheHitTokens: method === "input_tokens_cache_split",
       chargeInputCacheMissTokens: method === "input_tokens_cache_split",
@@ -2667,6 +2746,7 @@ export function BillingConfigEditor({
                 className={formSelectClassName}
               >
                 <option value="none">不计费</option>
+                <option value="input_characters">按输入字符（每千字符）</option>
                 <option value="input_tokens">按输入 Token（每百万）</option>
                 <option value="input_tokens_cache_split">按输入 Token（区分缓存命中 / 未命中）</option>
               </select>
@@ -2699,6 +2779,16 @@ export function BillingConfigEditor({
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
+        {inputMethod === "input_characters" ? (
+          <BillingNumberField
+            label="输入成本金额（每千字符）"
+            value={state.inputCostPerThousandCharacters}
+            onChange={(value) =>
+              setState((current) => ({ ...current, inputCostPerThousandCharacters: value }))
+            }
+            help="适合 AI detection、OCR、文档分析这类按字符或 credits 折算的模型。"
+          />
+        ) : null}
         {outputMethod === "per_request" ? (
           <BillingNumberField
             label="输出成本金额（每次请求）"
@@ -3064,6 +3154,7 @@ export function CreateProviderModelForm({
   const isTextOutputModel =
     selectedSupportedModel?.capability === "image_recognition" ||
     selectedSupportedModel?.capability === "text_generation";
+  const isDocumentAnalysisModel = selectedSupportedModel?.capability === "document_analysis";
   const [activeTab, setActiveTab] = useState<ProviderModelFormTab>("ai-autofill");
   void defaultActive;
   const [selectedCoverFileName, setSelectedCoverFileName] = useState("");
@@ -3226,7 +3317,7 @@ export function CreateProviderModelForm({
           nextRootTab ??= "manage";
           nextActiveTab ??= "basic";
         }
-        if (!isTextOutputModel && !executionConfigState.resultUrlPath.trim()) {
+        if (!isTextOutputModel && !isDocumentAnalysisModel && !executionConfigState.resultUrlPath.trim()) {
           missing.push("resultUrlPath");
           nextRootTab ??= "manage";
           nextActiveTab ??= "basic";
@@ -3865,7 +3956,7 @@ export function CreateProviderModelForm({
                       resultUrlPath: event.target.value,
                     }))
                   }
-                  required={!isTextOutputModel}
+                  required={!isTextOutputModel && !isDocumentAnalysisModel}
                   disabled={disabled}
                   className={formInputClassName}
                   placeholder="例如 data.outputs.0 / response.outputUrl"
@@ -3925,7 +4016,7 @@ export function CreateProviderModelForm({
                   </label>
                 </>
               ) : null}
-              {isTextOutputModel ? null : (
+              {isTextOutputModel || isDocumentAnalysisModel ? null : (
                 <>
                   <label className="block">
                     <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">结果值类型</span>

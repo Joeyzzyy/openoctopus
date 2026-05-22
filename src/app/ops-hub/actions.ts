@@ -21,6 +21,7 @@ const capabilitySchema = z.enum([
   "image_generation",
   "image_edit",
   "image_recognition",
+  "document_analysis",
   "text_generation",
   "video_generation",
 ]);
@@ -1667,6 +1668,25 @@ const upsertGatewayErrorDefinitionSchema = z.object({
   operatorNotes: z.string().trim().max(2000).optional().nullable(),
 });
 
+const staticModelTypeValueSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(80)
+  .regex(/^[a-z0-9-]+$/);
+
+const upsertStaticModelTypeOptionSchema = z.object({
+  optionId: z.string().uuid().optional(),
+  value: staticModelTypeValueSchema,
+  label: z.string().trim().min(2).max(80),
+  active: z.boolean().default(true),
+  sortOrder: z.coerce.number().int().min(0).max(9999).default(100),
+});
+
+const deleteStaticModelTypeOptionSchema = z.object({
+  optionId: z.string().uuid(),
+});
+
 
 export async function createWorkerTemplate(formData: FormData) {
   const { supabase, userId, workspaceId } = await getInternalAdminContext();
@@ -1849,6 +1869,116 @@ export async function upsertGatewayErrorDefinition(formData: FormData) {
     targetId: data?.id ?? parsed.definitionId ?? null,
     summary: `${parsed.definitionId ? "Updated" : "Created"} gateway error definition ${parsed.code}`,
     details: parsed,
+  });
+
+  revalidatePath("/ops-hub");
+}
+
+export async function upsertStaticModelTypeOption(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = upsertStaticModelTypeOptionSchema.parse({
+    optionId: normalizeOptionalText(formData.get("optionId")) ?? undefined,
+    value: formData.get("value"),
+    label: formData.get("label"),
+    active: parseBooleanField(formData.get("active")),
+    sortOrder: formData.get("sortOrder"),
+  });
+
+  const payload = {
+    value: parsed.value,
+    label: parsed.label,
+    active: parsed.active,
+    sort_order: parsed.sortOrder,
+  };
+
+  const { data, error } = await supabase
+    .from("static_model_type_options")
+    .upsert(
+      parsed.optionId
+        ? {
+            id: parsed.optionId,
+            ...payload,
+          }
+        : payload,
+      { onConflict: "value" }
+    )
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: parsed.optionId
+      ? "static_model_type_option.update"
+      : "static_model_type_option.create",
+    targetType: "static_model_type_option",
+    targetId: data?.id ?? parsed.optionId ?? null,
+    summary: `${parsed.optionId ? "Updated" : "Created"} model type option ${parsed.value}`,
+    details: parsed,
+  });
+
+  revalidatePath("/ops-hub");
+}
+
+export async function deleteStaticModelTypeOption(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = deleteStaticModelTypeOptionSchema.parse({
+    optionId: formData.get("optionId"),
+  });
+
+  const { data: optionRow, error: optionError } = await supabase
+    .from("static_model_type_options")
+    .select("value, label")
+    .eq("id", parsed.optionId)
+    .maybeSingle();
+
+  if (optionError) {
+    throw new Error(optionError.message);
+  }
+  if (!optionRow) {
+    throw new Error("模型类型选项不存在");
+  }
+
+  const { data: inUseRows, error: inUseError } = await supabase
+    .from("supported_models")
+    .select("id")
+    .filter("billing_config->metadata->>modelType", "eq", optionRow.value)
+    .limit(1);
+
+  if (inUseError) {
+    throw new Error(inUseError.message);
+  }
+  if ((inUseRows ?? []).length > 0) {
+    throw new Error("该模型类型仍被可售模型使用，无法删除。");
+  }
+
+  const { error } = await supabase
+    .from("static_model_type_options")
+    .delete()
+    .eq("id", parsed.optionId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "static_model_type_option.delete",
+    targetType: "static_model_type_option",
+    targetId: parsed.optionId,
+    summary: `Deleted model type option ${optionRow.value}`,
+    details: {
+      ...parsed,
+      value: optionRow.value,
+      label: optionRow.label,
+    },
   });
 
   revalidatePath("/ops-hub");
@@ -2073,7 +2203,8 @@ export async function createSupportedModel(formData: FormData) {
   const invalidCapabilityForModality =
     (parsed.modality === "image" &&
       !["image_generation", "image_edit", "image_recognition"].includes(parsed.capability)) ||
-    (parsed.modality === "text" && parsed.capability !== "text_generation") ||
+    (parsed.modality === "text" &&
+      !["text_generation", "document_analysis"].includes(parsed.capability)) ||
     (parsed.modality === "video" && parsed.capability !== "video_generation");
 
   if (invalidCapabilityForModality) {
@@ -2265,7 +2396,8 @@ export async function updateSupportedModelDetails(formData: FormData) {
   const invalidCapabilityForModality =
     (parsed.modality === "image" &&
       !["image_generation", "image_edit", "image_recognition"].includes(parsed.capability)) ||
-    (parsed.modality === "text" && parsed.capability !== "text_generation") ||
+    (parsed.modality === "text" &&
+      !["text_generation", "document_analysis"].includes(parsed.capability)) ||
     (parsed.modality === "video" && parsed.capability !== "video_generation");
 
   if (invalidCapabilityForModality) {
@@ -3610,7 +3742,7 @@ export async function generateProviderModelDraftFromSource(input: {
     "Constraints:",
     "1) pricing must follow internal billing config format: { billingMode, currency, charges }.",
     "2) billingMode should be \"hybrid\" whenever possible.",
-    "3) charges can include: perRequest, perImage, perVideo, perSecond, inputTextTokensPerMillion, outputTextTokensPerMillion; use number values ONLY when an explicit upstream provider cost is present in the source document.",
+    "3) charges can include: perRequest, perImage, perVideo, perSecond, inputTextCharactersPerThousand, inputTextTokensPerMillion, outputTextTokensPerMillion; use number values ONLY when an explicit upstream provider cost is present in the source document.",
     "3a) Never invent pricing. Never use 0 as a placeholder. If the source does not include an explicit provider price, return charges as an empty object: {}.",
     "4) inputSchema format: { officialDocUrl, params: [{ name, type, required, description, example, exposedToCustomer, maxItems }] }.",
     "5) outputSchema format: { officialDocUrl, fields: [{ name, type, description, example, exposedToCustomer }] }.",

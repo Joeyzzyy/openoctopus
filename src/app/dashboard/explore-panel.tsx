@@ -59,6 +59,9 @@ function capabilityToCategory(capability: string, labels: ExploreLabels) {
   if (normalized.includes("image")) {
     return labels.textToImage;
   }
+  if (normalized.includes("document")) {
+    return labels.text;
+  }
   if (normalized.includes("text") || normalized.includes("code")) {
     return labels.text;
   }
@@ -210,10 +213,14 @@ export function ExplorePanel({
                   className="block overflow-hidden rounded-2xl border border-[#BAE6FD] bg-white shadow-sm transition-colors hover:border-[#7DD3FC]"
                 >
                   <div className="flex h-full min-h-[120px] items-center">
-                    <div className="ml-3 size-20 shrink-0 overflow-hidden rounded-lg bg-[#F0F9FF] sm:size-24">
+                    <div className="ml-3 flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#F0F9FF] p-1 sm:size-24">
                       {model.coverImageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={model.coverImageUrl} alt={model.displayName} className="h-full w-full object-cover" />
+                        <img
+                          src={model.coverImageUrl}
+                          alt={model.displayName}
+                          className="h-full w-full object-contain"
+                        />
                       ) : (
                         <div className="flex h-full items-center justify-center px-2 text-center text-xs text-black/40">
                           {labels.noCover}

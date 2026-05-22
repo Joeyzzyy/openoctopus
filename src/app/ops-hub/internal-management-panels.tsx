@@ -10,6 +10,7 @@ import {
   createProviderCredential,
   createProviderModel,
   createSupportedModel,
+  deleteStaticModelTypeOption,
   deleteSupportedModel,
   deleteModelVendor,
   deleteProviderCredential,
@@ -18,6 +19,7 @@ import {
   createRoutingRule,
   rotateProviderCredentialSecret,
   upsertGatewayErrorDefinition,
+  upsertStaticModelTypeOption,
   updateProvider,
   updateProviderCredentialDetails,
   updateProviderCredentialState,
@@ -56,7 +58,14 @@ type SupportedModelSummary = {
   model_slug: string;
   display_name: string;
   modality: "image" | "video" | "audio" | "text";
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation"
+    | null;
   active: boolean;
   createdLabel: string;
   billingConfigText: string;
@@ -97,6 +106,16 @@ type GatewayErrorDefinitionSummary = {
   updatedLabel: string;
 };
 
+type StaticModelTypeOptionSummary = {
+  id: string;
+  value: string;
+  label: string;
+  active: boolean;
+  sortOrder: number;
+  createdLabel: string;
+  updatedLabel: string;
+};
+
 function normalizeCapabilityForModality(
   modality: SupportedModelSummary["modality"],
   capability: NonNullable<SupportedModelSummary["capability"]>
@@ -125,6 +144,10 @@ function normalizeModalityForCapability(
   }
 
   if (capability === "text_generation") {
+    return "text";
+  }
+
+  if (capability === "document_analysis") {
     return "text";
   }
 
@@ -178,7 +201,13 @@ type ProviderModelSummary = {
   supportedModelName: string;
   public_model_slug: string;
   upstream_model_slug: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
   active: boolean;
   pricingText: string;
   pricingSummary: string;
@@ -226,7 +255,13 @@ type RoutingRuleSummary = {
   id: string;
   supportedModelId: string | null;
   public_model_slug: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
   primary_provider_model_id: string;
   fallback_provider_model_id: string | null;
   route_strategy: string;
@@ -410,35 +445,28 @@ function StatusPill({
   );
 }
 
-const SUPPORTED_MODEL_TYPE_OPTIONS = [
-  "text-to-video",
-  "text-to-image",
-  "lora-support",
-  "image-to-video",
-  "image-to-image",
-  "image-to-3d",
-  "video-dubbing",
-  "training",
-  "video-to-video",
-  "upscaler",
-  "video-effects",
-  "image-effects",
-  "portrait-transfer",
-  "text-to-audio",
-  "ai-remover",
-  "digital-human",
-  "motion-control",
-  "content-moderation",
-  "llm",
-  "video-to-text",
-  "image-to-text",
-  "image-to-prompt",
-  "speech-to-text",
-  "audio-to-audio",
-  "video-extend",
-  "text-to-3d",
-  "video-to-audio",
-] as const;
+function buildModelTypeSelectOptions(
+  modelTypeOptions: StaticModelTypeOptionSummary[],
+  extraValues: string[] = []
+) {
+  const merged = new Map<string, string>();
+  merged.set("", "未分类");
+
+  for (const option of modelTypeOptions) {
+    if (!option.active) continue;
+    const value = option.value.trim();
+    if (!value) continue;
+    merged.set(value, option.label.trim() || value);
+  }
+
+  for (const value of extraValues) {
+    const normalized = value.trim();
+    if (!normalized || merged.has(normalized)) continue;
+    merged.set(normalized, normalized);
+  }
+
+  return Array.from(merged.entries()).map(([value, label]) => ({ value, label }));
+}
 
 function readTemplateMode(config: Record<string, unknown> | null) {
   const mode = typeof config?.mode === "string" ? config.mode.trim() : "";
@@ -487,6 +515,8 @@ function readTemplateConfigDiagnostics(config: Record<string, unknown> | null) {
   if (isAsyncMode && !taskIdPath) diagnostics.push("缺少 taskIdPath");
   if (capability === "image_recognition" || capability === "text_generation") {
     if (!resultTextPath) diagnostics.push("缺少 resultTextPath");
+  } else if (capability === "document_analysis") {
+    // Document analysis returns status/score objects rather than text or asset URLs.
   } else if (!resultUrlPath) {
     diagnostics.push("缺少 resultUrlPath");
   }
@@ -1068,12 +1098,14 @@ function SupportedModelDetailsForm({
   model,
   vendorOptions,
   capabilityOptions,
+  modelTypeOptions,
   providerModelMappings,
   close,
 }: {
   model: SupportedModelSummary;
   vendorOptions: Array<{ value: string; label: string }>;
   capabilityOptions: readonly CapabilityOption[];
+  modelTypeOptions: StaticModelTypeOptionSummary[];
   providerModelMappings: ProviderModelSummary[];
   close: () => void;
 }) {
@@ -1081,6 +1113,9 @@ function SupportedModelDetailsForm({
   const [pricingSeed, setPricingSeed] = useState(model.billingConfigText);
   const [modality, setModality] = useState<SupportedModelSummary["modality"]>(model.modality);
   const [capability, setCapability] = useState(model.capability ?? "image_generation");
+  const modelTypeSelectOptions = buildModelTypeSelectOptions(modelTypeOptions, [
+    readModelTypeFromBillingConfig(model.billingConfigText),
+  ]);
 
   return (
     <ManagedDialogForm action={updateSupportedModelDetails} close={close} className="grid gap-4">
@@ -1142,7 +1177,7 @@ function SupportedModelDetailsForm({
               label="类型"
               name="modelType"
               defaultValue={readModelTypeFromBillingConfig(model.billingConfigText)}
-              options={SUPPORTED_MODEL_TYPE_OPTIONS.map((item) => ({ value: item, label: item }))}
+              options={modelTypeSelectOptions}
             />
             <FormSelect
               label="模态"
@@ -1299,6 +1334,7 @@ export function PublicModelsPanel({
   providers = [],
   workerTemplates = [],
   modelVendors = [],
+  modelTypeOptions = [],
   capabilityOptions,
 }: {
   models: SupportedModelSummary[];
@@ -1310,6 +1346,7 @@ export function PublicModelsPanel({
   providers?: ProviderSummary[];
   workerTemplates?: WorkerTemplateSummary[];
   modelVendors?: ModelVendorSummary[];
+  modelTypeOptions?: StaticModelTypeOptionSummary[];
   capabilityOptions: readonly CapabilityOption[];
 }) {
   const activeModelTypeFilter = modelTypeFilter;
@@ -1319,6 +1356,7 @@ export function PublicModelsPanel({
   const safeRoutingRules = Array.isArray(routingRules) ? routingRules : [];
   const safeProviders = Array.isArray(providers) ? providers : [];
   const safeWorkerTemplates = Array.isArray(workerTemplates) ? workerTemplates : [];
+  const safeModelTypeOptions = Array.isArray(modelTypeOptions) ? modelTypeOptions : [];
   const vendorSuggestions = Array.from(
     new Set([
       ...safeModelVendors.map((item) => item.name),
@@ -1372,6 +1410,7 @@ export function PublicModelsPanel({
     if (value === "image_generation") return "图片生成";
     if (value === "image_edit") return "图片编辑";
     if (value === "image_recognition") return "图片识别";
+    if (value === "document_analysis") return "文档分析";
     if (value === "text_generation") return "对话生成";
     if (value === "video_generation") return "视频生成";
     return "未设置";
@@ -1383,12 +1422,14 @@ export function PublicModelsPanel({
     map.set(modelType, list);
     return map;
   }, new Map<string, SupportedModelSummary[]>());
+  const configuredModelTypeOrder = safeModelTypeOptions
+    .filter((item) => item.active)
+    .map((item) => item.value.trim())
+    .filter(Boolean);
   const orderedCategories = [
-    ...SUPPORTED_MODEL_TYPE_OPTIONS,
+    ...configuredModelTypeOrder,
     ...Array.from(groupedSupportedModels.keys()).filter(
-      (key) =>
-        key !== "uncategorized" &&
-        !SUPPORTED_MODEL_TYPE_OPTIONS.includes(key as (typeof SUPPORTED_MODEL_TYPE_OPTIONS)[number])
+      (key) => key !== "uncategorized" && !configuredModelTypeOrder.includes(key)
     ),
     "uncategorized",
   ].filter((key, index, arr) => arr.indexOf(key) === index);
@@ -1401,7 +1442,10 @@ export function PublicModelsPanel({
   const modelCategoryLabel = (value: string) => (value === "uncategorized" ? "未分类" : value);
   const modelTypeFilterOptions = [
     { value: "all", label: "全部类型" },
-    ...SUPPORTED_MODEL_TYPE_OPTIONS.map((item) => ({ value: item, label: item })),
+    ...buildModelTypeSelectOptions(
+      safeModelTypeOptions,
+      Array.from(groupedSupportedModels.keys()).filter((key) => key !== "uncategorized")
+    ).filter((item) => item.value),
   ];
   const visibleModelGroups =
     activeModelTypeFilter === "all"
@@ -1576,6 +1620,7 @@ export function PublicModelsPanel({
                           model={model}
                           vendorOptions={vendorOptions}
                           capabilityOptions={capabilityOptions}
+                          modelTypeOptions={safeModelTypeOptions}
                           providerModelMappings={mappings}
                           close={close}
                         />
@@ -1999,13 +2044,16 @@ export function CreateModelVendorButton() {
 
 export function CreateSupportedModelButton({
   capabilityOptions,
+  modelTypeOptions = [],
   modelVendors = [],
   models = [],
 }: {
   capabilityOptions: readonly CapabilityOption[];
+  modelTypeOptions?: StaticModelTypeOptionSummary[];
   modelVendors?: ModelVendorSummary[];
   models?: SupportedModelSummary[];
 }) {
+  const safeModelTypeOptions = Array.isArray(modelTypeOptions) ? modelTypeOptions : [];
   const safeModelVendors = Array.isArray(modelVendors) ? modelVendors : [];
   const safeModels = Array.isArray(models) ? models : [];
   const vendorNames = Array.from(
@@ -2023,6 +2071,10 @@ export function CreateSupportedModelButton({
       : [{ value: "Google", label: "Google" }];
   const cloneCandidates = safeModels;
   const defaultBillingTemplate = '{"billingMode":"hybrid","currency":"USD","charges":{"perImage":0.039,"inputTextTokensPerMillion":0.30}}';
+  const modelTypeSelectOptions = buildModelTypeSelectOptions(safeModelTypeOptions, [
+    "text-to-image",
+    ...safeModels.map((item) => readModelTypeFromBillingConfig(item.billingConfigText)),
+  ]);
   const [sourceModelId, setSourceModelId] = useState("");
   const [formSeed, setFormSeed] = useState(0);
   const [draftValues, setDraftValues] = useState(() => ({
@@ -2132,7 +2184,7 @@ export function CreateSupportedModelButton({
         <FormSelect
           label="类型"
           name="modelType"
-          options={SUPPORTED_MODEL_TYPE_OPTIONS.map((item) => ({ value: item, label: item }))}
+          options={modelTypeSelectOptions}
           defaultValue={draftValues.modelType}
         />
         <ActiveCheckbox
@@ -2783,6 +2835,153 @@ export function GatewayErrorDefinitionsPanel({
   );
 }
 
+export function ModelTypeOptionsPanel({
+  modelTypeOptions,
+}: {
+  modelTypeOptions: StaticModelTypeOptionSummary[];
+}) {
+  const rows = [...modelTypeOptions].sort(
+    (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, "zh-CN")
+  );
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <ManagementDialog
+          trigger={<ModalButton tone="primary">新增类型</ModalButton>}
+          title="新增模型类型选项"
+          description="新增一个可售模型类型选项，值会写入 supported_models.billing_config.metadata.modelType。"
+        >
+          {({ close }) => (
+            <ManagedDialogForm action={upsertStaticModelTypeOption} close={close}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField label="值" name="value" required placeholder="text-to-image" />
+                <FormField label="展示名" name="label" required placeholder="Text to Image" />
+                <FormField label="排序" name="sortOrder" required placeholder="100" />
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <ActiveCheckbox name="active" defaultChecked={true} label="启用此选项" />
+              </div>
+              <div className="flex justify-end">
+                <SubmitButton label="保存类型" />
+              </div>
+            </ManagedDialogForm>
+          )}
+        </ManagementDialog>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="overflow-x-auto rounded-2xl border border-[#BAE6FD] bg-white shadow-sm">
+          <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+            <thead>
+              <tr className="text-xs text-black/50">
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">展示名</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">值</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">状态</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">排序</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">更新时间</th>
+                <th className="border-b border-[#BAE6FD] px-3 py-2.5">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top text-sm text-black">
+                    {row.label}
+                  </td>
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top font-mono text-xs text-black/60">
+                    {row.value}
+                  </td>
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/60">
+                    {row.active ? "启用" : "停用"}
+                  </td>
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/60">
+                    {row.sortOrder}
+                  </td>
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top text-xs text-black/50">
+                    <p>{row.updatedLabel}</p>
+                    <p className="mt-1">创建于 {row.createdLabel}</p>
+                  </td>
+                  <td className="border-b border-[#DDF4FF] px-3 py-3 align-top">
+                    <div className="flex flex-wrap gap-1.5">
+                      <form action={upsertStaticModelTypeOption}>
+                        <input type="hidden" name="optionId" value={row.id} />
+                        <input type="hidden" name="value" value={row.value} />
+                        <input type="hidden" name="label" value={row.label} />
+                        <input type="hidden" name="sortOrder" value={String(row.sortOrder)} />
+                        <input type="hidden" name="active" value={row.active ? "false" : "true"} />
+                        <button
+                          type="submit"
+                          className={`inline-flex h-9 min-w-[64px] items-center justify-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                            row.active
+                              ? "border-[#9CC9A5] bg-[#EAF7ED] text-[#2F7A3E] hover:bg-[#def0e3]"
+                              : "border-black/[0.14] bg-[#F0F9FF] text-black/70 hover:bg-[#E0F2FE]"
+                          }`}
+                        >
+                          {row.active ? "停用" : "启用"}
+                        </button>
+                      </form>
+                      <ManagementDialog
+                        trigger={<ModalButton tone="secondary">编辑</ModalButton>}
+                        title={`编辑模型类型 ${row.label}`}
+                        description="修改类型值、展示名、排序和启用状态。"
+                      >
+                        {({ close }) => (
+                          <ManagedDialogForm action={upsertStaticModelTypeOption} close={close}>
+                            <input type="hidden" name="optionId" value={row.id} />
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <FormField label="值" name="value" required defaultValue={row.value} />
+                              <FormField label="展示名" name="label" required defaultValue={row.label} />
+                              <FormField
+                                label="排序"
+                                name="sortOrder"
+                                required
+                                defaultValue={String(row.sortOrder)}
+                              />
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <ActiveCheckbox name="active" defaultChecked={row.active} label="启用此选项" />
+                            </div>
+                            <div className="flex justify-end">
+                              <SubmitButton label="保存类型" />
+                            </div>
+                          </ManagedDialogForm>
+                        )}
+                      </ManagementDialog>
+
+                      <ManagementDialog
+                        trigger={<ModalButton tone="secondary">删除</ModalButton>}
+                        title={`删除模型类型 ${row.label}`}
+                        description="确认删除这个模型类型选项。若仍被可售模型使用，将阻止删除。"
+                      >
+                        {({ close }) => (
+                          <ManagedDialogForm action={deleteStaticModelTypeOption} close={close}>
+                            <input type="hidden" name="optionId" value={row.id} />
+                            <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
+                              删除后，这个类型不会再出现在可售模型下拉和筛选中。
+                            </div>
+                            <div className="flex justify-end">
+                              <SubmitButton label="确认删除" pendingLabel="删除中..." tone="danger" />
+                            </div>
+                          </ManagedDialogForm>
+                        )}
+                      </ManagementDialog>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
+          <p className="text-sm font-medium text-black">还没有模型类型选项</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ProvidersPanel({
   providers,
   credentials,
@@ -3203,7 +3402,7 @@ export function ModelsPanel({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex h-6 items-center rounded-md border border-[#BAE6FD] bg-[#E0F2FE] px-2 text-[11px] text-[#0369A1]">
-                    {item.capability === "image_generation" ? "图片生成" : item.capability === "image_edit" ? "图片编辑" : item.capability === "image_recognition" ? "图片识别" : item.capability === "text_generation" ? "对话生成" : "视频生成"}
+                    {item.capability === "image_generation" ? "图片生成" : item.capability === "image_edit" ? "图片编辑" : item.capability === "image_recognition" ? "图片识别" : item.capability === "document_analysis" ? "文档分析" : item.capability === "text_generation" ? "对话生成" : "视频生成"}
                   </span>
                   <span className="text-sm font-medium text-black">{item.providerName}</span>
                 </div>

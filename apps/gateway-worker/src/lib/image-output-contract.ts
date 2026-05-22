@@ -263,8 +263,46 @@ export function normalizeTextOutputPayload(outputPayload: unknown) {
   };
 }
 
+export function normalizeDocumentAnalysisOutputPayload(outputPayload: unknown) {
+  const output = isRecord(outputPayload) ? outputPayload : {};
+  const raw = isRecord(output.raw) ? output.raw : null;
+  const score = isRecord(output.score)
+    ? output.score
+    : isRecord(readPath(raw, ["score"]))
+      ? (readPath(raw, ["score"]) as Record<string, unknown>)
+      : null;
+  const status =
+    typeof output.status === "string" && output.status.trim().length > 0
+      ? output.status
+      : typeof readPath(raw, ["status"]) === "string"
+        ? String(readPath(raw, ["status"]))
+        : null;
+  const scoreRequestId =
+    typeof output.score_request_id === "string" && output.score_request_id.trim().length > 0
+      ? output.score_request_id
+      : typeof output.scoreRequestId === "string" && output.scoreRequestId.trim().length > 0
+        ? output.scoreRequestId
+        : typeof readPath(raw, ["score_request_id"]) === "string"
+          ? String(readPath(raw, ["score_request_id"]))
+          : null;
+
+  return {
+    format: "openoctopus.document_analysis.output.v1",
+    raw: output.raw ?? null,
+    ...(status ? { status } : {}),
+    ...(scoreRequestId ? { scoreRequestId, score_request_id: scoreRequestId } : {}),
+    ...(score ? { score } : {}),
+  };
+}
+
 export function normalizeOutputPayloadByCapability(input: {
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
   outputPayload: unknown;
 }) {
   if (input.capability === "image_generation" || input.capability === "image_edit") {
@@ -272,6 +310,9 @@ export function normalizeOutputPayloadByCapability(input: {
   }
   if (input.capability === "video_generation") {
     return normalizeVideoOutputPayload(input.outputPayload);
+  }
+  if (input.capability === "document_analysis") {
+    return normalizeDocumentAnalysisOutputPayload(input.outputPayload);
   }
   if (input.capability === "text_generation") {
     return normalizeTextOutputPayload(input.outputPayload);

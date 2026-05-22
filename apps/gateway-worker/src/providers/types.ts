@@ -2,6 +2,7 @@ export type Capability =
   | "image_generation"
   | "image_edit"
   | "image_recognition"
+  | "document_analysis"
   | "text_generation"
   | "video_generation";
 

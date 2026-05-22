@@ -10,6 +10,7 @@ import { buildGatewayErrorResponse, isGatewayValidationError } from "@/lib/gatew
 const submitSchema = z.object({
   action: z.literal("submit"),
   endpoint: z.enum([
+    "/v1/documents/analyses",
     "/v1/images/generations",
     "/v1/images/edits",
     "/v1/images/recognitions",
@@ -100,7 +101,8 @@ function sanitizePlaygroundOutputPayload(outputPayload: unknown) {
   }
 
   const record = outputPayload as Record<string, unknown>;
-  const { raw: _raw, ...rest } = record;
+  const rest = { ...record };
+  delete rest.raw;
   const assets = Array.isArray(rest.assets) ? rest.assets : null;
 
   if (!assets) {
@@ -114,19 +116,20 @@ function sanitizePlaygroundOutputPayload(outputPayload: unknown) {
         return asset;
       }
       const assetRecord = asset as Record<string, unknown>;
-      const { sourceUrl: _sourceUrl, ...assetRest } = assetRecord;
+      const assetRest = { ...assetRecord };
+      delete assetRest.sourceUrl;
       return assetRest;
     }),
   };
 }
 
 export async function POST(request: Request) {
+  const apiBase = resolveGatewayBaseUrl();
   try {
     const body = await request.json();
     const parsed = z.union([submitSchema, statusSchema]).parse(body);
     const { workspaceId, userId } = await getAuthedWorkspaceForPlayground();
     const { secret } = await getOrCreateWorkspacePlaygroundKey(workspaceId, userId);
-    const apiBase = resolveGatewayBaseUrl();
 
     if (parsed.action === "submit") {
       const sanitizedInput = sanitizePlaygroundInput(parsed.input);
@@ -134,6 +137,7 @@ export async function POST(request: Request) {
         model: parsed.model,
         input: sanitizedInput,
       };
+      const requestUrl = `${apiBase}${parsed.endpoint}`;
       if (parsed.endpoint === "/v1/chat/completions") {
         const rawMessages = sanitizedInput.messages;
         if (rawMessages !== undefined) {
@@ -144,7 +148,7 @@ export async function POST(request: Request) {
         payload.prompt = parsed.prompt;
       }
 
-      const submitResponse = await fetch(`${apiBase}${parsed.endpoint}`, {
+      const submitResponse = await fetch(requestUrl, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -158,7 +162,14 @@ export async function POST(request: Request) {
       const submitJson = (await submitResponse.json().catch(() => ({}))) as Record<string, unknown>;
       if (!submitResponse.ok) {
         return NextResponse.json(
-          { error: submitJson?.error ?? { message: "Failed to submit request" } },
+          {
+            error: submitJson?.error ?? { message: "Failed to submit request" },
+            apiBase,
+            requestUrl,
+            upstreamStatus: submitResponse.status,
+            upstreamBody: submitJson,
+            source: "gateway",
+          },
           { status: submitResponse.status }
         );
       }
@@ -166,7 +177,8 @@ export async function POST(request: Request) {
       return NextResponse.json(submitJson);
     }
 
-    const statusResponse = await fetch(`${apiBase}/v1/tasks/${parsed.taskId}`, {
+    const requestUrl = `${apiBase}/v1/tasks/${parsed.taskId}`;
+    const statusResponse = await fetch(requestUrl, {
       method: "GET",
       headers: {
         authorization: `Bearer ${secret}`,
@@ -176,7 +188,14 @@ export async function POST(request: Request) {
     const statusJson = (await statusResponse.json().catch(() => ({}))) as Record<string, unknown>;
     if (!statusResponse.ok) {
       return NextResponse.json(
-        { error: statusJson?.error ?? { message: "Failed to query task status" } },
+        {
+          error: statusJson?.error ?? { message: "Failed to query task status" },
+          apiBase,
+          requestUrl,
+          upstreamStatus: statusResponse.status,
+          upstreamBody: statusJson,
+          source: "gateway",
+        },
         { status: statusResponse.status }
       );
     }
@@ -193,12 +212,21 @@ export async function POST(request: Request) {
 
     return NextResponse.json(sanitized);
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unexpected proxy failure";
     if (isGatewayValidationError(error)) {
       const response = await buildGatewayErrorResponse({
         code: "invalid_request",
         statusCode: 400,
       });
-      return NextResponse.json(response.payload, { status: response.statusCode });
+      return NextResponse.json(
+        {
+          ...response.payload,
+          apiBase,
+          source: "playground_proxy",
+          proxyError: message,
+        },
+        { status: response.statusCode }
+      );
     }
 
     if (error instanceof Error && error.message === "Not authenticated") {
@@ -206,13 +234,29 @@ export async function POST(request: Request) {
         code: "unauthorized",
         statusCode: 401,
       });
-      return NextResponse.json(response.payload, { status: response.statusCode });
+      return NextResponse.json(
+        {
+          ...response.payload,
+          apiBase,
+          source: "playground_proxy",
+          proxyError: message,
+        },
+        { status: response.statusCode }
+      );
     }
 
     const response = await buildGatewayErrorResponse({
       code: "internal_error",
       statusCode: 500,
     });
-    return NextResponse.json(response.payload, { status: response.statusCode });
+    return NextResponse.json(
+      {
+        ...response.payload,
+        apiBase,
+        source: "playground_proxy",
+        proxyError: message,
+      },
+      { status: response.statusCode }
+    );
   }
 }

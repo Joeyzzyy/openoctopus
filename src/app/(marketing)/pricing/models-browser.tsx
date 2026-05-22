@@ -27,6 +27,8 @@ type PlaygroundUpload = {
   name: string;
   mimeType: string;
   size: number;
+  characterCount?: number;
+  extractionSource?: string;
 };
 
 type PlaygroundHistoryImage = {
@@ -43,6 +45,28 @@ type PreviewImageState = {
   mimeType?: string;
 };
 
+type PlaygroundDocumentSentenceScore = {
+  text: string;
+  score?: number;
+  length?: number;
+};
+
+type PlaygroundDocumentAnalysisResult = {
+  status?: string;
+  humanScore?: number;
+  readabilityScore?: number;
+  creditsUsed?: number;
+  creditsRemaining?: number;
+  language?: string;
+  version?: string;
+  inputType?: string;
+  attackDetected?: {
+    homoglyphAttack?: boolean;
+    zeroWidthSpace?: boolean;
+  };
+  sentences: PlaygroundDocumentSentenceScore[];
+};
+
 type MaskEditorState = {
   fieldKey: string;
   fieldLabel: string;
@@ -50,7 +74,7 @@ type MaskEditorState = {
   sourceUpload: PlaygroundUpload;
 };
 
-type UploadFieldKind = "image" | "video" | "audio";
+type UploadFieldKind = "image" | "video" | "audio" | "document";
 
 type TaskStatus =
   | "idle"
@@ -1062,10 +1086,29 @@ function isAudioUploadField(field: JsonSchemaField) {
   );
 }
 
+function isDocumentUploadField(field: JsonSchemaField) {
+  const key = field.key.trim().toLowerCase();
+  const leafKey = getFieldLeafKey(field.key);
+  if (field.type === "boolean") return false;
+  return (
+    leafKey === "file" ||
+    leafKey === "document" ||
+    leafKey === "file_url" ||
+    leafKey === "document_url" ||
+    key.endsWith(".file") ||
+    key.endsWith(".document") ||
+    key.endsWith(".file_url") ||
+    key.endsWith(".document_url") ||
+    leafKey.endsWith("_file") ||
+    leafKey.endsWith("_document")
+  );
+}
+
 function getUploadFieldKind(field: JsonSchemaField): UploadFieldKind | null {
   if (isImageUploadField(field)) return "image";
   if (isVideoUploadField(field)) return "video";
   if (isAudioUploadField(field)) return "audio";
+  if (isDocumentUploadField(field)) return "document";
   return null;
 }
 
@@ -1131,6 +1174,7 @@ function getUploadLimit(field: JsonSchemaField) {
 function getUploadAccept(kind: UploadFieldKind) {
   if (kind === "video") return "video/mp4,video/webm,video/quicktime";
   if (kind === "audio") return "audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,audio/ogg,audio/webm";
+  if (kind === "document") return "application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   return "image/png,image/jpeg,image/webp,image/gif";
 }
 
@@ -1140,6 +1184,9 @@ function getUploadHelpText(kind: UploadFieldKind) {
   }
   if (kind === "audio") {
     return "Upload MP3, WAV, M4A, AAC, OGG, or WebM audio. They are converted to secure URLs before submission.";
+  }
+  if (kind === "document") {
+    return "Upload DOC or DOCX files. They are converted to secure URLs before submission.";
   }
   return "Upload PNG, JPEG, WebP, or GIF images. They are converted to secure URLs before submission.";
 }
@@ -1155,6 +1202,7 @@ function appendUploadLimitText(baseText: string, field: JsonSchemaField) {
 function getUploadTitle(kind: UploadFieldKind) {
   if (kind === "video") return "video";
   if (kind === "audio") return "audio";
+  if (kind === "document") return "document";
   return "image";
 }
 
@@ -1511,6 +1559,51 @@ function extractTextOutput(output: unknown): string | null {
   return null;
 }
 
+function extractDocumentAnalysis(output: unknown): PlaygroundDocumentAnalysisResult | null {
+  if (!isRecord(output)) return null;
+  const score = isRecord(output.score) ? output.score : null;
+  if (!score) return null;
+
+  const sentences = Array.isArray(score.sentences)
+    ? score.sentences.flatMap((item) => {
+        if (!isRecord(item) || typeof item.text !== "string" || item.text.trim().length === 0) {
+          return [];
+        }
+        return [
+          {
+            text: item.text.trim(),
+            ...(typeof item.score === "number" ? { score: item.score } : {}),
+            ...(typeof item.length === "number" ? { length: item.length } : {}),
+          },
+        ];
+      })
+    : [];
+
+  const attackDetected = isRecord(score.attack_detected)
+    ? {
+        ...(typeof score.attack_detected.homoglyph_attack === "boolean"
+          ? { homoglyphAttack: score.attack_detected.homoglyph_attack }
+          : {}),
+        ...(typeof score.attack_detected.zero_width_space === "boolean"
+          ? { zeroWidthSpace: score.attack_detected.zero_width_space }
+          : {}),
+      }
+    : undefined;
+
+  return {
+    ...(typeof output.status === "string" ? { status: output.status } : {}),
+    ...(typeof score.human_score === "number" ? { humanScore: score.human_score } : {}),
+    ...(typeof score.readability_score === "number" ? { readabilityScore: score.readability_score } : {}),
+    ...(typeof score.credits_used === "number" ? { creditsUsed: score.credits_used } : {}),
+    ...(typeof score.credits_remaining === "number" ? { creditsRemaining: score.credits_remaining } : {}),
+    ...(typeof score.language === "string" ? { language: score.language } : {}),
+    ...(typeof score.version === "string" ? { version: score.version } : {}),
+    ...(typeof score.input === "string" ? { inputType: score.input } : {}),
+    ...(attackDetected ? { attackDetected } : {}),
+    sentences,
+  };
+}
+
 export function ModelsBrowser({
   rows,
   vendorOptions,
@@ -1679,6 +1772,10 @@ export function ModelsBrowser({
     () => extractTextOutput(playgroundOutput),
     [playgroundOutput]
   );
+  const playgroundDocumentAnalysis = useMemo(
+    () => extractDocumentAnalysis(playgroundOutput),
+    [playgroundOutput]
+  );
   useEffect(() => {
     setPlaygroundForm({});
     setPlaygroundUploads({});
@@ -1801,6 +1898,31 @@ export function ModelsBrowser({
     [selectedModel?.inputSchemaText]
   );
   const isChatModel = selectedModel?.capability === "text_generation";
+  const isDocumentAnalysisModel = selectedModel?.capability === "document_analysis";
+  const documentTextField = useMemo(
+    () =>
+      isDocumentAnalysisModel
+        ? parsedFields.find((field) => getFieldLeafKey(field.key) === "text") ?? null
+        : null,
+    [isDocumentAnalysisModel, parsedFields]
+  );
+  const documentFileField = useMemo(
+    () =>
+      isDocumentAnalysisModel
+        ? parsedFields.find((field) => {
+            const leafKey = getFieldLeafKey(field.key);
+            return leafKey === "file" || leafKey === "file_url" || leafKey === "document" || leafKey === "document_url";
+          }) ?? null
+        : null,
+    [isDocumentAnalysisModel, parsedFields]
+  );
+  const visiblePlaygroundFields = useMemo(() => {
+    if (!isDocumentAnalysisModel) return parsedFields;
+    return parsedFields.filter((field) => {
+      const leafKey = getFieldLeafKey(field.key);
+      return leafKey === "text" || leafKey === "file" || leafKey === "file_url" || leafKey === "document" || leafKey === "document_url";
+    });
+  }, [isDocumentAnalysisModel, parsedFields]);
   const chatConfigFields = useMemo(
     () =>
       parsedFields.filter(
@@ -1815,6 +1937,7 @@ export function ModelsBrowser({
     selectedModel?.allowContinuousOperations === true &&
     parsedFields.some((field) => canUseHistoryImageForField(field));
   const isSubmitting = taskStatus === "submitting" || taskStatus === "queued" || taskStatus === "processing";
+  const [documentInputMode, setDocumentInputMode] = useState<"text" | "file">("text");
 
   useEffect(() => {
     if (!selectedModel?.publicModel || !supportsContinuousOperations) {
@@ -1874,7 +1997,9 @@ export function ModelsBrowser({
     );
     if (tiers.length === 0) {
       if (selectedModel.primaryPriceValue !== null) {
-        return formatUsd(selectedModel.primaryPriceValue + booleanSurchargeTotal);
+        const price = formatUsd(selectedModel.primaryPriceValue + booleanSurchargeTotal);
+        const unitLabel = selectedModel.primaryPriceLabel?.trim();
+        return unitLabel ? `${price} ${unitLabel}` : price;
       }
       return selectedModel.priceLabel || "";
     }
@@ -2036,8 +2161,19 @@ export function ModelsBrowser({
     setPlaygroundForm((current) => ({ ...current, prompt: prefillPrompt }));
   }, [isChatModel, parsedFields, searchParams]);
 
+  useEffect(() => {
+    if (!isDocumentAnalysisModel) return;
+    if (!documentTextField && documentFileField) {
+      setDocumentInputMode("file");
+      return;
+    }
+    setDocumentInputMode("text");
+  }, [documentFileField, documentTextField, isDocumentAnalysisModel, selectedModel?.publicModel]);
+
   const inferEndpoint = (capability: string | null | undefined) =>
-    capability === "image_edit"
+    capability === "document_analysis"
+      ? "/v1/documents/analyses"
+      : capability === "image_edit"
       ? "/v1/images/edits"
       : capability === "image_recognition"
         ? "/v1/images/recognitions"
@@ -2094,6 +2230,8 @@ export function ModelsBrowser({
           mimeType?: string;
           name?: string;
           size?: number;
+          characterCount?: number;
+          extractionSource?: string;
           error?: { message?: string };
         };
         if (!response.ok || !payload.url) {
@@ -2104,6 +2242,10 @@ export function ModelsBrowser({
           name: payload.name || file.name,
           mimeType: payload.mimeType || file.type,
           size: typeof payload.size === "number" ? payload.size : file.size,
+          characterCount:
+            typeof payload.characterCount === "number" ? payload.characterCount : undefined,
+          extractionSource:
+            typeof payload.extractionSource === "string" ? payload.extractionSource : undefined,
         });
       }
 
@@ -2386,13 +2528,20 @@ export function ModelsBrowser({
     let optimisticUserId: string | undefined;
 
     const nextValidationErrors: Record<string, string> = {};
-    for (const field of parsedFields) {
+    for (const field of visiblePlaygroundFields) {
       if (isChatModel && field.key === "messages") {
+        continue;
+      }
+      if (
+        isDocumentAnalysisModel &&
+        ((documentInputMode === "text" && field.key === documentFileField?.key) ||
+          (documentInputMode === "file" && field.key === documentTextField?.key))
+      ) {
         continue;
       }
       if (isUploadField(field)) {
         const uploadCount = (playgroundUploads[field.key] ?? []).length;
-        if (field.required && uploadCount === 0) {
+        if (field.required && uploadCount === 0 && !(isDocumentAnalysisModel && documentInputMode === "text")) {
           nextValidationErrors[field.key] = `${field.label} is required.`;
         }
         const uploadLimit = getUploadLimit(field);
@@ -2402,11 +2551,20 @@ export function ModelsBrowser({
         continue;
       }
       const value = playgroundForm[field.key]?.trim() ?? "";
-      if (field.required && value.length === 0) {
+      if (field.required && value.length === 0 && !(isDocumentAnalysisModel && documentInputMode === "file")) {
         nextValidationErrors[field.key] = `${field.label} is required.`;
       }
       if (getFieldLeafKey(field.key) === "prompt" && value.length === 0) {
         nextValidationErrors[field.key] = "Prompt is required.";
+      }
+      if (isDocumentAnalysisModel && getFieldLeafKey(field.key) === "text" && documentInputMode === "text") {
+        if (value.length === 0) {
+          nextValidationErrors[field.key] = `${field.label} is required.`;
+        } else if (value.length < 300) {
+          nextValidationErrors[field.key] = `${field.label} must be at least 300 characters.`;
+        } else if (value.length > 150000) {
+          nextValidationErrors[field.key] = `${field.label} must not exceed 150,000 characters.`;
+        }
       }
     }
     if (Object.keys(nextValidationErrors).length > 0) {
@@ -2682,7 +2840,14 @@ export function ModelsBrowser({
         return;
       }
 
-      for (const field of parsedFields) {
+      for (const field of visiblePlaygroundFields) {
+        if (
+          isDocumentAnalysisModel &&
+          ((documentInputMode === "text" && field.key === documentFileField?.key) ||
+            (documentInputMode === "file" && field.key === documentTextField?.key))
+        ) {
+          continue;
+        }
         if (isUploadField(field)) {
           const uploads = playgroundUploads[field.key] ?? [];
           if (uploads.length > 0) {
@@ -2693,6 +2858,14 @@ export function ModelsBrowser({
                 ? uploads.map((item) => item.url)
                 : uploads[0]?.url
             );
+            if (
+              isDocumentAnalysisModel &&
+              documentInputMode === "file" &&
+              getFieldLeafKey(field.key) === "file" &&
+              typeof uploads[0]?.characterCount === "number"
+            ) {
+              inputPayload.input_characters = uploads[0].characterCount;
+            }
           }
           continue;
         }
@@ -3308,12 +3481,48 @@ export function ModelsBrowser({
             <section className="rounded-lg border border-black/[0.08] bg-white p-3 sm:rounded-xl sm:p-4">
               <h3 className="mb-3 text-sm font-medium text-black">Input</h3>
               <div className="space-y-3">
-                {parsedFields.length === 0 ? (
+                {visiblePlaygroundFields.length === 0 ? (
                   <p className="text-sm text-black/55">
                     No structured input schema found. You can still submit with default empty input.
                   </p>
                 ) : (
-                  parsedFields.map((field) => (
+                  <>
+                  {isDocumentAnalysisModel && documentTextField && documentFileField ? (
+                    <div className="rounded-md border border-black/[0.08] bg-[#F8FCFF] p-1">
+                      <div className="grid grid-cols-2 gap-1">
+                        {([
+                          { key: "text" as const, label: "Paste text" },
+                          { key: "file" as const, label: "Upload document" },
+                        ]).map((item) => {
+                          const active = documentInputMode === item.key;
+                          return (
+                            <button
+                              key={item.key}
+                              type="button"
+                              onClick={() => setDocumentInputMode(item.key)}
+                              className={`h-9 rounded-md text-xs font-medium transition-colors ${
+                                active
+                                  ? "bg-white text-black shadow-sm"
+                                  : "text-black/55 hover:bg-white/70"
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                  {visiblePlaygroundFields.map((field) => {
+                    const hiddenForDocumentMode =
+                      isDocumentAnalysisModel &&
+                      ((documentInputMode === "text" && field.key === documentFileField?.key) ||
+                        (documentInputMode === "file" && field.key === documentTextField?.key));
+                    if (hiddenForDocumentMode) {
+                      return null;
+                    }
+
+                    return (
                     <label key={field.key} className="block">
                       <span className="mb-1 block text-xs text-black/65">
                         <span className="inline-flex items-center">
@@ -3510,7 +3719,17 @@ export function ModelsBrowser({
                                         <audio src={upload.url} controls className="w-full" />
                                       </div>
                                     </div>
-                                  ) : null}
+                                  ) : (
+                                    <div className="rounded border border-black/[0.06] bg-white px-3 py-3 text-sm text-black/65">
+                                      <p className="font-medium text-black/75">{upload.name}</p>
+                                      <p className="mt-1 text-xs text-black/45">{upload.mimeType}</p>
+                                      {typeof upload.characterCount === "number" ? (
+                                        <p className="mt-1 text-xs text-black/45">
+                                          Detected {upload.characterCount.toLocaleString("en-US")} characters
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -3592,17 +3811,26 @@ export function ModelsBrowser({
                           <option value="true">true</option>
                           <option value="false">false</option>
                         </select>
-                      ) : field.key === "prompt" ? (
+                      ) : field.key === "prompt" || (isDocumentAnalysisModel && getFieldLeafKey(field.key) === "text") ? (
                         <textarea
                           disabled={isSubmitting}
+                          maxLength={isDocumentAnalysisModel && getFieldLeafKey(field.key) === "text" ? 150000 : undefined}
                           value={playgroundForm[field.key] ?? ""}
                           onChange={(event) =>
                             setPlaygroundForm((prev) => ({ ...prev, [field.key]: event.target.value }))
                           }
-                          className={`min-h-[120px] w-full rounded-md border bg-white px-3 py-2 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03] ${
+                          className={`${
+                            isDocumentAnalysisModel && getFieldLeafKey(field.key) === "text"
+                              ? "min-h-[188px]"
+                              : "min-h-[120px]"
+                          } w-full rounded-md border bg-white px-3 py-2 text-sm text-black/80 disabled:cursor-not-allowed disabled:bg-black/[0.03] ${
                             validationErrors[field.key] ? "border-[#D94A38]" : "border-black/[0.1]"
                           }`}
-                          placeholder="Describe what to generate..."
+                          placeholder={
+                            isDocumentAnalysisModel
+                              ? "Paste the text to analyze..."
+                              : "Describe what to generate..."
+                          }
                         />
                       ) : field.type === "array" ? (
                         <textarea
@@ -3648,11 +3876,17 @@ export function ModelsBrowser({
                           placeholder={field.type === "number" ? "0" : `Enter ${field.label}`}
                         />
                       )}
+                      {isDocumentAnalysisModel && getFieldLeafKey(field.key) === "text" ? (
+                        <p className="mt-1 text-[11px] text-black/45">
+                          {(playgroundForm[field.key] ?? "").trim().length} / 150,000 characters. Minimum 300. Under 600 may be less reliable.
+                        </p>
+                      ) : null}
                       {validationErrors[field.key] ? (
                         <p className="mt-1 text-[11px] text-[#B54432]">{validationErrors[field.key]}</p>
                       ) : null}
                     </label>
-                  ))
+                  )})}
+                  </>
                 )}
               </div>
               <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -3662,7 +3896,7 @@ export function ModelsBrowser({
                   onClick={submitPlayground}
                   className="h-11 w-full rounded-md bg-[#1F8A4C] px-4 text-sm font-medium text-white transition-colors hover:bg-[#176D3D] disabled:cursor-not-allowed disabled:opacity-45 sm:h-10 sm:w-auto"
                 >
-                  {isSubmitting ? "Generating..." : `Generate${priceTag ? ` ${priceTag}` : ""}`}
+                  {isSubmitting ? "Generating..." : priceTag ? `Generate · ${priceTag}` : "Generate"}
                 </button>
               </div>
             </section>
@@ -3751,6 +3985,84 @@ export function ModelsBrowser({
                 </div>
               ) : playgroundOutput ? (
                 <div className="space-y-3">
+                  {isDocumentAnalysisModel && playgroundDocumentAnalysis ? (
+                    <div className="max-h-[560px] space-y-3 overflow-y-auto pr-1">
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-md border border-[#BAE6FD] bg-white p-3">
+                          <p className="text-[11px] font-medium uppercase tracking-[0.35px] text-black/45">Human score</p>
+                          <p className="mt-2 text-3xl font-semibold text-black">
+                            {typeof playgroundDocumentAnalysis.humanScore === "number"
+                              ? `${playgroundDocumentAnalysis.humanScore} / 100`
+                              : "-"}
+                          </p>
+                          <p className="mt-2 text-[11px] leading-5 text-black/50">
+                            0-100. Higher means more likely human-written.
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-[#BAE6FD] bg-white p-3">
+                          <p className="text-[11px] font-medium uppercase tracking-[0.35px] text-black/45">Readability score</p>
+                          <p className="mt-2 text-3xl font-semibold text-black">
+                            {typeof playgroundDocumentAnalysis.readabilityScore === "number"
+                              ? `${playgroundDocumentAnalysis.readabilityScore} / 100`
+                              : "-"}
+                          </p>
+                          <p className="mt-2 text-[11px] leading-5 text-black/50">
+                            0-100. Higher means easier to read.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-md border border-black/[0.08] bg-white p-3">
+                        <div className="grid gap-2 text-xs text-black/65 sm:grid-cols-2">
+                          <p>Language: <span className="font-medium text-black/80">{playgroundDocumentAnalysis.language ?? "-"}</span></p>
+                          <p>Version: <span className="font-medium text-black/80">{playgroundDocumentAnalysis.version ?? "-"}</span></p>
+                          <p>Input: <span className="font-medium text-black/80">{playgroundDocumentAnalysis.inputType ?? "-"}</span></p>
+                          <p>Status: <span className="font-medium text-black/80">{playgroundDocumentAnalysis.status ?? "-"}</span></p>
+                        </div>
+                        {playgroundDocumentAnalysis.attackDetected ? (
+                          <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                            <span className="rounded-full border border-black/[0.08] bg-[#F8FCFF] px-2.5 py-1 text-black/65">
+                              Homoglyph attack: {playgroundDocumentAnalysis.attackDetected.homoglyphAttack ? "Detected" : "No"}
+                            </span>
+                            <span className="rounded-full border border-black/[0.08] bg-[#F8FCFF] px-2.5 py-1 text-black/65">
+                              Zero-width space: {playgroundDocumentAnalysis.attackDetected.zeroWidthSpace ? "Detected" : "No"}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {playgroundDocumentAnalysis.sentences.length > 0 ? (
+                        <div className="rounded-md border border-black/[0.08] bg-white p-3">
+                          <div className="mb-2">
+                            <p className="text-xs font-medium text-black/55">Sentence score</p>
+                            <p className="mt-1 text-[11px] leading-5 text-black/45">
+                              Sentence-level score from Winston AI. Smaller samples are less accurate than the overall score.
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            {playgroundDocumentAnalysis.sentences.map((sentence, index) => (
+                              <div key={`${sentence.text.slice(0, 24)}-${index}`} className="rounded-md border border-black/[0.06] bg-[#F8FCFF] p-3">
+                                <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-black/50">
+                                  <span>#{index + 1}</span>
+                                  {typeof sentence.score === "number" ? (
+                                    <span className="rounded-full border border-[#BAE6FD] bg-white px-2 py-0.5 text-black/70">
+                                      Score {sentence.score} / 100
+                                    </span>
+                                  ) : null}
+                                  {typeof sentence.length === "number" ? (
+                                    <span>{sentence.length} chars</span>
+                                  ) : null}
+                                </div>
+                                <p className="whitespace-pre-wrap break-words text-sm leading-6 text-black/80">
+                                  {sentence.text}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {playgroundTextOutput ? (
                     <div className="rounded-md border border-black/[0.08] bg-white p-3">
                       <div className="mb-2 flex items-center justify-between gap-2">

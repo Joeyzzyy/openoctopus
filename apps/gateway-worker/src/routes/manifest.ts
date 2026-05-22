@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { supabaseAdmin } from "../lib/supabase.js";
 
 function endpointForCapability(capability: string) {
+  if (capability === "document_analysis") return "/v1/documents/analyses";
   if (capability === "image_edit") return "/v1/images/edits";
   if (capability === "image_recognition") return "/v1/images/recognitions";
   if (capability === "text_generation") return "/v1/chat/completions";
@@ -10,6 +11,7 @@ function endpointForCapability(capability: string) {
 }
 
 function outputTypeForCapability(capability: string) {
+  if (capability === "document_analysis") return "analysis";
   if (capability === "image_recognition" || capability === "text_generation") return "text";
   if (capability === "video_generation") return "video";
   return "image";
@@ -39,6 +41,10 @@ function normalizeInputSchema(inputSchema: unknown) {
           normalizedName === "videos" ||
           normalizedName === "audio" ||
           normalizedName === "audios" ||
+          normalizedName === "file" ||
+          normalizedName === "file_url" ||
+          normalizedName === "document" ||
+          normalizedName === "document_url" ||
           normalizedName.endsWith("_image") ||
           normalizedName.endsWith("_images") ||
           normalizedName.endsWith("_video") ||

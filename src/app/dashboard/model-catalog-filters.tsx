@@ -14,7 +14,11 @@ function capabilityGroup(capability: string): ModelType {
   if (capability.includes("video")) {
     return "video";
   }
-  if (capability.includes("text") || capability.includes("code")) {
+  if (
+    capability.includes("text") ||
+    capability.includes("code") ||
+    capability.includes("document")
+  ) {
     return "text-coding";
   }
   return "image";

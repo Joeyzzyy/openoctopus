@@ -30,7 +30,14 @@ type SupportedModelRow = {
   model_slug: string;
   display_name: string;
   modality: "image" | "video" | "audio" | "text";
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation" | null;
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation"
+    | null;
   billing_config: Record<string, unknown> | null;
   unit_label: string;
   default_unit_cost: number;
@@ -69,6 +76,16 @@ type GatewayErrorDefinitionRow = {
   updated_at: string;
 };
 
+type StaticModelTypeOptionRow = {
+  id: string;
+  value: string;
+  label: string;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 type ProviderAdapterAliasRow = {
   id: string;
   alias_slug: string;
@@ -90,7 +107,13 @@ type ProviderModelRow = {
   supported_model_id: string | null;
   public_model_slug: string;
   upstream_model_slug: string;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
   active: boolean;
   pricing: Record<string, unknown> | null;
   input_schema: Record<string, unknown> | null;
@@ -115,7 +138,13 @@ type ProviderModelShowcaseAssetRow = {
 type RoutingRuleRow = {
   id: string;
   workspace_id: string | null;
-  capability: "image_generation" | "image_edit" | "image_recognition" | "text_generation" | "video_generation";
+  capability:
+    | "image_generation"
+    | "image_edit"
+    | "image_recognition"
+    | "document_analysis"
+    | "text_generation"
+    | "video_generation";
   public_model_slug: string;
   primary_provider_model_id: string;
   fallback_provider_model_id: string | null;
@@ -1282,6 +1311,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     supportedModelsResponse,
     modelVendorsResponse,
     workerTemplatesResponse,
+    staticModelTypeOptionsResponse,
     gatewayErrorDefinitionsResponse,
     providerAdapterCatalogResponse,
     providerAdapterAliasesResponse,
@@ -1338,6 +1368,13 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
             .select("id, display_name, slug, config, active, created_at")
             .eq("active", true)
             .order("slug", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? supabase
+            .from("static_model_type_options")
+            .select("id, value, label, active, sort_order, created_at, updated_at")
+            .order("sort_order", { ascending: true })
+            .order("label", { ascending: true })
         : Promise.resolve({ data: [], error: null }),
       shouldLoadManagementData
         ? supabase
@@ -1448,6 +1485,9 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const workerTemplates = (workerTemplatesResponse.error
     ? []
     : workerTemplatesResponse.data ?? []) as WorkerTemplateRow[];
+  const staticModelTypeOptions = (staticModelTypeOptionsResponse.error
+    ? []
+    : staticModelTypeOptionsResponse.data ?? []) as StaticModelTypeOptionRow[];
   const gatewayErrorDefinitions = (gatewayErrorDefinitionsResponse.error
     ? []
     : gatewayErrorDefinitionsResponse.data ?? []) as GatewayErrorDefinitionRow[];
@@ -2341,6 +2381,15 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       ...worker,
       display_name: worker.display_name ?? worker.slug,
       createdLabel: formatRelativeTimestamp(worker.created_at),
+    })),
+    staticModelTypeOptions: staticModelTypeOptions.map((option) => ({
+      id: option.id,
+      value: option.value,
+      label: option.label,
+      active: option.active === true,
+      sortOrder: Number(option.sort_order ?? 100),
+      createdLabel: formatRelativeTimestamp(option.created_at),
+      updatedLabel: formatRelativeTimestamp(option.updated_at),
     })),
     gatewayErrorDefinitions: gatewayErrorDefinitions.map((definition) => ({
       id: definition.id,
