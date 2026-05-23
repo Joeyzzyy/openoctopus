@@ -1,5 +1,6 @@
 import "server-only";
 
+import { normalizeGatewayFileAssetUrl } from "@/lib/asset-urls";
 import { parseBillingConfig, summarizeBillingConfig } from "@/lib/billing-config";
 import {
   getProviderModelRuntimeDiagnostics,
@@ -480,6 +481,12 @@ function sanitizeOutputPayloadForCustomer(value: unknown) {
         const asset = asRecord(item);
         if (!asset) return item;
         const { sourceUrl: _sourceUrl, ...assetRest } = asset;
+        if (typeof assetRest.url === "string") {
+          return {
+            ...assetRest,
+            url: normalizeGatewayFileAssetUrl(assetRest.url),
+          };
+        }
         return assetRest;
       })
     : rest.assets;
