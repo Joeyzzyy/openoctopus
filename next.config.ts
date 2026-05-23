@@ -47,6 +47,18 @@ const nextConfig: NextConfig = {
           basePath: false,
         },
         {
+          source: "/resource/sitemap.xml",
+          destination:
+            "https://openoctopus-seo-nine.vercel.app/resource/sitemap.xml",
+          basePath: false,
+        },
+        {
+          source: "/resource/robots.txt",
+          destination:
+            "https://openoctopus-seo-nine.vercel.app/resource/robots.txt",
+          basePath: false,
+        },
+        {
           source: "/resource/:path*",
           destination: "https://openoctopus-seo-nine.vercel.app/resource/:path*",
           basePath: false,
