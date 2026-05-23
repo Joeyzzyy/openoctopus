@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
+import { normalizeGatewayFileAssetUrl } from "@/lib/asset-urls";
 import { getAuthedWorkspaceForPlayground } from "@/lib/playground-key-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -40,26 +40,9 @@ function extractPromptText(requestRow: Record<string, unknown>) {
 
 function normalizeAssetUrl(value: string, mimeType: string) {
   const text = value.trim();
-  if (text.startsWith("http://") || text.startsWith("https://")) {
-    try {
-      const url = new URL(text);
-      if (url.pathname.startsWith("/v1/files/")) {
-        url.searchParams.set("display", "1");
-        return url.toString();
-      }
-    } catch {
-      return text;
-    }
-    return text;
-  }
-  if (text.startsWith("/v1/files/")) {
-    try {
-      const url = new URL(text, PUBLIC_API_BASE_URL);
-      url.searchParams.set("display", "1");
-      return url.toString();
-    } catch {
-      return text;
-    }
+  const normalizedGatewayFileUrl = normalizeGatewayFileAssetUrl(text);
+  if (normalizedGatewayFileUrl !== text) {
+    return normalizedGatewayFileUrl;
   }
   if (text.startsWith("data:image/")) {
     return text;

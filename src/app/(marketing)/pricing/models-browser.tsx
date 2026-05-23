@@ -11,6 +11,7 @@ import type {
 } from "../models/data";
 import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
+import { normalizeGatewayFileAssetUrl } from "@/lib/asset-urls";
 
 type JsonSchemaField = {
   key: string;
@@ -1490,6 +1491,10 @@ function replaceFileExtension(filename: string, extension: string) {
 
 function buildDisplayImageUrl(src: string) {
   if (src.startsWith("data:image/")) return src;
+  const normalizedGatewayFileUrl = normalizeGatewayFileAssetUrl(src);
+  if (normalizedGatewayFileUrl !== src) {
+    return normalizedGatewayFileUrl;
+  }
   try {
     const url = src.startsWith("/v1/files/")
       ? new URL(src, PUBLIC_API_BASE_URL)

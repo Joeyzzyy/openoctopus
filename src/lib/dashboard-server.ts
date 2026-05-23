@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeGatewayFileAssetUrl } from "@/lib/asset-urls";
 import Stripe from "stripe";
 
 type MetricTone = "neutral" | "positive" | "warning";
@@ -51,26 +52,9 @@ function extractDashboardPromptText(
 
 function normalizeDashboardAssetUrl(value: string, mimeType: string | null) {
   const text = value.trim();
-  if (text.startsWith("http://") || text.startsWith("https://")) {
-    try {
-      const url = new URL(text);
-      if (url.pathname.startsWith("/v1/files/")) {
-        url.searchParams.set("display", "1");
-        return url.toString();
-      }
-    } catch {
-      return text;
-    }
-    return text;
-  }
-  if (text.startsWith("/v1/files/")) {
-    try {
-      const url = new URL(text, "https://openoctopus.local");
-      url.searchParams.set("display", "1");
-      return `${url.pathname}${url.search}`;
-    } catch {
-      return text;
-    }
+  const normalizedGatewayFileUrl = normalizeGatewayFileAssetUrl(text);
+  if (normalizedGatewayFileUrl !== text) {
+    return normalizedGatewayFileUrl;
   }
   if (
     text.startsWith("data:")
