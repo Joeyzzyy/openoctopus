@@ -3,7 +3,7 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode, SyntheticEvent } from "react";
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Check, CircleHelp, Copy, Download, X } from "lucide-react";
+import { Check, ChevronDown, CircleHelp, Copy, Download, X } from "lucide-react";
 import type {
   GatewayErrorDocRow,
   ModelDocRow,
@@ -3325,38 +3325,42 @@ export function ModelsBrowser({
       <div className="space-y-2.5">
         {selectedModel ? (
           <div className="rounded-xl border border-[#BAE6FD] bg-[linear-gradient(135deg,#E0F2FE_0%,#FFFDFC_55%,#E0F2FE_100%)] p-3 sm:rounded-2xl sm:p-3.5">
-            <div className="grid gap-2.5 sm:gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
-              <label className="block">
-                <span className="mb-1.5 block text-[14px] font-semibold tracking-[0.18px] text-black/60">Vendor</span>
-                <select
-                  value={selectedProvider}
-                  onChange={(event) => handleProviderChange(event.target.value)}
-                  className="h-11 w-full appearance-none rounded-md border border-transparent bg-white/55 px-3.5 text-[16px] font-semibold text-black/90 outline-none transition-colors hover:bg-white/70 focus:bg-white/85"
-                >
-                  {selectableProviderOptions.map((provider) => (
-                    <option key={provider} value={provider}>
-                      {provider}
-                    </option>
-                  ))}
-                </select>
+            <div className="flex flex-col gap-2.5 sm:gap-3 md:flex-row md:flex-wrap md:items-end">
+              <label className="block md:w-[220px] md:flex-none">
+                <div className="relative">
+                  <select
+                    value={selectedProvider}
+                    onChange={(event) => handleProviderChange(event.target.value)}
+                    className="h-12 w-full appearance-none rounded-md border border-transparent bg-white/55 px-4 pr-11 text-[18px] font-semibold text-black/90 outline-none transition-colors hover:bg-white/70 focus:bg-white/85 sm:text-[19px]"
+                  >
+                    {selectableProviderOptions.map((provider) => (
+                      <option key={provider} value={provider}>
+                        {provider}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-black/45" />
+                </div>
               </label>
-              <label className="block">
-                <span className="mb-1.5 block text-[14px] font-semibold tracking-[0.18px] text-black/60">Model</span>
-                <select
-                  value={effectiveModelSlug ?? visibleRows[0]?.publicModel ?? ""}
-                  onChange={(event) => handleModelChange(event.target.value || null)}
-                  className="h-11 w-full appearance-none rounded-md border border-transparent bg-white/55 px-3.5 text-[16px] font-semibold text-black/95 outline-none transition-colors hover:bg-white/70 focus:bg-white/85"
-                >
-                  {modelsByCapability.map(([capability, models]) => (
-                    <optgroup key={capability} label={capability}>
-                      {models.map((item) => (
-                        <option key={item.publicModel} value={item.publicModel}>
-                          {item.displayName}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
+              <label className="block md:w-[min(560px,calc(100vw-22rem))] md:min-w-[320px] md:flex-1">
+                <div className="relative">
+                  <select
+                    value={effectiveModelSlug ?? visibleRows[0]?.publicModel ?? ""}
+                    onChange={(event) => handleModelChange(event.target.value || null)}
+                    className="h-12 w-full appearance-none rounded-md border border-transparent bg-white/55 px-4 pr-11 text-[18px] font-semibold text-black/95 outline-none transition-colors hover:bg-white/70 focus:bg-white/85 sm:text-[19px]"
+                  >
+                    {modelsByCapability.map(([capability, models]) => (
+                      <optgroup key={capability} label={capability}>
+                        {models.map((item) => (
+                          <option key={item.publicModel} value={item.publicModel}>
+                            {item.displayName}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-black/45" />
+                </div>
               </label>
             </div>
             {isRouteSkeletonVisible ? (
