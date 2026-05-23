@@ -176,6 +176,16 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+function formatRequestCostLabel(row: {
+  status: "queued" | "processing" | "succeeded" | "failed" | "cancelled";
+  cost: string;
+}) {
+  if (row.cost === "pending" && (row.status === "failed" || row.status === "cancelled")) {
+    return formatCurrency(0);
+  }
+  return row.cost;
+}
+
 function MetricCard({
   title,
   value,
@@ -478,7 +488,7 @@ export default async function DashboardPage({
                             <div>{dashboardCopy.requests.time}: {row.createdAtLabel}</div>
                             <div>{dashboardCopy.requests.vendor}: {row.vendor}</div>
                             <div>{dashboardCopy.requests.latency}: {row.latency}</div>
-                            <div>{dashboardCopy.requests.cost}: {row.cost}</div>
+                            <div>{dashboardCopy.requests.cost}: {formatRequestCostLabel(row)}</div>
                           </div>
                           {row.promptText ? (
                             <div className="mt-3 rounded-xl border border-black/[0.08] bg-white px-3 py-2">
@@ -619,7 +629,7 @@ export default async function DashboardPage({
                                   </span>
                                 </td>
                                 <td className="px-2 py-3 text-sm text-black/70">{row.latency}</td>
-                                <td className="px-2 py-3 text-sm text-black/70">{row.cost}</td>
+                                <td className="px-2 py-3 text-sm text-black/70">{formatRequestCostLabel(row)}</td>
                                 <td className="px-2 py-3 text-xs text-black/60">
                                   <span className="block max-w-[120px] truncate" title={row.createdAtLabel}>
                                     {row.createdAtLabel}

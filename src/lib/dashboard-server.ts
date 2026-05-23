@@ -72,6 +72,29 @@ function normalizeDashboardAssetUrl(value: string, mimeType: string | null) {
   return text;
 }
 
+function formatDashboardRequestCharge(
+  row: Record<string, unknown> & {
+    status?: string | null;
+  }
+) {
+  const chargeValue = Number(
+    row.actual_customer_charge ??
+      row.estimated_customer_charge ??
+      row.actual_cost ??
+      row.estimated_cost ??
+      0
+  );
+  if (chargeValue > 0) {
+    return formatCurrency(chargeValue);
+  }
+
+  if (row.status === "queued" || row.status === "processing" || row.status === "submitted") {
+    return "pending";
+  }
+
+  return formatCurrency(0);
+}
+
 export type DashboardData = {
   user: {
     id: string;
@@ -653,7 +676,7 @@ export async function getDashboardData({
         let query = supabaseAdmin
           .from("inference_requests")
           .select(
-            "id, api_key_id, request_source, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, input_payload, normalized_params, output_payload, created_at, queued_at, started_at, completed_at",
+            "id, api_key_id, request_source, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, input_payload, normalized_params, output_payload, created_at, queued_at, started_at, completed_at",
             { count: "exact" }
           )
           .eq("workspace_id", workspace.id)
@@ -904,7 +927,6 @@ export async function getDashboardData({
         latency = "queueing";
       }
 
-      const costValue = Number(row.actual_cost ?? row.estimated_cost ?? 0);
       const inputPayload = isRecord((row as { input_payload?: unknown }).input_payload)
         ? ((row as { input_payload?: unknown }).input_payload as Record<string, unknown>)
         : null;
@@ -952,7 +974,7 @@ export async function getDashboardData({
               ? "processing"
               : "failed",
         latency,
-        cost: costValue > 0 ? formatCurrency(costValue) : "pending",
+        cost: formatDashboardRequestCharge(row as Record<string, unknown> & { status?: string | null }),
         promptText: extractDashboardPromptText(normalizedParams, inputPayload),
         outputAssets,
       };
