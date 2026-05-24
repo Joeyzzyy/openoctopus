@@ -16,8 +16,26 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      allow: "/",
-      disallow: ["/api/", "/dashboard", "/ops-hub", "/login", "/sign-in"],
+      allow: [
+        "/",
+        "/models?tab=playground",
+        "/models?tab=api",
+        "/models/*?tab=playground",
+        "/models/*?tab=api",
+      ],
+      disallow: [
+        "/api/",
+        "/auth/",
+        "/dashboard",
+        "/ops-hub",
+        "/login",
+        "/sign-in",
+        "/pricing",
+        "/docs",
+        "/bestof",
+        "/models?*",
+        "/models/*?*",
+      ],
     },
     sitemap: [`${origin}/sitemap.xml`, `${origin}/resource/sitemap.xml`],
     host: origin,

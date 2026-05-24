@@ -24,35 +24,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 1,
     },
-    {
-      url: buildSiteUrl("/pricing"),
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.8,
-    },
-    {
-      url: buildSiteUrl("/docs"),
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.8,
-    },
-    {
-      url: buildSiteUrl("/models"),
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 0.8,
-    },
-    {
-      url: buildSiteUrl("/bestof"),
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.7,
-    },
-    {
-      url: buildSiteUrl("/resource"),
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 0.9,
-    },
   ];
 }
