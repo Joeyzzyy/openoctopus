@@ -3715,27 +3715,32 @@ export function ModelsBrowser({
                           {(() => {
                             const uploadKind = getUploadFieldKind(field) ?? "image";
                             const uploadTitle = getUploadTitle(uploadKind);
+                            const maskUploadField = uploadKind === "image" && isMaskUploadField(field);
                             return (
                               <>
-                          <input
-                            disabled={isSubmitting || uploadingFields[field.key]}
-                            type="file"
-                            accept={getUploadAccept(uploadKind)}
-                            multiple={isMultipleUploadField(field) && (getUploadLimit(field) ?? 2) > 1}
-                            onChange={(event) => {
-                              void uploadPlaygroundAssets(field, event.target.files);
-                              event.target.value = "";
-                            }}
-                            className="block w-full text-xs text-black/60 file:mb-2 file:mr-3 file:h-8 file:rounded-md file:border-0 file:bg-black file:px-3 file:text-xs file:font-medium file:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:file:mb-0"
-                          />
-                          <p className="mt-2 text-[11px] leading-5 text-black/45">
-                            {appendUploadLimitText(getUploadHelpText(uploadKind), field)}
-                          </p>
-                          {uploadKind === "image" && isMaskUploadField(field) ? (
+                          {!maskUploadField ? (
+                            <>
+                              <input
+                                disabled={isSubmitting || uploadingFields[field.key]}
+                                type="file"
+                                accept={getUploadAccept(uploadKind)}
+                                multiple={isMultipleUploadField(field) && (getUploadLimit(field) ?? 2) > 1}
+                                onChange={(event) => {
+                                  void uploadPlaygroundAssets(field, event.target.files);
+                                  event.target.value = "";
+                                }}
+                                className="block w-full text-xs text-black/60 file:mb-2 file:mr-3 file:h-8 file:rounded-md file:border-0 file:bg-black file:px-3 file:text-xs file:font-medium file:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:file:mb-0"
+                              />
+                              <p className="mt-2 text-[11px] leading-5 text-black/45">
+                                {appendUploadLimitText(getUploadHelpText(uploadKind), field)}
+                              </p>
+                            </>
+                          ) : null}
+                          {maskUploadField ? (
                             (() => {
                               const maskSource = resolveMaskSourceForField(field);
                               return (
-                                <div className="mt-3 rounded-md border border-dashed border-[#D6E4FF] bg-[#F8FBFF] p-2.5">
+                                <div className="rounded-md border border-dashed border-[#D6E4FF] bg-[#F8FBFF] p-2.5">
                                   <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div className="min-w-0">
                                       <p className="text-[11px] font-medium text-black/70">
