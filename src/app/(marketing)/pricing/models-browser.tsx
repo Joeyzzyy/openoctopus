@@ -1516,6 +1516,68 @@ type PlaygroundImageAsset = {
   mimeType?: string;
 };
 
+function PlaygroundImagePreview({
+  asset,
+  index,
+  onDownload,
+}: {
+  asset: PlaygroundImageAsset;
+  index: number;
+  onDownload: (src: string, filename: string, mimeType?: string) => void;
+}) {
+  const displaySrc = buildDisplayImageUrl(asset.url);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const failed = failedSrc === displaySrc;
+
+  if (failed) {
+    return (
+      <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-md border border-dashed border-black/[0.14] bg-[#F8FCFF] px-4 py-8 text-center">
+        <div>
+          <p className="text-sm font-medium text-black">Image preview failed</p>
+          <p className="mt-1 text-xs leading-5 text-black/55">
+            The task succeeded, but the generated file did not load in this browser.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFailedSrc(null)}
+            className="inline-flex h-8 items-center rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+          >
+            Retry
+          </button>
+          <a
+            href={displaySrc}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-8 items-center rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+          >
+            Open image
+          </a>
+          <button
+            type="button"
+            onClick={() => onDownload(asset.url, `generated-result-${index + 1}.png`, asset.mimeType)}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+          >
+            <Download className="size-3.5" />
+            Download
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={displaySrc}
+      alt={`Generated result ${index + 1}`}
+      onError={() => setFailedSrc(displaySrc)}
+      className="max-h-[70vh] w-full rounded-md border border-black/[0.08] bg-white object-contain"
+    />
+  );
+}
+
 type PlaygroundVideoAsset = {
   url: string;
   mimeType?: string;
@@ -4262,12 +4324,11 @@ export function ModelsBrowser({
                   {playgroundImageAssets.length > 0 ? (
                     <div className="grid gap-2">
                       {playgroundImageAssets.map((asset, index) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <PlaygroundImagePreview
                           key={`${asset.url}-${index}`}
-                          src={buildDisplayImageUrl(asset.url)}
-                          alt={`Generated result ${index + 1}`}
-                          className="max-h-[70vh] w-full rounded-md border border-black/[0.08] bg-white object-contain"
+                          asset={asset}
+                          index={index}
+                          onDownload={downloadImage}
                         />
                       ))}
                     </div>
