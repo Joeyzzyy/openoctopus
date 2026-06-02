@@ -639,6 +639,12 @@ export function ApiQuickstartCard({
           upstreamQueueSupported: "whether the upstream provider has a reliable queue",
           upstreamCancelSupported: "whether the upstream provider supports cancellation",
         },
+        asset_storage: {
+          provider: "supabase | aliyun-oss | tencent-cos",
+          inputBucket: "bucket used for uploaded reference media",
+          outputBucket: "bucket used for generated media",
+          custom: "true when this model overrides default system asset storage",
+        },
         capability: "image_generation | video_generation",
         output_payload: {
           format: "openoctopus.image.output.v1 | openoctopus.video.output.v1",

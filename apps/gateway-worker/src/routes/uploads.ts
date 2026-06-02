@@ -1,13 +1,16 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { env } from "../config.js";
 import { sendGatewayError } from "../lib/gateway-errors.js";
+import {
+  buildPublicAssetStorageConfig,
+  getAssetStorageBucket,
+  parseAssetStorageConfig,
+} from "../lib/asset-storage.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { authenticateApiKey, RequestValidationError } from "../services/request-service.js";
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-const SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 
 const allowedMimeTypes = new Map([
   ["image/png", "png"],
@@ -29,6 +32,15 @@ const allowedMimeTypes = new Map([
 const querySchema = z.object({
   filename: z.string().trim().min(1).max(180).default("upload"),
   field: z.string().trim().min(1).max(80).default("file"),
+  model: z.string().trim().min(1).max(120).optional(),
+  capability: z.enum([
+    "image_generation",
+    "image_edit",
+    "image_recognition",
+    "document_analysis",
+    "text_generation",
+    "video_generation",
+  ]).optional(),
 });
 
 function sanitizePathPart(value: string) {
@@ -42,6 +54,47 @@ function sanitizePathPart(value: string) {
 
 function stripKnownExtension(filename: string) {
   return filename.replace(/\.(png|jpe?g|webp|gif|mp4|webm|mov|mp3|wav|m4a|aac|ogg)$/i, "");
+}
+
+async function resolveUploadAssetStorage(input: {
+  workspaceId: string;
+  model?: string;
+  capability?: string;
+}) {
+  if (!input.model || !input.capability) {
+    return parseAssetStorageConfig({});
+  }
+
+  const { data: routeRow, error: routeError } = await supabaseAdmin
+    .from("routing_rules")
+    .select("primary_provider_model_id, workspace_id")
+    .eq("public_model_slug", input.model)
+    .eq("capability", input.capability)
+    .eq("active", true)
+    .or(`workspace_id.eq.${input.workspaceId},workspace_id.is.null`)
+    .order("workspace_id", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (routeError) {
+    throw new Error(routeError.message);
+  }
+
+  if (!routeRow?.primary_provider_model_id) {
+    return parseAssetStorageConfig({});
+  }
+
+  const { data: providerModel, error: providerModelError } = await supabaseAdmin
+    .from("provider_models")
+    .select("execution_config")
+    .eq("id", routeRow.primary_provider_model_id)
+    .maybeSingle();
+
+  if (providerModelError) {
+    throw new Error(providerModelError.message);
+  }
+
+  return parseAssetStorageConfig(providerModel?.execution_config ?? {});
 }
 
 export async function registerUploadRoutes(app: FastifyInstance) {
@@ -62,6 +115,12 @@ export async function registerUploadRoutes(app: FastifyInstance) {
       const contentType = String(request.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
       const extension = allowedMimeTypes.get(contentType);
       const body = request.body;
+      const storageConfig = await resolveUploadAssetStorage({
+        workspaceId: apiKeyRow.workspace_id,
+        model: parsed.model,
+        capability: parsed.capability,
+      });
+      const storageBucket = getAssetStorageBucket(storageConfig, "input");
 
       if (!extension || !Buffer.isBuffer(body) || body.length <= 0 || body.length > MAX_UPLOAD_BYTES) {
         return sendGatewayError(reply, {
@@ -72,7 +131,7 @@ export async function registerUploadRoutes(app: FastifyInstance) {
 
       const storagePath = `api-uploads/${apiKeyRow.workspace_id}/${sanitizePathPart(parsed.field)}/${randomUUID()}-${sanitizePathPart(stripKnownExtension(parsed.filename))}.${extension}`;
       const { error: uploadError } = await supabaseAdmin.storage
-        .from(env.GENERATED_ASSETS_BUCKET)
+        .from(storageBucket)
         .upload(storagePath, body, {
           contentType,
           upsert: false,
@@ -83,8 +142,8 @@ export async function registerUploadRoutes(app: FastifyInstance) {
       }
 
       const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin.storage
-        .from(env.GENERATED_ASSETS_BUCKET)
-        .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
+        .from(storageBucket)
+        .createSignedUrl(storagePath, storageConfig.signedUrlTtlSeconds);
 
       if (signedUrlError || !signedUrlData?.signedUrl) {
         throw new Error(signedUrlError?.message ?? "Failed to create upload URL");
@@ -95,7 +154,8 @@ export async function registerUploadRoutes(app: FastifyInstance) {
         mimeType: contentType,
         name: parsed.filename,
         size: body.length,
-        expiresIn: SIGNED_URL_TTL_SECONDS,
+        expiresIn: storageConfig.signedUrlTtlSeconds,
+        asset_storage: buildPublicAssetStorageConfig(storageConfig),
       });
     } catch (error) {
       if (error instanceof RequestValidationError) {

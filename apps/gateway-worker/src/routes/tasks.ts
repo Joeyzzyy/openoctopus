@@ -10,6 +10,10 @@ import { sendFeishuFailureAlert } from "../lib/feishu-alert.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { normalizeOutputPayloadByCapability } from "../lib/image-output-contract.js";
 import { decryptProviderSecret } from "../lib/provider-secret-crypto.js";
+import {
+  buildPublicAssetStorageConfig,
+  parseAssetStorageConfig,
+} from "../lib/asset-storage.js";
 
 function redactOutputPayloadRaw(outputPayload: unknown) {
   if (!outputPayload || typeof outputPayload !== "object" || Array.isArray(outputPayload)) {
@@ -668,6 +672,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         id: queued.requestId,
         status: "queued",
         queue: queued.queue,
+        asset_storage: queued.assetStorage,
       });
     } catch (error) {
       return sendRequestError(reply, error);
@@ -724,6 +729,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         id: queued.requestId,
         status: "queued",
         queue: queued.queue,
+        asset_storage: queued.assetStorage,
       });
     } catch (error) {
       return sendRequestError(reply, error);
@@ -772,6 +778,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         id: queued.requestId,
         status: "queued",
         queue: queued.queue,
+        asset_storage: queued.assetStorage,
       });
     } catch (error) {
       return sendRequestError(reply, error);
@@ -820,6 +827,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         id: queued.requestId,
         status: "queued",
         queue: queued.queue,
+        asset_storage: queued.assetStorage,
       });
     } catch (error) {
       return sendRequestError(reply, error);
@@ -878,6 +886,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         id: queued.requestId,
         status: "queued",
         queue: queued.queue,
+        asset_storage: queued.assetStorage,
       });
     } catch (error) {
       return sendRequestError(reply, error);
@@ -1409,6 +1418,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         id: queued.requestId,
         status: "queued",
         queue: queued.queue,
+        asset_storage: queued.assetStorage,
       });
     } catch (error) {
       return sendRequestError(reply, error);
@@ -1472,6 +1482,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
 
     const { provider_model_id: providerModelId, ...publicData } = data;
     let queue = null;
+    let assetStorage = null;
     if (providerModelId) {
       const { data: providerModel, error: providerModelError } = await supabaseAdmin
         .from("provider_models")
@@ -1488,6 +1499,9 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         providerModelId,
         executionConfig: providerModel?.execution_config ?? {},
       });
+      assetStorage = buildPublicAssetStorageConfig(
+        parseAssetStorageConfig(providerModel?.execution_config ?? {})
+      );
     }
 
     if (data.status === "succeeded") {
@@ -1501,6 +1515,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       return {
         ...publicData,
         queue,
+        asset_storage: assetStorage,
         output_payload: redactedOutputPayload,
       };
     }
@@ -1510,6 +1525,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       return {
         ...publicData,
         queue,
+        asset_storage: assetStorage,
         error_code: publicError.code,
         error_message: publicError.publicMessage,
         error: {
@@ -1523,6 +1539,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     return {
       ...publicData,
       queue,
+      asset_storage: assetStorage,
     };
   });
 }

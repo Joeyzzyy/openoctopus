@@ -813,6 +813,7 @@ export async function processNextInferenceJob() {
         requestId: message.requestId,
         workspaceId: message.workspaceId,
         output: normalizedOutput,
+        executionConfig,
       });
       const settlement = await resolveSettlementAmounts({
         providerModelId: message.providerModelId,
@@ -1217,6 +1218,7 @@ export async function processNextPollingJob() {
         requestId: message.requestId,
         workspaceId: message.workspaceId,
         output: normalizedOutput,
+        executionConfig: asRecord(message.providerConfig)?.executionConfig,
       });
       const settlement = await resolveSettlementAmounts({
         providerModelId: message.providerModelId,

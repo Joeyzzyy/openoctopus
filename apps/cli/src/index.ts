@@ -329,12 +329,13 @@ function mimeFromPath(path: string) {
 async function resolveFileLikeValue(
   config: Config,
   param: ManifestParam,
-  value: string | string[]
+  value: string | string[],
+  model: ManifestModel
 ) {
   if (Array.isArray(value)) {
     const uploaded = await Promise.all(
       value.map(async (item) =>
-        isRemoteAssetUrl(item) ? item : (await uploadFile(config, item, param.name)).url
+        isRemoteAssetUrl(item) ? item : (await uploadFile(config, item, param.name, model)).url
       )
     );
     return uploaded;
@@ -342,19 +343,24 @@ async function resolveFileLikeValue(
   if (isRemoteAssetUrl(value)) {
     return value;
   }
-  const uploaded = await uploadFile(config, value, param.name);
+  const uploaded = await uploadFile(config, value, param.name, model);
   return uploaded.url;
 }
 
-async function uploadFile(config: Config, filePath: string, field = "file") {
+async function uploadFile(config: Config, filePath: string, field = "file", model?: ManifestModel) {
   const apiKey = requireApiKey(config);
   const absolute = resolve(filePath);
   const fileStat = await stat(absolute);
   if (!fileStat.isFile()) throw new Error(`Not a file: ${filePath}`);
   const body = await readFile(absolute);
   const filename = basename(absolute);
+  const uploadUrl = new URL(`/v1/uploads?filename=${encodeURIComponent(filename)}&field=${encodeURIComponent(field)}`, config.apiBase);
+  if (model) {
+    uploadUrl.searchParams.set("model", model.model);
+    uploadUrl.searchParams.set("capability", model.capability);
+  }
   const response = await fetch(
-    new URL(`/v1/uploads?filename=${encodeURIComponent(filename)}&field=${encodeURIComponent(field)}`, config.apiBase),
+    uploadUrl,
     {
       method: "POST",
       headers: {
@@ -387,7 +393,7 @@ async function buildInput(config: Config, model: ManifestModel, flags: ParsedArg
       isLikelyFileParam(param) &&
       (typeof value === "string" || (Array.isArray(value) && value.every((item) => typeof item === "string")))
     ) {
-      value = await resolveFileLikeValue(config, param, value);
+      value = await resolveFileLikeValue(config, param, value, model);
     }
     if (param.name === "prompt") {
       prompt = String(value);
@@ -511,7 +517,24 @@ async function uploadsCommand(config: Config, args: ParsedArgs) {
   if (args.positionals[1] !== "create" || !args.positionals[2]) {
     throw new Error("Usage: ooct uploads create <file>");
   }
-  const uploaded = await uploadFile(config, args.positionals[2], readFlag(args.flags, "field") ?? "file");
+  const modelSlug = readFlag(args.flags, "model");
+  const capability = readFlag(args.flags, "capability");
+  const uploaded = await uploadFile(
+    config,
+    args.positionals[2],
+    readFlag(args.flags, "field") ?? "file",
+    modelSlug && capability
+      ? {
+          model: modelSlug,
+          displayName: modelSlug,
+          capability,
+          endpoint: "",
+          requestMode: "async_polling",
+          output: {},
+          inputSchema: { params: [] },
+        }
+      : undefined
+  );
   if (hasFlag(args.flags, "json")) console.log(JSON.stringify(uploaded, null, 2));
   else console.log(uploaded.url);
 }

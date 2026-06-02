@@ -1,10 +1,16 @@
 import { supabaseAdmin } from "../lib/supabase.js";
 import { env } from "../config.js";
+import {
+  getAssetStorageBucket,
+  parseAssetStorageConfig,
+  type AssetStorageConfig,
+} from "../lib/asset-storage.js";
 
 type PersistAssetInput = {
   requestId: string;
   workspaceId: string;
   output: Record<string, unknown>;
+  executionConfig?: unknown;
 };
 
 type CachedAsset = {
@@ -146,6 +152,7 @@ async function cacheAsset(input: {
   assetIndex: number;
   url: string;
   mimeType?: string;
+  storageConfig: AssetStorageConfig;
 }): Promise<{ cached: CachedAsset | null; integrity: AssetIntegrity }> {
   const dataUri = parseDataUri(input.url);
   let buffer: Buffer | null = dataUri?.buffer ?? null;
@@ -187,8 +194,9 @@ async function cacheAsset(input: {
   }
 
   const storagePath = buildAssetCachePath(input.requestId, input.assetIndex, mimeType);
+  const storageBucket = getAssetStorageBucket(input.storageConfig, "output");
   const { error } = await supabaseAdmin.storage
-    .from(env.GENERATED_ASSETS_BUCKET)
+    .from(storageBucket)
     .upload(storagePath, buffer, {
       contentType: mimeType ?? "application/octet-stream",
       upsert: true,
@@ -201,7 +209,7 @@ async function cacheAsset(input: {
   return {
     cached: {
       url: buildPublicAssetUrl(input.requestId, input.assetIndex),
-      storageBucket: env.GENERATED_ASSETS_BUCKET,
+      storageBucket,
       storagePath,
       mimeType,
       sizeBytes: buffer.byteLength,
@@ -215,6 +223,7 @@ async function cacheAsset(input: {
 
 export async function persistGeneratedAssets(input: PersistAssetInput) {
   const assets = Array.isArray(input.output.assets) ? input.output.assets : [];
+  const storageConfig = parseAssetStorageConfig(input.executionConfig);
 
   if (assets.length === 0) {
     return input.output;
@@ -241,6 +250,7 @@ export async function persistGeneratedAssets(input: PersistAssetInput) {
       assetIndex: index,
       url: assetRecord.url,
       mimeType: typeof assetRecord.mimeType === "string" ? assetRecord.mimeType : undefined,
+      storageConfig,
     });
     if (integrity.status === "invalid") {
       throw new AssetIntegrityError({

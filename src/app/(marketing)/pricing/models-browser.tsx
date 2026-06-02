@@ -96,6 +96,13 @@ type PlaygroundQueueInfo = {
   concurrency: number;
 };
 
+type PlaygroundAssetStorageInfo = {
+  provider: string;
+  inputBucket: string;
+  outputBucket: string;
+  custom: boolean;
+};
+
 type PromptComposerSelectionMap = Record<string, string>;
 
 type MarkdownBlock =
@@ -250,6 +257,20 @@ function readPlaygroundQueueInfo(value: unknown): PlaygroundQueueInfo | null {
   };
 }
 
+function readPlaygroundAssetStorageInfo(value: unknown): PlaygroundAssetStorageInfo | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const root = value as Record<string, unknown>;
+  const raw = root.asset_storage ?? root.assetStorage;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const record = raw as Record<string, unknown>;
+  return {
+    provider: typeof record.provider === "string" ? record.provider : "supabase",
+    inputBucket: typeof record.inputBucket === "string" ? record.inputBucket : "",
+    outputBucket: typeof record.outputBucket === "string" ? record.outputBucket : "",
+    custom: record.custom === true,
+  };
+}
+
 function playgroundQueueLabel(queue: PlaygroundQueueInfo | null, status: TaskStatus) {
   if (!queue?.enabled) return null;
   if (status === "queued") {
@@ -261,6 +282,12 @@ function playgroundQueueLabel(queue: PlaygroundQueueInfo | null, status: TaskSta
     return `Processing from local queue`;
   }
   return null;
+}
+
+function playgroundAssetStorageLabel(assetStorage: PlaygroundAssetStorageInfo | null) {
+  if (!assetStorage?.custom) return null;
+  const bucket = assetStorage.outputBucket || assetStorage.inputBucket;
+  return `Custom asset storage: ${assetStorage.provider}${bucket ? ` / ${bucket}` : ""}`;
 }
 
 function decodeHtmlEntities(text: string) {
@@ -1869,6 +1896,7 @@ export function ModelsBrowser({
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const [taskId, setTaskId] = useState<string | null>(null);
   const [queueInfo, setQueueInfo] = useState<PlaygroundQueueInfo | null>(null);
+  const [assetStorageInfo, setAssetStorageInfo] = useState<PlaygroundAssetStorageInfo | null>(null);
   const [playgroundError, setPlaygroundError] = useState<string | null>(null);
   const [playgroundErrorDetail, setPlaygroundErrorDetail] = useState<unknown>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -2427,6 +2455,12 @@ export function ModelsBrowser({
         const formData = new FormData();
         formData.set("field", field.key);
         formData.set("file", file);
+        if (selectedModel?.publicModel) {
+          formData.set("model", selectedModel.publicModel);
+        }
+        if (selectedModel?.capability) {
+          formData.set("capability", selectedModel.capability);
+        }
         const response = await fetch("/api/playground/uploads", {
           method: "POST",
           body: formData,
@@ -2438,11 +2472,13 @@ export function ModelsBrowser({
           size?: number;
           characterCount?: number;
           extractionSource?: string;
+          asset_storage?: PlaygroundAssetStorageInfo;
           error?: { message?: string };
         };
         if (!response.ok || !payload.url) {
           throw new Error(payload.error?.message ?? "Upload failed");
         }
+        setAssetStorageInfo(readPlaygroundAssetStorageInfo(payload));
         uploaded.push({
           url: payload.url,
           name: payload.name || file.name,
@@ -2673,6 +2709,12 @@ export function ModelsBrowser({
 
       const formData = new FormData();
       formData.set("field", maskEditorState.fieldKey);
+      if (selectedModel?.publicModel) {
+        formData.set("model", selectedModel.publicModel);
+      }
+      if (selectedModel?.capability) {
+        formData.set("capability", selectedModel.capability);
+      }
       formData.set(
         "file",
         new File([blob], `mask-${Date.now()}.png`, {
@@ -2689,11 +2731,13 @@ export function ModelsBrowser({
         mimeType?: string;
         name?: string;
         size?: number;
+        asset_storage?: PlaygroundAssetStorageInfo;
         error?: { message?: string };
       };
       if (!response.ok || !payload.url) {
         throw new Error(payload.error?.message ?? "Failed to upload mask image.");
       }
+      setAssetStorageInfo(readPlaygroundAssetStorageInfo(payload));
 
       setPlaygroundUploads((current) => ({
         ...current,
@@ -2954,6 +2998,7 @@ export function ModelsBrowser({
 
         setTaskId(submitJson.id);
         setQueueInfo(readPlaygroundQueueInfo(submitJson));
+        setAssetStorageInfo(readPlaygroundAssetStorageInfo(submitJson));
         setTaskStatus("queued");
 
         const startedAt = Date.now();
@@ -2980,6 +3025,7 @@ export function ModelsBrowser({
 
           const status = String(statusJson.status ?? "").toLowerCase();
           setQueueInfo(readPlaygroundQueueInfo(statusJson));
+          setAssetStorageInfo(readPlaygroundAssetStorageInfo(statusJson));
           if (status === "queued") {
             setTaskStatus("queued");
             continue;
@@ -3204,6 +3250,7 @@ export function ModelsBrowser({
 
       setTaskId(submitJson.id);
       setQueueInfo(readPlaygroundQueueInfo(submitJson));
+      setAssetStorageInfo(readPlaygroundAssetStorageInfo(submitJson));
       setTaskStatus("queued");
 
       const startedAt = Date.now();
@@ -3250,6 +3297,7 @@ export function ModelsBrowser({
         }
 
         setQueueInfo(readPlaygroundQueueInfo(statusJson));
+        setAssetStorageInfo(readPlaygroundAssetStorageInfo(statusJson));
         if (statusJson.status === "queued" || statusJson.status === "processing") {
           setTaskStatus(statusJson.status);
           continue;
@@ -4208,6 +4256,11 @@ export function ModelsBrowser({
                     {playgroundQueueLabel(queueInfo, taskStatus) ? (
                       <span className="inline-flex h-7 items-center rounded-md border border-[#BAE6FD] bg-[#F0F9FF] px-2.5 text-xs font-medium text-[#0369A1]">
                         {playgroundQueueLabel(queueInfo, taskStatus)}
+                      </span>
+                    ) : null}
+                    {playgroundAssetStorageLabel(assetStorageInfo) ? (
+                      <span className="inline-flex h-7 items-center rounded-md border border-[#DDD6FE] bg-[#F5F3FF] px-2.5 text-xs font-medium text-[#6D28D9]">
+                        {playgroundAssetStorageLabel(assetStorageInfo)}
                       </span>
                     ) : null}
                   </div>

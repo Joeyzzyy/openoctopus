@@ -129,6 +129,7 @@ type ExecutionConfigFormState = {
   localQueueJson: string;
   upstreamQueueJson: string;
   upstreamCancelJson: string;
+  assetStorageJson: string;
   playgroundDefaultPrompt: string;
   playgroundPromptComposerJson: string;
   docRequestExampleJson: string;
@@ -2194,6 +2195,7 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
     localQueueJson: "",
     upstreamQueueJson: "",
     upstreamCancelJson: "",
+    assetStorageJson: "",
     playgroundDefaultPrompt: "",
     playgroundPromptComposerJson: "",
     docRequestExampleJson: "",
@@ -2294,6 +2296,10 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
         parsed.upstreamCancel && typeof parsed.upstreamCancel === "object" && !Array.isArray(parsed.upstreamCancel)
           ? JSON.stringify(parsed.upstreamCancel, null, 2)
           : fallback.upstreamCancelJson,
+      assetStorageJson:
+        parsed.assetStorage && typeof parsed.assetStorage === "object" && !Array.isArray(parsed.assetStorage)
+          ? JSON.stringify(parsed.assetStorage, null, 2)
+          : fallback.assetStorageJson,
       playgroundDefaultPrompt:
         parsed.playground &&
         typeof parsed.playground === "object" &&
@@ -2409,6 +2415,17 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
       const parsedUpstreamCancel = JSON.parse(upstreamCancelText) as unknown;
       if (parsedUpstreamCancel && typeof parsedUpstreamCancel === "object" && !Array.isArray(parsedUpstreamCancel)) {
         result.upstreamCancel = parsedUpstreamCancel;
+      }
+    } catch {
+      // Form validation blocks invalid JSON before submit; keep serialize path resilient.
+    }
+  }
+  const assetStorageText = state.assetStorageJson.trim();
+  if (assetStorageText) {
+    try {
+      const parsedAssetStorage = JSON.parse(assetStorageText) as unknown;
+      if (parsedAssetStorage && typeof parsedAssetStorage === "object" && !Array.isArray(parsedAssetStorage)) {
+        result.assetStorage = parsedAssetStorage;
       }
     } catch {
       // Form validation blocks invalid JSON before submit; keep serialize path resilient.
@@ -3550,6 +3567,7 @@ export function CreateProviderModelForm({
           ["本地队列配置 localQueue", executionConfigState.localQueueJson],
           ["上游队列配置 upstreamQueue", executionConfigState.upstreamQueueJson],
           ["上游取消配置 upstreamCancel", executionConfigState.upstreamCancelJson],
+          ["素材存储配置 assetStorage", executionConfigState.assetStorageJson],
         ] as const) {
           const trimmed = text.trim();
           if (!trimmed) continue;
@@ -4277,7 +4295,7 @@ export function CreateProviderModelForm({
                 </>
               )}
             </div>
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <label className="block">
                 <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">本地队列 localQueue（JSON，可选）</span>
                 <textarea
@@ -4328,6 +4346,23 @@ export function CreateProviderModelForm({
                   placeholder={'{\n  "supported": false\n}'}
                 />
                 <FieldHint help="如果上游不支持取消，已 processing 的请求不会因为用户关闭页面而立即停止。" />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">素材存储 assetStorage（JSON，可选）</span>
+                <textarea
+                  value={executionConfigState.assetStorageJson}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      assetStorageJson: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={7}
+                  placeholder={'{\n  "provider": "supabase",\n  "input": { "bucket": "sensitive-assets" },\n  "output": { "bucket": "sensitive-assets" },\n  "signedUrlTtlSeconds": 86400\n}'}
+                />
+                <FieldHint help="只给高敏感模型填写。默认空走系统 GENERATED_ASSETS_BUCKET；provider 非 supabase 会被标记，但需要后续接入云厂商上传实现。" />
               </label>
             </div>
           </div>

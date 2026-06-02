@@ -7,6 +7,11 @@ import {
   type QueueStatus,
 } from "../lib/local-queue.js";
 import {
+  buildPublicAssetStorageConfig,
+  parseAssetStorageConfig,
+  type PublicAssetStorageConfig,
+} from "../lib/asset-storage.js";
+import {
   pickRuntimeCredential,
   type RuntimeProviderCredential,
 } from "../lib/provider-runtime-guard.js";
@@ -61,6 +66,7 @@ export type ResolvedRequestRuntime = {
   providerBaseUrl: string | null;
   providerConfig: Record<string, unknown>;
   queue: QueueStatus;
+  assetStorage: PublicAssetStorageConfig;
   upstreamModelSlug: string;
   endpoint: UnifiedRequestInput["endpoint"];
   publicModelSlug: string;
@@ -392,6 +398,7 @@ export async function resolveRequestRuntime(input: UnifiedRequestInput): Promise
       ? (providerModelRow.execution_config as Record<string, unknown>)
       : {};
   const localQueueConfig = parseLocalQueueConfig(modelExecutionConfig);
+  const assetStorageConfig = parseAssetStorageConfig(modelExecutionConfig);
 
   const { data: credentialRows, error: credentialError } = await supabaseAdmin
     .from("provider_credentials")
@@ -437,6 +444,7 @@ export async function resolveRequestRuntime(input: UnifiedRequestInput): Promise
     queue: buildQueueStatus({
       config: localQueueConfig,
     }),
+    assetStorage: buildPublicAssetStorageConfig(assetStorageConfig),
     upstreamModelSlug: providerModelRow.upstream_model_slug,
     endpoint: input.endpoint,
     publicModelSlug: input.model,
@@ -623,5 +631,6 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
           ? resolved.providerConfig.executionConfig
           : {},
     }),
+    assetStorage: resolved.assetStorage,
   };
 }

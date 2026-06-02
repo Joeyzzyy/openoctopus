@@ -1,9 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { env } from "../config.js";
 import { sendGatewayError } from "../lib/gateway-errors.js";
 import { decryptProviderSecret } from "../lib/provider-secret-crypto.js";
 import { getStream } from "../lib/http.js";
+import {
+  getAssetStorageBucket,
+  parseAssetStorageConfig,
+  type AssetStorageConfig,
+} from "../lib/asset-storage.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 
 const fileAssetParamsSchema = z.object({
@@ -169,9 +173,9 @@ function looksLikeValidBinary(buffer: Buffer, mimeType: string | null) {
   return true;
 }
 
-async function downloadFromGeneratedBucket(storagePath: string) {
+async function downloadFromGeneratedBucket(storagePath: string, storageConfig: AssetStorageConfig) {
   const download = await supabaseAdmin.storage
-    .from(env.GENERATED_ASSETS_BUCKET)
+    .from(getAssetStorageBucket(storageConfig, "output"))
     .download(storagePath);
   if (!download.data) {
     return null;
@@ -181,6 +185,24 @@ async function downloadFromGeneratedBucket(storagePath: string) {
     buffer,
     contentType: download.data.type || "application/octet-stream",
   };
+}
+
+async function resolveRequestAssetStorageConfig(providerModelId: string | null) {
+  if (!providerModelId) {
+    return parseAssetStorageConfig({});
+  }
+
+  const { data: providerModel, error } = await supabaseAdmin
+    .from("provider_models")
+    .select("execution_config")
+    .eq("id", providerModelId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return parseAssetStorageConfig(providerModel?.execution_config ?? {});
 }
 
 async function markGeneratedAssetInvalid(input: {
@@ -239,31 +261,9 @@ export async function registerFileRoutes(app: FastifyInstance) {
       }
     }
 
-    const cachePathBase = buildAssetCachePath(params.requestId, params.assetIndex);
-    const candidatePaths = [
-      cachePathBase,
-      `${cachePathBase}.png`,
-      `${cachePathBase}.jpg`,
-      `${cachePathBase}.webp`,
-      `${cachePathBase}.gif`,
-      `${cachePathBase}.mp4`,
-      `${cachePathBase}.webm`,
-    ];
-    for (const path of candidatePaths) {
-      const cachedFile = await downloadFromGeneratedBucket(path);
-      if (!cachedFile) {
-        continue;
-      }
-      if (!looksLikeValidBinary(cachedFile.buffer, cachedFile.contentType)) {
-        continue;
-      }
-      setGeneratedAssetHeaders(reply, cachedFile.contentType, cachedFile.buffer.length);
-      return reply.code(200).send(cachedFile.buffer);
-    }
-
     const { data: requestRow, error: requestError } = await supabaseAdmin
       .from("inference_requests")
-      .select("id, provider_id, output_payload")
+      .select("id, provider_id, provider_model_id, output_payload")
       .eq("id", params.requestId)
       .maybeSingle();
 
@@ -278,12 +278,36 @@ export async function registerFileRoutes(app: FastifyInstance) {
       });
     }
 
+    const storageConfig = await resolveRequestAssetStorageConfig(requestRow.provider_model_id);
+    const outputStorageBucket = getAssetStorageBucket(storageConfig, "output");
+    const cachePathBase = buildAssetCachePath(params.requestId, params.assetIndex);
+    const candidatePaths = [
+      cachePathBase,
+      `${cachePathBase}.png`,
+      `${cachePathBase}.jpg`,
+      `${cachePathBase}.webp`,
+      `${cachePathBase}.gif`,
+      `${cachePathBase}.mp4`,
+      `${cachePathBase}.webm`,
+    ];
+    for (const path of candidatePaths) {
+      const cachedFile = await downloadFromGeneratedBucket(path, storageConfig);
+      if (!cachedFile) {
+        continue;
+      }
+      if (!looksLikeValidBinary(cachedFile.buffer, cachedFile.contentType)) {
+        continue;
+      }
+      setGeneratedAssetHeaders(reply, cachedFile.contentType, cachedFile.buffer.length);
+      return reply.code(200).send(cachedFile.buffer);
+    }
+
     const sourceUrl = getAssetSourceUrl(requestRow.output_payload, params.assetIndex);
     if (sourceUrl?.startsWith("data:")) {
       const parsed = parseDataUri(sourceUrl);
       if (parsed) {
         await supabaseAdmin.storage
-          .from(env.GENERATED_ASSETS_BUCKET)
+          .from(outputStorageBucket)
           .upload(cachePathBase, parsed.buffer, {
             contentType: parsed.mimeType,
             upsert: true,
@@ -348,7 +372,7 @@ export async function registerFileRoutes(app: FastifyInstance) {
         });
       }
       await supabaseAdmin.storage
-        .from(env.GENERATED_ASSETS_BUCKET)
+        .from(outputStorageBucket)
         .upload(buildAssetCachePathWithExtension(params.requestId, params.assetIndex, contentType ?? null), bodyBuffer, {
           contentType,
           upsert: true,

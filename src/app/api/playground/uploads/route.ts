@@ -7,10 +7,13 @@ import WordExtractor from "word-extractor";
 import { buildGatewayErrorResponse, isGatewayValidationError } from "@/lib/gateway-errors";
 import { getAuthedWorkspaceForPlayground } from "@/lib/playground-key-server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  buildPublicAssetStorageConfig,
+  getAssetStorageBucket,
+  parseAssetStorageConfig,
+} from "@/lib/asset-storage-config";
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-const SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
-const UPLOAD_BUCKET = process.env.GENERATED_ASSETS_BUCKET || "generated-assets";
 
 const allowedMimeTypes = new Map([
   ["image/png", "png"],
@@ -33,7 +36,58 @@ const allowedMimeTypes = new Map([
 
 const uploadSchema = z.object({
   field: z.string().trim().min(1).default("images"),
+  model: z.string().trim().min(1).max(120).optional(),
+  capability: z.enum([
+    "image_generation",
+    "image_edit",
+    "image_recognition",
+    "document_analysis",
+    "text_generation",
+    "video_generation",
+  ]).optional(),
 });
+
+async function resolveUploadAssetStorage(input: {
+  supabaseAdmin: ReturnType<typeof createAdminClient>;
+  workspaceId: string;
+  model?: string;
+  capability?: string;
+}) {
+  if (!input.model || !input.capability) {
+    return parseAssetStorageConfig({});
+  }
+
+  const { data: routeRow, error: routeError } = await input.supabaseAdmin
+    .from("routing_rules")
+    .select("primary_provider_model_id, workspace_id")
+    .eq("public_model_slug", input.model)
+    .eq("capability", input.capability)
+    .eq("active", true)
+    .or(`workspace_id.eq.${input.workspaceId},workspace_id.is.null`)
+    .order("workspace_id", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (routeError) {
+    throw new Error(routeError.message);
+  }
+
+  if (!routeRow?.primary_provider_model_id) {
+    return parseAssetStorageConfig({});
+  }
+
+  const { data: providerModel, error: providerModelError } = await input.supabaseAdmin
+    .from("provider_models")
+    .select("execution_config")
+    .eq("id", routeRow.primary_provider_model_id)
+    .maybeSingle();
+
+  if (providerModelError) {
+    throw new Error(providerModelError.message);
+  }
+
+  return parseAssetStorageConfig(providerModel?.execution_config ?? {});
+}
 
 async function extractDocumentCharacterInfo(file: File, buffer: Buffer) {
   try {
@@ -62,6 +116,8 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const parsed = uploadSchema.parse({
       field: formData.get("field") ?? "images",
+      model: formData.get("model") ?? undefined,
+      capability: formData.get("capability") ?? undefined,
     });
     const file = formData.get("file");
 
@@ -94,9 +150,16 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const characterInfo = await extractDocumentCharacterInfo(file, buffer);
     const supabaseAdmin = createAdminClient();
+    const storageConfig = await resolveUploadAssetStorage({
+      supabaseAdmin,
+      workspaceId,
+      model: parsed.model,
+      capability: parsed.capability,
+    });
+    const uploadBucket = getAssetStorageBucket(storageConfig, "input");
     const storagePath = `playground-uploads/${workspaceId}/${parsed.field}/${randomUUID()}.${extension}`;
     const { error: uploadError } = await supabaseAdmin.storage
-      .from(UPLOAD_BUCKET)
+      .from(uploadBucket)
       .upload(storagePath, buffer, {
         contentType: file.type,
         upsert: false,
@@ -107,8 +170,8 @@ export async function POST(request: Request) {
     }
 
     const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin.storage
-      .from(UPLOAD_BUCKET)
-      .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
+      .from(uploadBucket)
+      .createSignedUrl(storagePath, storageConfig.signedUrlTtlSeconds);
 
     if (signedUrlError || !signedUrlData?.signedUrl) {
       throw new Error(signedUrlError?.message ?? "Failed to create upload URL");
@@ -123,7 +186,8 @@ export async function POST(request: Request) {
         characterCount: characterInfo.characterCount,
         extractionSource: characterInfo.extractionSource,
       } : {}),
-      expiresIn: SIGNED_URL_TTL_SECONDS,
+      expiresIn: storageConfig.signedUrlTtlSeconds,
+      asset_storage: buildPublicAssetStorageConfig(storageConfig),
     });
   } catch (error) {
     console.error("[playground/uploads] upload failed", error);
