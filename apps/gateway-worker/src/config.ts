@@ -5,7 +5,7 @@ import { z } from "zod";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: resolve(currentDir, "../../../.env.local"), override: false });
-loadEnv({ path: resolve(currentDir, "../.env.local"), override: false });
+loadEnv({ path: resolve(currentDir, "../.env.local"), override: true });
 loadEnv();
 
 const envSchema = z

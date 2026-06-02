@@ -631,6 +631,14 @@ export function ApiQuickstartCard({
       standard: {
         id: "task id",
         status: "queued | processing | succeeded | failed | cancelled",
+        queue: {
+          enabled: "whether OpenOctopus local queue is enabled for this model",
+          position: "1-based queue position while queued, 0 while processing, null when unavailable",
+          size: "current queued request count for this model",
+          concurrency: "local concurrent upstream submissions allowed for this model",
+          upstreamQueueSupported: "whether the upstream provider has a reliable queue",
+          upstreamCancelSupported: "whether the upstream provider supports cancellation",
+        },
         capability: "image_generation | video_generation",
         output_payload: {
           format: "openoctopus.image.output.v1 | openoctopus.video.output.v1",

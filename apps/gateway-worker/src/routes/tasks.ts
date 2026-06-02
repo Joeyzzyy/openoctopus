@@ -59,6 +59,7 @@ import {
   recordInferenceRequest,
   RequestValidationError,
   resolveProviderSecret,
+  resolveRequestQueueStatus,
   resolveRequestRuntime,
   touchApiKeyLastUsed,
 } from "../services/request-service.js";
@@ -666,6 +667,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       return reply.code(202).send({
         id: queued.requestId,
         status: "queued",
+        queue: queued.queue,
       });
     } catch (error) {
       return sendRequestError(reply, error);
@@ -721,6 +723,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       return reply.code(202).send({
         id: queued.requestId,
         status: "queued",
+        queue: queued.queue,
       });
     } catch (error) {
       return sendRequestError(reply, error);
@@ -768,6 +771,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       return reply.code(202).send({
         id: queued.requestId,
         status: "queued",
+        queue: queued.queue,
       });
     } catch (error) {
       return sendRequestError(reply, error);
@@ -815,6 +819,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       return reply.code(202).send({
         id: queued.requestId,
         status: "queued",
+        queue: queued.queue,
       });
     } catch (error) {
       return sendRequestError(reply, error);
@@ -872,6 +877,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       return reply.code(202).send({
         id: queued.requestId,
         status: "queued",
+        queue: queued.queue,
       });
     } catch (error) {
       return sendRequestError(reply, error);
@@ -1402,6 +1408,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       return reply.code(202).send({
         id: queued.requestId,
         status: "queued",
+        queue: queued.queue,
       });
     } catch (error) {
       return sendRequestError(reply, error);
@@ -1427,7 +1434,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
 
     const { data, error } = await supabaseAdmin
       .from("inference_requests")
-      .select("id, workspace_id, api_key_id, status, capability, public_model_slug, output_payload, error_code, error_message, created_at, completed_at")
+      .select("id, workspace_id, api_key_id, status, capability, public_model_slug, provider_model_id, output_payload, error_code, error_message, created_at, completed_at")
       .eq("id", params.id)
       .maybeSingle();
 
@@ -1463,6 +1470,26 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       };
     }
 
+    const { provider_model_id: providerModelId, ...publicData } = data;
+    let queue = null;
+    if (providerModelId) {
+      const { data: providerModel, error: providerModelError } = await supabaseAdmin
+        .from("provider_models")
+        .select("execution_config")
+        .eq("id", providerModelId)
+        .maybeSingle();
+
+      if (providerModelError) {
+        throw new Error(providerModelError.message);
+      }
+
+      queue = await resolveRequestQueueStatus({
+        requestId: data.id,
+        providerModelId,
+        executionConfig: providerModel?.execution_config ?? {},
+      });
+    }
+
     if (data.status === "succeeded") {
       const normalizedOutputPayload = normalizeOutputPayloadByCapability({
         capability: data.capability,
@@ -1472,7 +1499,8 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         redactOutputPayloadRaw(normalizedOutputPayload)
       );
       return {
-        ...data,
+        ...publicData,
+        queue,
         output_payload: redactedOutputPayload,
       };
     }
@@ -1480,7 +1508,8 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     if (data.status === "failed") {
       const publicError = await resolveGatewayErrorDefinition(data.error_code);
       return {
-        ...data,
+        ...publicData,
+        queue,
         error_code: publicError.code,
         error_message: publicError.publicMessage,
         error: {
@@ -1491,6 +1520,9 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       };
     }
 
-    return data;
+    return {
+      ...publicData,
+      queue,
+    };
   });
 }

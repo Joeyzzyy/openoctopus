@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../lib/supabase.js";
 import { sendFeishuFailureAlert } from "../lib/feishu-alert.js";
 import { decryptProviderSecret } from "../lib/provider-secret-crypto.js";
+import { parseLocalQueueConfig } from "../lib/local-queue.js";
 import { normalizeOutputPayloadByCapability } from "../lib/image-output-contract.js";
 import { getProviderAdapter } from "../providers/index.js";
 import { AssetIntegrityError, persistGeneratedAssets } from "../services/assets-service.js";
@@ -604,6 +605,38 @@ export async function processNextInferenceJob() {
     });
 
     return true;
+  }
+
+  const executionConfig = asRecord(message.providerConfig)?.executionConfig;
+  const localQueueConfig = parseLocalQueueConfig(executionConfig);
+  if (localQueueConfig.enabled && requestRow.status === "queued") {
+    const { data: claimed, error: claimError } = await supabaseAdmin.rpc(
+      "try_claim_queued_inference_request",
+      {
+        p_request_id: message.requestId,
+        p_provider_model_id: message.providerModelId,
+        p_concurrency: localQueueConfig.concurrency,
+      }
+    );
+
+    if (claimError) {
+      throw new Error(claimError.message);
+    }
+
+    if (claimed !== true) {
+      await sendQueueMessage({
+        queueName: "inference_jobs",
+        message,
+        delaySeconds: 2,
+      });
+
+      await deleteQueueMessage({
+        queueName: "inference_jobs",
+        messageId: row.msg_id,
+      });
+
+      return true;
+    }
   }
 
   const { data: existingAttempt, error: existingAttemptError } = await supabaseAdmin

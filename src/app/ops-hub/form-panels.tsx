@@ -126,6 +126,9 @@ type ExecutionConfigFormState = {
   resultUrlPath: string;
   resultTextPath: string;
   submitBodyTemplate: string;
+  localQueueJson: string;
+  upstreamQueueJson: string;
+  upstreamCancelJson: string;
   playgroundDefaultPrompt: string;
   playgroundPromptComposerJson: string;
   docRequestExampleJson: string;
@@ -2188,6 +2191,9 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
     resultUrlPath: "response.outputUrl",
     resultTextPath: "",
     submitBodyTemplate: "",
+    localQueueJson: "",
+    upstreamQueueJson: "",
+    upstreamCancelJson: "",
     playgroundDefaultPrompt: "",
     playgroundPromptComposerJson: "",
     docRequestExampleJson: "",
@@ -2276,6 +2282,18 @@ function parseExecutionConfigState(initialValue?: string): ExecutionConfigFormSt
               !Array.isArray(parsed.submitBodyTemplate)
             ? JSON.stringify(parsed.submitBodyTemplate, null, 2)
             : fallback.submitBodyTemplate,
+      localQueueJson:
+        parsed.localQueue && typeof parsed.localQueue === "object" && !Array.isArray(parsed.localQueue)
+          ? JSON.stringify(parsed.localQueue, null, 2)
+          : fallback.localQueueJson,
+      upstreamQueueJson:
+        parsed.upstreamQueue && typeof parsed.upstreamQueue === "object" && !Array.isArray(parsed.upstreamQueue)
+          ? JSON.stringify(parsed.upstreamQueue, null, 2)
+          : fallback.upstreamQueueJson,
+      upstreamCancelJson:
+        parsed.upstreamCancel && typeof parsed.upstreamCancel === "object" && !Array.isArray(parsed.upstreamCancel)
+          ? JSON.stringify(parsed.upstreamCancel, null, 2)
+          : fallback.upstreamCancelJson,
       playgroundDefaultPrompt:
         parsed.playground &&
         typeof parsed.playground === "object" &&
@@ -2361,6 +2379,39 @@ function buildExecutionConfigValue(state: ExecutionConfigFormState) {
       result.submitBodyTemplate = JSON.parse(submitBodyTemplateText);
     } catch {
       result.submitBodyTemplate = submitBodyTemplateText;
+    }
+  }
+  const localQueueText = state.localQueueJson.trim();
+  if (localQueueText) {
+    try {
+      const parsedLocalQueue = JSON.parse(localQueueText) as unknown;
+      if (parsedLocalQueue && typeof parsedLocalQueue === "object" && !Array.isArray(parsedLocalQueue)) {
+        result.localQueue = parsedLocalQueue;
+      }
+    } catch {
+      // Form validation blocks invalid JSON before submit; keep serialize path resilient.
+    }
+  }
+  const upstreamQueueText = state.upstreamQueueJson.trim();
+  if (upstreamQueueText) {
+    try {
+      const parsedUpstreamQueue = JSON.parse(upstreamQueueText) as unknown;
+      if (parsedUpstreamQueue && typeof parsedUpstreamQueue === "object" && !Array.isArray(parsedUpstreamQueue)) {
+        result.upstreamQueue = parsedUpstreamQueue;
+      }
+    } catch {
+      // Form validation blocks invalid JSON before submit; keep serialize path resilient.
+    }
+  }
+  const upstreamCancelText = state.upstreamCancelJson.trim();
+  if (upstreamCancelText) {
+    try {
+      const parsedUpstreamCancel = JSON.parse(upstreamCancelText) as unknown;
+      if (parsedUpstreamCancel && typeof parsedUpstreamCancel === "object" && !Array.isArray(parsedUpstreamCancel)) {
+        result.upstreamCancel = parsedUpstreamCancel;
+      }
+    } catch {
+      // Form validation blocks invalid JSON before submit; keep serialize path resilient.
     }
   }
   const playgroundDefaultPrompt = state.playgroundDefaultPrompt.trim();
@@ -3495,6 +3546,26 @@ export function CreateProviderModelForm({
             nextActiveTab ??= "doc-examples";
           }
         }
+        for (const [label, text] of [
+          ["本地队列配置 localQueue", executionConfigState.localQueueJson],
+          ["上游队列配置 upstreamQueue", executionConfigState.upstreamQueueJson],
+          ["上游取消配置 upstreamCancel", executionConfigState.upstreamCancelJson],
+        ] as const) {
+          const trimmed = text.trim();
+          if (!trimmed) continue;
+          try {
+            const parsed = JSON.parse(trimmed) as unknown;
+            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+              missing.push(`${label} 必须是 JSON 对象`);
+              nextRootTab ??= "manage";
+              nextActiveTab ??= "protocol";
+            }
+          } catch {
+            missing.push(`${label} JSON 格式无效`);
+            nextRootTab ??= "manage";
+            nextActiveTab ??= "protocol";
+          }
+        }
 
         const inputWarnings = getSchemaRequiredWarnings(
           String(formData.get("inputSchema") ?? ""),
@@ -4205,6 +4276,59 @@ export function CreateProviderModelForm({
                   ) : null}
                 </>
               )}
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">本地队列 localQueue（JSON，可选）</span>
+                <textarea
+                  value={executionConfigState.localQueueJson}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      localQueueJson: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={7}
+                  placeholder={'{\n  "enabled": true,\n  "concurrency": 1,\n  "maxQueued": 100\n}'}
+                />
+                <FieldHint help="只给需要本地控流的模型填写。默认空表示不启用，其他模型继续走当前队列逻辑。" />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上游队列 upstreamQueue（JSON，可选）</span>
+                <textarea
+                  value={executionConfigState.upstreamQueueJson}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      upstreamQueueJson: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={7}
+                  placeholder={'{\n  "supported": false\n}'}
+                />
+                <FieldHint help="SCU 这类没有可靠上游排队的模型可填 supported=false，用于 API 返回和运营识别。" />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[11px] tracking-[0.35px] text-black/60">上游取消 upstreamCancel（JSON，可选）</span>
+                <textarea
+                  value={executionConfigState.upstreamCancelJson}
+                  onChange={(event) =>
+                    setExecutionConfigState((current) => ({
+                      ...current,
+                      upstreamCancelJson: event.target.value,
+                    }))
+                  }
+                  disabled={disabled}
+                  className={formTextAreaClassName}
+                  rows={7}
+                  placeholder={'{\n  "supported": false\n}'}
+                />
+                <FieldHint help="如果上游不支持取消，已 processing 的请求不会因为用户关闭页面而立即停止。" />
+              </label>
             </div>
           </div>
         </div>

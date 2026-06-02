@@ -89,6 +89,13 @@ type TaskStatus =
   | "succeeded"
   | "failed";
 
+type PlaygroundQueueInfo = {
+  enabled: boolean;
+  position: number | null;
+  size: number | null;
+  concurrency: number;
+};
+
 type PromptComposerSelectionMap = Record<string, string>;
 
 type MarkdownBlock =
@@ -229,6 +236,31 @@ function taskStatusClass(status: TaskStatus) {
     return "border-[#BAE6FD] bg-[#F0F9FF] text-[#0369A1]";
   }
   return "border-black/[0.08] bg-white text-black/55";
+}
+
+function readPlaygroundQueueInfo(value: unknown): PlaygroundQueueInfo | null {
+  if (!isRecord(value)) return null;
+  const queue = isRecord(value.queue) ? value.queue : null;
+  if (!queue || queue.enabled !== true) return null;
+  return {
+    enabled: true,
+    position: typeof queue.position === "number" ? queue.position : null,
+    size: typeof queue.size === "number" ? queue.size : null,
+    concurrency: typeof queue.concurrency === "number" ? queue.concurrency : 1,
+  };
+}
+
+function playgroundQueueLabel(queue: PlaygroundQueueInfo | null, status: TaskStatus) {
+  if (!queue?.enabled) return null;
+  if (status === "queued") {
+    const position = queue.position === null ? "-" : String(queue.position);
+    const size = queue.size === null ? "-" : String(queue.size);
+    return `Queue position ${position}/${size}`;
+  }
+  if (status === "processing") {
+    return `Processing from local queue`;
+  }
+  return null;
 }
 
 function decodeHtmlEntities(text: string) {
@@ -1836,6 +1868,7 @@ export function ModelsBrowser({
   const mainTab: "playground" | "api" = searchParams.get("tab") === "api" ? "api" : "playground";
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const [taskId, setTaskId] = useState<string | null>(null);
+  const [queueInfo, setQueueInfo] = useState<PlaygroundQueueInfo | null>(null);
   const [playgroundError, setPlaygroundError] = useState<string | null>(null);
   const [playgroundErrorDetail, setPlaygroundErrorDetail] = useState<unknown>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -2696,6 +2729,7 @@ export function ModelsBrowser({
     setResultModalOpen(false);
     setPlaygroundOutput(null);
     setTaskId(null);
+    setQueueInfo(null);
     setTaskStatus("idle");
     let optimisticAssistantId: string | undefined;
     let optimisticUserId: string | undefined;
@@ -2919,6 +2953,7 @@ export function ModelsBrowser({
         }
 
         setTaskId(submitJson.id);
+        setQueueInfo(readPlaygroundQueueInfo(submitJson));
         setTaskStatus("queued");
 
         const startedAt = Date.now();
@@ -2944,6 +2979,7 @@ export function ModelsBrowser({
           }
 
           const status = String(statusJson.status ?? "").toLowerCase();
+          setQueueInfo(readPlaygroundQueueInfo(statusJson));
           if (status === "queued") {
             setTaskStatus("queued");
             continue;
@@ -3167,6 +3203,7 @@ export function ModelsBrowser({
       }
 
       setTaskId(submitJson.id);
+      setQueueInfo(readPlaygroundQueueInfo(submitJson));
       setTaskStatus("queued");
 
       const startedAt = Date.now();
@@ -3212,6 +3249,7 @@ export function ModelsBrowser({
           throw new Error(formatPlaygroundError(statusJson));
         }
 
+        setQueueInfo(readPlaygroundQueueInfo(statusJson));
         if (statusJson.status === "queued" || statusJson.status === "processing") {
           setTaskStatus(statusJson.status);
           continue;
@@ -3506,6 +3544,7 @@ export function ModelsBrowser({
                         setChatComposer("");
                         setPlaygroundOutput(null);
                         setTaskId(null);
+                        setQueueInfo(null);
                         setTaskStatus("idle");
                         setPlaygroundError(null);
                         setPlaygroundErrorDetail(null);
@@ -3571,7 +3610,7 @@ export function ModelsBrowser({
                             >
                               {isAssistant && message.pending ? (
                                 <span className="bg-[linear-gradient(90deg,#64748B_0%,#0F172A_50%,#64748B_100%)] bg-[length:200%_100%] bg-clip-text text-sm font-medium text-transparent animate-pulse">
-                                  thinking...
+                                  {playgroundQueueLabel(queueInfo, taskStatus) ?? "thinking..."}
                                 </span>
                               ) : (
                                 isAssistant ? (
@@ -4166,6 +4205,11 @@ export function ModelsBrowser({
                     >
                       Status: {taskStatusLabel(taskStatus)}
                     </span>
+                    {playgroundQueueLabel(queueInfo, taskStatus) ? (
+                      <span className="inline-flex h-7 items-center rounded-md border border-[#BAE6FD] bg-[#F0F9FF] px-2.5 text-xs font-medium text-[#0369A1]">
+                        {playgroundQueueLabel(queueInfo, taskStatus)}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -4222,6 +4266,11 @@ export function ModelsBrowser({
                   <span className="inline-flex size-7 animate-spin rounded-full border-2 border-[#BAE6FD] border-t-[#38BDF8]" />
                   <p className="mt-3 text-sm font-medium text-black">Generating...</p>
                   <p className="mt-1 text-xs text-black/55">{taskStatusLabel(taskStatus)}</p>
+                  {playgroundQueueLabel(queueInfo, taskStatus) ? (
+                    <p className="mt-1 text-xs text-[#0369A1]">
+                      {playgroundQueueLabel(queueInfo, taskStatus)}
+                    </p>
+                  ) : null}
                 </div>
               ) : playgroundOutput ? (
                 <div className="space-y-3">

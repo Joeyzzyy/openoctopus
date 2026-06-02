@@ -2,6 +2,11 @@ import crypto from "node:crypto";
 import { parseBillingConfig, resolveBillingBreakdown } from "../lib/billing-config.js";
 import { validateReferenceAssetLimits } from "../lib/reference-asset-limits.js";
 import {
+  buildQueueStatus,
+  parseLocalQueueConfig,
+  type QueueStatus,
+} from "../lib/local-queue.js";
+import {
   pickRuntimeCredential,
   type RuntimeProviderCredential,
 } from "../lib/provider-runtime-guard.js";
@@ -55,6 +60,7 @@ export type ResolvedRequestRuntime = {
   providerSlug: string;
   providerBaseUrl: string | null;
   providerConfig: Record<string, unknown>;
+  queue: QueueStatus;
   upstreamModelSlug: string;
   endpoint: UnifiedRequestInput["endpoint"];
   publicModelSlug: string;
@@ -385,6 +391,7 @@ export async function resolveRequestRuntime(input: UnifiedRequestInput): Promise
     !Array.isArray(providerModelRow.execution_config)
       ? (providerModelRow.execution_config as Record<string, unknown>)
       : {};
+  const localQueueConfig = parseLocalQueueConfig(modelExecutionConfig);
 
   const { data: credentialRows, error: credentialError } = await supabaseAdmin
     .from("provider_credentials")
@@ -427,6 +434,9 @@ export async function resolveRequestRuntime(input: UnifiedRequestInput): Promise
           ...modelExecutionConfig,
         },
       },
+    queue: buildQueueStatus({
+      config: localQueueConfig,
+    }),
     upstreamModelSlug: providerModelRow.upstream_model_slug,
     endpoint: input.endpoint,
     publicModelSlug: input.model,
@@ -435,6 +445,73 @@ export async function resolveRequestRuntime(input: UnifiedRequestInput): Promise
     messages: input.messages,
     input: input.input,
   };
+}
+
+export async function resolveRequestQueueStatus(input: {
+  requestId: string;
+  providerModelId: string;
+  executionConfig: unknown;
+}) {
+  const config = parseLocalQueueConfig(input.executionConfig);
+  if (!config.enabled) {
+    return buildQueueStatus({ config });
+  }
+
+  const { data: requestRow, error: requestError } = await supabaseAdmin
+    .from("inference_requests")
+    .select("id, status")
+    .eq("id", input.requestId)
+    .maybeSingle();
+
+  if (requestError) {
+    throw new RequestValidationError(
+      "Failed to read queue request state",
+      503,
+      "database_operation_failed"
+    );
+  }
+
+  if (!requestRow) {
+    const { count: size, error: sizeError } = await supabaseAdmin
+      .from("inference_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("provider_model_id", input.providerModelId)
+      .eq("status", "queued");
+
+    if (sizeError) {
+      throw new RequestValidationError(
+        "Failed to read queue size",
+        503,
+        "database_operation_failed"
+      );
+    }
+
+    return buildQueueStatus({
+      config,
+      position: null,
+      size: size ?? null,
+    });
+  }
+
+  const { data, error } = await supabaseAdmin.rpc("get_inference_queue_position", {
+    p_request_id: input.requestId,
+  });
+
+  if (error) {
+    throw new RequestValidationError(
+      "Failed to read queue position",
+      503,
+      "database_operation_failed"
+    );
+  }
+
+  const row = Array.isArray(data) ? data[0] : null;
+
+  return buildQueueStatus({
+    config,
+    position: typeof row?.queue_position === "number" ? row.queue_position : null,
+    size: typeof row?.queue_size === "number" ? row.queue_size : null,
+  });
 }
 
 export async function touchApiKeyLastUsed(apiKeyId: string) {
@@ -491,6 +568,31 @@ export async function recordInferenceRequest(
 
 export async function createQueuedRequest(input: UnifiedRequestInput) {
   const resolved = await resolveRequestRuntime(input);
+  const localQueueConfig = parseLocalQueueConfig(resolved.providerConfig.executionConfig);
+
+  if (localQueueConfig.enabled && localQueueConfig.maxQueued !== null) {
+    const { count, error } = await supabaseAdmin
+      .from("inference_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("provider_model_id", resolved.providerModelId)
+      .eq("status", "queued");
+
+    if (error) {
+      throw new RequestValidationError(
+        "Failed to read queue size",
+        503,
+        "database_operation_failed"
+      );
+    }
+
+    if ((count ?? 0) >= localQueueConfig.maxQueued) {
+      throw new RequestValidationError(
+        "The local queue for this model is full. Please retry later.",
+        503,
+        "queue_unavailable"
+      );
+    }
+  }
 
   await recordInferenceRequest({
     ...resolved,
@@ -511,5 +613,15 @@ export async function createQueuedRequest(input: UnifiedRequestInput) {
     upstreamModelSlug: resolved.upstreamModelSlug,
     endpoint: resolved.endpoint,
     publicModelSlug: resolved.publicModelSlug,
+    queue: await resolveRequestQueueStatus({
+      requestId: resolved.requestId,
+      providerModelId: resolved.providerModelId,
+      executionConfig:
+        resolved.providerConfig.executionConfig &&
+        typeof resolved.providerConfig.executionConfig === "object" &&
+        !Array.isArray(resolved.providerConfig.executionConfig)
+          ? resolved.providerConfig.executionConfig
+          : {},
+    }),
   };
 }
