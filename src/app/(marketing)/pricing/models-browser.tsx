@@ -279,7 +279,7 @@ function playgroundQueueLabel(queue: PlaygroundQueueInfo | null, status: TaskSta
     return `Queue position ${position}/${size}`;
   }
   if (status === "processing") {
-    return `Processing from local queue`;
+    return "Queue cleared · generation in progress";
   }
   return null;
 }
