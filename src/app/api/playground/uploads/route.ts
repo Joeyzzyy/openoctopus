@@ -13,7 +13,7 @@ import {
   parseAssetStorageConfig,
 } from "@/lib/asset-storage-config";
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 const allowedMimeTypes = new Map([
   ["image/png", "png"],
@@ -140,7 +140,7 @@ export async function POST(request: Request) {
           error: {
             ...response.payload.error,
             message:
-              "Upload must be a supported image, video, audio, or DOC/DOCX document no larger than 100MB.",
+              "Upload must be a supported image, video, audio, or DOC/DOCX document no larger than 10MB.",
           },
         },
         { status: response.statusCode }

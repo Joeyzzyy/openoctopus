@@ -641,8 +641,6 @@ export function ApiQuickstartCard({
         },
         asset_storage: {
           provider: "supabase | aliyun-oss | tencent-cos",
-          inputBucket: "bucket used for uploaded reference media",
-          outputBucket: "bucket used for generated media",
           custom: "true when this model overrides default system asset storage",
         },
         capability: "image_generation | video_generation",

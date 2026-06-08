@@ -1,10 +1,12 @@
 import { supabaseAdmin } from "../lib/supabase.js";
 import { env } from "../config.js";
+import { getBuffer } from "../lib/http.js";
 import {
   getAssetStorageBucket,
   parseAssetStorageConfig,
   type AssetStorageConfig,
 } from "../lib/asset-storage.js";
+import { appendFileAccessToken } from "../lib/file-access-token.js";
 
 type PersistAssetInput = {
   requestId: string;
@@ -87,7 +89,8 @@ function buildAssetCachePath(requestId: string, assetIndex: number, mimeType: st
 
 function buildPublicAssetUrl(requestId: string, assetIndex: number) {
   const path = `/v1/files/${encodeURIComponent(requestId)}/assets/${assetIndex}`;
-  return env.GATEWAY_PUBLIC_BASE_URL ? new URL(path, env.GATEWAY_PUBLIC_BASE_URL).toString() : path;
+  const url = env.GATEWAY_PUBLIC_BASE_URL ? new URL(path, env.GATEWAY_PUBLIC_BASE_URL).toString() : path;
+  return appendFileAccessToken(url, { requestId, assetIndex });
 }
 
 function parseDataUri(value: string) {
@@ -159,18 +162,20 @@ async function cacheAsset(input: {
   let mimeType = dataUri?.mimeType ?? input.mimeType ?? null;
 
   if (!buffer && (input.url.startsWith("https://") || input.url.startsWith("http://"))) {
-    const response = await fetch(input.url);
-    if (!response.ok) {
+    try {
+      const response = await getBuffer(input.url);
+      buffer = response.data;
+      const contentType = response.headers["content-type"];
+      mimeType = (Array.isArray(contentType) ? contentType[0] : contentType)?.split(";")[0] ?? mimeType;
+    } catch (error) {
       return {
         cached: null,
         integrity: {
           status: "invalid",
-          reason: `upstream_fetch_not_ok_${response.status}`,
+          reason: error instanceof Error ? error.message : "upstream_fetch_failed",
         },
       };
     }
-    buffer = Buffer.from(await response.arrayBuffer());
-    mimeType = response.headers.get("content-type")?.split(";")[0] ?? mimeType;
   }
 
   if (!buffer) {

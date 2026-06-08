@@ -9,6 +9,10 @@ const DEFAULT_INTERNAL_ADMIN_EMAILS = ["zhuyuejoey@gmail.com"];
 
 function getAllowedAdminEmails() {
   const configured = process.env.INTERNAL_ADMIN_EMAILS;
+  if ((!configured || configured.trim().length === 0) && process.env.NODE_ENV === "production") {
+    return new Set<string>();
+  }
+
   const source = configured && configured.trim().length > 0
     ? configured.split(",")
     : DEFAULT_INTERNAL_ADMIN_EMAILS;

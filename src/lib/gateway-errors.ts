@@ -17,6 +17,7 @@ const DEFAULT_GATEWAY_ERROR_DEFINITIONS: GatewayErrorDefinition[] = [
   { code: "unauthorized", httpStatus: 401, publicMessage: "Authentication is required for this request.", retryable: false },
   { code: "invalid_api_key", httpStatus: 401, publicMessage: "The API key is invalid or inactive.", retryable: false },
   { code: "insufficient_balance", httpStatus: 402, publicMessage: "Your wallet balance is insufficient. Please top up and try again.", retryable: false },
+  { code: "budget_exceeded", httpStatus: 402, publicMessage: "This request would exceed the configured monthly budget. Adjust the budget or wait for the next billing period.", retryable: false },
   { code: "model_not_available", httpStatus: 404, publicMessage: "The requested model is currently unavailable.", retryable: false },
   { code: "task_not_found", httpStatus: 404, publicMessage: "The requested task could not be found.", retryable: false },
   { code: "file_not_found", httpStatus: 404, publicMessage: "The requested generated file is not available.", retryable: false },

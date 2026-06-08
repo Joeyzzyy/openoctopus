@@ -8,7 +8,9 @@ import {
   parseAssetStorageConfig,
   type AssetStorageConfig,
 } from "../lib/asset-storage.js";
+import { verifyFileAccessToken } from "../lib/file-access-token.js";
 import { supabaseAdmin } from "../lib/supabase.js";
+import { authenticateApiKey } from "../services/request-service.js";
 
 const fileAssetParamsSchema = z.object({
   requestId: z.string().uuid(),
@@ -225,9 +227,75 @@ async function markGeneratedAssetInvalid(input: {
     .eq("storage_path", input.storagePath);
 }
 
+async function hasAuthorizedFileAccess(input: {
+  request: { headers: { authorization?: string }; url: string };
+  requestId: string;
+  assetIndex: number;
+  workspaceId: string;
+}) {
+  const token = new URL(input.request.url, "http://localhost").searchParams.get("token") ?? undefined;
+  if (verifyFileAccessToken({ token, requestId: input.requestId, assetIndex: input.assetIndex })) {
+    return true;
+  }
+
+  const apiKey = input.request.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
+  if (!apiKey) {
+    return false;
+  }
+
+  try {
+    const apiKeyRow = await authenticateApiKey(apiKey);
+    return apiKeyRow.workspace_id === input.workspaceId;
+  } catch {
+    return false;
+  }
+}
+
 export async function registerFileRoutes(app: FastifyInstance) {
   app.get("/v1/files/:requestId/assets/:assetIndex", async (request, reply) => {
     const params = fileAssetParamsSchema.parse(request.params);
+
+    const { data: requestRow, error: requestError } = await supabaseAdmin
+      .from("inference_requests")
+      .select("id, workspace_id, provider_id, provider_model_id, output_payload")
+      .eq("id", params.requestId)
+      .maybeSingle();
+
+    if (requestError) {
+      throw new Error(requestError.message);
+    }
+
+    if (!requestRow) {
+      return sendGatewayError(reply, {
+        code: "file_not_found",
+        statusCode: 404,
+      });
+    }
+
+    const storageConfig = await resolveRequestAssetStorageConfig(requestRow.provider_model_id);
+    if (storageConfig.custom) {
+      const authorized = await hasAuthorizedFileAccess({
+        request: {
+          headers: {
+            authorization:
+              typeof request.headers.authorization === "string"
+                ? request.headers.authorization
+                : undefined,
+          },
+          url: request.url,
+        },
+        requestId: params.requestId,
+        assetIndex: params.assetIndex,
+        workspaceId: requestRow.workspace_id,
+      });
+
+      if (!authorized) {
+        return sendGatewayError(reply, {
+          code: "unauthorized",
+          statusCode: 401,
+        });
+      }
+    }
 
     const { data: assetRows, error: assetError } = await supabaseAdmin
       .from("generated_assets")
@@ -260,25 +328,6 @@ export async function registerFileRoutes(app: FastifyInstance) {
         });
       }
     }
-
-    const { data: requestRow, error: requestError } = await supabaseAdmin
-      .from("inference_requests")
-      .select("id, provider_id, provider_model_id, output_payload")
-      .eq("id", params.requestId)
-      .maybeSingle();
-
-    if (requestError) {
-      throw new Error(requestError.message);
-    }
-
-    if (!requestRow) {
-      return sendGatewayError(reply, {
-        code: "file_not_found",
-        statusCode: 404,
-      });
-    }
-
-    const storageConfig = await resolveRequestAssetStorageConfig(requestRow.provider_model_id);
     const outputStorageBucket = getAssetStorageBucket(storageConfig, "output");
     const cachePathBase = buildAssetCachePath(params.requestId, params.assetIndex);
     const candidatePaths = [

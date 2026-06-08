@@ -56,6 +56,16 @@ const DEFAULT_GATEWAY_ERROR_DEFINITIONS: GatewayErrorDefinition[] = [
     operatorNotes: null,
   },
   {
+    code: "budget_exceeded",
+    category: "billing",
+    httpStatus: 402,
+    publicMessage: "This request would exceed the configured monthly budget. Adjust the budget or wait for the next billing period.",
+    retryable: false,
+    active: true,
+    sortOrder: 45,
+    operatorNotes: null,
+  },
+  {
     code: "model_not_available",
     category: "routing",
     httpStatus: 404,

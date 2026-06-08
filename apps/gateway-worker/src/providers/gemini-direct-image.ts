@@ -1,5 +1,6 @@
 import { getJson, postJson } from "../lib/http.js";
 import { env } from "../config.js";
+import { appendFileAccessToken } from "../lib/file-access-token.js";
 import type {
   PollRequestInput,
   PollRequestResult,
@@ -44,11 +45,9 @@ function isGeminiFileDownloadUrl(url: string) {
 
 function buildProxiedAssetUrl(requestId: string, assetIndex: number) {
   const path = `/v1/files/${encodeURIComponent(requestId)}/assets/${assetIndex}`;
-  if (!env.GATEWAY_PUBLIC_BASE_URL) {
-    return path;
-  }
+  const url = env.GATEWAY_PUBLIC_BASE_URL ? new URL(path, env.GATEWAY_PUBLIC_BASE_URL).toString() : path;
 
-  return new URL(path, env.GATEWAY_PUBLIC_BASE_URL).toString();
+  return appendFileAccessToken(url, { requestId, assetIndex });
 }
 
 export class GeminiDirectImageAdapter implements ProviderAdapter {

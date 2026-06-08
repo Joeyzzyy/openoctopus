@@ -517,6 +517,11 @@ const fallbackGatewayErrorDefinitions: Record<
     message: "Your wallet balance is insufficient. Please top up and try again.",
     retryable: false,
   },
+  budget_exceeded: {
+    code: "budget_exceeded",
+    message: "This request would exceed the configured monthly budget. Adjust the budget or wait for the next billing period.",
+    retryable: false,
+  },
   model_not_available: {
     code: "model_not_available",
     message: "The requested model is currently unavailable.",

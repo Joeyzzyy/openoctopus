@@ -121,7 +121,7 @@ export async function authenticateApiKey(apiKey: string) {
 
   const { data: apiKeyRow, error: apiKeyError } = await supabaseAdmin
     .from("api_keys")
-    .select("id, workspace_id, created_by, status, key_prefix")
+    .select("id, workspace_id, created_by, status, key_prefix, monthly_budget")
     .eq("secret_hash", secretHash)
     .maybeSingle();
 
@@ -205,6 +205,139 @@ async function resolveProviderAdapterSlug(slug: string) {
   return data?.adapter_slug ?? slug;
 }
 
+function getCurrentMonthStartIso() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+}
+
+async function resolveCurrentMonthSpend(input: {
+  workspaceId: string;
+  apiKeyId?: string;
+  modelId?: string;
+}) {
+  let query = supabaseAdmin
+    .from("usage_events")
+    .select("total_cost")
+    .eq("workspace_id", input.workspaceId)
+    .gte("created_at", getCurrentMonthStartIso());
+
+  if (input.apiKeyId) {
+    query = query.eq("api_key_id", input.apiKeyId);
+  }
+  if (input.modelId) {
+    query = query.eq("model_id", input.modelId);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw new RequestValidationError(
+      "Failed to read monthly usage",
+      503,
+      "database_operation_failed"
+    );
+  }
+
+  return (data ?? []).reduce((sum, row) => sum + Number(row.total_cost ?? 0), 0);
+}
+
+function assertMonthlyBudgetAvailable(input: {
+  label: string;
+  limit: number;
+  currentSpend: number;
+  estimatedCharge: number;
+}) {
+  if (!Number.isFinite(input.limit) || input.limit <= 0) {
+    return;
+  }
+
+  const nextSpend = input.currentSpend + Math.max(input.estimatedCharge, 0);
+  if (nextSpend <= input.limit + 0.000001) {
+    return;
+  }
+
+  throw new RequestValidationError(
+    input.label + " monthly budget exceeded. Current spend is $" +
+      input.currentSpend.toFixed(2) +
+      ", estimated request cost is $" +
+      input.estimatedCharge.toFixed(2) +
+      ", limit is $" +
+      input.limit.toFixed(2) +
+      ".",
+    402,
+    "budget_exceeded"
+  );
+}
+
+async function enforceMonthlyBudgetLimits(input: {
+  workspaceId: string;
+  apiKeyId: string;
+  modelId: string | null;
+  apiKeyMonthlyBudget: number;
+  estimatedCharge: number;
+}) {
+  const spendCache = new Map<string, Promise<number>>();
+  const readSpend = (key: string, filters: { apiKeyId?: string; modelId?: string }) => {
+    const existing = spendCache.get(key);
+    if (existing) return existing;
+    const pending = resolveCurrentMonthSpend({
+      workspaceId: input.workspaceId,
+      ...filters,
+    });
+    spendCache.set(key, pending);
+    return pending;
+  };
+
+  assertMonthlyBudgetAvailable({
+    label: "API key",
+    limit: input.apiKeyMonthlyBudget,
+    currentSpend: await readSpend("api-key", { apiKeyId: input.apiKeyId }),
+    estimatedCharge: input.estimatedCharge,
+  });
+
+  const { data: rules, error } = await supabaseAdmin
+    .from("budget_rules")
+    .select("scope, api_key_id, model_id, monthly_limit, hard_stop")
+    .eq("workspace_id", input.workspaceId)
+    .eq("hard_stop", true);
+
+  if (error) {
+    throw new RequestValidationError(
+      "Failed to read budget rules",
+      503,
+      "database_operation_failed"
+    );
+  }
+
+  for (const rule of rules ?? []) {
+    const scope = String(rule.scope ?? "");
+    const limit = Number(rule.monthly_limit ?? 0);
+    if (scope === "workspace") {
+      assertMonthlyBudgetAvailable({
+        label: "Workspace",
+        limit,
+        currentSpend: await readSpend("workspace", {}),
+        estimatedCharge: input.estimatedCharge,
+      });
+    }
+    if (scope === "api_key" && rule.api_key_id === input.apiKeyId) {
+      assertMonthlyBudgetAvailable({
+        label: "API key rule",
+        limit,
+        currentSpend: await readSpend("api-key-rule:" + input.apiKeyId, { apiKeyId: input.apiKeyId }),
+        estimatedCharge: input.estimatedCharge,
+      });
+    }
+    if (scope === "model" && input.modelId && rule.model_id === input.modelId) {
+      assertMonthlyBudgetAvailable({
+        label: "Model",
+        limit,
+        currentSpend: await readSpend("model:" + input.modelId, { modelId: input.modelId }),
+        estimatedCharge: input.estimatedCharge,
+      });
+    }
+  }
+}
+
 export async function resolveRequestRuntime(input: UnifiedRequestInput): Promise<ResolvedRequestRuntime> {
   const apiKeyRow = await authenticateApiKey(input.apiKey);
 
@@ -261,7 +394,7 @@ export async function resolveRequestRuntime(input: UnifiedRequestInput): Promise
 
   const { data: supportedModelRow, error: supportedModelError } = await supabaseAdmin
     .from("supported_models")
-    .select("billing_config, active")
+    .select("id, billing_config, active")
     .eq("model_slug", input.model)
     .maybeSingle();
 
@@ -313,6 +446,14 @@ export async function resolveRequestRuntime(input: UnifiedRequestInput): Promise
       "insufficient_balance"
     );
   }
+
+  await enforceMonthlyBudgetLimits({
+    workspaceId: apiKeyRow.workspace_id,
+    apiKeyId: apiKeyRow.id,
+    modelId: supportedModelRow.id ?? null,
+    apiKeyMonthlyBudget: Number(apiKeyRow.monthly_budget ?? 0),
+    estimatedCharge: estimatedCustomerCharge,
+  });
 
   const { data: providerModelRow, error: providerModelError } = await supabaseAdmin
     .from("provider_models")

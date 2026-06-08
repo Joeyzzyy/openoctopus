@@ -1,5 +1,7 @@
 import http, { type IncomingHttpHeaders, type IncomingMessage } from "node:http";
 import https from "node:https";
+import net from "node:net";
+import { lookup } from "node:dns/promises";
 import { ProxyAgent } from "proxy-agent";
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30000;
@@ -33,6 +35,91 @@ function redactUrl(rawUrl: string) {
   }
 }
 
+function isPrivateIpv4(address: string) {
+  const parts = address.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+  const [a, b] = parts;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
+function isUnsafeIpAddress(address: string) {
+  const normalized = address.replace(/^\[|\]$/g, "").toLowerCase();
+  const ipVersion = net.isIP(normalized);
+  if (ipVersion === 4) {
+    return isPrivateIpv4(normalized);
+  }
+  if (ipVersion === 6) {
+    const mappedIpv4 = normalized.match(/^(?:::ffff:)(\d{1,3}(?:\.\d{1,3}){3})$/);
+    if (mappedIpv4) {
+      return isPrivateIpv4(mappedIpv4[1]);
+    }
+
+    return (
+      normalized === "::" ||
+      normalized === "::1" ||
+      normalized.startsWith("fe80:") ||
+      normalized.startsWith("fc") ||
+      normalized.startsWith("fd")
+    );
+  }
+  return false;
+}
+
+type PinnedLookup = (
+  hostname: string,
+  options: unknown,
+  callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void
+) => void;
+
+function createPinnedLookup(address: { address: string; family: number }): PinnedLookup {
+  return (_hostname, _options, callback) => {
+    callback(null, address.address, address.family);
+  };
+}
+
+async function resolveSafeHttpTarget(target: URL): Promise<{ lookup?: PinnedLookup }> {
+  if (target.protocol !== "https:" && target.protocol !== "http:") {
+    throw new Error(`Blocked unsupported upstream protocol: ${target.protocol}`);
+  }
+
+  const hostname = target.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname === "metadata.google.internal"
+  ) {
+    throw new Error(`Blocked unsafe upstream host: ${hostname}`);
+  }
+
+  if (isUnsafeIpAddress(hostname)) {
+    throw new Error(`Blocked private upstream IP host: ${hostname}`);
+  }
+
+  if (net.isIP(hostname) === 0) {
+    const addresses = await lookup(hostname, { all: true, verbatim: true });
+    if (addresses.some((entry) => isUnsafeIpAddress(entry.address))) {
+      throw new Error(`Blocked upstream host resolving to private IP: ${hostname}`);
+    }
+    const selected = addresses[0];
+    if (!selected) {
+      throw new Error(`Unable to resolve upstream host: ${hostname}`);
+    }
+    return { lookup: createPinnedLookup(selected) };
+  }
+
+  return {};
+}
+
 function requestJson<TResponse>(
   url: string,
   options: {
@@ -44,9 +131,10 @@ function requestJson<TResponse>(
   return new Promise((resolve, reject) => {
     const target = new URL(url);
     const payload = options.body ? JSON.stringify(options.body) : null;
-    const transport = target.protocol === "https:" ? https : http;
+    void resolveSafeHttpTarget(target).then((safeTarget) => {
+      const transport = target.protocol === "https:" ? https : http;
 
-    const req = transport.request(
+      const req = transport.request(
       {
         protocol: target.protocol,
         hostname: target.hostname,
@@ -56,6 +144,7 @@ function requestJson<TResponse>(
         family: 4,
         timeout: REQUEST_TIMEOUT_MS,
         agent: proxyAgent ?? undefined,
+        lookup: safeTarget.lookup,
         headers: {
           accept: "application/json",
           ...(payload ? { "content-type": "application/json" } : {}),
@@ -100,19 +189,20 @@ function requestJson<TResponse>(
       }
     );
 
-    req.on("timeout", () => {
-      req.destroy(new Error(`Upstream ${options.method} timed out after ${REQUEST_TIMEOUT_MS}ms`));
-    });
+      req.on("timeout", () => {
+        req.destroy(new Error(`Upstream ${options.method} timed out after ${REQUEST_TIMEOUT_MS}ms`));
+      });
 
-    req.on("error", (error) => {
-      reject(error);
-    });
+      req.on("error", (error) => {
+        reject(error);
+      });
 
-    if (payload) {
-      req.write(payload);
-    }
+      if (payload) {
+        req.write(payload);
+      }
 
-    req.end();
+      req.end();
+    }).catch(reject);
   });
 }
 
@@ -131,9 +221,10 @@ function requestBuffer(
   return new Promise((resolve, reject) => {
     const target = new URL(url);
     const payload = options.body ?? null;
-    const transport = target.protocol === "https:" ? https : http;
+    void resolveSafeHttpTarget(target).then((safeTarget) => {
+      const transport = target.protocol === "https:" ? https : http;
 
-    const req = transport.request(
+      const req = transport.request(
       {
         protocol: target.protocol,
         hostname: target.hostname,
@@ -143,6 +234,7 @@ function requestBuffer(
         family: 4,
         timeout: REQUEST_TIMEOUT_MS,
         agent: proxyAgent ?? undefined,
+        lookup: safeTarget.lookup,
         headers: {
           accept: "*/*",
           ...(payload ? { "content-length": Buffer.byteLength(payload).toString() } : {}),
@@ -178,19 +270,20 @@ function requestBuffer(
       }
     );
 
-    req.on("timeout", () => {
-      req.destroy(new Error(`Upstream ${options.method} timed out after ${REQUEST_TIMEOUT_MS}ms`));
-    });
+      req.on("timeout", () => {
+        req.destroy(new Error(`Upstream ${options.method} timed out after ${REQUEST_TIMEOUT_MS}ms`));
+      });
 
-    req.on("error", (error) => {
-      reject(error);
-    });
+      req.on("error", (error) => {
+        reject(error);
+      });
 
-    if (payload) {
-      req.write(payload);
-    }
+      if (payload) {
+        req.write(payload);
+      }
 
-    req.end();
+      req.end();
+    }).catch(reject);
   });
 }
 
@@ -222,9 +315,10 @@ export function postStream(
   return new Promise((resolve, reject) => {
     const target = new URL(url);
     const payload = JSON.stringify(options.body);
-    const transport = target.protocol === "https:" ? https : http;
+    void resolveSafeHttpTarget(target).then((safeTarget) => {
+      const transport = target.protocol === "https:" ? https : http;
 
-    const req = transport.request(
+      const req = transport.request(
       {
         protocol: target.protocol,
         hostname: target.hostname,
@@ -234,6 +328,7 @@ export function postStream(
         family: 4,
         timeout: REQUEST_TIMEOUT_MS,
         agent: proxyAgent ?? undefined,
+        lookup: safeTarget.lookup,
         headers: {
           accept: "*/*",
           "content-type": "application/json",
@@ -250,16 +345,17 @@ export function postStream(
       }
     );
 
-    req.on("timeout", () => {
-      req.destroy(new Error(`Upstream POST timed out after ${REQUEST_TIMEOUT_MS}ms`));
-    });
+      req.on("timeout", () => {
+        req.destroy(new Error(`Upstream POST timed out after ${REQUEST_TIMEOUT_MS}ms`));
+      });
 
-    req.on("error", (error) => {
-      reject(error);
-    });
+      req.on("error", (error) => {
+        reject(error);
+      });
 
-    req.write(payload);
-    req.end();
+      req.write(payload);
+      req.end();
+    }).catch(reject);
   });
 }
 
@@ -324,9 +420,10 @@ export function getStream(
   }> =>
     new Promise((resolve, reject) => {
       const target = new URL(currentUrl);
-      const transport = target.protocol === "https:" ? https : http;
+      void resolveSafeHttpTarget(target).then((safeTarget) => {
+        const transport = target.protocol === "https:" ? https : http;
 
-      const req = transport.request(
+        const req = transport.request(
         {
           protocol: target.protocol,
           hostname: target.hostname,
@@ -336,6 +433,7 @@ export function getStream(
           family: 4,
           timeout: REQUEST_TIMEOUT_MS,
           agent: proxyAgent ?? undefined,
+          lookup: safeTarget.lookup,
           headers,
         },
         (res) => {
@@ -366,7 +464,7 @@ export function getStream(
                 };
 
             res.resume();
-            requestWithRedirect(nextUrl, nextHeaders, redirectCount + 1)
+            void requestWithRedirect(nextUrl, nextHeaders, redirectCount + 1)
               .then(resolve)
               .catch(reject);
             return;
@@ -380,15 +478,16 @@ export function getStream(
         }
       );
 
-      req.on("timeout", () => {
-        req.destroy(new Error(`Upstream GET timed out after ${REQUEST_TIMEOUT_MS}ms`));
-      });
+        req.on("timeout", () => {
+          req.destroy(new Error(`Upstream GET timed out after ${REQUEST_TIMEOUT_MS}ms`));
+        });
 
-      req.on("error", (error) => {
-        reject(error);
-      });
+        req.on("error", (error) => {
+          reject(error);
+        });
 
-      req.end();
+        req.end();
+      }).catch(reject);
     });
 
   return requestWithRedirect(

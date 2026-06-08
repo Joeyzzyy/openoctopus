@@ -12,8 +12,6 @@ export type AssetStorageConfig = {
 
 export type PublicAssetStorageConfig = {
   provider: AssetStorageConfig["provider"];
-  inputBucket: string;
-  outputBucket: string;
   custom: boolean;
 };
 
@@ -66,8 +64,6 @@ export function getAssetStorageBucket(config: AssetStorageConfig, scope: AssetSt
 export function buildPublicAssetStorageConfig(config: AssetStorageConfig): PublicAssetStorageConfig {
   return {
     provider: config.provider,
-    inputBucket: config.inputBucket,
-    outputBucket: config.outputBucket,
     custom: config.custom,
   };
 }

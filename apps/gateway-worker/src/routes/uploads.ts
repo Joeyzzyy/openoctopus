@@ -10,7 +10,7 @@ import {
 import { supabaseAdmin } from "../lib/supabase.js";
 import { authenticateApiKey, RequestValidationError } from "../services/request-service.js";
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 const allowedMimeTypes = new Map([
   ["image/png", "png"],

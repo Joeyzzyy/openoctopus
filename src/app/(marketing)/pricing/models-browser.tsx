@@ -13,6 +13,8 @@ import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
 import { normalizeGatewayFileAssetUrl } from "@/lib/asset-urls";
 
+const MAX_PLAYGROUND_UPLOAD_BYTES = 10 * 1024 * 1024;
+
 type JsonSchemaField = {
   key: string;
   label: string;
@@ -98,8 +100,6 @@ type PlaygroundQueueInfo = {
 
 type PlaygroundAssetStorageInfo = {
   provider: string;
-  inputBucket: string;
-  outputBucket: string;
   custom: boolean;
 };
 
@@ -265,8 +265,6 @@ function readPlaygroundAssetStorageInfo(value: unknown): PlaygroundAssetStorageI
   const record = raw as Record<string, unknown>;
   return {
     provider: typeof record.provider === "string" ? record.provider : "supabase",
-    inputBucket: typeof record.inputBucket === "string" ? record.inputBucket : "",
-    outputBucket: typeof record.outputBucket === "string" ? record.outputBucket : "",
     custom: record.custom === true,
   };
 }
@@ -286,8 +284,7 @@ function playgroundQueueLabel(queue: PlaygroundQueueInfo | null, status: TaskSta
 
 function playgroundAssetStorageLabel(assetStorage: PlaygroundAssetStorageInfo | null) {
   if (!assetStorage?.custom) return null;
-  const bucket = assetStorage.outputBucket || assetStorage.inputBucket;
-  return `Custom asset storage: ${assetStorage.provider}${bucket ? ` / ${bucket}` : ""}`;
+  return `Custom asset storage: ${assetStorage.provider}`;
 }
 
 function decodeHtmlEntities(text: string) {
@@ -354,6 +351,23 @@ function looksLikeHtmlDocument(text: string) {
   return /^\s*<[^>]+>/.test(text);
 }
 
+function escapeHtmlAttribute(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function sanitizeReadmeHref(value: string) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
 function sanitizeReadmeHtml(html: string) {
   let sanitized = html;
 
@@ -376,9 +390,9 @@ function sanitizeReadmeHtml(html: string) {
     if (safeTag === "a") {
       const hrefMatch = String(rawAttrs).match(/\shref=(["'])(.*?)\1/i);
       const href = hrefMatch?.[2]?.trim() ?? "";
-      const safeHref = /^https?:\/\//i.test(href) ? href : "";
+      const safeHref = sanitizeReadmeHref(href);
       return safeHref
-        ? `<a href="${safeHref}" target="_blank" rel="noreferrer">`
+        ? `<a href="${escapeHtmlAttribute(safeHref)}" target="_blank" rel="noreferrer">`
         : "<a>";
     }
 
@@ -2422,6 +2436,14 @@ export function ModelsBrowser({
     if (selectedFiles.length === 0) return;
     const uploadLimit = getUploadLimit(field);
     const isSingleBaseSlot = isSingleBaseImageSlotField(field);
+    const oversizedFile = selectedFiles.find((file) => file.size > MAX_PLAYGROUND_UPLOAD_BYTES);
+    if (oversizedFile) {
+      setValidationErrors((current) => ({
+        ...current,
+        [field.key]: oversizedFile.name + " is larger than the 10MB upload limit.",
+      }));
+      return;
+    }
 
     if (uploadLimit !== null) {
       const existingCount = playgroundUploads[field.key]?.length ?? 0;
@@ -2705,6 +2727,9 @@ export function ModelsBrowser({
       });
       if (!blob) {
         throw new Error("Failed to export mask image.");
+      }
+      if (blob.size > MAX_PLAYGROUND_UPLOAD_BYTES) {
+        throw new Error("Generated mask is larger than the 10MB upload limit.");
       }
 
       const formData = new FormData();

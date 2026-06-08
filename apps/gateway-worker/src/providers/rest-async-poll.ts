@@ -1,5 +1,6 @@
 import { getJson, postJson } from "../lib/http.js";
 import { env } from "../config.js";
+import { appendFileAccessToken } from "../lib/file-access-token.js";
 import { classifyUpstreamError } from "./upstream-error.js";
 import type {
   Capability,
@@ -256,7 +257,7 @@ function buildAuthConfig(cfg: Record<string, unknown>, secret: string) {
     const headerName = readString(cfg.authHeaderName, "x-api-key");
     return {
       headers: { [headerName]: secret },
-      applyQuery: (_url: URL) => {},
+      applyQuery: () => {},
     };
   }
   const headerName = readString(cfg.authHeaderName, "Authorization");
@@ -265,7 +266,7 @@ function buildAuthConfig(cfg: Record<string, unknown>, secret: string) {
     headers: {
       [headerName]: headerPrefix ? `${headerPrefix} ${secret}` : secret,
     },
-    applyQuery: (_url: URL) => {},
+    applyQuery: () => {},
   };
 }
 
@@ -313,9 +314,13 @@ function buildAssetFromResult(
 
     if (isGeminiFileDownload && requestId) {
       const path = `/v1/files/${encodeURIComponent(requestId)}/assets/0`;
-      const proxiedUrl = env.GATEWAY_PUBLIC_BASE_URL
+      const rawProxiedUrl = env.GATEWAY_PUBLIC_BASE_URL
         ? new URL(path, env.GATEWAY_PUBLIC_BASE_URL).toString()
         : path;
+      const proxiedUrl = appendFileAccessToken(rawProxiedUrl, {
+        requestId,
+        assetIndex: 0,
+      });
       return {
         url: proxiedUrl,
         sourceUrl: resultValue,
