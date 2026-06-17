@@ -14,6 +14,9 @@ type RequestState = "queued" | "processing" | "succeeded" | "failed" | "cancelle
 
 type DashboardDataOptions = {
   requestsPage?: number;
+  requestDetailsPage?: number;
+  requestGroupId?: string | null;
+  includeRequestDetails?: boolean;
   billingPage?: number;
   requestsApiKeyId?: string | null;
   analyticsLookbackMs?: number;
@@ -29,6 +32,82 @@ type AnalyticsRequestRow = {
   actual_cost: number | null;
   estimated_cost: number | null;
   created_at: string;
+};
+
+type RequestSummaryScanRow = {
+  id: string;
+  api_key_id: string | null;
+  request_source: string | null;
+  capability: string;
+  public_model_slug: string;
+  provider_id: string | null;
+  status: string;
+  actual_cost: number | null;
+  estimated_cost: number | null;
+  actual_customer_charge: number | null;
+  estimated_customer_charge: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+};
+
+type RequestListGroup = {
+  kind: "request" | "session";
+  id: string;
+  requestIds: string[];
+  latestRequest: RequestSummaryScanRow;
+  firstCreatedAt: string;
+  lastCreatedAt: string;
+  totalCost: number;
+  totalDurationMs: number;
+  durationCount: number;
+  succeededCount: number;
+  failedCount: number;
+  inflightCount: number;
+};
+
+type DashboardRequestQueueRow = {
+  rowKind: "request" | "session";
+  requestId: string;
+  requestCount: number;
+  createdAtLabel: string;
+  createdAtTitle: string;
+  apiKeyId: string | null;
+  apiKeyName: string;
+  requestSourceLabel: string;
+  capability: string;
+  model: string;
+  vendor: string;
+  status: RequestState;
+  latency: string;
+  cost: string;
+  promptText: string | null;
+  outputAssets: Array<{
+    type: string;
+    url: string;
+    mimeType: string | null;
+  }>;
+};
+
+type DashboardFullRequestRow = {
+  id: string;
+  api_key_id: string | null;
+  request_source: string | null;
+  capability: string;
+  public_model_slug: string;
+  provider_id: string | null;
+  status: string;
+  estimated_cost: number | null;
+  actual_cost: number | null;
+  estimated_customer_charge: number | null;
+  actual_customer_charge: number | null;
+  input_payload: unknown;
+  normalized_params: unknown;
+  output_payload: unknown;
+  created_at: string;
+  queued_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -77,13 +156,7 @@ function formatDashboardRequestCharge(
     status?: string | null;
   }
 ) {
-  const chargeValue = Number(
-    row.actual_customer_charge ??
-      row.estimated_customer_charge ??
-      row.actual_cost ??
-      row.estimated_cost ??
-      0
-  );
+  const chargeValue = getDashboardRequestChargeValue(row);
   if (chargeValue > 0) {
     return formatCurrency(chargeValue);
   }
@@ -93,6 +166,162 @@ function formatDashboardRequestCharge(
   }
 
   return formatCurrency(0);
+}
+
+function getDashboardRequestChargeValue(row: Record<string, unknown>) {
+  return Number(
+    row.actual_customer_charge ??
+      row.estimated_customer_charge ??
+      row.actual_cost ??
+      row.estimated_cost ??
+      0
+  );
+}
+
+function normalizeRequestGroupId(value: string | null | undefined) {
+  if (!value || !/^text-[0-9a-f-]{36}$/i.test(value)) {
+    return null;
+  }
+  return value;
+}
+
+function getRequestDurationMs(row: { started_at?: string | null; completed_at?: string | null }) {
+  if (!row.started_at || !row.completed_at) {
+    return null;
+  }
+  const startedAt = new Date(row.started_at).getTime();
+  const completedAt = new Date(row.completed_at).getTime();
+  if (!Number.isFinite(startedAt) || !Number.isFinite(completedAt) || completedAt < startedAt) {
+    return null;
+  }
+  return completedAt - startedAt;
+}
+
+function formatDurationFromMs(value: number | null) {
+  if (value === null) {
+    return "n/a";
+  }
+  return `${Math.max(1, Math.round(value / 1000))}s`;
+}
+
+function getRequestListGroupStatus(group: RequestListGroup): RequestState {
+  if (group.inflightCount > 0) {
+    return "processing";
+  }
+  if (group.failedCount > 0 && group.succeededCount === 0) {
+    return "failed";
+  }
+  if (group.failedCount > 0) {
+    return "failed";
+  }
+  return "succeeded";
+}
+
+function normalizeRequestState(value: string): RequestState {
+  if (value === "queued" || value === "processing" || value === "succeeded" || value === "failed" || value === "cancelled") {
+    return value;
+  }
+  if (value === "submitted") {
+    return "processing";
+  }
+  return "failed";
+}
+
+function buildRequestListGroups(rows: RequestSummaryScanRow[]) {
+  const groups: RequestListGroup[] = [];
+  const textRowsByKey = new Map<string, RequestSummaryScanRow[]>();
+
+  for (const row of rows) {
+    if (row.capability !== "text_generation") {
+      const durationMs = getRequestDurationMs(row);
+      groups.push({
+        kind: "request",
+        id: row.id,
+        requestIds: [row.id],
+        latestRequest: row,
+        firstCreatedAt: row.created_at,
+        lastCreatedAt: row.created_at,
+        totalCost: getDashboardRequestChargeValue(row as unknown as Record<string, unknown>),
+        totalDurationMs: durationMs ?? 0,
+        durationCount: durationMs === null ? 0 : 1,
+        succeededCount: row.status === "succeeded" ? 1 : 0,
+        failedCount: row.status === "failed" || row.status === "cancelled" ? 1 : 0,
+        inflightCount: row.status === "queued" || row.status === "submitted" || row.status === "processing" ? 1 : 0,
+      });
+      continue;
+    }
+
+    const key = [
+      row.api_key_id ?? "no-key",
+      row.request_source ?? "api",
+      row.public_model_slug,
+      row.provider_id ?? "no-provider",
+    ].join("|");
+    const keyRows = textRowsByKey.get(key) ?? [];
+    keyRows.push(row);
+    textRowsByKey.set(key, keyRows);
+  }
+
+  for (const keyRows of textRowsByKey.values()) {
+    const ascendingRows = [...keyRows].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    let sessionRows: RequestSummaryScanRow[] = [];
+    let previousCreatedAt: number | null = null;
+
+    const flushSession = () => {
+      if (sessionRows.length === 0) {
+        return;
+      }
+      const rowsNewestFirst = [...sessionRows].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      const latestRequest = rowsNewestFirst[0];
+      const durationValues = sessionRows
+        .map((row) => getRequestDurationMs(row))
+        .filter((value): value is number => value !== null);
+
+      groups.push({
+        kind: "session",
+        id: `text-${latestRequest.id}`,
+        requestIds: rowsNewestFirst.map((row) => row.id),
+        latestRequest,
+        firstCreatedAt: sessionRows[0].created_at,
+        lastCreatedAt: latestRequest.created_at,
+        totalCost: sessionRows.reduce(
+          (sum, row) => sum + getDashboardRequestChargeValue(row as unknown as Record<string, unknown>),
+          0
+        ),
+        totalDurationMs: durationValues.reduce((sum, value) => sum + value, 0),
+        durationCount: durationValues.length,
+        succeededCount: sessionRows.filter((row) => row.status === "succeeded").length,
+        failedCount: sessionRows.filter((row) => row.status === "failed" || row.status === "cancelled").length,
+        inflightCount: sessionRows.filter(
+          (row) => row.status === "queued" || row.status === "submitted" || row.status === "processing"
+        ).length,
+      });
+      sessionRows = [];
+      previousCreatedAt = null;
+    };
+
+    for (const row of ascendingRows) {
+      const createdAt = new Date(row.created_at).getTime();
+      if (
+        previousCreatedAt !== null &&
+        Number.isFinite(createdAt) &&
+        createdAt - previousCreatedAt > 60 * 60 * 1000
+      ) {
+        flushSession();
+      }
+      sessionRows.push(row);
+      previousCreatedAt = createdAt;
+    }
+    flushSession();
+  }
+
+  return groups.sort(
+    (a, b) => new Date(b.lastCreatedAt).getTime() - new Date(a.lastCreatedAt).getTime()
+  );
 }
 
 export type DashboardData = {
@@ -236,31 +465,21 @@ export type DashboardData = {
     total: number;
     totalPages: number;
   };
+  requestDetailsPagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+  selectedRequestGroupId: string | null;
   billingPagination: {
     page: number;
     pageSize: number;
     total: number;
     totalPages: number;
   };
-  requestQueueRows: Array<{
-    requestId: string;
-    createdAtLabel: string;
-    apiKeyId: string | null;
-    apiKeyName: string;
-    requestSourceLabel: string;
-    capability: string;
-    model: string;
-    vendor: string;
-    status: RequestState;
-    latency: string;
-    cost: string;
-    promptText: string | null;
-    outputAssets: Array<{
-      type: string;
-      url: string;
-      mimeType: string | null;
-    }>;
-  }>;
+  requestQueueRows: DashboardRequestQueueRow[];
+  requestDetailRows: DashboardRequestQueueRow[];
 };
 
 function formatCurrency(value: number | null | undefined) {
@@ -285,6 +504,120 @@ function formatTimestamp(value: string) {
     month: "2-digit",
     day: "2-digit",
   }).replace(/-/g, ".");
+}
+
+function formatTimestampTitle(value: string) {
+  return new Date(value).toLocaleString("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function summarizeDashboardFullRequestRow(
+  row: DashboardFullRequestRow,
+  input: {
+    keyNameById: Map<string, string>;
+    modelVendorBySlug: Map<string, string>;
+  }
+): DashboardRequestQueueRow {
+  const startedAt = row.started_at ? new Date(row.started_at).getTime() : null;
+  const completedAt = row.completed_at ? new Date(row.completed_at).getTime() : null;
+  const queuedAt = row.queued_at ? new Date(row.queued_at).getTime() : new Date(row.created_at).getTime();
+
+  let latency = "pending";
+  if (startedAt && completedAt && completedAt >= startedAt) {
+    latency = `${Math.round((completedAt - startedAt) / 1000)}s`;
+  } else if (startedAt) {
+    latency = `${Math.max(1, Math.round((Date.now() - startedAt) / 1000))}s`;
+  } else if (queuedAt) {
+    latency = "queueing";
+  }
+
+  const inputPayload = isRecord(row.input_payload) ? row.input_payload : null;
+  const normalizedParams = isRecord(row.normalized_params) ? row.normalized_params : null;
+  const outputPayload = isRecord(row.output_payload) ? row.output_payload : {};
+  const outputAssets = Array.isArray(outputPayload.assets)
+    ? outputPayload.assets
+        .filter((asset): asset is Record<string, unknown> => isRecord(asset))
+        .map((asset) => ({
+          type: typeof asset.type === "string" ? asset.type : "image",
+          mimeType: typeof asset.mimeType === "string" ? asset.mimeType : null,
+          url:
+            typeof asset.url === "string"
+              ? normalizeDashboardAssetUrl(
+                  asset.url,
+                  typeof asset.mimeType === "string" ? asset.mimeType : null
+                )
+              : "",
+        }))
+        .filter((asset) => asset.url.length > 0)
+    : [];
+
+  return {
+    rowKind: "request",
+    requestId: row.id,
+    requestCount: 1,
+    createdAtLabel: formatTimestamp(row.created_at),
+    createdAtTitle: formatTimestampTitle(row.created_at),
+    apiKeyId: row.api_key_id ?? null,
+    apiKeyName: row.api_key_id ? input.keyNameById.get(row.api_key_id) ?? "Unknown key" : "No key",
+    requestSourceLabel:
+      row.request_source === "playground"
+        ? "Playground"
+        : row.api_key_id
+          ? `API Key · ${input.keyNameById.get(row.api_key_id) ?? "Unknown key"}`
+          : "API",
+    capability: row.capability,
+    model: row.public_model_slug,
+    vendor: input.modelVendorBySlug.get(row.public_model_slug) ?? "Unknown vendor",
+    status: normalizeRequestState(row.status),
+    latency,
+    cost: formatDashboardRequestCharge(row as unknown as Record<string, unknown> & { status?: string | null }),
+    promptText: extractDashboardPromptText(normalizedParams, inputPayload),
+    outputAssets,
+  };
+}
+
+function summarizeDashboardSessionRow(
+  group: RequestListGroup,
+  input: {
+    keyNameById: Map<string, string>;
+    modelVendorBySlug: Map<string, string>;
+  }
+): DashboardRequestQueueRow {
+  const row = group.latestRequest;
+  return {
+    rowKind: "session",
+    requestId: group.id,
+    requestCount: group.requestIds.length,
+    createdAtLabel:
+      group.firstCreatedAt.slice(0, 10) === group.lastCreatedAt.slice(0, 10)
+        ? formatTimestamp(group.lastCreatedAt)
+        : `${formatTimestamp(group.firstCreatedAt)} - ${formatTimestamp(group.lastCreatedAt)}`,
+    createdAtTitle: `${formatTimestampTitle(group.firstCreatedAt)} - ${formatTimestampTitle(group.lastCreatedAt)}`,
+    apiKeyId: row.api_key_id ?? null,
+    apiKeyName: row.api_key_id ? input.keyNameById.get(row.api_key_id) ?? "Unknown key" : "No key",
+    requestSourceLabel:
+      row.request_source === "playground"
+        ? "Playground"
+        : row.api_key_id
+          ? `API Key · ${input.keyNameById.get(row.api_key_id) ?? "Unknown key"}`
+          : "API",
+    capability: row.capability,
+    model: row.public_model_slug,
+    vendor: input.modelVendorBySlug.get(row.public_model_slug) ?? "Unknown vendor",
+    status: getRequestListGroupStatus(group),
+    latency: formatDurationFromMs(
+      group.durationCount > 0 ? group.totalDurationMs / group.durationCount : null
+    ),
+    cost: formatCurrency(group.totalCost),
+    promptText: null,
+    outputAssets: [],
+  };
 }
 
 async function fetchAnalyticsRequests(
@@ -325,6 +658,51 @@ async function fetchAnalyticsRequests(
     }
 
     const batchRows = (response.data ?? []) as AnalyticsRequestRow[];
+    rows.push(...batchRows);
+
+    if (batchRows.length < batchSize) {
+      break;
+    }
+  }
+
+  return rows;
+}
+
+async function fetchRequestSummaryRows(
+  supabase:
+    | Awaited<ReturnType<typeof createClient>>
+    | ReturnType<typeof createAdminClient>,
+  input: {
+    workspaceId: string;
+    apiKeyId?: string | null;
+  }
+) {
+  const batchSize = 5000;
+  const maxBatches = 20;
+  const rows: RequestSummaryScanRow[] = [];
+
+  for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
+    const from = batchIndex * batchSize;
+    const to = from + batchSize - 1;
+    let query = supabase
+      .from("inference_requests")
+      .select(
+        "id, api_key_id, request_source, capability, public_model_slug, provider_id, status, actual_cost, estimated_cost, actual_customer_charge, estimated_customer_charge, started_at, completed_at, created_at"
+      )
+      .eq("workspace_id", input.workspaceId)
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (input.apiKeyId) {
+      query = query.eq("api_key_id", input.apiKeyId);
+    }
+
+    const response = await query;
+    if (response.error) {
+      break;
+    }
+
+    const batchRows = (response.data ?? []) as RequestSummaryScanRow[];
     rows.push(...batchRows);
 
     if (batchRows.length < batchSize) {
@@ -385,10 +763,17 @@ function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardDa
     analyticsRequests: [],
     requestPagination: {
       page: 1,
+      pageSize: 20,
+      total: 0,
+      totalPages: 1,
+    },
+    requestDetailsPagination: {
+      page: 1,
       pageSize: 10,
       total: 0,
       totalPages: 1,
     },
+    selectedRequestGroupId: null,
     billingPagination: {
       page: 1,
       pageSize: 5,
@@ -396,6 +781,7 @@ function buildEmptyDashboard(user: DashboardData["user"], workspace: DashboardDa
       totalPages: 1,
     },
     requestQueueRows: [],
+    requestDetailRows: [],
   };
 }
 
@@ -529,6 +915,9 @@ async function buildStripeInvoiceUrlMapBySessionId(sessionIds: string[]) {
 
 export async function getDashboardData({
   requestsPage = 1,
+  requestDetailsPage = 1,
+  requestGroupId = null,
+  includeRequestDetails = true,
   billingPage = 1,
   requestsApiKeyId = null,
   analyticsLookbackMs = 24 * 60 * 60 * 1000,
@@ -608,9 +997,14 @@ export async function getDashboardData({
     };
 
     const pageSize = 20;
+    const requestDetailsPageSize = 10;
     const normalizedRequestsPage = Math.max(1, Math.floor(requestsPage));
+    const normalizedRequestDetailsPage = Math.max(1, Math.floor(requestDetailsPage));
+    const normalizedRequestGroupId = normalizeRequestGroupId(requestGroupId);
     const requestFrom = (normalizedRequestsPage - 1) * pageSize;
     const requestTo = requestFrom + pageSize - 1;
+    const requestDetailsFrom = (normalizedRequestDetailsPage - 1) * requestDetailsPageSize;
+    const requestDetailsTo = requestDetailsFrom + requestDetailsPageSize - 1;
     const billingPageSize = 5;
     const normalizedBillingPage = Math.max(1, Math.floor(billingPage));
     const billingFrom = (normalizedBillingPage - 1) * billingPageSize;
@@ -671,24 +1065,13 @@ export async function getDashboardData({
     const safeAnalyticsApiKeyId =
       analyticsApiKeyId && keyIdSet.has(analyticsApiKeyId) ? analyticsApiKeyId : null;
 
-    const [requestResponse, analyticsRequestRows] = await Promise.all([
-      (() => {
-        let query = supabaseAdmin
-          .from("inference_requests")
-          .select(
-            "id, api_key_id, request_source, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, input_payload, normalized_params, output_payload, created_at, queued_at, started_at, completed_at",
-            { count: "exact" }
-          )
-          .eq("workspace_id", workspace.id)
-          .order("created_at", { ascending: false })
-          .range(requestFrom, requestTo);
-
-        if (safeRequestsApiKeyId) {
-          query = query.eq("api_key_id", safeRequestsApiKeyId);
-        }
-
-        return query;
-      })(),
+    const [requestSummaryRows, analyticsRequestRows] = await Promise.all([
+      includeRequestDetails
+        ? fetchRequestSummaryRows(supabaseAdmin, {
+            workspaceId: workspace.id,
+            apiKeyId: safeRequestsApiKeyId,
+          })
+        : Promise.resolve([]),
       fetchAnalyticsRequests(supabaseAdmin, {
         workspaceId: workspace.id,
         apiKeyId: safeAnalyticsApiKeyId,
@@ -713,20 +1096,65 @@ export async function getDashboardData({
     const providerModels = providerModelResponse.error ? [] : providerModelResponse.data ?? [];
     const supportedModels = supportedModelResponse.error ? [] : supportedModelResponse.data ?? [];
     const routingRuleRows = routingRuleResponse.error ? [] : routingRuleResponse.data ?? [];
-    const requestRows = requestResponse.error ? [] : requestResponse.data ?? [];
-    const requestTotal = requestResponse.error ? 0 : requestResponse.count ?? 0;
     const analyticsRows = analyticsRequestRows ?? [];
+    const requestListGroups = buildRequestListGroups(requestSummaryRows);
+    const requestGroupsById = new Map(requestListGroups.map((group) => [group.id, group]));
+    const selectedRequestGroup =
+      normalizedRequestGroupId && requestGroupsById.get(normalizedRequestGroupId)?.kind === "session"
+        ? requestGroupsById.get(normalizedRequestGroupId) ?? null
+        : null;
+    const requestListPageGroups = requestListGroups.slice(requestFrom, requestTo + 1);
+    const requestRawIdsForPage = requestListPageGroups
+      .filter((group) => group.kind === "request")
+      .map((group) => group.latestRequest.id);
+    const requestDetailIds = selectedRequestGroup
+      ? selectedRequestGroup.requestIds.slice(requestDetailsFrom, requestDetailsTo + 1)
+      : [];
     const providerNameById = new Map(providers.map((row) => [row.id, row.name]));
     const modelVendorBySlug = new Map(
       supportedModels.map((row) => [row.model_slug, typeof row.provider === "string" && row.provider.trim().length > 0 ? row.provider : "Unknown vendor"])
     );
+    const fullRequestIds = Array.from(new Set([...requestRawIdsForPage, ...requestDetailIds]));
+    const fullRequestRows =
+      fullRequestIds.length > 0
+        ? (
+            await supabaseAdmin
+              .from("inference_requests")
+              .select(
+                "id, api_key_id, request_source, capability, public_model_slug, provider_id, status, estimated_cost, actual_cost, estimated_customer_charge, actual_customer_charge, input_payload, normalized_params, output_payload, created_at, queued_at, started_at, completed_at"
+              )
+              .eq("workspace_id", workspace.id)
+              .in("id", fullRequestIds)
+          ).data ?? []
+        : [];
+    const fullRequestRowById = new Map(
+      (fullRequestRows as DashboardFullRequestRow[]).map((row) => [row.id, row])
+    );
+    const requestQueueRows = requestListPageGroups
+      .map((group) => {
+        if (group.kind === "session") {
+          return summarizeDashboardSessionRow(group, { keyNameById, modelVendorBySlug });
+        }
+        const row = fullRequestRowById.get(group.latestRequest.id);
+        return row
+          ? summarizeDashboardFullRequestRow(row, { keyNameById, modelVendorBySlug })
+          : summarizeDashboardSessionRow(group, { keyNameById, modelVendorBySlug });
+      })
+      .map((row) => ({
+        ...row,
+        rowKind: requestGroupsById.get(row.requestId)?.kind ?? row.rowKind,
+      }));
+    const requestDetailRows = requestDetailIds
+      .map((id) => fullRequestRowById.get(id))
+      .filter((row): row is DashboardFullRequestRow => Boolean(row))
+      .map((row) => summarizeDashboardFullRequestRow(row, { keyNameById, modelVendorBySlug }));
     const providerById = new Map(providers.map((row) => [row.id, row]));
     const providerModelById = new Map(providerModels.map((row) => [row.id, row]));
     const modelsPerProvider = providerModels.reduce((acc, row) => {
       acc.set(row.provider_id, (acc.get(row.provider_id) ?? 0) + 1);
       return acc;
     }, new Map<string, number>());
-    const queuePerProvider = requestRows.reduce((acc, row) => {
+    const queuePerProvider = requestSummaryRows.reduce((acc, row) => {
       if (!row.provider_id || (row.status !== "queued" && row.status !== "processing")) {
         return acc;
       }
@@ -912,73 +1340,6 @@ export async function getDashboardData({
               : null,
         };
       });
-
-    const requestQueueRows = requestRows.map((row) => {
-      const startedAt = row.started_at ? new Date(row.started_at).getTime() : null;
-      const completedAt = row.completed_at ? new Date(row.completed_at).getTime() : null;
-      const queuedAt = row.queued_at ? new Date(row.queued_at).getTime() : new Date(row.created_at).getTime();
-
-      let latency = "pending";
-      if (startedAt && completedAt && completedAt >= startedAt) {
-        latency = `${Math.round((completedAt - startedAt) / 1000)}s`;
-      } else if (startedAt) {
-        latency = `${Math.max(1, Math.round((Date.now() - startedAt) / 1000))}s`;
-      } else if (queuedAt) {
-        latency = "queueing";
-      }
-
-      const inputPayload = isRecord((row as { input_payload?: unknown }).input_payload)
-        ? ((row as { input_payload?: unknown }).input_payload as Record<string, unknown>)
-        : null;
-      const normalizedParams = isRecord((row as { normalized_params?: unknown }).normalized_params)
-        ? ((row as { normalized_params?: unknown }).normalized_params as Record<string, unknown>)
-        : null;
-      const outputPayload = isRecord((row as { output_payload?: unknown }).output_payload)
-        ? ((row as { output_payload?: unknown }).output_payload as Record<string, unknown>)
-        : {};
-      const outputAssets = Array.isArray(outputPayload.assets)
-        ? outputPayload.assets
-            .filter((asset): asset is Record<string, unknown> => isRecord(asset))
-            .map((asset) => ({
-              type: typeof asset.type === "string" ? asset.type : "image",
-              mimeType: typeof asset.mimeType === "string" ? asset.mimeType : null,
-              url:
-                typeof asset.url === "string"
-                  ? normalizeDashboardAssetUrl(
-                      asset.url,
-                      typeof asset.mimeType === "string" ? asset.mimeType : null
-                    )
-                  : "",
-            }))
-            .filter((asset) => asset.url.length > 0)
-        : [];
-
-      return {
-        requestId: row.id,
-        createdAtLabel: formatTimestamp(row.created_at),
-        apiKeyId: row.api_key_id ?? null,
-        apiKeyName: row.api_key_id ? keyNameById.get(row.api_key_id) ?? "Unknown key" : "No key",
-        requestSourceLabel:
-          row.request_source === "playground"
-            ? "Playground"
-            : row.api_key_id
-              ? `API Key · ${keyNameById.get(row.api_key_id) ?? "Unknown key"}`
-              : "API",
-        capability: row.capability,
-        model: row.public_model_slug,
-        vendor: modelVendorBySlug.get(row.public_model_slug) ?? "Unknown vendor",
-        status:
-          row.status === "queued" || row.status === "processing" || row.status === "succeeded" || row.status === "failed"
-            ? (row.status as RequestState)
-            : row.status === "submitted"
-              ? "processing"
-              : "failed",
-        latency,
-        cost: formatDashboardRequestCharge(row as Record<string, unknown> & { status?: string | null }),
-        promptText: extractDashboardPromptText(normalizedParams, inputPayload),
-        outputAssets,
-      };
-    });
 
     return {
       user: userView,
@@ -1209,9 +1570,19 @@ export async function getDashboardData({
       requestPagination: {
         page: normalizedRequestsPage,
         pageSize,
-        total: requestTotal,
-        totalPages: Math.max(1, Math.ceil(requestTotal / pageSize)),
+        total: requestListGroups.length,
+        totalPages: Math.max(1, Math.ceil(requestListGroups.length / pageSize)),
       },
+      requestDetailsPagination: {
+        page: normalizedRequestDetailsPage,
+        pageSize: requestDetailsPageSize,
+        total: selectedRequestGroup?.requestIds.length ?? 0,
+        totalPages: Math.max(
+          1,
+          Math.ceil((selectedRequestGroup?.requestIds.length ?? 0) / requestDetailsPageSize)
+        ),
+      },
+      selectedRequestGroupId: selectedRequestGroup?.id ?? null,
       billingPagination: {
         page: normalizedBillingPage,
         pageSize: billingPageSize,
@@ -1222,6 +1593,7 @@ export async function getDashboardData({
         ),
       },
       requestQueueRows,
+      requestDetailRows,
     };
   } catch {
     return buildEmptyDashboard(userView, null);
