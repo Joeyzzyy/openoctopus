@@ -13,7 +13,7 @@ import { ApiQuickstartCard } from "@/app/dashboard/api-quickstart-card";
 import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
 import { buildDisplayImageUrl, extractDocumentAnalysis, extractImageAssets, extractTextOutput, extractVideoAssets, imageExtensionFromMimeType, replaceFileExtension, type PlaygroundImageAsset } from "./playground-output-utils";
 import { HtmlReadme, MarkdownChatMessage, MarkdownReadme, ReadmeSeoHeading, looksLikeHtmlDocument } from "./readme-renderers";
-import { appendUploadLimitText, canUseHistoryImageForField, getUploadAccept, getUploadFieldKind, getUploadHelpText, getUploadLimit, getUploadTitle, isEditableBaseImageField, isImageUploadField, isMaskUploadField, isMultipleUploadField, isSingleBaseImageSlotField, isUploadField, pickPlaygroundExampleForField, type JsonSchemaField } from "./upload-field-utils";
+import { appendUploadLimitText, canUseHistoryImageForField, getUploadAccept, getUploadFieldKind, getUploadHelpText, getUploadLimit, getUploadTitle, isEditableBaseImageField, isImageUploadField, isMaskUploadField, isMultipleUploadField, isUploadField, pickPlaygroundExampleForField, type JsonSchemaField } from "./upload-field-utils";
 
 const MAX_PLAYGROUND_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -1343,7 +1343,6 @@ export function ModelsBrowser({
     const selectedFiles = Array.from(files ?? []);
     if (selectedFiles.length === 0) return;
     const uploadLimit = getUploadLimit(field);
-    const isSingleBaseSlot = isSingleBaseImageSlotField(field);
     const oversizedFile = selectedFiles.find((file) => file.size > MAX_PLAYGROUND_UPLOAD_BYTES);
     if (oversizedFile) {
       setValidationErrors((current) => ({
@@ -1355,7 +1354,7 @@ export function ModelsBrowser({
 
     if (uploadLimit !== null) {
       const existingCount = playgroundUploads[field.key]?.length ?? 0;
-      const allowedRemaining = isSingleBaseSlot ? uploadLimit : Math.max(0, uploadLimit - existingCount);
+      const allowedRemaining = Math.max(0, uploadLimit - existingCount);
       if (allowedRemaining <= 0) {
         setValidationErrors((current) => ({
           ...current,
@@ -1423,9 +1422,7 @@ export function ModelsBrowser({
 
       setPlaygroundUploads((current) => ({
         ...current,
-        [field.key]: isSingleBaseSlot
-          ? uploaded.slice(0, 1)
-          : isMultipleUploadField(field)
+        [field.key]: isMultipleUploadField(field)
           ? [...(current[field.key] ?? []), ...uploaded]
           : uploaded.slice(0, 1),
       }));

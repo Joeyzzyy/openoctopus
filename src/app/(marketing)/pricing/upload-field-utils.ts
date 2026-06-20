@@ -153,10 +153,6 @@ export function canUseHistoryImageForField(field: JsonSchemaField) {
   return !["faceimage", "maskimage"].includes(normalized);
 }
 
-export function isSingleBaseImageSlotField(field: JsonSchemaField) {
-  return normalizeImageFieldKey(field.key) === "images";
-}
-
 export function pickPlaygroundExampleForField(
   field: JsonSchemaField,
   examples: ModelDocRow["playgroundInputExamples"]
@@ -226,4 +222,3 @@ export function getUploadTitle(kind: UploadFieldKind) {
   if (kind === "document") return "document";
   return "image";
 }
-
