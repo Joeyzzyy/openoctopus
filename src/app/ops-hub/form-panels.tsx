@@ -50,18 +50,6 @@ type ExecutionConfigPresetOption = {
   inputSchemaText?: string;
   outputSchemaText?: string;
   active?: boolean;
-  showcaseCoverUrl?: string | null;
-  playgroundInputUrl?: string | null;
-  facePlaygroundInputUrl?: string | null;
-  showcaseGalleryUrls?: string[];
-  showcaseCoverPrompt?: string;
-  playgroundInputPrompt?: string;
-  facePlaygroundInputPrompt?: string;
-  showcaseGalleryPrompts?: string[];
-  showcaseCoverAssetId?: string;
-  playgroundInputAssetId?: string;
-  facePlaygroundInputAssetId?: string;
-  showcaseGalleryAssetIds?: string[];
 };
 type ProviderModelRootTab = "manage" | "source-doc";
 
@@ -399,6 +387,23 @@ Structure:
 ## Pro tips for best quality
 
 ## Note`;
+
+function sanitizeCopiedExecutionConfigText(value?: string) {
+  if (!value?.trim()) {
+    return "";
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return value;
+    }
+    const { doc: _doc, playground: _playground, ...runtimeConfig } = parsed;
+    return JSON.stringify(runtimeConfig, null, 2);
+  } catch {
+    return value;
+  }
+}
 
 function randomFieldId() {
   return Math.random().toString(36).slice(2, 10);
@@ -3294,20 +3299,22 @@ export function CreateProviderModelForm({
   const effectiveDefaultInputSchema = selectedPreset?.inputSchemaText ?? defaultInputSchema;
   const effectiveDefaultOutputSchema = selectedPreset?.outputSchemaText ?? defaultOutputSchema;
   const effectiveDefaultExecutionTemplate = selectedPreset?.executionTemplate ?? defaultExecutionTemplate;
-  const effectiveDefaultExecutionConfig = selectedPreset?.executionConfigText ?? defaultExecutionConfig;
+  const effectiveDefaultExecutionConfig = selectedPreset
+    ? sanitizeCopiedExecutionConfigText(selectedPreset.executionConfigText)
+    : defaultExecutionConfig;
   const effectiveDefaultActive = selectedPreset?.active ?? defaultActive;
-  const effectiveShowcaseCoverUrl = selectedPreset?.showcaseCoverUrl ?? defaultShowcaseCoverUrl;
-  const effectivePlaygroundInputUrl = selectedPreset?.playgroundInputUrl ?? defaultPlaygroundInputUrl;
-  const effectiveFacePlaygroundInputUrl = selectedPreset?.facePlaygroundInputUrl ?? defaultFacePlaygroundInputUrl;
-  const effectiveShowcaseGalleryUrls = selectedPreset?.showcaseGalleryUrls ?? defaultShowcaseGalleryUrls;
-  const effectiveShowcaseCoverPrompt = selectedPreset?.showcaseCoverPrompt ?? defaultShowcaseCoverPrompt;
-  const effectivePlaygroundInputPrompt = selectedPreset?.playgroundInputPrompt ?? defaultPlaygroundInputPrompt;
-  const effectiveFacePlaygroundInputPrompt = selectedPreset?.facePlaygroundInputPrompt ?? defaultFacePlaygroundInputPrompt;
-  const effectiveShowcaseGalleryPrompts = selectedPreset?.showcaseGalleryPrompts ?? defaultShowcaseGalleryPrompts;
-  const effectiveShowcaseCoverAssetId = selectedPreset?.showcaseCoverAssetId ?? defaultShowcaseCoverAssetId;
-  const effectivePlaygroundInputAssetId = selectedPreset?.playgroundInputAssetId ?? defaultPlaygroundInputAssetId;
-  const effectiveFacePlaygroundInputAssetId = selectedPreset?.facePlaygroundInputAssetId ?? defaultFacePlaygroundInputAssetId;
-  const effectiveShowcaseGalleryAssetIds = selectedPreset?.showcaseGalleryAssetIds ?? defaultShowcaseGalleryAssetIds;
+  const effectiveShowcaseCoverUrl = defaultShowcaseCoverUrl;
+  const effectivePlaygroundInputUrl = defaultPlaygroundInputUrl;
+  const effectiveFacePlaygroundInputUrl = defaultFacePlaygroundInputUrl;
+  const effectiveShowcaseGalleryUrls = defaultShowcaseGalleryUrls;
+  const effectiveShowcaseCoverPrompt = defaultShowcaseCoverPrompt;
+  const effectivePlaygroundInputPrompt = defaultPlaygroundInputPrompt;
+  const effectiveFacePlaygroundInputPrompt = defaultFacePlaygroundInputPrompt;
+  const effectiveShowcaseGalleryPrompts = defaultShowcaseGalleryPrompts;
+  const effectiveShowcaseCoverAssetId = defaultShowcaseCoverAssetId;
+  const effectivePlaygroundInputAssetId = defaultPlaygroundInputAssetId;
+  const effectiveFacePlaygroundInputAssetId = defaultFacePlaygroundInputAssetId;
+  const effectiveShowcaseGalleryAssetIds = defaultShowcaseGalleryAssetIds;
   const templateSupportedModelId =
     supportedModels.find((item) => item.modelSlug === effectiveDefaultSupportedModelSlug)?.id ??
     fallbackSupportedModelId;
@@ -3990,14 +3997,13 @@ export function CreateProviderModelForm({
                     const nextPresetId = event.target.value;
                     setSelectedPresetId(nextPresetId);
                     if (!nextPresetId) return;
-                    if (!nextPresetId) return;
                   }}
                   disabled={disabled || executionConfigPresets.length === 0}
                   className={formSelectClassName}
                 >
                   <option value="">
                     {executionConfigPresets.length > 0
-                      ? "选择一个已配置映射并复制全部信息"
+                      ? "选择一个已配置映射并复制运行配置"
                       : "暂无可复制的其他模型映射"}
                   </option>
                   {executionConfigPresets.map((item) => (
@@ -4006,7 +4012,7 @@ export function CreateProviderModelForm({
                     </option>
                   ))}
                 </select>
-                <FieldHint help="会把基本信息、调用协议、输入输出参数、示例素材和供应商成本等已存配置一起带过来。" />
+                <FieldHint help="只复制调用协议、输入输出参数、资产存储、队列和供应商成本；不会复制 README、Playground prompt options、默认提示词或示例素材。" />
               </label>
               <label className="block">
                 <select

@@ -276,13 +276,6 @@ function stripFacePlaygroundPrompt(value: string | null) {
 }
 
 function buildProviderModelPreset(mapping: ProviderModelSummary) {
-  const coverAsset = mapping.showcaseAssets.find((asset) => asset.kind === "cover");
-  const playgroundInputAsset = mapping.showcaseAssets.find(isPrimaryPlaygroundInputAsset);
-  const facePlaygroundInputAsset = mapping.showcaseAssets.find(isFacePlaygroundInputAsset);
-  const galleryAssets = mapping.showcaseAssets.filter(
-    (asset) => asset.kind === "gallery" && !isFacePlaygroundInputAsset(asset)
-  );
-
   return {
     id: mapping.id,
     label: `${mapping.supportedModelName} / ${mapping.providerName} / ${mapping.upstream_model_slug}`,
@@ -295,18 +288,6 @@ function buildProviderModelPreset(mapping: ProviderModelSummary) {
     inputSchemaText: mapping.inputSchemaText,
     outputSchemaText: mapping.outputSchemaText,
     active: mapping.active,
-    showcaseCoverUrl: coverAsset?.publicUrl ?? null,
-    playgroundInputUrl: playgroundInputAsset?.publicUrl ?? null,
-    facePlaygroundInputUrl: facePlaygroundInputAsset?.publicUrl ?? null,
-    showcaseGalleryUrls: galleryAssets.map((asset) => asset.publicUrl),
-    showcaseCoverPrompt: coverAsset?.altText ?? "",
-    playgroundInputPrompt: playgroundInputAsset?.altText ?? "",
-    facePlaygroundInputPrompt: stripFacePlaygroundPrompt(facePlaygroundInputAsset?.altText ?? null),
-    showcaseGalleryPrompts: galleryAssets.map((asset) => asset.altText ?? ""),
-    showcaseCoverAssetId: coverAsset?.id,
-    playgroundInputAssetId: playgroundInputAsset?.id,
-    facePlaygroundInputAssetId: facePlaygroundInputAsset?.id,
-    showcaseGalleryAssetIds: galleryAssets.map((asset) => asset.id),
   };
 }
 
