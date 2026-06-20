@@ -3459,6 +3459,9 @@ export function AssetStorageCredentialsPanel({
                 <p className="mt-1 max-w-[520px] break-all text-xs text-black/50">
                   {credential.endpoint ?? "未填 endpoint"} · {credential.public_base_url ?? "未填 public URL"}
                 </p>
+                <p className="mt-1 max-w-[520px] break-all text-xs text-black/50">
+                  Credential ID: <span className="select-all font-mono text-black/65">{credential.id}</span>
+                </p>
                 <p className="mt-1 text-xs text-black/50">
                   Key: {credential.accessKeyIdMask} / {credential.accessKeySecretMask}
                 </p>
@@ -3470,6 +3473,10 @@ export function AssetStorageCredentialsPanel({
                   {({ close }) => (
                     <ManagedDialogForm action={updateProviderAssetStorageCredential} close={close}>
                       <input type="hidden" name="credentialId" value={credential.id} />
+                      <div className="rounded-xl border border-[#DDF4FF] bg-[#F8FCFF] px-3 py-2">
+                        <p className="text-[11px] tracking-[0.35px] text-black/45">Credential ID</p>
+                        <p className="mt-1 select-all break-all font-mono text-xs text-black/65">{credential.id}</p>
+                      </div>
                       <FormField label="名称" name="label" defaultValue={credential.label} required />
                       <FormSelect
                         label="存储类型"
