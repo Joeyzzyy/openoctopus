@@ -3753,6 +3753,17 @@ const providerModelAutofillSchema = z.object({
   sourceLabel: z.string().trim().max(500).optional(),
 });
 
+const readmeMarkdownRewriteSchema = z.object({
+  sourceText: z.string().trim().min(20).max(400_000),
+  sourceLabel: z.string().trim().max(500).optional(),
+  modelName: z.string().trim().max(200).optional(),
+  modelSlug: z.string().trim().max(200).optional(),
+  upstreamModelSlug: z.string().trim().max(200).optional(),
+  pricingText: z.string().trim().max(30_000).optional(),
+  inputSchemaText: z.string().trim().max(30_000).optional(),
+  outputSchemaText: z.string().trim().max(30_000).optional(),
+});
+
 const providerModelAutofillResultSchema = z.object({
   pricing: z.record(z.string(), z.unknown()).default({}),
   inputSchema: z.record(z.string(), z.unknown()).default({}),
@@ -3912,6 +3923,12 @@ function safeJsonParseObject(text: string) {
   }
 }
 
+function stripMarkdownCodeFence(text: string) {
+  const trimmed = text.trim();
+  const match = trimmed.match(/^```{3,4}(?:markdown|md)?\s*([\s\S]*?)\s*```{3,4}$/i);
+  return (match?.[1] ?? trimmed).trim();
+}
+
 async function requestDeepSeekJsonObject(input: {
   apiKey: string;
   prompt: string;
@@ -3947,6 +3964,166 @@ async function requestDeepSeekJsonObject(input: {
   })();
 
   return { response, json, text, inputTokens, outputTokens, totalTokens };
+}
+
+export async function generateReadmeMarkdownFromSource(input: {
+  sourceText: string;
+  sourceLabel?: string;
+  modelName?: string;
+  modelSlug?: string;
+  upstreamModelSlug?: string;
+  pricingText?: string;
+  inputSchemaText?: string;
+  outputSchemaText?: string;
+}) {
+  const startedAt = Date.now();
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const actorUserId = /^[0-9a-f-]{36}$/i.test(userId) ? userId : null;
+  const usageWorkspaceId = normalizeUsageWorkspaceId(workspaceId);
+
+  try {
+    const parsedInput = readmeMarkdownRewriteSchema.parse(input);
+    const apiKey = process.env.INTERNAL_DEEPSEEK_API_KEY ?? process.env.DEEPSEEK_API_KEY;
+    ensureProxyEnvForDeepSeek();
+
+    if (!apiKey) {
+      return { ok: false as const, error: "Missing INTERNAL_DEEPSEEK_API_KEY" };
+    }
+
+    const compactSourceText = parsedInput.sourceText
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .trim()
+      .slice(0, 120_000);
+    const sourceLabel = parsedInput.sourceLabel?.trim() || "manual://pasted-readme";
+    const prompt = [
+      "You rewrite third-party or upstream model README content into the OpenOctopus internal README format.",
+      "Return ONLY a strict JSON object. Do not include markdown fences outside JSON.",
+      "JSON top-level key must be exactly: readmeMarkdown",
+      "readmeMarkdown must be raw markdown source as a string.",
+      "",
+      "Rules:",
+      "- Keep facts grounded in the provided source and model metadata.",
+      "- Do not mention competitors, upstream marketplaces, or copy source branding claims unless they are the actual model/provider name.",
+      "- Do not invent pricing. If explicit pricing is unavailable, write that pricing depends on configured billing or selected options.",
+      "- Keep tone factual, concise, and product-oriented.",
+      "- Use exactly one H1 title.",
+      "- Use these sections in this exact order:",
+      "# <Model Name>",
+      "> Short SEO summary",
+      "## Overview",
+      "## Why it looks great",
+      "## Limits and Performance",
+      "## Pricing",
+      "### Billing Rule",
+      "## How to Use",
+      "## Input Parameters",
+      "## Output Format",
+      "## Pro tips for best quality",
+      "## Note",
+      "",
+      "Formatting rules:",
+      "- Use markdown tables for Input Parameters and Pricing when useful.",
+      "- Use bullet lists for capabilities, limits, output format, and tips.",
+      "- Do not include HTML.",
+      "- Do not include placeholder text.",
+      "",
+      `Model Name: ${parsedInput.modelName ?? ""}`,
+      `Public Model Slug: ${parsedInput.modelSlug ?? ""}`,
+      `Upstream Model Slug: ${parsedInput.upstreamModelSlug ?? ""}`,
+      "",
+      "Current internal pricing JSON, if available:",
+      parsedInput.pricingText ?? "",
+      "",
+      "Current internal input schema JSON, if available:",
+      parsedInput.inputSchemaText ?? "",
+      "",
+      "Current internal output schema JSON, if available:",
+      parsedInput.outputSchemaText ?? "",
+      "",
+      `Source Label: ${sourceLabel}`,
+      "Source README or documentation content:",
+      compactSourceText,
+    ].join("\n");
+
+    let result = await requestDeepSeekJsonObject({ apiKey, prompt });
+    let parsedResult = safeJsonParseObject(result.text);
+    if (!result.response.ok || !parsedResult || typeof parsedResult.readmeMarkdown !== "string") {
+      const repairPrompt = [
+        "Convert the following content into strict JSON with exactly one key readmeMarkdown.",
+        "The value must be raw markdown source following the required README section structure.",
+        "Return JSON only.",
+        result.text || JSON.stringify(result.json),
+      ].join("\n");
+      result = await requestDeepSeekJsonObject({ apiKey, prompt: repairPrompt });
+      parsedResult = safeJsonParseObject(result.text);
+    }
+
+    const readmeMarkdown =
+      parsedResult && typeof parsedResult.readmeMarkdown === "string"
+        ? stripMarkdownCodeFence(parsedResult.readmeMarkdown)
+        : "";
+    const estimatedCostUsd = estimateDeepSeekCostUsd(result.inputTokens, result.outputTokens);
+
+    if (!result.response.ok || !readmeMarkdown) {
+      const errorMessage =
+        typeof ((result.json.error as Record<string, unknown> | undefined)?.message) === "string"
+          ? ((result.json.error as Record<string, unknown>).message as string)
+          : "DeepSeek README rewrite failed";
+      await supabase.from("internal_model_ai_usage_logs").insert({
+        workspace_id: usageWorkspaceId,
+        actor_user_id: actorUserId,
+        source_url: sourceLabel,
+        model: "deepseek-chat",
+        status: "failed",
+        input_tokens: result.inputTokens,
+        output_tokens: result.outputTokens,
+        total_tokens: result.totalTokens,
+        estimated_cost_usd: estimatedCostUsd,
+        latency_ms: Date.now() - startedAt,
+        error_message: errorMessage.slice(0, 4000),
+        raw_response: result.json,
+      });
+      return { ok: false as const, error: errorMessage };
+    }
+
+    await supabase.from("internal_model_ai_usage_logs").insert({
+      workspace_id: usageWorkspaceId,
+      actor_user_id: actorUserId,
+      source_url: sourceLabel,
+      model: "deepseek-chat",
+      status: "succeeded",
+      input_tokens: result.inputTokens,
+      output_tokens: result.outputTokens,
+      total_tokens: result.totalTokens,
+      estimated_cost_usd: estimatedCostUsd,
+      latency_ms: Date.now() - startedAt,
+      result_payload: { readmeMarkdown },
+    });
+
+    await logAdminAudit({
+      supabase,
+      userId,
+      workspaceId,
+      action: "provider_model.readme.rewrite",
+      targetType: "provider_model",
+      summary: "Rewrote provider model README from pasted content",
+      details: {
+        sourceLabel,
+        model: "deepseek-chat",
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        totalTokens: result.totalTokens,
+        estimatedCostUsd,
+      },
+    });
+
+    revalidatePath("/ops-hub");
+    return { ok: true as const, data: { readmeMarkdown } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "README rewrite failed";
+    return { ok: false as const, error: message };
+  }
 }
 
 export async function generateProviderModelDraftFromSource(input: {

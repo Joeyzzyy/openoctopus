@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   createProviderModel,
   createRoutingRule,
+  generateReadmeMarkdownFromSource,
   generateProviderModelDraftFromSource,
 } from "./actions";
 import { SubmitButton } from "./submit-button";
@@ -3350,12 +3351,14 @@ export function CreateProviderModelForm({
   const [autofillSummary, setAutofillSummary] = useState("");
   const [autofillPreviewJson, setAutofillPreviewJson] = useState("");
   const [autofillDebugRawOutput, setAutofillDebugRawOutput] = useState("");
+  const [readmeRewriteSourceText, setReadmeRewriteSourceText] = useState("");
   const [seedInputSchemaText, setSeedInputSchemaText] = useState("");
   const [seedOutputSchemaText, setSeedOutputSchemaText] = useState("");
   const [seedPricingText, setSeedPricingText] = useState(effectiveDefaultPricing ?? "");
   const [currentInputSchemaText, setCurrentInputSchemaText] = useState(effectiveDefaultInputSchema);
   const [currentOutputSchemaText, setCurrentOutputSchemaText] = useState(effectiveDefaultOutputSchema);
   const [isAutofilling, startAutofillTransition] = useTransition();
+  const [isRewritingReadme, startReadmeRewriteTransition] = useTransition();
   const executionConfigValue = buildExecutionConfigValue(executionConfigState);
   const templateIsAsync =
     executionTemplate === "rest-async-poll-v1" || executionTemplate === "upload-async-poll-v1";
@@ -3406,6 +3409,7 @@ export function CreateProviderModelForm({
     setAutofillSummary("");
     setAutofillPreviewJson("");
     setAutofillDebugRawOutput("");
+    setReadmeRewriteSourceText("");
     setSeedInputSchemaText("");
     setSeedOutputSchemaText("");
     setSeedPricingText(effectiveDefaultPricing ?? "");
@@ -3457,6 +3461,35 @@ export function CreateProviderModelForm({
       );
       toast.success("已完成自动识别并填充");
       setActiveTab("cost");
+    });
+  };
+
+  const runReadmeRewrite = () => {
+    const sourceText = readmeRewriteSourceText.trim();
+    if (!sourceText) {
+      toast.error("请先粘贴要改写的 README");
+      return;
+    }
+
+    startReadmeRewriteTransition(async () => {
+      const result = await generateReadmeMarkdownFromSource({
+        sourceText,
+        modelName: selectedSupportedModel?.displayName ?? upstreamModelSlug,
+        modelSlug: selectedSupportedModel?.modelSlug,
+        upstreamModelSlug,
+        pricingText: seedPricingText,
+        inputSchemaText: currentInputSchemaText,
+        outputSchemaText: currentOutputSchemaText,
+      });
+      if (!result.ok) {
+        toast.error(result.error || "README 改写失败");
+        return;
+      }
+      setExecutionConfigState((current) => ({
+        ...current,
+        docReadmeMarkdown: result.data.readmeMarkdown,
+      }));
+      toast.success("已改写并填入 README Markdown");
     });
   };
 
@@ -4623,6 +4656,27 @@ export function CreateProviderModelForm({
                 placeholder={"# google/imagen4\n\n> Short model summary for SEO and user education.\n\n## Overview\n\n- **Endpoint**: `https://api.example.com/...`\n- **Model ID**: `google/imagen4`"}
               />
             </label>
+            <div className="rounded-xl border border-[#BAE6FD] bg-white p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[11px] tracking-[0.35px] text-black/60">README 自动改写（粘贴外部 README 后转成 OpenOctopus 格式）</p>
+                <button
+                  type="button"
+                  onClick={runReadmeRewrite}
+                  disabled={disabled || isRewritingReadme || !readmeRewriteSourceText.trim()}
+                  className="inline-flex h-7 items-center rounded border border-[#7DD3FC]/45 bg-white px-2 text-[11px] text-black/70 hover:bg-[#E0F2FE] disabled:cursor-not-allowed disabled:bg-black/[0.03] disabled:text-black/35"
+                >
+                  {isRewritingReadme ? "改写中..." : "AI 改写并填入"}
+                </button>
+              </div>
+              <textarea
+                value={readmeRewriteSourceText}
+                onChange={(event) => setReadmeRewriteSourceText(event.target.value)}
+                disabled={disabled || isRewritingReadme}
+                className={formTextAreaClassName}
+                rows={8}
+                placeholder="粘贴其他来源的 README、模型说明、价格说明或 API 文档片段。系统会按固定结构改写，并填入上方 README Markdown。"
+              />
+            </div>
             <div className="rounded-xl border border-[#BAE6FD] bg-white p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-[11px] tracking-[0.35px] text-black/60">README 生成提示词（复制给模型生成 markdown）</p>
