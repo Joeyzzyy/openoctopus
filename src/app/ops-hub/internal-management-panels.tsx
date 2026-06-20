@@ -329,6 +329,14 @@ type InternalModelAiUsageLogSummary = {
   createdLabel: string;
 };
 
+type CoverageFilterValue = "all" | "has" | "missing";
+
+function coverageFilterMatches(filter: CoverageFilterValue, hasValue: boolean) {
+  if (filter === "has") return hasValue;
+  if (filter === "missing") return !hasValue;
+  return true;
+}
+
 const formInputClassName =
   "h-10 w-full rounded-md border border-[#BAE6FD] bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
 
@@ -628,16 +636,23 @@ type ProviderTemplate = {
 function ModalButton({
   children,
   tone = "default",
+  size = "default",
 }: {
   children: React.ReactNode;
   tone?: "default" | "secondary" | "primary";
+  size?: "default" | "large";
 }) {
+  const sizeClassName =
+    size === "large"
+      ? "h-11 min-w-[156px] justify-center px-5 text-sm"
+      : "h-9 px-3 text-xs";
+
   return (
     <span
       className={
         tone === "secondary"
-          ? "inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-[#BAE6FD] bg-white px-3 text-xs font-medium text-black/72 transition-colors hover:bg-[#E0F2FE]"
-          : "inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md bg-[#111827] px-3 text-xs font-medium text-white transition-colors hover:bg-[#0B1220]"
+          ? `inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-[#BAE6FD] bg-white font-medium text-black/72 transition-colors hover:bg-[#E0F2FE] ${sizeClassName}`
+          : `inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-md bg-[#111827] font-medium text-white transition-colors hover:bg-[#0B1220] ${sizeClassName}`
       }
     >
       {children}
@@ -1134,6 +1149,15 @@ export function PublicModelsPanel({
   const safeProviders = Array.isArray(providers) ? providers : [];
   const safeWorkerTemplates = Array.isArray(workerTemplates) ? workerTemplates : [];
   const safeModelTypeOptions = Array.isArray(modelTypeOptions) ? modelTypeOptions : [];
+  const [readmeCoverageFilter, setReadmeCoverageFilter] = useState<CoverageFilterValue>("all");
+  const [coverCoverageFilter, setCoverCoverageFilter] = useState<CoverageFilterValue>("all");
+  const [seoCoverageFilter, setSeoCoverageFilter] = useState<CoverageFilterValue>("all");
+  const [routeCoverageFilter, setRouteCoverageFilter] = useState<CoverageFilterValue>("all");
+  const coverageFilterOptions = [
+    { value: "all" as const, label: "全部" },
+    { value: "has" as const, label: "有" },
+    { value: "missing" as const, label: "无" },
+  ];
   const vendorSuggestions = Array.from(
     new Set([
       ...safeModelVendors.map((item) => item.name),
@@ -1172,6 +1196,45 @@ export function PublicModelsPanel({
     map.set(item.supported_model_id, list);
     return map;
   }, new Map<string, ProviderModelSummary[]>());
+  const supportedModelCoverageById = new Map(
+    models.map((model) => {
+      const mappings = providerModelsBySupportedModelId.get(model.id) ?? [];
+      const seoCoverage = readSeoCoverage(model.billingConfigText);
+      const modelRoutingRules = safeRoutingRules.filter((rule) => rule.supportedModelId === model.id);
+      const activeRoutingRule =
+        modelRoutingRules.find((rule) => rule.active && rule.scopeLabel.includes("全局")) ??
+        modelRoutingRules.find((rule) => rule.active) ??
+        modelRoutingRules[0] ??
+        null;
+      const hasRouting = Boolean(activeRoutingRule?.primary_provider_model_id);
+      const mappingCoverage = mappings.map(readProviderModelContentCoverage);
+      const hasReadme = mappingCoverage.some((coverage) => coverage.hasReadme);
+      const hasCover = mappingCoverage.some((coverage) => coverage.hasCover);
+
+      return [
+        model.id,
+        {
+          mappings,
+          seoCoverage,
+          activeRoutingRule,
+          hasRouting,
+          hasReadme,
+          hasCover,
+        },
+      ] as const;
+    })
+  );
+  const contentFilteredModels = models.filter((model) => {
+    const coverage = supportedModelCoverageById.get(model.id);
+    if (!coverage) return false;
+
+    return (
+      coverageFilterMatches(readmeCoverageFilter, coverage.hasReadme) &&
+      coverageFilterMatches(coverCoverageFilter, coverage.hasCover) &&
+      coverageFilterMatches(seoCoverageFilter, coverage.seoCoverage.isComplete) &&
+      coverageFilterMatches(routeCoverageFilter, coverage.hasRouting)
+    );
+  });
   const modalityLabel = (value: SupportedModelSummary["modality"]) => {
     if (value === "image") return "图片";
     if (value === "video") return "视频";
@@ -1187,7 +1250,7 @@ export function PublicModelsPanel({
     if (value === "video_generation") return "视频生成";
     return "未设置";
   };
-  const groupedSupportedModels = models.reduce((map, model) => {
+  const groupedSupportedModels = contentFilteredModels.reduce((map, model) => {
     const modelType = readModelTypeFromBillingConfig(model.billingConfigText).trim() || "uncategorized";
     const list = map.get(modelType) ?? [];
     list.push(model);
@@ -1216,7 +1279,13 @@ export function PublicModelsPanel({
     { value: "all", label: "全部类型" },
     ...buildModelTypeSelectOptions(
       safeModelTypeOptions,
-      Array.from(groupedSupportedModels.keys()).filter((key) => key !== "uncategorized")
+      Array.from(
+        new Set(
+          models
+            .map((model) => readModelTypeFromBillingConfig(model.billingConfigText).trim())
+            .filter(Boolean)
+        )
+      )
     ).filter((item) => item.value),
   ];
   const visibleModelGroups =
@@ -1234,6 +1303,11 @@ export function PublicModelsPanel({
             ),
     }))
     .filter((group) => group.models.length > 0);
+  const hasLocalCoverageFilters =
+    readmeCoverageFilter !== "all" ||
+    coverCoverageFilter !== "all" ||
+    seoCoverageFilter !== "all" ||
+    routeCoverageFilter !== "all";
   const modelPage = modelPagination?.page ?? 1;
   const modelTotalPages = modelPagination?.totalPages ?? 1;
   const modelTotalCount = modelPagination?.totalCount ?? models.length;
@@ -1255,60 +1329,130 @@ export function PublicModelsPanel({
       {models.length > 0 ? (
         <div className="space-y-4">
           <div className="rounded-xl border border-[#BAE6FD] bg-white p-2.5">
-            <form method="get" action="/ops-hub" className="flex flex-wrap items-end gap-2">
-              <input type="hidden" name="tab" value="public-models" />
-              <label className="grid gap-1">
-                <span className="text-[11px] tracking-[0.25px] text-black/55">按名称搜索</span>
-                <input
-                  type="text"
-                  name="modelSearch"
-                  defaultValue={activeModelSearch}
-                  placeholder="搜索名称或 slug"
-                  className="h-9 min-w-[220px] rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75 placeholder:text-black/35"
-                />
-              </label>
-              <label className="grid gap-1">
-                <span className="text-[11px] tracking-[0.25px] text-black/55">按类型筛选</span>
-                <select
-                  name="modelType"
-                  defaultValue={activeModelTypeFilter}
-                  className="h-9 min-w-[180px] rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
-                >
-                  {modelTypeFilterOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-1">
-                <span className="text-[11px] tracking-[0.25px] text-black/55">按状态筛选</span>
-                <select
-                  name="modelStatus"
-                  defaultValue={activeStatusFilter}
-                  className="h-9 min-w-[148px] rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
-                >
-                  <option value="all">全部状态</option>
-                  <option value="active">已启用</option>
-                  <option value="inactive">已停用</option>
-                </select>
-              </label>
-              <button
-                type="submit"
-                className="inline-flex h-9 items-center justify-center rounded-md border border-black/[0.12] bg-white px-3 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+              <form
+                method="get"
+                action="/ops-hub"
+                className="grid flex-1 gap-2 md:grid-cols-3 xl:grid-cols-8"
+                onChange={(event) => {
+                  const target = event.target;
+                  if (target instanceof HTMLSelectElement && target.dataset.autoSubmit === "true") {
+                    event.currentTarget.requestSubmit();
+                  }
+                }}
               >
-                应用
-              </button>
-              {headerAction}
-              {(activeModelSearch || activeModelTypeFilter !== "all" || activeStatusFilter !== "all") ? (
-                <a
-                  href={getModelHref({ page: 1, modelType: "all", status: "all" })}
-                  className="inline-flex h-9 items-center justify-center rounded-md px-2 text-xs text-black/45 hover:text-black/70"
-                >
-                  重置
-                </a>
-              ) : null}
-            </form>
+                <input type="hidden" name="tab" value="public-models" />
+                <label className="grid gap-1 md:col-span-2">
+                  <span className="text-[11px] tracking-[0.25px] text-black/55">按名称搜索</span>
+                  <input
+                    type="search"
+                    name="modelSearch"
+                    defaultValue={activeModelSearch}
+                    placeholder="搜索名称或 slug，回车生效"
+                    className="h-9 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75 placeholder:text-black/35"
+                  />
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[11px] tracking-[0.25px] text-black/55">类型</span>
+                  <select
+                    name="modelType"
+                    defaultValue={activeModelTypeFilter}
+                    data-auto-submit="true"
+                    className="h-9 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
+                  >
+                    {modelTypeFilterOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[11px] tracking-[0.25px] text-black/55">状态</span>
+                  <select
+                    name="modelStatus"
+                    defaultValue={activeStatusFilter}
+                    data-auto-submit="true"
+                    className="h-9 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
+                  >
+                    <option value="all">全部状态</option>
+                    <option value="active">已启用</option>
+                    <option value="inactive">已停用</option>
+                  </select>
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[11px] tracking-[0.25px] text-black/55">README</span>
+                  <select
+                    value={readmeCoverageFilter}
+                    onChange={(event) => setReadmeCoverageFilter(event.target.value as CoverageFilterValue)}
+                    className="h-9 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
+                  >
+                    {coverageFilterOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[11px] tracking-[0.25px] text-black/55">封面</span>
+                  <select
+                    value={coverCoverageFilter}
+                    onChange={(event) => setCoverCoverageFilter(event.target.value as CoverageFilterValue)}
+                    className="h-9 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
+                  >
+                    {coverageFilterOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[11px] tracking-[0.25px] text-black/55">SEO</span>
+                  <select
+                    value={seoCoverageFilter}
+                    onChange={(event) => setSeoCoverageFilter(event.target.value as CoverageFilterValue)}
+                    className="h-9 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
+                  >
+                    {coverageFilterOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[11px] tracking-[0.25px] text-black/55">路由</span>
+                  <select
+                    value={routeCoverageFilter}
+                    onChange={(event) => setRouteCoverageFilter(event.target.value as CoverageFilterValue)}
+                    className="h-9 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
+                  >
+                    {coverageFilterOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                {(activeModelSearch || activeModelTypeFilter !== "all" || activeStatusFilter !== "all") ? (
+                  <a
+                    href={getModelHref({ page: 1, modelType: "all", status: "all" })}
+                    className="inline-flex h-9 items-center justify-center rounded-md px-2 text-xs text-black/45 hover:text-black/70"
+                  >
+                    重置搜索
+                  </a>
+                ) : null}
+                {hasLocalCoverageFilters ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReadmeCoverageFilter("all");
+                      setCoverCoverageFilter("all");
+                      setSeoCoverageFilter("all");
+                      setRouteCoverageFilter("all");
+                    }}
+                    className="inline-flex h-9 items-center justify-center rounded-md px-2 text-xs text-black/45 hover:text-black/70"
+                  >
+                    重置资料筛选
+                  </button>
+                ) : null}
+              </form>
+              {headerAction ? <div className="flex shrink-0 justify-end">{headerAction}</div> : null}
+            </div>
           </div>
           {visibleModelGroupsWithStatus.map((group) => (
             <section key={group.category} className="rounded-xl border border-[#BAE6FD] bg-[#F8FCFF] p-2.5">
@@ -1320,16 +1464,12 @@ export function PublicModelsPanel({
               </div>
               <div className="space-y-3">
           {group.models.map((model) => {
-            const mappings = providerModelsBySupportedModelId.get(model.id) ?? [];
+            const modelCoverage = supportedModelCoverageById.get(model.id);
+            const mappings = modelCoverage?.mappings ?? [];
             const modelType = readModelTypeFromBillingConfig(model.billingConfigText);
-            const seoCoverage = readSeoCoverage(model.billingConfigText);
-            const modelRoutingRules = safeRoutingRules.filter((rule) => rule.supportedModelId === model.id);
-            const activeRoutingRule =
-              modelRoutingRules.find((rule) => rule.active && rule.scopeLabel.includes("全局")) ??
-              modelRoutingRules.find((rule) => rule.active) ??
-              modelRoutingRules[0] ??
-              null;
-            const hasRouting = Boolean(activeRoutingRule?.primary_provider_model_id);
+            const seoCoverage = modelCoverage?.seoCoverage ?? readSeoCoverage(model.billingConfigText);
+            const activeRoutingRule = modelCoverage?.activeRoutingRule ?? null;
+            const hasRouting = modelCoverage?.hasRouting ?? false;
             return (
               <section key={model.id} className="rounded-xl border border-[#DDF4FF] bg-white p-2.5 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1896,7 +2036,7 @@ export function CreateSupportedModelButton({
 
   return (
     <ManagementDialog
-      trigger={<ModalButton>新建</ModalButton>}
+      trigger={<ModalButton size="large">新建可售模型</ModalButton>}
       title="新建可售模型"
       description="在独立弹窗中创建新的客户侧模型定义。"
     >
