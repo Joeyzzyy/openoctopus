@@ -1,6 +1,7 @@
 import { env } from "../config.js";
 import OSS from "ali-oss";
 import { supabaseAdmin } from "./supabase.js";
+import { decryptProviderSecret } from "./provider-secret-crypto.js";
 
 type AssetStorageScope = "input" | "output";
 
@@ -13,7 +14,8 @@ export type AssetStorageConfig = {
   publicBaseUrl: string | null;
   inputPrefix: string | null;
   outputPrefix: string | null;
-  credentialRef: string | null;
+  credentialId: string | null;
+  providerId: string | null;
   signedUrlTtlSeconds: number;
   custom: boolean;
 };
@@ -50,16 +52,15 @@ function readTtl(value: unknown) {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 24 * 60 * 60;
 }
 
-function envSafeKey(value: string) {
-  return value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-}
-
 function joinPrefix(prefix: string | null, path: string) {
   const normalizedPath = path.replace(/^\/+/g, "");
   return prefix ? `${prefix}/${normalizedPath}` : normalizedPath;
 }
 
-export function parseAssetStorageConfig(executionConfig: unknown): AssetStorageConfig {
+export function parseAssetStorageConfig(
+  executionConfig: unknown,
+  options: { providerId?: string | null } = {}
+): AssetStorageConfig {
   const config = isRecord(executionConfig) ? executionConfig : {};
   const assetStorage = isRecord(config.assetStorage) ? config.assetStorage : {};
   const input = isRecord(assetStorage.input) ? assetStorage.input : {};
@@ -80,7 +81,8 @@ export function parseAssetStorageConfig(executionConfig: unknown): AssetStorageC
     publicBaseUrl: readString(assetStorage.publicBaseUrl),
     inputPrefix,
     outputPrefix,
-    credentialRef: readString(assetStorage.credentialRef),
+    credentialId: readString(assetStorage.credentialId) ?? readString(assetStorage.storageCredentialId),
+    providerId: options.providerId ?? null,
     signedUrlTtlSeconds: readTtl(assetStorage.signedUrlTtlSeconds),
     custom:
       provider !== "supabase" ||
@@ -99,29 +101,63 @@ export function getAssetStorageObjectKey(config: AssetStorageConfig, scope: Asse
   return joinPrefix(scope === "input" ? config.inputPrefix : config.outputPrefix, path);
 }
 
-function getAliyunCredentials(config: AssetStorageConfig) {
-  if (!config.credentialRef) {
-    throw new Error("assetStorage.credentialRef is required for aliyun-oss");
+async function resolveAliyunConfig(config: AssetStorageConfig) {
+  if (!config.credentialId) {
+    throw new Error("assetStorage.credentialId is required for aliyun-oss");
   }
-  const envKey = envSafeKey(config.credentialRef);
-  const accessKeyId = process.env[`ASSET_STORAGE_${envKey}_ACCESS_KEY_ID`];
-  const accessKeySecret = process.env[`ASSET_STORAGE_${envKey}_ACCESS_KEY_SECRET`];
-  if (!accessKeyId || !accessKeySecret) {
-    throw new Error(`Missing Aliyun OSS credentials for assetStorage credentialRef "${config.credentialRef}"`);
+  if (!config.providerId) {
+    throw new Error("Provider id is required to resolve asset storage credentials");
   }
-  return { accessKeyId, accessKeySecret };
+
+  const { data, error } = await supabaseAdmin
+    .from("provider_asset_storage_credentials")
+    .select(
+      "provider_id, storage_provider, bucket, region, endpoint, public_base_url, access_key_id_ciphertext, access_key_id_iv, access_key_id_auth_tag, access_key_secret_ciphertext, access_key_secret_iv, access_key_secret_auth_tag, is_active"
+    )
+    .eq("id", config.credentialId)
+    .eq("provider_id", config.providerId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data || data.storage_provider !== "aliyun-oss" || data.is_active !== true) {
+    throw new Error("Aliyun OSS asset storage credential is missing or inactive");
+  }
+
+  return {
+    bucket: config.outputBucket || data.bucket,
+    endpoint: config.endpoint ?? data.endpoint ?? null,
+    region: config.region ?? data.region ?? null,
+    publicBaseUrl: config.publicBaseUrl ?? data.public_base_url ?? null,
+    accessKeyId: decryptProviderSecret({
+      ciphertext: data.access_key_id_ciphertext,
+      iv: data.access_key_id_iv,
+      authTag: data.access_key_id_auth_tag,
+    }),
+    accessKeySecret: decryptProviderSecret({
+      ciphertext: data.access_key_secret_ciphertext,
+      iv: data.access_key_secret_iv,
+      authTag: data.access_key_secret_auth_tag,
+    }),
+  };
 }
 
-function createAliyunClient(config: AssetStorageConfig, scope: AssetStorageScope) {
-  if (!config.endpoint && !config.region) {
+async function createAliyunClient(config: AssetStorageConfig, scope: AssetStorageScope) {
+  const resolved = await resolveAliyunConfig(config);
+  const bucket = scope === "input" ? config.inputBucket : config.outputBucket;
+  const effectiveBucket = bucket && bucket !== env.GENERATED_ASSETS_BUCKET ? bucket : resolved.bucket;
+  const effectiveEndpoint = config.endpoint ?? resolved.endpoint;
+  const effectiveRegion = config.region ?? resolved.region;
+  if (!effectiveEndpoint && !effectiveRegion) {
     throw new Error("assetStorage.endpoint or assetStorage.region is required for aliyun-oss");
   }
-  const credentials = getAliyunCredentials(config);
   return new OSS({
-    ...credentials,
-    bucket: getAssetStorageBucket(config, scope),
-    endpoint: config.endpoint ?? undefined,
-    region: config.region ?? undefined,
+    accessKeyId: resolved.accessKeyId,
+    accessKeySecret: resolved.accessKeySecret,
+    bucket: effectiveBucket,
+    endpoint: effectiveEndpoint ?? undefined,
+    region: effectiveRegion ?? undefined,
     secure: true,
   });
 }
@@ -137,7 +173,7 @@ export async function uploadAssetStorageObject(input: {
   const storagePath = getAssetStorageObjectKey(input.config, input.scope, input.path);
 
   if (input.config.provider === "aliyun-oss") {
-    const client = createAliyunClient(input.config, input.scope);
+    const client = await createAliyunClient(input.config, input.scope);
     await client.put(storagePath, input.body, {
       headers: {
         "Content-Type": input.contentType,
@@ -189,7 +225,7 @@ export async function downloadAssetStorageObjectByStoragePath(input: {
   storagePath: string;
 }) {
   if (input.config.provider === "aliyun-oss") {
-    const client = createAliyunClient(input.config, input.scope);
+    const client = await createAliyunClient(input.config, input.scope);
     const result = await client.get(input.storagePath);
     const contentType =
       typeof result.res?.headers?.["content-type"] === "string"
@@ -230,7 +266,7 @@ export function getAssetStoragePublicUrl(input: {
   return new URL(storagePath.split("/").map(encodeURIComponent).join("/"), `${input.config.publicBaseUrl.replace(/\/+$/g, "")}/`).toString();
 }
 
-export function getAssetStorageSignedUrl(input: {
+export async function getAssetStorageSignedUrl(input: {
   config: AssetStorageConfig;
   scope: AssetStorageScope;
   path: string;
@@ -239,7 +275,7 @@ export function getAssetStorageSignedUrl(input: {
 }) {
   const storagePath = getAssetStorageObjectKey(input.config, input.scope, input.path);
   if (input.config.provider === "aliyun-oss") {
-    const client = createAliyunClient(input.config, input.scope);
+    const client = await createAliyunClient(input.config, input.scope);
     return client.signatureUrl(storagePath, {
       expires: input.config.signedUrlTtlSeconds,
       method: input.method ?? "GET",

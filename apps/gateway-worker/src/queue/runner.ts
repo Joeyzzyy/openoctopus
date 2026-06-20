@@ -812,6 +812,7 @@ export async function processNextInferenceJob() {
       const persistedOutput = await persistGeneratedAssets({
         requestId: message.requestId,
         workspaceId: message.workspaceId,
+        providerModelId: message.providerModelId,
         output: normalizedOutput,
         executionConfig,
       });
@@ -1217,6 +1218,7 @@ export async function processNextPollingJob() {
       const persistedOutput = await persistGeneratedAssets({
         requestId: message.requestId,
         workspaceId: message.workspaceId,
+        providerModelId: message.providerModelId,
         output: normalizedOutput,
         executionConfig: asRecord(message.providerConfig)?.executionConfig,
       });

@@ -88,7 +88,7 @@ async function resolveUploadAssetStorage(input: {
 
   const { data: providerModel, error: providerModelError } = await supabaseAdmin
     .from("provider_models")
-    .select("execution_config")
+    .select("provider_id, execution_config")
     .eq("id", routeRow.primary_provider_model_id)
     .maybeSingle();
 
@@ -96,7 +96,9 @@ async function resolveUploadAssetStorage(input: {
     throw new Error(providerModelError.message);
   }
 
-  return parseAssetStorageConfig(providerModel?.execution_config ?? {});
+  return parseAssetStorageConfig(providerModel?.execution_config ?? {}, {
+    providerId: providerModel?.provider_id ?? null,
+  });
 }
 
 export async function registerUploadRoutes(app: FastifyInstance) {
@@ -140,7 +142,7 @@ export async function registerUploadRoutes(app: FastifyInstance) {
       });
 
       let signedUrl =
-        getAssetStorageSignedUrl({
+        await getAssetStorageSignedUrl({
           config: storageConfig,
           scope: "input",
           path: relativePath,

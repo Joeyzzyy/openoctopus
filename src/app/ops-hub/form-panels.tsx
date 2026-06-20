@@ -4360,9 +4360,9 @@ export function CreateProviderModelForm({
                   disabled={disabled}
                   className={formTextAreaClassName}
                   rows={7}
-                  placeholder={'{\n  "provider": "supabase",\n  "input": { "bucket": "sensitive-assets" },\n  "output": { "bucket": "sensitive-assets" },\n  "signedUrlTtlSeconds": 86400\n}'}
+                  placeholder={'{\n  "provider": "aliyun-oss",\n  "credentialId": "provider storage credential uuid",\n  "inputPrefix": "openoctopus/input",\n  "outputPrefix": "openoctopus/output",\n  "signedUrlTtlSeconds": 86400\n}'}
                 />
-                <FieldHint help="只给高敏感模型填写。默认空走系统 GENERATED_ASSETS_BUCKET；provider 非 supabase 会被标记，但需要后续接入云厂商上传实现。" />
+                <FieldHint help="默认空走系统 GENERATED_ASSETS_BUCKET；云厂商密钥在供应商的资产存储凭证里加密保存，这里只引用 credentialId 和模型级前缀。" />
               </label>
             </div>
           </div>

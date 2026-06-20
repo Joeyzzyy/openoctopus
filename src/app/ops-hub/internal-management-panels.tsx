@@ -6,7 +6,9 @@ import { deriveLegacyBillingFields, parseBillingConfig } from "@/lib/billing-con
 import {
   createModelVendor,
   createProvider,
+  createProviderAssetStorageCredential,
   deleteProvider,
+  deleteProviderAssetStorageCredential,
   createProviderCredential,
   createProviderModel,
   createSupportedModel,
@@ -18,9 +20,11 @@ import {
   deleteRoutingRule,
   createRoutingRule,
   rotateProviderCredentialSecret,
+  rotateProviderAssetStorageCredentialSecret,
   upsertGatewayErrorDefinition,
   upsertStaticModelTypeOption,
   updateProvider,
+  updateProviderAssetStorageCredential,
   updateProviderCredentialDetails,
   updateProviderCredentialState,
   updateProviderModelDetails,
@@ -167,6 +171,7 @@ type ProviderSummary = {
   regionsLabel: string;
   regions: string[] | null;
   credentialCount: number;
+  assetStorageCredentialCount?: number;
   modelCount: number;
   activeModelCount: number;
   configText: string;
@@ -190,6 +195,25 @@ type ProviderCredentialSummary = {
   secretUpdatedLabel: string;
   hasEncryptedSecretMaterial: boolean;
   runtimeDiagnostics: string[];
+};
+
+type ProviderAssetStorageCredentialSummary = {
+  id: string;
+  provider_id: string;
+  providerName: string;
+  providerSlug: string;
+  label: string;
+  storage_provider: "aliyun-oss" | "tencent-cos";
+  bucket: string;
+  region: string | null;
+  endpoint: string | null;
+  public_base_url: string | null;
+  accessKeyIdMask: string;
+  accessKeySecretMask: string;
+  secretUpdatedLabel: string;
+  notes: string | null;
+  metadataText: string;
+  is_active: boolean;
 };
 
 type ProviderModelSummary = {
@@ -3022,10 +3046,12 @@ export function ModelTypeOptionsPanel({
 export function ProvidersPanel({
   providers,
   credentials,
+  assetStorageCredentials,
   providerStatusOptions,
 }: {
   providers: ProviderSummary[];
   credentials: ProviderCredentialSummary[];
+  assetStorageCredentials: ProviderAssetStorageCredentialSummary[];
   providerStatusOptions: readonly ProviderStatusOption[];
 }) {
   const statusToneClassName = (status: ProviderSummary["status"]) => {
@@ -3057,6 +3083,7 @@ export function ProvidersPanel({
             <tbody>
               {providers.map((provider) => {
                 const providerCredentials = credentials.filter((item) => item.provider_id === provider.id);
+                const providerAssetStorageCredentials = assetStorageCredentials.filter((item) => item.provider_id === provider.id);
 
                 return (
                 <tr key={provider.id}>
@@ -3104,6 +3131,13 @@ export function ProvidersPanel({
                           description="在弹窗里新增、编辑、轮换或删除这个供应商的密钥。"
                         >
                           <CredentialsPanel credentials={providerCredentials} providers={[provider]} selectedTemplate={null} />
+                        </ManagementDialog>
+                        <ManagementDialog
+                          trigger={<ModalButton tone="secondary">资产存储</ModalButton>}
+                          title="资产存储凭证"
+                          description="管理这个供应商下用于模型输入和输出资产缓存的云存储凭证。"
+                        >
+                          <AssetStorageCredentialsPanel credentials={providerAssetStorageCredentials} providers={[provider]} />
                         </ManagementDialog>
                         <ManagementDialog
                           trigger={<ModalButton tone="secondary">删除</ModalButton>}
@@ -3348,6 +3382,146 @@ export function CredentialsPanel({
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">
             创建供应商后，在这里登记真实的密钥引用。
           </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AssetStorageCredentialsPanel({
+  credentials,
+  providers,
+}: {
+  credentials: ProviderAssetStorageCredentialSummary[];
+  providers: ProviderSummary[];
+}) {
+  const hasProviders = providers.length > 0;
+  const providerOptions = hasProviders
+    ? providers.map((item) => ({ value: item.id, label: `${item.name} (${item.slug})` }))
+    : [{ value: "", label: "请先创建供应商" }];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm text-black/55">已有资产存储凭证</div>
+        <ManagementDialog
+          trigger={<ModalButton>新建资产存储</ModalButton>}
+          disabled={!hasProviders}
+          title="新建资产存储"
+          description="密钥会加密保存，模型配置只引用这条存储凭证。"
+        >
+          {({ close }) => (
+            <ManagedDialogForm action={createProviderAssetStorageCredential} close={close}>
+              <FormSelect label="供应商" name="providerId" options={providerOptions} disabled={!hasProviders} />
+              <FormField label="名称" name="label" required disabled={!hasProviders} />
+              <FormSelect
+                label="存储类型"
+                name="storageProvider"
+                defaultValue="aliyun-oss"
+                options={[{ value: "aliyun-oss", label: "Aliyun OSS" }, { value: "tencent-cos", label: "Tencent COS" }]}
+                disabled={!hasProviders}
+              />
+              <FormField label="Bucket" name="bucket" required disabled={!hasProviders} />
+              <FormField label="Region" name="region" placeholder="oss-cn-shanghai" disabled={!hasProviders} />
+              <FormField label="Endpoint" name="endpoint" placeholder="https://oss-cn-shanghai.aliyuncs.com" disabled={!hasProviders} />
+              <FormField label="Public Base URL" name="publicBaseUrl" placeholder="https://bucket.oss-cn-shanghai.aliyuncs.com" disabled={!hasProviders} />
+              <FormField label="Access Key ID" name="accessKeyId" type="password" required disabled={!hasProviders} />
+              <FormField label="Access Key Secret" name="accessKeySecret" type="password" required disabled={!hasProviders} />
+              <FormTextArea label="备注" name="notes" disabled={!hasProviders} />
+              <FormTextArea label="Metadata JSON" name="metadata" defaultValue="{}" disabled={!hasProviders} />
+              <ActiveCheckbox name="isActive" defaultChecked disabled={!hasProviders} label="启用" />
+              <div className="flex justify-end">
+                <SubmitButton label="创建资产存储" disabled={!hasProviders} />
+              </div>
+            </ManagedDialogForm>
+          )}
+        </ManagementDialog>
+      </div>
+
+      {credentials.length > 0 ? (
+        credentials.map((credential) => (
+          <div key={credential.id} className="rounded-2xl border border-[#BAE6FD] bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex h-6 items-center rounded-md border border-[#BAE6FD] bg-[#E0F2FE] px-2 text-[11px] text-[#0369A1]">
+                    {credential.storage_provider}
+                  </span>
+                  {credential.is_active ? (
+                    <span className="inline-flex h-6 items-center gap-1 rounded-md border border-[#D7EADB] bg-[#EDF8F0] px-2 text-[11px] text-[#335D2D]">
+                      <BadgeCheck className="size-3" />
+                      已启用
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-3 text-sm font-medium text-black">{credential.label}</p>
+                <p className="mt-1 text-xs text-black/50">{credential.providerName} · {credential.bucket}</p>
+                <p className="mt-1 max-w-[520px] break-all text-xs text-black/50">
+                  {credential.endpoint ?? "未填 endpoint"} · {credential.public_base_url ?? "未填 public URL"}
+                </p>
+                <p className="mt-1 text-xs text-black/50">
+                  Key: {credential.accessKeyIdMask} / {credential.accessKeySecretMask}
+                </p>
+                <p className="mt-1 text-xs text-black/50">密钥更新时间：{credential.secretUpdatedLabel}</p>
+                {credential.notes ? <p className="mt-2 text-xs leading-5 text-black/55">{credential.notes}</p> : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <ManagementDialog trigger={<ModalButton tone="secondary">编辑</ModalButton>} title={`编辑 ${credential.label}`}>
+                  {({ close }) => (
+                    <ManagedDialogForm action={updateProviderAssetStorageCredential} close={close}>
+                      <input type="hidden" name="credentialId" value={credential.id} />
+                      <FormField label="名称" name="label" defaultValue={credential.label} required />
+                      <FormSelect
+                        label="存储类型"
+                        name="storageProvider"
+                        defaultValue={credential.storage_provider}
+                        options={[{ value: "aliyun-oss", label: "Aliyun OSS" }, { value: "tencent-cos", label: "Tencent COS" }]}
+                      />
+                      <FormField label="Bucket" name="bucket" defaultValue={credential.bucket} required />
+                      <FormField label="Region" name="region" defaultValue={credential.region ?? ""} />
+                      <FormField label="Endpoint" name="endpoint" defaultValue={credential.endpoint ?? ""} />
+                      <FormField label="Public Base URL" name="publicBaseUrl" defaultValue={credential.public_base_url ?? ""} />
+                      <FormTextArea label="备注" name="notes" defaultValue={credential.notes ?? ""} />
+                      <FormTextArea label="Metadata JSON" name="metadata" defaultValue={credential.metadataText} />
+                      <ActiveCheckbox name="isActive" defaultChecked={credential.is_active} label="启用" />
+                      <div className="flex justify-end">
+                        <SubmitButton label="保存资产存储" />
+                      </div>
+                    </ManagedDialogForm>
+                  )}
+                </ManagementDialog>
+                <ManagementDialog trigger={<ModalButton tone="secondary">轮换密钥</ModalButton>} title={`轮换密钥：${credential.label}`}>
+                  {({ close }) => (
+                    <ManagedDialogForm action={rotateProviderAssetStorageCredentialSecret} close={close}>
+                      <input type="hidden" name="credentialId" value={credential.id} />
+                      <FormField label="Access Key ID" name="accessKeyId" type="password" required />
+                      <FormField label="Access Key Secret" name="accessKeySecret" type="password" required />
+                      <div className="flex justify-end">
+                        <SubmitButton label="提交轮换" />
+                      </div>
+                    </ManagedDialogForm>
+                  )}
+                </ManagementDialog>
+                <ManagementDialog trigger={<ModalButton tone="secondary">删除</ModalButton>} title={`删除 ${credential.label}`}>
+                  {({ close }) => (
+                    <ManagedDialogForm action={deleteProviderAssetStorageCredential} close={close}>
+                      <input type="hidden" name="credentialId" value={credential.id} />
+                      <div className="rounded-xl border border-[#F1D2CC] bg-[#FFF7F5] px-4 py-3 text-sm text-[#8D4336]">
+                        删除后引用这条凭证的模型会无法使用对应私有存储。
+                      </div>
+                      <div className="flex justify-end">
+                        <SubmitButton label="删除资产存储" pendingLabel="删除中..." tone="danger" />
+                      </div>
+                    </ManagedDialogForm>
+                  )}
+                </ManagementDialog>
+              </div>
+            </div>
+          </div>
+        ))
+      ) : (
+        <div className="rounded-2xl border border-dashed border-[#7DD3FC]/45 bg-[#F8FCFF] px-4 py-6">
+          <p className="text-sm font-medium text-black">还没有资产存储凭证</p>
         </div>
       )}
     </div>

@@ -1486,7 +1486,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     if (providerModelId) {
       const { data: providerModel, error: providerModelError } = await supabaseAdmin
         .from("provider_models")
-        .select("execution_config")
+        .select("provider_id, execution_config")
         .eq("id", providerModelId)
         .maybeSingle();
 
@@ -1500,7 +1500,9 @@ export async function registerTaskRoutes(app: FastifyInstance) {
         executionConfig: providerModel?.execution_config ?? {},
       });
       assetStorage = buildPublicAssetStorageConfig(
-        parseAssetStorageConfig(providerModel?.execution_config ?? {})
+        parseAssetStorageConfig(providerModel?.execution_config ?? {}, {
+          providerId: providerModel?.provider_id ?? null,
+        })
       );
     }
 

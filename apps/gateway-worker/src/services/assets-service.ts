@@ -11,6 +11,7 @@ import { appendFileAccessToken } from "../lib/file-access-token.js";
 type PersistAssetInput = {
   requestId: string;
   workspaceId: string;
+  providerModelId?: string;
   output: Record<string, unknown>;
   executionConfig?: unknown;
 };
@@ -224,7 +225,19 @@ async function cacheAsset(input: {
 
 export async function persistGeneratedAssets(input: PersistAssetInput) {
   const assets = Array.isArray(input.output.assets) ? input.output.assets : [];
-  const storageConfig = parseAssetStorageConfig(input.executionConfig);
+  let providerId: string | null = null;
+  if (input.providerModelId) {
+    const { data, error } = await supabaseAdmin
+      .from("provider_models")
+      .select("provider_id")
+      .eq("id", input.providerModelId)
+      .maybeSingle();
+    if (error) {
+      throw new Error(error.message);
+    }
+    providerId = data?.provider_id ?? null;
+  }
+  const storageConfig = parseAssetStorageConfig(input.executionConfig, { providerId });
 
   if (assets.length === 0) {
     return input.output;

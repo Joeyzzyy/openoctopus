@@ -539,7 +539,9 @@ export async function resolveRequestRuntime(input: UnifiedRequestInput): Promise
       ? (providerModelRow.execution_config as Record<string, unknown>)
       : {};
   const localQueueConfig = parseLocalQueueConfig(modelExecutionConfig);
-  const assetStorageConfig = parseAssetStorageConfig(modelExecutionConfig);
+  const assetStorageConfig = parseAssetStorageConfig(modelExecutionConfig, {
+    providerId: providerModelRow.provider_id,
+  });
 
   const { data: credentialRows, error: credentialError } = await supabaseAdmin
     .from("provider_credentials")

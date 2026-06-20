@@ -1103,6 +1103,7 @@ export default async function InternalPage({
               <ProvidersPanel
                 providers={data.providers}
                 credentials={data.providerCredentials}
+                assetStorageCredentials={data.providerAssetStorageCredentials}
                 providerStatusOptions={displayProviderStatusOptions}
               />
               </SectionShell>

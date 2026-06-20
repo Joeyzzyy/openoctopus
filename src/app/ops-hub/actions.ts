@@ -1435,6 +1435,244 @@ export async function deleteProviderCredential(formData: FormData) {
   revalidatePath("/ops-hub");
 }
 
+const storageProviderSchema = z.enum(["aliyun-oss", "tencent-cos"]);
+
+const createProviderAssetStorageCredentialSchema = z.object({
+  providerId: z.string().uuid(),
+  label: z.string().min(2).max(120),
+  storageProvider: storageProviderSchema,
+  bucket: z.string().min(2).max(180),
+  region: z.string().max(120).optional().or(z.literal("")),
+  endpoint: z.string().max(300).optional().or(z.literal("")),
+  publicBaseUrl: z.string().max(300).optional().or(z.literal("")),
+  accessKeyId: z.string().min(4).max(4000),
+  accessKeySecret: z.string().min(8).max(4000),
+  notes: z.string().max(2000).optional().or(z.literal("")),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+  isActive: z.boolean(),
+});
+
+export async function createProviderAssetStorageCredential(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = createProviderAssetStorageCredentialSchema.parse({
+    providerId: formData.get("providerId"),
+    label: formData.get("label"),
+    storageProvider: formData.get("storageProvider"),
+    bucket: formData.get("bucket"),
+    region: normalizeOptionalText(formData.get("region")) ?? "",
+    endpoint: normalizeOptionalText(formData.get("endpoint")) ?? "",
+    publicBaseUrl: normalizeOptionalText(formData.get("publicBaseUrl")) ?? "",
+    accessKeyId: formData.get("accessKeyId"),
+    accessKeySecret: formData.get("accessKeySecret"),
+    notes: normalizeOptionalText(formData.get("notes")) ?? "",
+    metadata: parseJsonField(formData.get("metadata")),
+    isActive: formData.get("isActive") === null ? true : parseBooleanField(formData.get("isActive")),
+  });
+  const encryptedAccessKeyId = encryptProviderSecret(parsed.accessKeyId);
+  const encryptedAccessKeySecret = encryptProviderSecret(parsed.accessKeySecret);
+
+  const { data, error } = await supabase
+    .from("provider_asset_storage_credentials")
+    .insert({
+      provider_id: parsed.providerId,
+      label: parsed.label,
+      storage_provider: parsed.storageProvider,
+      bucket: parsed.bucket,
+      region: parsed.region || null,
+      endpoint: parsed.endpoint || null,
+      public_base_url: parsed.publicBaseUrl || null,
+      access_key_id_ciphertext: encryptedAccessKeyId.ciphertext,
+      access_key_id_iv: encryptedAccessKeyId.iv,
+      access_key_id_auth_tag: encryptedAccessKeyId.authTag,
+      access_key_id_mask: encryptedAccessKeyId.mask,
+      access_key_secret_ciphertext: encryptedAccessKeySecret.ciphertext,
+      access_key_secret_iv: encryptedAccessKeySecret.iv,
+      access_key_secret_auth_tag: encryptedAccessKeySecret.authTag,
+      access_key_secret_mask: encryptedAccessKeySecret.mask,
+      secret_key_version: encryptedAccessKeySecret.version,
+      secret_last_updated_at: new Date().toISOString(),
+      is_active: parsed.isActive,
+      notes: parsed.notes || null,
+      metadata: parsed.metadata,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_asset_storage_credential.create",
+    targetType: "provider_asset_storage_credential",
+    targetId: data?.id ?? null,
+    summary: `Created provider asset storage credential ${parsed.label}`,
+    details: {
+      ...parsed,
+      accessKeyId: "[redacted]",
+      accessKeySecret: "[redacted]",
+      accessKeyIdMask: encryptedAccessKeyId.mask,
+      accessKeySecretMask: encryptedAccessKeySecret.mask,
+    },
+  });
+
+  revalidatePath("/ops-hub");
+}
+
+const updateProviderAssetStorageCredentialSchema = z.object({
+  credentialId: z.string().uuid(),
+  label: z.string().min(2).max(120),
+  storageProvider: storageProviderSchema,
+  bucket: z.string().min(2).max(180),
+  region: z.string().max(120).optional().or(z.literal("")),
+  endpoint: z.string().max(300).optional().or(z.literal("")),
+  publicBaseUrl: z.string().max(300).optional().or(z.literal("")),
+  notes: z.string().max(2000).optional().or(z.literal("")),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+  isActive: z.boolean(),
+});
+
+export async function updateProviderAssetStorageCredential(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = updateProviderAssetStorageCredentialSchema.parse({
+    credentialId: formData.get("credentialId"),
+    label: formData.get("label"),
+    storageProvider: formData.get("storageProvider"),
+    bucket: formData.get("bucket"),
+    region: normalizeOptionalText(formData.get("region")) ?? "",
+    endpoint: normalizeOptionalText(formData.get("endpoint")) ?? "",
+    publicBaseUrl: normalizeOptionalText(formData.get("publicBaseUrl")) ?? "",
+    notes: normalizeOptionalText(formData.get("notes")) ?? "",
+    metadata: parseJsonField(formData.get("metadata")),
+    isActive: parseBooleanField(formData.get("isActive")),
+  });
+
+  const { error } = await supabase
+    .from("provider_asset_storage_credentials")
+    .update({
+      label: parsed.label,
+      storage_provider: parsed.storageProvider,
+      bucket: parsed.bucket,
+      region: parsed.region || null,
+      endpoint: parsed.endpoint || null,
+      public_base_url: parsed.publicBaseUrl || null,
+      notes: parsed.notes || null,
+      metadata: parsed.metadata,
+      is_active: parsed.isActive,
+    })
+    .eq("id", parsed.credentialId);
+
+  if (error) throw new Error(error.message);
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_asset_storage_credential.update",
+    targetType: "provider_asset_storage_credential",
+    targetId: parsed.credentialId,
+    summary: `Updated provider asset storage credential ${parsed.label}`,
+    details: parsed,
+  });
+
+  revalidatePath("/ops-hub");
+}
+
+const rotateProviderAssetStorageCredentialSecretSchema = z.object({
+  credentialId: z.string().uuid(),
+  accessKeyId: z.string().min(4).max(4000),
+  accessKeySecret: z.string().min(8).max(4000),
+});
+
+export async function rotateProviderAssetStorageCredentialSecret(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = rotateProviderAssetStorageCredentialSecretSchema.parse({
+    credentialId: formData.get("credentialId"),
+    accessKeyId: formData.get("accessKeyId"),
+    accessKeySecret: formData.get("accessKeySecret"),
+  });
+  const encryptedAccessKeyId = encryptProviderSecret(parsed.accessKeyId);
+  const encryptedAccessKeySecret = encryptProviderSecret(parsed.accessKeySecret);
+
+  const { error } = await supabase
+    .from("provider_asset_storage_credentials")
+    .update({
+      access_key_id_ciphertext: encryptedAccessKeyId.ciphertext,
+      access_key_id_iv: encryptedAccessKeyId.iv,
+      access_key_id_auth_tag: encryptedAccessKeyId.authTag,
+      access_key_id_mask: encryptedAccessKeyId.mask,
+      access_key_secret_ciphertext: encryptedAccessKeySecret.ciphertext,
+      access_key_secret_iv: encryptedAccessKeySecret.iv,
+      access_key_secret_auth_tag: encryptedAccessKeySecret.authTag,
+      access_key_secret_mask: encryptedAccessKeySecret.mask,
+      secret_key_version: encryptedAccessKeySecret.version,
+      secret_last_updated_at: new Date().toISOString(),
+    })
+    .eq("id", parsed.credentialId);
+
+  if (error) throw new Error(error.message);
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_asset_storage_credential.secret.rotate",
+    targetType: "provider_asset_storage_credential",
+    targetId: parsed.credentialId,
+    summary: "Rotated provider asset storage credential secret",
+    details: {
+      credentialId: parsed.credentialId,
+      accessKeyId: "[redacted]",
+      accessKeySecret: "[redacted]",
+      accessKeyIdMask: encryptedAccessKeyId.mask,
+      accessKeySecretMask: encryptedAccessKeySecret.mask,
+    },
+  });
+
+  revalidatePath("/ops-hub");
+}
+
+const deleteProviderAssetStorageCredentialSchema = z.object({
+  credentialId: z.string().uuid(),
+});
+
+export async function deleteProviderAssetStorageCredential(formData: FormData) {
+  const { supabase, userId, workspaceId } = await getInternalAdminContext();
+  const parsed = deleteProviderAssetStorageCredentialSchema.parse({
+    credentialId: formData.get("credentialId"),
+  });
+
+  const { data: credentialRow, error: credentialError } = await supabase
+    .from("provider_asset_storage_credentials")
+    .select("id, label")
+    .eq("id", parsed.credentialId)
+    .maybeSingle();
+
+  if (credentialError) throw new Error(credentialError.message);
+  if (!credentialRow) throw new Error("Asset storage credential is missing");
+
+  const { error } = await supabase
+    .from("provider_asset_storage_credentials")
+    .delete()
+    .eq("id", parsed.credentialId);
+
+  if (error) throw new Error(error.message);
+
+  await logAdminAudit({
+    supabase,
+    userId,
+    workspaceId,
+    action: "provider_asset_storage_credential.delete",
+    targetType: "provider_asset_storage_credential",
+    targetId: parsed.credentialId,
+    summary: `Deleted provider asset storage credential ${credentialRow.label}`,
+    details: parsed,
+  });
+
+  revalidatePath("/ops-hub");
+}
+
 const updateProviderCredentialDetailsSchema = z.object({
   credentialId: z.string().uuid(),
   label: z.string().min(2).max(120),

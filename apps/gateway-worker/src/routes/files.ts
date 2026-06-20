@@ -192,7 +192,7 @@ async function resolveRequestAssetStorageConfig(providerModelId: string | null) 
 
   const { data: providerModel, error } = await supabaseAdmin
     .from("provider_models")
-    .select("execution_config")
+    .select("provider_id, execution_config")
     .eq("id", providerModelId)
     .maybeSingle();
 
@@ -200,7 +200,9 @@ async function resolveRequestAssetStorageConfig(providerModelId: string | null) 
     throw new Error(error.message);
   }
 
-  return parseAssetStorageConfig(providerModel?.execution_config ?? {});
+  return parseAssetStorageConfig(providerModel?.execution_config ?? {}, {
+    providerId: providerModel?.provider_id ?? null,
+  });
 }
 
 async function markGeneratedAssetInvalid(input: {

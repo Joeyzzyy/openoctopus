@@ -320,6 +320,24 @@ type ProviderCredentialRow = {
   created_at: string;
 };
 
+type ProviderAssetStorageCredentialRow = {
+  id: string;
+  provider_id: string;
+  label: string;
+  storage_provider: "aliyun-oss" | "tencent-cos";
+  bucket: string;
+  region: string | null;
+  endpoint: string | null;
+  public_base_url: string | null;
+  access_key_id_mask: string | null;
+  access_key_secret_mask: string | null;
+  secret_last_updated_at: string | null;
+  is_active: boolean;
+  notes: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
 type AdminAuditLogRow = {
   id: string;
   actor_user_id: string | null;
@@ -1330,6 +1348,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     providerAdapterCatalogResponse,
     providerAdapterAliasesResponse,
     providerCredentialsResponse,
+    providerAssetStorageCredentialsResponse,
     providerModelsResponse,
     providerModelShowcaseAssetsResponse,
     routingRulesResponse,
@@ -1422,6 +1441,14 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
             .from("provider_credentials")
             .select(
               "id, provider_id, label, secret_ref, secret_mask, secret_source, secret_ciphertext, secret_iv, secret_auth_tag, secret_last_updated_at, environment, is_active, notes, metadata, created_at"
+            )
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      shouldLoadManagementData
+        ? supabase
+            .from("provider_asset_storage_credentials")
+            .select(
+              "id, provider_id, label, storage_provider, bucket, region, endpoint, public_base_url, access_key_id_mask, access_key_secret_mask, secret_last_updated_at, is_active, notes, metadata, created_at"
             )
             .order("created_at", { ascending: false })
         : Promise.resolve({ data: [], error: null }),
@@ -1520,6 +1547,9 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const providerCredentials = (providerCredentialsResponse.error
     ? []
     : providerCredentialsResponse.data ?? []) as ProviderCredentialRow[];
+  const providerAssetStorageCredentials = (providerAssetStorageCredentialsResponse.error
+    ? []
+    : providerAssetStorageCredentialsResponse.data ?? []) as ProviderAssetStorageCredentialRow[];
   let providerModels = (providerModelsResponse.error ? [] : providerModelsResponse.data ?? []) as ProviderModelRow[];
   let providerModelShowcaseAssets =
     (providerModelShowcaseAssetsResponse.error
@@ -1627,6 +1657,12 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     map.set(credential.provider_id, list);
     return map;
   }, new Map<string, ProviderCredentialRow[]>());
+  const assetStorageCredentialsByProviderId = providerAssetStorageCredentials.reduce((map, credential) => {
+    const list = map.get(credential.provider_id) ?? [];
+    list.push(credential);
+    map.set(credential.provider_id, list);
+    return map;
+  }, new Map<string, ProviderAssetStorageCredentialRow[]>());
   const showcaseAssetsByProviderModelId = providerModelShowcaseAssets.reduce((map, asset) => {
     const list = map.get(asset.provider_model_id) ?? [];
     list.push(asset);
@@ -2007,12 +2043,14 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     const models = providerModels.filter((item) => item.provider_id === provider.id);
     const providerRequests = requests.filter((item) => item.provider_id === provider.id);
     const credentials = credentialsByProviderId.get(provider.id) ?? [];
+    const assetStorageCredentials = assetStorageCredentialsByProviderId.get(provider.id) ?? [];
 
     return {
       ...provider,
       modelCount: models.length,
       activeModelCount: models.filter((item) => item.active).length,
       credentialCount: credentials.length,
+      assetStorageCredentialCount: assetStorageCredentials.length,
       requestCount: providerRequests.length,
       regionsLabel: (provider.regions ?? []).join(", ") || "global",
       configText: formatJson(provider.config),
@@ -2309,6 +2347,20 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     };
   });
 
+  const providerAssetStorageCredentialSummaries = providerAssetStorageCredentials.map((credential) => {
+    const provider = providerById.get(credential.provider_id);
+    return {
+      ...credential,
+      providerName: provider?.name ?? "Unknown provider",
+      providerSlug: provider?.slug ?? "unknown",
+      accessKeyIdMask: credential.access_key_id_mask ?? "[key not set]",
+      accessKeySecretMask: credential.access_key_secret_mask ?? "[secret not set]",
+      metadataText: formatJson(credential.metadata),
+      createdLabel: formatRelativeTimestamp(credential.created_at),
+      secretUpdatedLabel: formatRelativeTimestamp(credential.secret_last_updated_at),
+    };
+  });
+
   const auditLogSummaries = adminAuditLogs.map((log) => ({
     ...log,
     detailsText: formatJson(log.details),
@@ -2440,6 +2492,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       totalPages: Math.max(1, Math.ceil(supportedModelTotalCount / modelPageSize)),
     },
     providerCredentials: providerCredentialSummaries,
+    providerAssetStorageCredentials: providerAssetStorageCredentialSummaries,
     providerModels: providerModelSummaries,
     routingRules: routingRuleSummaries,
     requests: recentRequestSummaries,
