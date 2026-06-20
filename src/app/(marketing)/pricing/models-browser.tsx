@@ -3173,9 +3173,11 @@ export function ModelsBrowser({
                       <button
                         type="button"
                         onClick={() => setResultModalOpen(true)}
-                        className="inline-flex h-7 items-center rounded-md px-2 text-xs font-medium text-black/45 hover:bg-black/[0.03] hover:text-black/70"
+                        className="inline-flex size-7 items-center justify-center rounded-md border border-black/[0.08] bg-white text-black/50 hover:bg-black/[0.03] hover:text-black/75"
+                        aria-label="View output details"
+                        title="Details"
                       >
-                        Details
+                        <CircleHelp className="size-3.5" />
                       </button>
                     ) : null}
                     <span
@@ -3193,10 +3195,6 @@ export function ModelsBrowser({
                         {playgroundAssetStorageLabel(assetStorageInfo)}
                       </span>
                     ) : null}
-                  </div>
-                </div>
-                <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                  <div className="flex flex-wrap items-center gap-2">
                     {playgroundImageAssets.length > 0 ? (
                       <button
                         type="button"
@@ -3207,19 +3205,21 @@ export function ModelsBrowser({
                             playgroundImageAssets[0].mimeType
                           )
                         }
-                        className="inline-flex h-8 items-center gap-1 rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                        className="inline-flex size-7 items-center justify-center rounded-md border border-black/[0.12] bg-white text-black/60 hover:bg-black/[0.03] hover:text-black/80"
+                        aria-label="Download image"
+                        title="Download image"
                       >
                         <Download className="size-3.5" />
-                        <span>Download image</span>
                       </button>
                     ) : playgroundVideoAssets.length > 0 ? (
                       <a
                         href={playgroundVideoAssets[0].url}
                         download={`${slugifyPathPart(selectedModel?.publicModel || "generated-video")}-1.mp4`}
-                        className="inline-flex h-8 items-center gap-1 rounded-md border border-black/[0.12] bg-white px-2.5 text-xs font-medium text-black/70 hover:bg-black/[0.03]"
+                        className="inline-flex size-7 items-center justify-center rounded-md border border-black/[0.12] bg-white text-black/60 hover:bg-black/[0.03] hover:text-black/80"
+                        aria-label="Download video"
+                        title="Download video"
                       >
                         <Download className="size-3.5" />
-                        <span>Download video</span>
                       </a>
                     ) : null}
                   </div>
