@@ -126,7 +126,7 @@ async function resolveAliyunConfig(config: AssetStorageConfig) {
   }
 
   return {
-    bucket: config.outputBucket || data.bucket,
+    bucket: data.bucket,
     endpoint: config.endpoint ?? data.endpoint ?? null,
     region: config.region ?? data.region ?? null,
     publicBaseUrl: config.publicBaseUrl ?? data.public_base_url ?? null,
@@ -152,14 +152,17 @@ async function createAliyunClient(config: AssetStorageConfig, scope: AssetStorag
   if (!effectiveEndpoint && !effectiveRegion) {
     throw new Error("assetStorage.endpoint or assetStorage.region is required for aliyun-oss");
   }
-  return new OSS({
-    accessKeyId: resolved.accessKeyId,
-    accessKeySecret: resolved.accessKeySecret,
+  return {
     bucket: effectiveBucket,
-    endpoint: effectiveEndpoint ?? undefined,
-    region: effectiveRegion ?? undefined,
-    secure: true,
-  });
+    client: new OSS({
+      accessKeyId: resolved.accessKeyId,
+      accessKeySecret: resolved.accessKeySecret,
+      bucket: effectiveBucket,
+      endpoint: effectiveEndpoint ?? undefined,
+      region: effectiveRegion ?? undefined,
+      secure: true,
+    }),
+  };
 }
 
 export async function uploadAssetStorageObject(input: {
@@ -173,14 +176,14 @@ export async function uploadAssetStorageObject(input: {
   const storagePath = getAssetStorageObjectKey(input.config, input.scope, input.path);
 
   if (input.config.provider === "aliyun-oss") {
-    const client = await createAliyunClient(input.config, input.scope);
+    const { bucket, client } = await createAliyunClient(input.config, input.scope);
     await client.put(storagePath, input.body, {
       headers: {
         "Content-Type": input.contentType,
       },
     });
     return {
-      storageBucket,
+      storageBucket: bucket,
       storagePath,
     };
   }
@@ -225,7 +228,7 @@ export async function downloadAssetStorageObjectByStoragePath(input: {
   storagePath: string;
 }) {
   if (input.config.provider === "aliyun-oss") {
-    const client = await createAliyunClient(input.config, input.scope);
+    const { client } = await createAliyunClient(input.config, input.scope);
     const result = await client.get(input.storagePath);
     const contentType =
       typeof result.res?.headers?.["content-type"] === "string"
@@ -275,7 +278,7 @@ export async function getAssetStorageSignedUrl(input: {
 }) {
   const storagePath = getAssetStorageObjectKey(input.config, input.scope, input.path);
   if (input.config.provider === "aliyun-oss") {
-    const client = await createAliyunClient(input.config, input.scope);
+    const { client } = await createAliyunClient(input.config, input.scope);
     return client.signatureUrl(storagePath, {
       expires: input.config.signedUrlTtlSeconds,
       method: input.method ?? "GET",
