@@ -1,4 +1,5 @@
-create or replace view public.v_workspace_wallet_summary as
+create or replace view public.v_workspace_wallet_summary
+with (security_invoker = true) as
 select
   workspace_id,
   coalesce(sum(amount_delta), 0)::numeric(12,2) as balance,

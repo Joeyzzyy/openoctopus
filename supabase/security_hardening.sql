@@ -11,6 +11,9 @@ alter view if exists public.v_model_spend_summary
 alter view if exists public.v_workspace_daily_spend
   set (security_invoker = true);
 
+alter view if exists public.v_workspace_wallet_summary
+  set (security_invoker = true);
+
 -- Lock down API-exposed tables that were created outside this repo's bootstrap.
 -- Enabling RLS without user-facing policies keeps them inaccessible to anon/authenticated
 -- while still allowing privileged service roles to operate.
