@@ -694,6 +694,7 @@ function ManagementDialog({
   description,
   headerActions,
   disabled = false,
+  fixedHeight = false,
   children,
 }: {
   trigger: React.ReactNode;
@@ -701,6 +702,7 @@ function ManagementDialog({
   description?: string;
   headerActions?: React.ReactNode;
   disabled?: boolean;
+  fixedHeight?: boolean;
   children: React.ReactNode | ((controls: { close: () => void; openVersion: number }) => React.ReactNode);
 }) {
   const [open, setOpen] = useState(false);
@@ -716,7 +718,11 @@ function ManagementDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange} disablePointerDismissal>
       <DialogTrigger disabled={disabled}>{trigger}</DialogTrigger>
-      <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] [&>button]:hidden sm:max-w-5xl">
+      <DialogContent
+        className={`flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-[#BAE6FD] bg-[#F8FCFF] p-0 shadow-[0_30px_80px_rgba(17,24,39,0.12)] [&>button]:hidden sm:max-w-5xl ${
+          fixedHeight ? "h-[900px]" : ""
+        }`}
+      >
         <DialogHeader className="border-b border-[#BAE6FD] px-5 pb-4 pt-5">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -1467,6 +1473,7 @@ export function PublicModelsPanel({
                       disabled={!safeProviders.length}
                       title={`新建映射：${model.display_name}`}
                       description="为当前可售模型新增供应商供应模型映射。"
+                      fixedHeight
                       headerActions={
                         <DialogFormSubmitButton formId={`provider-model-form-create-for-${model.id}`} />
                       }
@@ -1486,7 +1493,7 @@ export function PublicModelsPanel({
                           defaultSupportedModelSlug={model.model_slug}
                           formId={`provider-model-form-create-for-${model.id}`}
                           showSubmitButton={false}
-                          className="grid gap-4"
+                          className="gap-4"
                           onSuccess={close}
                           disabled={false}
                         />
@@ -1534,6 +1541,7 @@ export function PublicModelsPanel({
                                     trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                                     title={`编辑映射 ${mapping.supportedModelName} / ${mapping.providerName}`}
                                     description=" "
+                                    fixedHeight
                                     headerActions={
                                       <DialogFormSubmitButton formId={`provider-model-form-${mapping.id}`} />
                                     }
@@ -1605,7 +1613,7 @@ export function PublicModelsPanel({
                                         }
                                         formId={`provider-model-form-${mapping.id}`}
                                         showSubmitButton={false}
-                                        className="grid gap-4"
+                                        className="gap-4"
                                         onSuccess={close}
                                         disabled={false}
                                       />
@@ -2217,6 +2225,7 @@ export function EconomicsPanel({
                                 trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                                 title={`编辑 ${row.supportedModel.display_name} / ${row.providerModel.providerName}`}
                                 description=" "
+                                fixedHeight
                                 headerActions={
                                   <DialogFormSubmitButton formId={`provider-model-form-${row.providerModel.id}`} />
                                 }
@@ -2286,7 +2295,7 @@ export function EconomicsPanel({
                                     }
                                     formId={`provider-model-form-${row.providerModel.id}`}
                                     showSubmitButton={false}
-                                    className="grid gap-4"
+                                    className="gap-4"
                                     onSuccess={close}
                                     disabled={false}
                                   />
@@ -3287,6 +3296,7 @@ export function ModelsPanel({
           disabled={!hasProviders || !hasSupportedModels}
           title="新建供应商模型"
           description="在独立弹窗中，把可售模型映射到某个供应商的具体模型。"
+          fixedHeight
           headerActions={
             <DialogFormSubmitButton formId="provider-model-form-create-models" />
           }
@@ -3304,7 +3314,7 @@ export function ModelsPanel({
               formId="provider-model-form-create-models"
               showSubmitButton={false}
               disabled={!hasProviders || !hasSupportedModels}
-              className="grid gap-4"
+              className="gap-4"
               onSuccess={close}
             />
           )}
@@ -3338,6 +3348,7 @@ export function ModelsPanel({
                 trigger={<ModalButton tone="secondary">编辑</ModalButton>}
                 title={`编辑 ${item.upstream_model_slug}`}
                 description="在独立弹窗中编辑这个供应商模型。"
+                fixedHeight
                 headerActions={
                   <DialogFormSubmitButton formId={`provider-model-form-models-${item.id}`} />
                 }
@@ -3362,7 +3373,7 @@ export function ModelsPanel({
                     formId={`provider-model-form-models-${item.id}`}
                     showSubmitButton={false}
                     disabled={!hasProviders || !hasSupportedModels}
-                    className="grid gap-4"
+                    className="gap-4"
                     onSuccess={close}
                   />
                 )}

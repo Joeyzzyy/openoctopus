@@ -3301,7 +3301,7 @@ export function CreateProviderModelForm({
     <form
       id={formId}
       action={action}
-      className={`${className} flex max-h-[calc(100vh-9rem)] min-h-0 flex-col overflow-hidden`}
+      className={`${className} flex h-full min-h-0 flex-col overflow-hidden`}
       onSubmit={(event) => {
         const formData = new FormData(event.currentTarget);
         const missing: string[] = [];
@@ -3446,7 +3446,7 @@ export function CreateProviderModelForm({
           </nav>
         </aside>
 
-        <div className="max-h-[calc(100vh-12rem)] min-h-0 space-y-3 overflow-y-auto pr-1">
+        <div className="h-full min-h-0 space-y-3 overflow-y-auto pr-1">
         <div
           ref={(node) => {
             sectionRefs.current["input-params"] = node;
