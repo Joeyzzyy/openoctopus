@@ -4,8 +4,10 @@ import { sendGatewayError } from "../lib/gateway-errors.js";
 import { decryptProviderSecret } from "../lib/provider-secret-crypto.js";
 import { getStream } from "../lib/http.js";
 import {
-  getAssetStorageBucket,
+  downloadAssetStorageObject,
+  downloadAssetStorageObjectByStoragePath,
   parseAssetStorageConfig,
+  uploadAssetStorageObject,
   type AssetStorageConfig,
 } from "../lib/asset-storage.js";
 import { verifyFileAccessToken } from "../lib/file-access-token.js";
@@ -176,17 +178,11 @@ function looksLikeValidBinary(buffer: Buffer, mimeType: string | null) {
 }
 
 async function downloadFromGeneratedBucket(storagePath: string, storageConfig: AssetStorageConfig) {
-  const download = await supabaseAdmin.storage
-    .from(getAssetStorageBucket(storageConfig, "output"))
-    .download(storagePath);
-  if (!download.data) {
-    return null;
-  }
-  const buffer = Buffer.from(await download.data.arrayBuffer());
-  return {
-    buffer,
-    contentType: download.data.type || "application/octet-stream",
-  };
+  return downloadAssetStorageObject({
+    config: storageConfig,
+    scope: "output",
+    path: storagePath,
+  });
 }
 
 async function resolveRequestAssetStorageConfig(providerModelId: string | null) {
@@ -301,22 +297,30 @@ export async function registerFileRoutes(app: FastifyInstance) {
       .from("generated_assets")
       .select("storage_bucket, storage_path, mime_type, created_at")
       .eq("request_id", params.requestId)
-      .like("storage_path", `${params.requestId}/${params.assetIndex}.%`)
       .order("created_at", { ascending: false })
-      .limit(1);
+      .limit(20);
 
     if (assetError) {
       throw new Error(assetError.message);
     }
 
-    const storedAsset = assetRows?.[0];
+    const storedAsset = assetRows?.find((row) => row.storage_path?.endsWith(`/${params.assetIndex}.png`) ||
+      row.storage_path?.endsWith(`/${params.assetIndex}.jpg`) ||
+      row.storage_path?.endsWith(`/${params.assetIndex}.webp`) ||
+      row.storage_path?.endsWith(`/${params.assetIndex}.gif`) ||
+      row.storage_path?.endsWith(`/${params.assetIndex}.mp4`) ||
+      row.storage_path?.endsWith(`/${params.assetIndex}.webm`) ||
+      row.storage_path === `${params.requestId}/${params.assetIndex}` ||
+      row.storage_path?.endsWith(`/${params.requestId}/${params.assetIndex}`));
     if (storedAsset?.storage_bucket && storedAsset.storage_path) {
-      const storedDownload = await supabaseAdmin.storage
-        .from(storedAsset.storage_bucket)
-        .download(storedAsset.storage_path);
-      if (storedDownload.data) {
-        const buffer = Buffer.from(await storedDownload.data.arrayBuffer());
-        const contentType = storedAsset.mime_type || storedDownload.data.type || "application/octet-stream";
+      const storedDownload = await downloadAssetStorageObjectByStoragePath({
+        config: storageConfig,
+        scope: "output",
+        storagePath: storedAsset.storage_path,
+      });
+      if (storedDownload) {
+        const buffer = storedDownload.buffer;
+        const contentType = storedAsset.mime_type || storedDownload.contentType || "application/octet-stream";
         if (looksLikeValidBinary(buffer, contentType)) {
           setGeneratedAssetHeaders(reply, contentType, buffer.length);
           return reply.code(200).send(buffer);
@@ -328,7 +332,6 @@ export async function registerFileRoutes(app: FastifyInstance) {
         });
       }
     }
-    const outputStorageBucket = getAssetStorageBucket(storageConfig, "output");
     const cachePathBase = buildAssetCachePath(params.requestId, params.assetIndex);
     const candidatePaths = [
       cachePathBase,
@@ -355,12 +358,13 @@ export async function registerFileRoutes(app: FastifyInstance) {
     if (sourceUrl?.startsWith("data:")) {
       const parsed = parseDataUri(sourceUrl);
       if (parsed) {
-        await supabaseAdmin.storage
-          .from(outputStorageBucket)
-          .upload(cachePathBase, parsed.buffer, {
-            contentType: parsed.mimeType,
-            upsert: true,
-          });
+        await uploadAssetStorageObject({
+          config: storageConfig,
+          scope: "output",
+          path: cachePathBase,
+          body: parsed.buffer,
+          contentType: parsed.mimeType,
+        });
         setGeneratedAssetHeaders(reply, parsed.mimeType, parsed.buffer.length);
         return reply.code(200).send(parsed.buffer);
       }
@@ -420,12 +424,13 @@ export async function registerFileRoutes(app: FastifyInstance) {
           statusCode: 502,
         });
       }
-      await supabaseAdmin.storage
-        .from(outputStorageBucket)
-        .upload(buildAssetCachePathWithExtension(params.requestId, params.assetIndex, contentType ?? null), bodyBuffer, {
-          contentType,
-          upsert: true,
-        });
+      await uploadAssetStorageObject({
+        config: storageConfig,
+        scope: "output",
+        path: buildAssetCachePathWithExtension(params.requestId, params.assetIndex, contentType ?? null),
+        body: bodyBuffer,
+        contentType: contentType || "application/octet-stream",
+      });
       setGeneratedAssetHeaders(reply, contentType || "application/octet-stream", bodyBuffer.length);
       return reply.code(200).send(bodyBuffer);
     }

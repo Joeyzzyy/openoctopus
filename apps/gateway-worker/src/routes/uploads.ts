@@ -4,8 +4,10 @@ import { z } from "zod";
 import { sendGatewayError } from "../lib/gateway-errors.js";
 import {
   buildPublicAssetStorageConfig,
-  getAssetStorageBucket,
+  getAssetStorageSignedUrl,
+  getAssetStoragePublicUrl,
   parseAssetStorageConfig,
+  uploadAssetStorageObject,
 } from "../lib/asset-storage.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { authenticateApiKey, RequestValidationError } from "../services/request-service.js";
@@ -120,7 +122,6 @@ export async function registerUploadRoutes(app: FastifyInstance) {
         model: parsed.model,
         capability: parsed.capability,
       });
-      const storageBucket = getAssetStorageBucket(storageConfig, "input");
 
       if (!extension || !Buffer.isBuffer(body) || body.length <= 0 || body.length > MAX_UPLOAD_BYTES) {
         return sendGatewayError(reply, {
@@ -129,28 +130,41 @@ export async function registerUploadRoutes(app: FastifyInstance) {
         });
       }
 
-      const storagePath = `api-uploads/${apiKeyRow.workspace_id}/${sanitizePathPart(parsed.field)}/${randomUUID()}-${sanitizePathPart(stripKnownExtension(parsed.filename))}.${extension}`;
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from(storageBucket)
-        .upload(storagePath, body, {
-          contentType,
-          upsert: false,
+      const relativePath = `api-uploads/${apiKeyRow.workspace_id}/${sanitizePathPart(parsed.field)}/${randomUUID()}-${sanitizePathPart(stripKnownExtension(parsed.filename))}.${extension}`;
+      const uploaded = await uploadAssetStorageObject({
+        config: storageConfig,
+        scope: "input",
+        path: relativePath,
+        body,
+        contentType,
+      });
+
+      let signedUrl =
+        getAssetStorageSignedUrl({
+          config: storageConfig,
+          scope: "input",
+          path: relativePath,
+          method: "GET",
+        }) ??
+        getAssetStoragePublicUrl({
+          config: storageConfig,
+          scope: "input",
+          path: relativePath,
         });
 
-      if (uploadError) {
-        throw new Error(uploadError.message);
-      }
+      if (!signedUrl) {
+        const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin.storage
+          .from(uploaded.storageBucket)
+          .createSignedUrl(uploaded.storagePath, storageConfig.signedUrlTtlSeconds);
 
-      const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin.storage
-        .from(storageBucket)
-        .createSignedUrl(storagePath, storageConfig.signedUrlTtlSeconds);
-
-      if (signedUrlError || !signedUrlData?.signedUrl) {
-        throw new Error(signedUrlError?.message ?? "Failed to create upload URL");
+        if (signedUrlError || !signedUrlData?.signedUrl) {
+          throw new Error(signedUrlError?.message ?? "Failed to create upload URL");
+        }
+        signedUrl = signedUrlData.signedUrl;
       }
 
       return reply.code(201).send({
-        url: signedUrlData.signedUrl,
+        url: signedUrl,
         mimeType: contentType,
         name: parsed.filename,
         size: body.length,

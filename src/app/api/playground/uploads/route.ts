@@ -4,14 +4,12 @@ import { z } from "zod";
 import mammoth from "mammoth";
 import WordExtractor from "word-extractor";
 
+import { PUBLIC_API_BASE_URL } from "@/lib/api-docs";
 import { buildGatewayErrorResponse, isGatewayValidationError } from "@/lib/gateway-errors";
-import { getAuthedWorkspaceForPlayground } from "@/lib/playground-key-server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  buildPublicAssetStorageConfig,
-  getAssetStorageBucket,
-  parseAssetStorageConfig,
-} from "@/lib/asset-storage-config";
+  getAuthedWorkspaceForPlayground,
+  getOrCreateWorkspacePlaygroundKey,
+} from "@/lib/playground-key-server";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -47,46 +45,8 @@ const uploadSchema = z.object({
   ]).optional(),
 });
 
-async function resolveUploadAssetStorage(input: {
-  supabaseAdmin: ReturnType<typeof createAdminClient>;
-  workspaceId: string;
-  model?: string;
-  capability?: string;
-}) {
-  if (!input.model || !input.capability) {
-    return parseAssetStorageConfig({});
-  }
-
-  const { data: routeRow, error: routeError } = await input.supabaseAdmin
-    .from("routing_rules")
-    .select("primary_provider_model_id, workspace_id")
-    .eq("public_model_slug", input.model)
-    .eq("capability", input.capability)
-    .eq("active", true)
-    .or(`workspace_id.eq.${input.workspaceId},workspace_id.is.null`)
-    .order("workspace_id", { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (routeError) {
-    throw new Error(routeError.message);
-  }
-
-  if (!routeRow?.primary_provider_model_id) {
-    return parseAssetStorageConfig({});
-  }
-
-  const { data: providerModel, error: providerModelError } = await input.supabaseAdmin
-    .from("provider_models")
-    .select("execution_config")
-    .eq("id", routeRow.primary_provider_model_id)
-    .maybeSingle();
-
-  if (providerModelError) {
-    throw new Error(providerModelError.message);
-  }
-
-  return parseAssetStorageConfig(providerModel?.execution_config ?? {});
+function resolveGatewayBaseUrl() {
+  return process.env.OPENOCTOPUS_API_BASE_URL?.trim() || PUBLIC_API_BASE_URL;
 }
 
 async function extractDocumentCharacterInfo(file: File, buffer: Buffer) {
@@ -112,7 +72,7 @@ async function extractDocumentCharacterInfo(file: File, buffer: Buffer) {
 
 export async function POST(request: Request) {
   try {
-    const { workspaceId } = await getAuthedWorkspaceForPlayground();
+    const { workspaceId, userId } = await getAuthedWorkspaceForPlayground();
     const formData = await request.formData();
     const parsed = uploadSchema.parse({
       field: formData.get("field") ?? "images",
@@ -149,45 +109,34 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const characterInfo = await extractDocumentCharacterInfo(file, buffer);
-    const supabaseAdmin = createAdminClient();
-    const storageConfig = await resolveUploadAssetStorage({
-      supabaseAdmin,
-      workspaceId,
-      model: parsed.model,
-      capability: parsed.capability,
+    const { secret } = await getOrCreateWorkspacePlaygroundKey(workspaceId, userId);
+    const requestUrl = new URL("/v1/uploads", resolveGatewayBaseUrl());
+    requestUrl.searchParams.set("filename", `${randomUUID()}-${file.name}`);
+    requestUrl.searchParams.set("field", parsed.field);
+    if (parsed.model) requestUrl.searchParams.set("model", parsed.model);
+    if (parsed.capability) requestUrl.searchParams.set("capability", parsed.capability);
+
+    const uploadResponse = await fetch(requestUrl, {
+      method: "POST",
+      headers: {
+        "content-type": file.type,
+        authorization: `Bearer ${secret}`,
+      },
+      body: buffer,
+      cache: "no-store",
     });
-    const uploadBucket = getAssetStorageBucket(storageConfig, "input");
-    const storagePath = `playground-uploads/${workspaceId}/${parsed.field}/${randomUUID()}.${extension}`;
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from(uploadBucket)
-      .upload(storagePath, buffer, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      throw new Error(uploadError.message);
-    }
-
-    const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin.storage
-      .from(uploadBucket)
-      .createSignedUrl(storagePath, storageConfig.signedUrlTtlSeconds);
-
-    if (signedUrlError || !signedUrlData?.signedUrl) {
-      throw new Error(signedUrlError?.message ?? "Failed to create upload URL");
+    const uploadJson = (await uploadResponse.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!uploadResponse.ok) {
+      return NextResponse.json(uploadJson, { status: uploadResponse.status });
     }
 
     return NextResponse.json({
-      url: signedUrlData.signedUrl,
-      mimeType: file.type,
+      ...uploadJson,
       name: file.name,
-      size: file.size,
       ...(characterInfo ? {
         characterCount: characterInfo.characterCount,
         extractionSource: characterInfo.extractionSource,
       } : {}),
-      expiresIn: storageConfig.signedUrlTtlSeconds,
-      asset_storage: buildPublicAssetStorageConfig(storageConfig),
     });
   } catch (error) {
     console.error("[playground/uploads] upload failed", error);

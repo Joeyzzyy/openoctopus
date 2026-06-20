@@ -2,8 +2,8 @@ import { supabaseAdmin } from "../lib/supabase.js";
 import { env } from "../config.js";
 import { getBuffer } from "../lib/http.js";
 import {
-  getAssetStorageBucket,
   parseAssetStorageConfig,
+  uploadAssetStorageObject,
   type AssetStorageConfig,
 } from "../lib/asset-storage.js";
 import { appendFileAccessToken } from "../lib/file-access-token.js";
@@ -198,24 +198,20 @@ async function cacheAsset(input: {
     };
   }
 
-  const storagePath = buildAssetCachePath(input.requestId, input.assetIndex, mimeType);
-  const storageBucket = getAssetStorageBucket(input.storageConfig, "output");
-  const { error } = await supabaseAdmin.storage
-    .from(storageBucket)
-    .upload(storagePath, buffer, {
-      contentType: mimeType ?? "application/octet-stream",
-      upsert: true,
-    });
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  const relativePath = buildAssetCachePath(input.requestId, input.assetIndex, mimeType);
+  const uploaded = await uploadAssetStorageObject({
+    config: input.storageConfig,
+    scope: "output",
+    path: relativePath,
+    body: buffer,
+    contentType: mimeType ?? "application/octet-stream",
+  });
 
   return {
     cached: {
       url: buildPublicAssetUrl(input.requestId, input.assetIndex),
-      storageBucket,
-      storagePath,
+      storageBucket: uploaded.storageBucket,
+      storagePath: uploaded.storagePath,
       mimeType,
       sizeBytes: buffer.byteLength,
     },
