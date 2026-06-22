@@ -331,12 +331,6 @@ type InternalModelAiUsageLogSummary = {
 
 type CoverageFilterValue = "all" | "has" | "missing";
 
-function coverageFilterMatches(filter: CoverageFilterValue, hasValue: boolean) {
-  if (filter === "has") return hasValue;
-  if (filter === "missing") return !hasValue;
-  return true;
-}
-
 const formInputClassName =
   "h-10 w-full rounded-md border border-[#BAE6FD] bg-white px-3 text-sm text-black outline-none transition-colors placeholder:text-black/30 focus:border-black/20 focus:bg-white disabled:bg-black/[0.03] disabled:text-black/35";
 
@@ -1117,6 +1111,10 @@ export function PublicModelsPanel({
   modelSearch = "",
   modelTypeFilter = "all",
   modelStatusFilter = "all",
+  modelReadmeFilter = "all",
+  modelCoverFilter = "all",
+  modelSeoFilter = "all",
+  modelRouteFilter = "all",
   providerModels = [],
   routingRules = [],
   providers = [],
@@ -1131,6 +1129,10 @@ export function PublicModelsPanel({
   modelSearch?: string;
   modelTypeFilter?: string;
   modelStatusFilter?: "all" | "active" | "inactive";
+  modelReadmeFilter?: CoverageFilterValue;
+  modelCoverFilter?: CoverageFilterValue;
+  modelSeoFilter?: CoverageFilterValue;
+  modelRouteFilter?: CoverageFilterValue;
   providerModels?: ProviderModelSummary[];
   routingRules?: RoutingRuleSummary[];
   providers?: ProviderSummary[];
@@ -1143,16 +1145,16 @@ export function PublicModelsPanel({
   const activeModelTypeFilter = modelTypeFilter;
   const activeStatusFilter = modelStatusFilter;
   const activeModelSearch = modelSearch.trim();
+  const readmeCoverageFilter = modelReadmeFilter;
+  const coverCoverageFilter = modelCoverFilter;
+  const seoCoverageFilter = modelSeoFilter;
+  const routeCoverageFilter = modelRouteFilter;
   const safeModelVendors = Array.isArray(modelVendors) ? modelVendors : [];
   const safeProviderModels = Array.isArray(providerModels) ? providerModels : [];
   const safeRoutingRules = Array.isArray(routingRules) ? routingRules : [];
   const safeProviders = Array.isArray(providers) ? providers : [];
   const safeWorkerTemplates = Array.isArray(workerTemplates) ? workerTemplates : [];
   const safeModelTypeOptions = Array.isArray(modelTypeOptions) ? modelTypeOptions : [];
-  const [readmeCoverageFilter, setReadmeCoverageFilter] = useState<CoverageFilterValue>("all");
-  const [coverCoverageFilter, setCoverCoverageFilter] = useState<CoverageFilterValue>("all");
-  const [seoCoverageFilter, setSeoCoverageFilter] = useState<CoverageFilterValue>("all");
-  const [routeCoverageFilter, setRouteCoverageFilter] = useState<CoverageFilterValue>("all");
   const coverageFilterOptions = [
     { value: "all" as const, label: "全部" },
     { value: "has" as const, label: "有" },
@@ -1224,17 +1226,6 @@ export function PublicModelsPanel({
       ] as const;
     })
   );
-  const contentFilteredModels = models.filter((model) => {
-    const coverage = supportedModelCoverageById.get(model.id);
-    if (!coverage) return false;
-
-    return (
-      coverageFilterMatches(readmeCoverageFilter, coverage.hasReadme) &&
-      coverageFilterMatches(coverCoverageFilter, coverage.hasCover) &&
-      coverageFilterMatches(seoCoverageFilter, coverage.seoCoverage.isComplete) &&
-      coverageFilterMatches(routeCoverageFilter, coverage.hasRouting)
-    );
-  });
   const modalityLabel = (value: SupportedModelSummary["modality"]) => {
     if (value === "image") return "图片";
     if (value === "video") return "视频";
@@ -1250,7 +1241,7 @@ export function PublicModelsPanel({
     if (value === "video_generation") return "视频生成";
     return "未设置";
   };
-  const groupedSupportedModels = contentFilteredModels.reduce((map, model) => {
+  const groupedSupportedModels = models.reduce((map, model) => {
     const modelType = readModelTypeFromBillingConfig(model.billingConfigText).trim() || "uncategorized";
     const list = map.get(modelType) ?? [];
     list.push(model);
@@ -1314,13 +1305,29 @@ export function PublicModelsPanel({
   const modelPageSize = modelPagination?.pageSize ?? 10;
   const modelPageStart = modelTotalCount === 0 ? 0 : (modelPage - 1) * modelPageSize + 1;
   const modelPageEnd = Math.min(modelPage * modelPageSize, modelTotalCount);
-  const getModelHref = (input: { page?: number; modelType?: string; status?: string }) => {
+  const getModelHref = (input: {
+    page?: number;
+    modelType?: string;
+    status?: string;
+    readme?: CoverageFilterValue;
+    cover?: CoverageFilterValue;
+    seo?: CoverageFilterValue;
+    route?: CoverageFilterValue;
+  }) => {
     const params = new URLSearchParams();
     params.set("tab", "public-models");
     if ((input.page ?? 1) > 1) params.set("modelPage", String(input.page));
     if (activeModelSearch) params.set("modelSearch", activeModelSearch);
     if (input.modelType && input.modelType !== "all") params.set("modelType", input.modelType);
     if (input.status && input.status !== "all") params.set("modelStatus", input.status);
+    const readme = input.readme ?? readmeCoverageFilter;
+    const cover = input.cover ?? coverCoverageFilter;
+    const seo = input.seo ?? seoCoverageFilter;
+    const route = input.route ?? routeCoverageFilter;
+    if (readme !== "all") params.set("modelReadme", readme);
+    if (cover !== "all") params.set("modelCover", cover);
+    if (seo !== "all") params.set("modelSeo", seo);
+    if (route !== "all") params.set("modelRoute", route);
     return `/ops-hub?${params.toString()}`;
   };
 
@@ -1383,8 +1390,9 @@ export function PublicModelsPanel({
                 <label className="grid gap-1">
                   <span className="text-[11px] tracking-[0.25px] text-black/55">README</span>
                   <select
-                    value={readmeCoverageFilter}
-                    onChange={(event) => setReadmeCoverageFilter(event.target.value as CoverageFilterValue)}
+                    name="modelReadme"
+                    defaultValue={readmeCoverageFilter}
+                    data-auto-submit="true"
                     className="h-9 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
                   >
                     {coverageFilterOptions.map((option) => (
@@ -1395,8 +1403,9 @@ export function PublicModelsPanel({
                 <label className="grid gap-1">
                   <span className="text-[11px] tracking-[0.25px] text-black/55">封面</span>
                   <select
-                    value={coverCoverageFilter}
-                    onChange={(event) => setCoverCoverageFilter(event.target.value as CoverageFilterValue)}
+                    name="modelCover"
+                    defaultValue={coverCoverageFilter}
+                    data-auto-submit="true"
                     className="h-9 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
                   >
                     {coverageFilterOptions.map((option) => (
@@ -1407,8 +1416,9 @@ export function PublicModelsPanel({
                 <label className="grid gap-1">
                   <span className="text-[11px] tracking-[0.25px] text-black/55">SEO</span>
                   <select
-                    value={seoCoverageFilter}
-                    onChange={(event) => setSeoCoverageFilter(event.target.value as CoverageFilterValue)}
+                    name="modelSeo"
+                    defaultValue={seoCoverageFilter}
+                    data-auto-submit="true"
                     className="h-9 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
                   >
                     {coverageFilterOptions.map((option) => (
@@ -1419,8 +1429,9 @@ export function PublicModelsPanel({
                 <label className="grid gap-1">
                   <span className="text-[11px] tracking-[0.25px] text-black/55">路由</span>
                   <select
-                    value={routeCoverageFilter}
-                    onChange={(event) => setRouteCoverageFilter(event.target.value as CoverageFilterValue)}
+                    name="modelRoute"
+                    defaultValue={routeCoverageFilter}
+                    data-auto-submit="true"
                     className="h-9 rounded-md border border-[#BAE6FD] bg-[#F8FCFF] px-3 text-xs text-black/75"
                   >
                     {coverageFilterOptions.map((option) => (
@@ -1437,18 +1448,12 @@ export function PublicModelsPanel({
                   </a>
                 ) : null}
                 {hasLocalCoverageFilters ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReadmeCoverageFilter("all");
-                      setCoverCoverageFilter("all");
-                      setSeoCoverageFilter("all");
-                      setRouteCoverageFilter("all");
-                    }}
+                  <a
+                    href={getModelHref({ page: 1, readme: "all", cover: "all", seo: "all", route: "all" })}
                     className="inline-flex h-9 items-center justify-center rounded-md px-2 text-xs text-black/45 hover:text-black/70"
                   >
                     重置资料筛选
-                  </button>
+                  </a>
                 ) : null}
               </form>
               {headerAction ? <div className="flex shrink-0 justify-end">{headerAction}</div> : null}

@@ -389,6 +389,10 @@ type InternalAdminDataOptions = {
   modelSearch?: string | null;
   modelTypeFilter?: string | null;
   modelStatusFilter?: "all" | "active" | "inactive";
+  modelReadmeFilter?: "all" | "has" | "missing";
+  modelCoverFilter?: "all" | "has" | "missing";
+  modelSeoFilter?: "all" | "has" | "missing";
+  modelRouteFilter?: "all" | "has" | "missing";
   internalAiUsagePage?: number;
   internalAiUsagePageSize?: number;
   activeTab?: string;
@@ -1321,6 +1325,15 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
   const modelSearch = options.modelSearch?.trim() ?? "";
   const modelTypeFilter = options.modelTypeFilter?.trim() ?? "all";
   const modelStatusFilter = options.modelStatusFilter ?? "all";
+  const modelReadmeFilter = options.modelReadmeFilter ?? "all";
+  const modelCoverFilter = options.modelCoverFilter ?? "all";
+  const modelSeoFilter = options.modelSeoFilter ?? "all";
+  const modelRouteFilter = options.modelRouteFilter ?? "all";
+  const hasModelContentFilters =
+    modelReadmeFilter !== "all" ||
+    modelCoverFilter !== "all" ||
+    modelSeoFilter !== "all" ||
+    modelRouteFilter !== "all";
   const internalAiUsagePageSize = Math.min(Math.max(options.internalAiUsagePageSize ?? 10, 1), 50);
   const internalAiUsagePage = Math.max(Math.floor(options.internalAiUsagePage ?? 1), 1);
   const activeTab = options.activeTab ?? "public-models";
@@ -1389,7 +1402,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
             if (shouldPaginatePublicModels && modelTypeFilter !== "all") {
               query = query.filter("billing_config->metadata->>modelType", "eq", modelTypeFilter);
             }
-            return shouldPaginatePublicModels
+            return shouldPaginatePublicModels && !hasModelContentFilters
               ? query.range((modelPage - 1) * modelPageSize, modelPage * modelPageSize - 1)
               : query;
           })()
@@ -1453,7 +1466,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
             .order("created_at", { ascending: false })
         : Promise.resolve({ data: [], error: null }),
       shouldLoadManagementData || shouldLoadProblemRequests
-        ? (shouldPaginatePublicModels
+        ? (shouldPaginatePublicModels && !hasModelContentFilters
             ? Promise.resolve({ data: [], error: null })
             : supabase
                 .from("provider_models")
@@ -1463,7 +1476,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
                 .order("created_at", { ascending: true }))
         : Promise.resolve({ data: [], error: null }),
       shouldLoadManagementData
-        ? (shouldPaginatePublicModels
+        ? (shouldPaginatePublicModels && !hasModelContentFilters
             ? Promise.resolve({ data: [], error: null })
             : supabase
                 .from("provider_model_showcase_assets")
@@ -1555,7 +1568,7 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     (providerModelShowcaseAssetsResponse.error
       ? []
       : providerModelShowcaseAssetsResponse.data ?? []) as ProviderModelShowcaseAssetRow[];
-  if (shouldPaginatePublicModels && supportedModels.length > 0) {
+  if (shouldPaginatePublicModels && !hasModelContentFilters && supportedModels.length > 0) {
     const supportedModelIdsForPage = supportedModels.map((model) => model.id);
     const allProviderModelsResponse = await supabase
       .from("provider_models")
@@ -2174,6 +2187,14 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
     };
   });
 
+  const routingRulesBySupportedModelId = routingRuleSummaries.reduce((map, rule) => {
+    if (!rule.supportedModelId) return map;
+    const list = map.get(rule.supportedModelId) ?? [];
+    list.push(rule);
+    map.set(rule.supportedModelId, list);
+    return map;
+  }, new Map<string, (typeof routingRuleSummaries)[number][]>());
+
   const summarizeRequest = (request: RequestRow) => {
     const provider = request.provider_id ? providerById.get(request.provider_id) ?? null : null;
     const providerModel = request.provider_model_id
@@ -2390,6 +2411,32 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       !Array.isArray(model.billing_config.metadata)
         ? (model.billing_config.metadata as Record<string, unknown>)
         : null;
+    const seoTitle = typeof billingMetadata?.seoTitle === "string" ? billingMetadata.seoTitle.trim() : "";
+    const seoDescription =
+      typeof billingMetadata?.seoDescription === "string" ? billingMetadata.seoDescription.trim() : "";
+    const seoKeywords =
+      typeof billingMetadata?.seoKeywords === "string" ? billingMetadata.seoKeywords.trim() : "";
+    const hasReadme = linkedProviderModels.some((providerModel) => {
+      const executionConfig = providerModel.execution_config;
+      const doc =
+        executionConfig && typeof executionConfig === "object" && !Array.isArray(executionConfig)
+          ? (executionConfig as Record<string, unknown>).doc
+          : null;
+      const readmeMarkdown =
+        doc && typeof doc === "object" && !Array.isArray(doc)
+          ? (doc as Record<string, unknown>).readmeMarkdown
+          : null;
+      return typeof readmeMarkdown === "string" && readmeMarkdown.trim().length > 0;
+    });
+    const hasCover = linkedProviderModels.some((providerModel) =>
+      (showcaseAssetsByProviderModelId.get(providerModel.id) ?? []).some(
+        (asset) => asset.asset_kind === "cover"
+      )
+    );
+    const modelRoutingRules = routingRulesBySupportedModelId.get(model.id) ?? [];
+    const hasRouting = modelRoutingRules.some(
+      (rule) => rule.active && Boolean(rule.primary_provider_model_id)
+    );
 
     return {
       ...model,
@@ -2402,8 +2449,36 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       providerModelCount: linkedProviderModels.length,
       activeProviderModelCount: linkedProviderModels.filter((item) => item.active).length,
       createdLabel: formatRelativeTimestamp(model.created_at),
+      hasReadme,
+      hasCover,
+      seoComplete: Boolean(seoTitle) && Boolean(seoDescription) && Boolean(seoKeywords),
+      hasRouting,
     };
   });
+
+  const matchesCoverageFilter = (filter: "all" | "has" | "missing", value: boolean) => {
+    if (filter === "has") return value;
+    if (filter === "missing") return !value;
+    return true;
+  };
+  const contentFilteredSupportedModelSummaries = hasModelContentFilters
+    ? supportedModelSummaries.filter(
+        (model) =>
+          matchesCoverageFilter(modelReadmeFilter, model.hasReadme) &&
+          matchesCoverageFilter(modelCoverFilter, model.hasCover) &&
+          matchesCoverageFilter(modelSeoFilter, model.seoComplete) &&
+          matchesCoverageFilter(modelRouteFilter, model.hasRouting)
+      )
+    : supportedModelSummaries;
+  const supportedModelFilteredTotalCount = hasModelContentFilters
+    ? contentFilteredSupportedModelSummaries.length
+    : supportedModelTotalCount;
+  const pagedSupportedModelSummaries = hasModelContentFilters
+    ? contentFilteredSupportedModelSummaries.slice(
+        (modelPage - 1) * modelPageSize,
+        modelPage * modelPageSize
+      )
+    : contentFilteredSupportedModelSummaries;
 
   const globalMonitoring = {
     videoInflightRequests: [],
@@ -2484,12 +2559,12 @@ export async function getInternalAdminData(options: InternalAdminDataOptions = {
       ...alias,
       createdLabel: formatRelativeTimestamp(alias.created_at),
     })),
-    supportedModels: supportedModelSummaries,
+    supportedModels: pagedSupportedModelSummaries,
     supportedModelPagination: {
       page: modelPage,
       pageSize: modelPageSize,
-      totalCount: supportedModelTotalCount,
-      totalPages: Math.max(1, Math.ceil(supportedModelTotalCount / modelPageSize)),
+      totalCount: supportedModelFilteredTotalCount,
+      totalPages: Math.max(1, Math.ceil(supportedModelFilteredTotalCount / modelPageSize)),
     },
     providerCredentials: providerCredentialSummaries,
     providerAssetStorageCredentials: providerAssetStorageCredentialSummaries,

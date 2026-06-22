@@ -893,6 +893,14 @@ export default async function InternalPage({
     selectedModelStatusRaw === "active" || selectedModelStatusRaw === "inactive"
       ? selectedModelStatusRaw
       : "all";
+  const getCoverageFilterValue = (key: string) => {
+    const raw = getSearchValue(resolvedSearchParams, key) ?? "all";
+    return raw === "has" || raw === "missing" ? raw : "all";
+  };
+  const selectedModelReadmeFilter = getCoverageFilterValue("modelReadme");
+  const selectedModelCoverFilter = getCoverageFilterValue("modelCover");
+  const selectedModelSeoFilter = getCoverageFilterValue("modelSeo");
+  const selectedModelRouteFilter = getCoverageFilterValue("modelRoute");
   const selectedInternalAiUsagePageRaw = Number(getSearchValue(resolvedSearchParams, "aiUsagePage") ?? "1");
   const selectedInternalAiUsagePage =
     Number.isFinite(selectedInternalAiUsagePageRaw) && selectedInternalAiUsagePageRaw >= 1
@@ -916,6 +924,10 @@ export default async function InternalPage({
     modelSearch: selectedModelSearch,
     modelTypeFilter: selectedModelType,
     modelStatusFilter: selectedModelStatus,
+    modelReadmeFilter: selectedModelReadmeFilter,
+    modelCoverFilter: selectedModelCoverFilter,
+    modelSeoFilter: selectedModelSeoFilter,
+    modelRouteFilter: selectedModelRouteFilter,
     internalAiUsagePage: selectedInternalAiUsagePage,
     internalAiUsagePageSize: 10,
     activeTab,
@@ -1071,6 +1083,10 @@ export default async function InternalPage({
                   modelSearch={selectedModelSearch}
                   modelTypeFilter={selectedModelType}
                   modelStatusFilter={selectedModelStatus}
+                  modelReadmeFilter={selectedModelReadmeFilter}
+                  modelCoverFilter={selectedModelCoverFilter}
+                  modelSeoFilter={selectedModelSeoFilter}
+                  modelRouteFilter={selectedModelRouteFilter}
                   providerModels={data.providerModels}
                   routingRules={data.routingRules}
                   providers={data.providers}
